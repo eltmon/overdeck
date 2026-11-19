@@ -1,5 +1,6 @@
 ---
-title: Order Books
+title: "Order books: curated Flywheel campaigns"
+sidebarTitle: "Order Books"
 description: Build and run operator-curated Flywheel campaigns with parallel and serial lanes
 ---
 
@@ -7,7 +8,7 @@ import { ThemedImage } from "/snippets/themed-image.mdx";
 
 # Order Books
 
-An order book is an operator-curated Flywheel campaign. It replaces a prose list of “special orders” with a durable queue whose lane capacity, prerequisites, planning checks, pickup posture, and completion rules Overdeck enforces.
+An order book is an operator-curated Flywheel campaign. It replaces a prose list of “special orders” with a durable queue. The queue sets lane capacity, prerequisites, planning checks, pickup posture and completion rules, and the Flywheel follows them.
 
 Use an order book when the sequence matters: a migration campaign, a refactor that must stay behind a serial gate, or a release-hardening run whose scope must not expand into the normal backlog.
 
@@ -31,9 +32,11 @@ flywheel.auto_pickup_backlog=false
 
 That setting still holds every off-book issue. The Flywheel can work through the book without opening the rest of the backlog.
 
+The Flywheel keeps to the active book. A manual `pan start <id>` for an issue outside the book is not blocked.
+
 ## Build a book
 
-Open **Order Book** in the dashboard, or go directly to `/orders`.
+Open **Order books** in the dashboard, or go directly to `/orders`.
 
 1. Click **+ New book**, enter a name, and create the draft.
 2. Add open issues from search or from the ranked backlog-candidates rail. Adding an issue changes the plan only; it does not dispatch work.
@@ -43,10 +46,10 @@ Open **Order Book** in the dashboard, or go directly to `/orders`.
 6. Resolve every blocking validation finding, then click **Queue book**. A queued book is `ready`.
 7. Click **Start run** when the book should become the active Flywheel campaign.
 
-The book strip keeps drafts, queued books, the active book, and completed history together. The lifecycle strip marks the current state:
+The book strip lists drafts and queued books together. A book is `draft` until you queue it, then `ready`. Starting it launches the Flywheel bound to that book. The Progress view shows the book as drained once every item is terminal.
 
 ```text
-draft → ready → running → drained → complete
+draft → ready
 ```
 
 ### Add from other surfaces
@@ -64,17 +67,17 @@ These are narrow add actions. Editing, validation, settings, ordering, and lifec
 
 **OPEN** permits eligible book items to dispatch and renders blue-tinted: dispatch is live, machine working.
 
-**DRAIN** blocks every new book dispatch and renders amber: a human paused pickup. Work already in the pipeline continues toward a terminal state.
+**DRAIN** tells the Flywheel to start no new book items and renders amber: a human paused pickup. Work already in the pipeline continues toward a terminal state.
 
 Run settings always show posture attribution (who set it, when, and why) beneath the posture control, regardless of which posture is active. If the recorded reason predates the current posture (for example, a leftover "Operator paused new pickup." reason after reopening), an amber stale-reason flag calls that out.
 
 ### Lane A
 
-Lane A is parallel. The **Lane A concurrency** setting controls how many Lane A issues may be in flight at once. A new dispatch is refused when that count is full.
+Lane A is parallel. The **Lane A concurrency** setting controls how many Lane A issues may be in flight at once. The Flywheel starts no new Lane A item while that many are in flight.
 
 ### Lane B
 
-Lane B is strictly serial. A second Lane B issue cannot start while another Lane B item is in flight.
+Lane B is strictly serial. The Flywheel starts no second Lane B issue while another Lane B item is in flight.
 
 Each compact row leads with the lane position, such as `B11 · book`, then the issue id. Rows also show prerequisite, PRD, and re-verification state.
 
@@ -85,8 +88,10 @@ The validation panel separates blockers from warnings. Start is blocked when:
 - an issue is closed or cannot be resolved as open;
 - an issue belongs to another non-complete book;
 - a prerequisite is missing;
-- prerequisites form a cycle; or
-- a Lane B issue has no draft PRD or canonical spec.
+- prerequisites form a cycle;
+- a Lane B issue has no draft PRD or canonical spec;
+- the book has no items (`empty-book`); or
+- the shared issue store is unavailable or empty (`issue-store-unavailable`): run `pan up` once, then retry.
 
 A Lane B issue marked for planning at pickup turns the missing-PRD result into a warning. Warnings stay visible but do not prevent queueing or starting.
 
@@ -96,7 +101,7 @@ Use **Preview brief** to inspect the scope that the Flywheel will receive before
 
 **Setup** contains the book editor, run settings, add rails, and validation. Run settings save automatically per field: each field shows its own saved or error state beside its label, and a failed save offers Retry rather than silently discarding the change.
 
-**Progress** turns the book into a live checklist. For held issues it shows the same mechanical conditions used by the server dispatch gate:
+**Progress** turns the book into a live checklist. For held issues it shows the same conditions the Flywheel checks before it dispatches:
 
 - book membership;
 - OPEN or DRAIN pickup posture;
@@ -137,7 +142,7 @@ pan orders start 2026-07-18-refactor-p3-remainder
 pan flywheel start --orders 2026-07-18-refactor-p3-remainder
 ```
 
-`queue` is the CLI form of the dashboard's **Queue book** action: it moves a draft to `ready` so the Flywheel can pick the book up from the ready queue. It refuses a book that is not a draft rather than re-queueing a running or completed campaign.
+`queue` is the CLI form of the dashboard's **Queue book** action: it moves a draft to `ready`. It refuses a book that is not a draft. The CLI `pan orders queue` and `pan orders start` skip the validation panel's checks; validate on `/orders` first.
 
 `pan orders start <id>` and `pan flywheel start --orders <id>` both open the one `conv-flywheel` conversation with the book named in its `/pan-flywheel` prompt. They differ when a flywheel is already running: `pan orders start` leaves it running and returns without naming the new book to it, while `pan flywheel start --orders` refuses with "already running" (`pan flywheel stop` first). A paused flywheel makes both refuse; resume it (`pan flywheel resume`) or replace it (`pan flywheel start --fresh --orders <id>`).
 
@@ -157,11 +162,11 @@ Without the flag, the command resolves the project that contains your current di
 A book is drained only when every item is terminal. For order-book progress, terminal means either:
 
 - the issue is closed; or
-- the issue is parked with a recorded reason.
+- the issue carries the `parked` label.
 
 The server derives this result from canonical issue state. The orchestrator cannot declare a book drained through prose or a status message.
 
-A book completes when its items are terminal; there is no completion verb. Check it with:
+The Progress view shows the book as drained once every item is terminal; there is no completion verb. Check it with:
 
 ```bash
 pan orders show 2026-07-18-refactor-p3-remainder
@@ -171,21 +176,11 @@ pan orders show 2026-07-18-refactor-p3-remainder
 
 The flywheel loop writes its run report to `.pan/flywheel/report.md` when it stops (`pan flywheel stop`) or when asked (`pan flywheel report`), and records substrate fixes and learnings in `.pan/flywheel/state.md`. Both are committed; git history is the archive. See [docs/FLYWHEEL.md](https://github.com/eltmon/overdeck/blob/main/docs/FLYWHEEL.md).
 
-After a book drains, the loop's Orient step reads the next `running` or ready book on its next tick. Marking a book ready is your explicit release of that work; if you do not want a queued book picked up, leave it as a draft.
-
-## Intentional off-book work
-
-During an orders-bound run, Overdeck rejects work-agent dispatch for issues outside the book. If the exception is deliberate, the operator can use:
-
-```bash
-pan start PAN-1234 --off-book
-```
-
-Overdeck records every accepted exception in the run's `orders-overrides.jsonl`. The override applies to that dispatch only; it does not release the backlog.
+The first `ready` book in the queue is the active book: its issues count as released for pickup. A drained book stays `ready`, and nothing advances the queue on its own, so start the next book yourself with `pan orders start <id>`. If you do not want a queued book's issues picked up, leave it as a draft.
 
 ## Related
 
 - [Auto-Merge](/configuration/auto-merge) controls how eligible PRs ship after review and tests.
 - [State model](/reference/state-model) explains where order-book files live: under `.pan/orders/` in your repo.
-- [`pan orders`](/cli/overview) provides the terminal management surface.
+- [`pan orders`](/cli/pipeline-commands#pan-orders) provides the terminal management surface.
 - [Flywheel](/features/flywheel) runs the loop that works through the active book.

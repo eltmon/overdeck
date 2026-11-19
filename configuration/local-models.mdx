@@ -7,7 +7,7 @@ description: Wire an Overdeck agent to a GPU model served by Ollama, at zero cos
 
 Overdeck can point an agent at a model served locally by [Ollama](https://ollama.com)
 instead of a cloud provider. Ollama 0.14 and newer serves the Anthropic Messages
-API natively, which is the API Claude Code speaks — so the harness talks to your
+API natively, which is the API Claude Code speaks, so the harness talks to your
 GPU exactly the way it talks to Anthropic, the model traffic never leaves the host,
 and the run records `$0`.
 
@@ -17,7 +17,7 @@ id to your local endpoint instead of a cloud provider.
 
 <Warning>
 **Status: the plumbing is verified, the models are not.** Overdeck's launch path is
-tested end to end — a real `pan start` reaches a local model, the agent's prompt is
+tested end to end: a real `pan start` reaches a local model, the agent's prompt is
 served by Ollama, and no model traffic leaves the host. **But no local model has yet
 completed an Overdeck work-agent task in testing.** `gemma4:12b` specifically failed
 as a work agent on a 24 GB RTX 3090: across three attempts it made **zero tool
@@ -37,7 +37,7 @@ not as a supported way to run autonomous work agents. Details and transcripts ar
   serve the Anthropic Messages API, and the preflight refuses to launch against them
   rather than failing mid-turn. **Individual models need more.** A model's manifest
   can require a newer Ollama than 0.14, and the pull then fails with
-  `412: The model you are attempting to pull requires a newer version of Ollama` —
+  `412: The model you are attempting to pull requires a newer version of Ollama`.
   `gemma4:12b` did exactly that on 0.19.0. Run the newest Ollama you can; upgrade if
   a pull returns 412.
 - **About 24 GB of GPU memory** for a 12B model at Q4. Verified on an RTX 3090
@@ -50,7 +50,7 @@ not as a supported way to run autonomous work agents. Details and transcripts ar
 
 ## Install Ollama
 
-Overdeck never runs an installer for you — a `curl | sh` fired from a setup script
+Overdeck never runs an installer for you: a `curl | sh` fired from a setup script
 is exactly the thing worth reading first. Run it yourself:
 
 ```bash
@@ -71,7 +71,7 @@ download to start by accident, and because it is not a working work-agent model)
 
 Any tag your server has pulled works. `gemma4:12b` is the tag Overdeck's install step
 offers and the one this page's examples use, because it is what the wiring was verified
-against — **not because it works as a work agent.** It does not; see the warning above.
+against, **not because it works as a work agent.** It does not; see the warning above.
 Overdeck never substitutes it for a model you asked for.
 
 ```bash
@@ -88,7 +88,7 @@ so the default window is far too small.
 
 **The window is the server's to set, so you have to set it on the server.** Overdeck
 reads back whatever window the server gave the model and pins Claude Code to that
-number, so the harness's own compaction agrees with reality — but it cannot raise
+number, so the harness's own compaction agrees with reality, but it cannot raise
 the window for a server it did not start. Set `OLLAMA_CONTEXT_LENGTH`:
 
 ```bash
@@ -108,8 +108,8 @@ On a host where Overdeck starts the server itself (see [pan up](#what-pan-up-doe
 below) it passes `OLLAMA_CONTEXT_LENGTH` from `ollama.context_length`, so the config
 value is enough and the steps above are unnecessary.
 
-`pan doctor` warns about any loaded model whose window is under 64K, which is the
-check to run after changing this.
+`pan doctor` warns when an `ollama:` model named in a workhorse slot or a role is
+loaded with a window under 64K, which is the check to run after changing this.
 
 <Warning>
 Getting this wrong is not a loud failure. Below about 32K a work agent's first
@@ -119,7 +119,7 @@ prompt either gets silently truncated or is rejected outright with
 
 ## Configure Overdeck
 
-Point a role — or a workhorse slot — at the local model in `~/.overdeck/config.yaml`.
+Point a role (or a workhorse slot) at the local model in `~/.overdeck/config.yaml`.
 Because no local model has completed a work-agent task yet, prefer `--model` on a single
 `pan start` over pinning `roles.work` for real work:
 
@@ -139,10 +139,12 @@ The optional top-level `ollama:` block tunes the endpoint:
 ```yaml
 ollama:
   base_url: http://localhost:11434   # default; must be a localhost address
-  context_length: 65536              # default; used when Overdeck starts the server
+  context_length: 65536              # default; minimum 2048; used when Overdeck starts the server
 ```
 
-A `base_url` with no port gets Ollama's default `11434`.
+A `base_url` with no port gets Ollama's default `11434`. The localhost check
+accepts `localhost`, any `127.x.x.x` address, and `[::1]`. `context_length` must be
+an integer of at least 2048; a smaller value is refused at config load.
 
 A non-localhost `base_url` is refused at config load. The point of a local model is
 that no prompt leaves the machine, so a remote endpoint is a configuration error
@@ -162,28 +164,30 @@ failure names the fix rather than leaving you with a dead agent:
 | What went wrong | What you see |
 | --- | --- |
 | Nothing listening, and it will not start | `` Ollama did not become healthy at <url> within 30s. Start it with `ollama serve` and retry. `` |
-| Ollama not installed | `Ollama could not be started at <url>. Install it from https://ollama.com/download` |
+| Ollama not installed | `` Ollama could not be started at <url>. Install it from https://ollama.com/download, then run `ollama serve`. `` |
 | Server older than 0.14.0 | A message naming `0.14.0` as the minimum |
 | Tag not pulled | `` Ollama model <tag> is not pulled. Run `ollama pull <tag>`. `` |
 
 ### What `pan doctor` shows
 
-`pan doctor` prints Ollama rows only when this host has a reason to care — a
-configured `ollama:` model, or the binary installed. It reports the version and
-base URL, warns per configured tag that is not pulled, and warns when a resident
-model's window is under 64K. It never warm-loads a model, so running it does not
+`pan doctor` prints Ollama rows only when this host has a reason to care: an
+`ollama:` model in a workhorse slot or role, or the binary installed. It reports the
+version and base URL, warns per tag of those models that is not pulled, and warns
+when one of them is resident with a window under 64K. It never warm-loads a model, so running it does not
 pull 8 GB into VRAM as a side effect.
 
 ### What `pan up` does
 
-`pan up` starts `ollama serve` only when your config names an `ollama:` model. On
-every other host it makes no network call at all. If the server will not start,
-`pan up` prints a warning and continues — cloud-model agents are unaffected.
+`pan up` starts `ollama serve` only when a workhorse slot or a role names an `ollama:`
+model. On every other host it makes no network call at all. For a model used only in
+a tier or through `--model`, the launch preflight starts the server when an agent
+needs it. If the server will not start, `pan up` prints a warning and continues;
+cloud-model agents are unaffected.
 
 ## Limits
 
-- **claude-code only.** `codex`, `opencode`, `kimi-code`, `acp`, and `muse` are
-  refused for `ollama:` models.
+- **claude-code only.** Every harness other than `claude-code` is refused for
+  `ollama:` models.
 - **Localhost only.** A non-localhost `base_url` is a config error.
 - **Local workspaces only.** The preflight checks this host, so remote (Fly.io)
   workspaces cannot use local models.

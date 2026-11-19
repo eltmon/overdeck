@@ -1,14 +1,15 @@
 ---
-title: Context Layers
+title: "Context layers: rules and guidance for agents"
+sidebarTitle: "Context Layers"
 description: How Overdeck delivers layered rules and guidance to managed harness sessions
 ---
 
 # Context Layers
 
-Overdeck distributes context — engineering rules, project guidance, machine
-quirks — to the coding-agent harnesses it drives through a layered system.
-You author small canonical markdown files; `pan sync` renders Overdeck-owned
-artifacts that are delivered only when Overdeck launches a managed session.
+Overdeck distributes context (engineering rules, project guidance, machine
+quirks) to the coding-agent harnesses it drives through a layered system.
+You author small canonical markdown files; Overdeck renders them into
+Overdeck-owned artifacts that it delivers only when it launches a managed session.
 Overdeck never writes native `CLAUDE.md`, `AGENTS.md`, or equivalent files.
 The dashboard's Context view at `/context` is described in [Dashboard views](/features/dashboard-views).
 
@@ -24,8 +25,9 @@ agents themselves are taught:
 | **Project layer** | `<projectRoot>/.overdeck/context/project.md` | Guidance for **one project**; committed to that repo |
 | **Workspace layer** | `<workspace>/.overdeck/context/workspace.md` | Auto-assembled per issue workspace; never hand-edited |
 
-The rendered outputs are **managed-session launch artifacts** under `~/.overdeck/context/` — never edit those directly.
-Edit the source layer or rule, then run `pan sync`.
+The rendered outputs are **managed-session launch artifacts** under `~/.overdeck/context/`. Never edit those directly.
+Edit the source layer or rule. The next managed launch renders it;
+`pan sync` refreshes the inspectable `*-global.md` renders and is still needed for oh-my-pi.
 
 <Info>
 There is no "global context template". A request phrased that way means either
@@ -34,7 +36,7 @@ a **bundled rule** (every machine) or the **global layer** (one machine).
 
 ### The shorthand: "add a `<scope>` rule"
 
-In practice you (and your agents) only need four phrases — the scope word
+In practice you (and your agents) only need four phrases; the scope word
 alone routes the content:
 
 | You say | Applies to | Destination |
@@ -44,18 +46,18 @@ alone routes the content:
 | "add a **project rule**: …" | one project | `<root>/.overdeck/context/project.md` |
 | "add a **machine rule**: …" | one machine | `~/.overdeck/context/global.md` |
 
-After any of them: `pan sync`, and the change reaches new sessions.
+After any of them, the change reaches the next new session.
 
 ## Bundled rules
 
 Overdeck ships engineering rules inside the package under
 `sync-sources/rules/`. Each rule carries a `scope:` frontmatter key:
 
-- `scope: universal` — folded into every machine's rendered global context;
-- `scope: dev` — folded in only on a overdeck source checkout, for rules
+- `scope: universal`: folded into every machine's rendered global context;
+- `scope: dev`: folded in only on a overdeck source checkout, for rules
   about developing Overdeck itself.
 
-Rules ship with `pan install` and refresh on every `pan sync`.
+Rules ship with `pan install`, and each managed launch reads the package's current copy.
 
 ### Switching a bundled rule off
 
@@ -82,15 +84,23 @@ harness-correct launch artifact from global, project, and workspace layers:
 
 | Harness | Rendered artifact | How the harness receives it |
 | --- | --- | --- |
-| **Claude Code** | `~/.overdeck/context/claude-global.md` | Passed with Claude's append-system-prompt launch mechanism |
-| **Codex** | `~/.overdeck/context/codex-global.md` | Passed as Codex `developer_instructions` for TUI, exec/resume, and app-server transports |
-| **Pi** | `~/.overdeck/context/pi-global.md` | Injected into the session's system-prompt context at spawn. Pi does natively support a global `~/.pi/agent/AGENTS.md`; Overdeck deliberately does not write there — the global layer is delivered per-spawn instead, leaving `~/.pi/agent/` entirely yours |
-| **Kimi Code** | `~/.overdeck/context/launch/kimi-code-<workspace-hash>-cli.md` | Sent once per native Kimi session as a clearly delimited first-user-message envelope. The managed context block comes first and the operator's original task follows unchanged in its own block |
+| **Claude Code** | `~/.overdeck/context/launch/claude-code-<hash>-cli.md` (`-mcp.md` when the agent gets the `overdeck` MCP server) | Composed at each launch and passed with `--append-system-prompt-file` |
+| **Codex** | `~/.overdeck/context/launch/codex-<hash>-cli.md`, plus your native `~/.codex/AGENTS.override.md` or `AGENTS.md` when present | Passed as Codex `developer_instructions` for TUI, exec/resume, and app-server transports |
+| **Pi** | `~/.overdeck/context/launch/pi-<hash>-cli.md` | Passed with Pi's `--append-system-prompt` at spawn. Pi does natively support a global `~/.pi/agent/AGENTS.md`; Overdeck deliberately does not write there. The global layer is delivered per spawn instead, leaving `~/.pi/agent/` entirely yours |
+| **Kimi Code** | `~/.overdeck/context/launch/kimi-code-<workspace-hash>-cli.md` (`-mcp.md` when the agent gets the `overdeck` MCP server) | Sent once per native Kimi session as a clearly delimited first-user-message envelope. The managed context block comes first and the operator's original task follows unchanged in its own block |
+| **ACP, OpenCode, Grok** | `<agentDir>/acp-context.md`, one file per agent | Sent once, in a delimited `<overdeck-context>` block ahead of the first prompt of a new session |
+| **Muse** | `~/.overdeck/agents/<id>/muse-context.md` | Sent as Muse's developer message |
 | **Prime Agent** | `<agentDir>/prime-agent-context.md` (per agent) | Passed as `--append-system-prompt` values after Overdeck's managed policy, split on paragraph boundaries into values of at most 100,000 bytes. Overdeck writes nothing under `~/.prime/agent` |
 
-The `claude-global.md` / `pi-global.md` / `codex-global.md` files are **Overdeck-owned render
-artifacts** — the harnesses do not know about them. They exist so the global
-layer has a stable, inspectable rendered form per harness.
+In the `launch/` file names, `<hash>` is a short hash of the workspace path, and
+the name ends in `-mcp.md` instead of `-cli.md` when the agent gets the
+`overdeck` MCP server.
+
+The `claude-global.md`, `pi-global.md` and `codex-global.md` files in
+`~/.overdeck/context/` are inspectable renders of the global layer that
+`pan sync` writes. They are **Overdeck-owned render artifacts** and the
+harnesses do not read them, with one exception: `pi-global.md` is read only by
+the oh-my-pi extension at session start.
 
 Every launch artifact ends with a tools block: "Overdeck tools" when the agent
 gets the `overdeck` MCP server, else "Overdeck commands" with the `pan`
@@ -105,10 +115,10 @@ discovery behavior.
 
 ## Project memory
 
-Curated memory facts — short, human-reviewable, repo-committed truths distinct from the layers
-above — are injected right after the project layer and before the workspace section, as a `## Project
-memory` section and (on this machine) a following `## Operator memory` section. See
-[Project Memory](/configuration/memory) for the fact format, the two store paths, and the `pan memory`
+Curated memory facts (short, human-reviewable truths distinct from the layers
+above) are injected right after the project layer and before the workspace section, as a `## Project
+memory` section followed (on this machine) by `## Operator memory` and `## Machine memory` sections. See
+[Project Memory](/configuration/memory) for the fact format, the store paths, and the `pan memory`
 commands.
 
 ## Native files are a no-touch boundary
@@ -125,15 +135,17 @@ When the dashboard compares, it ignores the directory `pan sync` ran from, so a
 sync run from any workspace or project counts.
 
 The dashboard runs the light `pan sync` itself. It checks the inputs when it
-starts, so after every `pan reload`, and again every 60 seconds, so a merge that
-changes the main checkout's `sync-sources/` is synced within about a minute. Each
-set of changes gets one attempt; a failed attempt waits until the inputs change
-again.
+starts, so after every `pan reload`, and again every 60 seconds, and runs an
+automatic sync no earlier than 60 seconds after startup. Peer dashboards never
+run it. A merge that changes the main checkout's `sync-sources/` is synced
+within about a minute. Each set of changes gets one attempt; a failed attempt
+waits until the inputs change again.
 
-The **Setup changed** banner appears only when auto-sync failed, ran but could not
-apply the change, or is turned off. It names what changed, for example
-"3 skills and 1 rule changed", and its tooltip lists the changed files. Click
-**Sync now** (or **Retry sync** after a failure) to run the sync by hand.
+A banner appears when auto-sync failed (**Auto-sync failed**), or when it ran but
+could not apply the change or is turned off (**Setup changed**). It names what
+changed, for example "3 skills and 1 rule changed", and its tooltip lists the
+changed files. Click **Sync now** (or **Retry sync** after a failure) to run the
+sync by hand.
 
 To turn auto-sync off, set this in `~/.overdeck/config.yaml`. The banner then
 shows for every needed sync:
@@ -160,9 +172,9 @@ Write completion markers via `/pan-done` when ready for review.
 {{/harness:pi}}
 ```
 
-Blocks may be stacked to target several harnesses; `{{#harness:codex}}` is
-also recognized, and so is `{{#harness:prime-agent}}` for Prime Agent-only
-instructions.
+Blocks may be stacked to target several harnesses. The recognized markers are
+`claude`, `pi`, `ohmypi`, `codex`, `acp`, `kimi-code`, `opencode`, `muse`,
+`prime-agent` and `grok`; `pan context validate` warns on any other marker.
 
 ## CLI
 
@@ -170,11 +182,12 @@ instructions.
 pan context list                  # show all three layers and their files
 pan context edit                  # open global.md in $EDITOR
 pan context edit --layer project  # open this project's project.md
-pan context sync                  # refresh managed-session launch artifacts
+pan context sync                  # refresh the inspectable *-global.md renders
 pan context detach --dry-run      # preview legacy managed-region removal
 pan context detach --apply        # back up and remove unambiguous legacy regions
 pan context diff --harness pi     # preview what one harness would receive
 pan context validate              # lint templates for malformed blocks
+pan context migrate               # one-shot migration from the deprecated sync.devroot model
 ```
 
 `pan sync` runs the context render as part of its broader sync (skills,
@@ -183,9 +196,9 @@ per-harness previews.
 
 ## Changes apply to new sessions only
 
-Harnesses receive their managed context at session startup. After editing a layer
-and running `pan sync`, running sessions keep their old context — only newly
-spawned agents and conversations pick up the change.
+Harnesses receive their managed context at session startup. Running sessions
+keep their old context; only agents and conversations started after the edit
+pick it up.
 
 ## Source attribution
 

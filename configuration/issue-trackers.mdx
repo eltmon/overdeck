@@ -1,6 +1,6 @@
 ---
 title: Issue Tracker Integration
-description: "Connect Overdeck to GitHub Issues, Linear, GitLab, Rally or Jira, and set the credentials and options that each tracker needs."
+description: "Connect Overdeck to GitHub Issues, Linear, Rally or Jira, use GitLab as a code host, and set the credentials each tracker needs."
 ---
 
 Overdeck integrates with popular issue tracking systems to provide unified project management.
@@ -11,29 +11,40 @@ Overdeck integrates with popular issue tracking systems to provide unified proje
 |---------|---------------|
 | **GitHub Issues** | `GITHUB_TOKEN` or `gh auth login` |
 | **Linear** | `LINEAR_API_KEY` in `.overdeck.env` |
-| **GitLab Issues** | `GITLAB_TOKEN` or `glab auth login` |
+| **GitLab** | GitLab issue tracking is not supported yet. GitLab works as a code host: set `gitlab_repo` and sign in with `glab auth login` (or `GITLAB_TOKEN`). |
 | **Rally** | `RALLY_API_KEY` in `.overdeck.env` |
 | **Jira** (Cloud and Data Center) | `JIRA_API_TOKEN`, `JIRA_EMAIL`, `JIRA_BASE_URL` in `.overdeck.env`, or Settings → Tracker Keys |
 
-All trackers are equal — configure whichever your projects use. The dashboard displays issues from all configured trackers in a unified Kanban board.
+All trackers are equal: configure whichever your projects use. The dashboard shows issues from all configured trackers on one **Board**.
+
+When a project does not set `tracker`, Overdeck infers it from the first key it finds, in this order: `tracker`, `rally_project` (Rally), `github_repo` (GitHub), `issue_prefix` (Linear), `gitlab_repo`.
 
 ## Configuration
 
 Create `~/.overdeck.env`:
 
 ```bash
-GITHUB_TOKEN=ghp_xxxxx     # For GitHub-tracked projects
-LINEAR_API_KEY=lin_api_xxxxx  # For Linear-tracked projects
-GITLAB_TOKEN=glpat-xxxxx  # For GitLab-tracked projects
-RALLY_API_KEY=_xxxxx       # For Rally-tracked projects
-JIRA_API_TOKEN=xxxxx       # For Jira-tracked projects (API token or personal access token)
-JIRA_EMAIL=you@acme.com    # Jira Cloud only: the account that owns the token
-JIRA_BASE_URL=https://acme.atlassian.net  # Default Jira site
+# For GitHub-tracked projects
+GITHUB_TOKEN=ghp_xxxxx
+# For Linear-tracked projects
+LINEAR_API_KEY=lin_api_xxxxx
+# For GitLab-hosted code (merge requests)
+GITLAB_TOKEN=glpat-xxxxx
+# For Rally-tracked projects
+RALLY_API_KEY=_xxxxx
+# For Jira-tracked projects (API token or personal access token)
+JIRA_API_TOKEN=xxxxx
+# Jira Cloud only: the account that owns the token
+JIRA_EMAIL=you@acme.com
+# Default Jira site
+JIRA_BASE_URL=https://acme.atlassian.net
 ```
+
+Put each comment on its own line: Overdeck does not strip a `#` comment after a value.
 
 ## Unified Issue ID Parser
 
-Overdeck uses a unified issue ID parser that handles multiple formats through configurable project patterns. This eliminates the hardcoded `PREFIX-NUMBER` assumption that doesn't work for Rally-style IDs.
+Overdeck uses one issue ID parser for every tracker. Issue IDs are `PREFIX-NUMBER` with a letters-only prefix, or a Rally artifact ID (`US123`, `DE45`, and so on).
 
 ### Supported Formats
 
@@ -41,7 +52,6 @@ Overdeck uses a unified issue ID parser that handles multiple formats through co
 |--------|---------|----------------|
 | **Standard** | `MIN-123`, `PAN-456` | Prefix and number separated by dash |
 | **Rally** | `F29698`, `US12345` | Type prefix directly concatenated with number |
-| **Custom** | `PROJ12345` | Per-project regex pattern via `issue_pattern` |
 | **Jira** | `PROJ-123` | Standard format; `issue_prefix` is the Jira project key |
 
 ### Configuration Fields
@@ -51,18 +61,6 @@ Overdeck uses a unified issue ID parser that handles multiple formats through co
 | `tracker` | Tracker type: `linear`, `github`, `gitlab`, `rally`, `jira` |
 | `issue_prefix` | Single prefix (e.g., `"MIN"`) |
 | `issue_prefixes` | Array of prefixes mapping to one project (e.g., `[F, US, DE, TA]`) |
-| `issue_pattern` | Custom regex with two capture groups: `^(PREFIX)-(\d+)$` |
-
-### Custom ID Patterns
-
-For non-standard trackers, define a custom regex pattern:
-
-```yaml
-projects:
-  myproject:
-    tracker: custom
-    issue_pattern: "^(PROJ)-(\\d+)$"  # Matches PROJ-123
-```
 
 ## GitHub Issues
 
@@ -97,14 +95,14 @@ A separate work GitHub account and GitHub Enterprise Server hosts are not suppor
 
 ### Issue Prefix
 
-GitHub Issues use an uppercase project key as prefix, derived from the project name in `projects.yaml`:
+A GitHub issue ID is the project's prefix followed by the issue number:
 
 ```
 PAN-45       # GitHub issue #45 on the overdeck project
 KRUX-3       # GitHub issue #3 on the krux project
 ```
 
-The prefix is the project key uppercased. Configure via `projects.yaml`:
+The prefix is `issue_prefix`; without it, Overdeck uses the project key uppercased with dashes removed. Configure via `projects.yaml`:
 
 ```yaml
 projects:
@@ -112,6 +110,7 @@ projects:
     name: "Overdeck CLI"
     path: /home/user/projects/overdeck
     github_repo: eltmon/overdeck
+    issue_prefix: PAN
 ```
 
 ### Creating Issues
@@ -153,27 +152,25 @@ Overdeck tracks and updates Linear issue states:
 
 | State | Description |
 |-------|-------------|
-| **Backlog** | Not started |
-| **Planning** | Planning session active |
+| **In Planning** (or **Planning**) | Planning session active |
 | **In Progress** | Agent working on issue |
 | **In Review** | Awaiting code review |
+| **Verifying on main** | Merged; checking main. Falls back to **Verifying**, then **In Review** |
 | **Done** | Work completed |
+| **Canceled** | Issue canceled |
+
+Reopening an issue moves it to the team's first unstarted state (usually **Todo**).
 
 ## GitLab Issues
 
-GitLab Issues integrate similarly to GitHub Issues, with MR management support.
+GitLab issue tracking is not supported yet. GitLab works as a code host: set `gitlab_repo` and Overdeck opens and merges MRs. Sign in with `glab auth login` (or set `GITLAB_TOKEN`).
 
-### Setup
-
-```bash
-# Authenticate with GitLab CLI
-glab auth login
-```
-
-### Issue Prefix
-
-```
-myproject!23  # GitLab issue/MR
+```yaml
+projects:
+  myapp:
+    tracker: linear              # Issues live in another tracker
+    issue_prefix: APP
+    gitlab_repo: mygroup/myapp   # Code and merge requests live on GitLab
 ```
 
 ## Rally Integration
@@ -186,11 +183,15 @@ Rally (CA Agile Central) is supported for enterprises using Rally for project ma
 2. Add to `~/.overdeck.env`:
    ```bash
    RALLY_API_KEY=_xxxxx
+   # The Rally workspace
+   RALLY_WORKSPACE=/workspace/12345
+   # Optional; the default server is rally1.rallydev.com
+   RALLY_SERVER=https://rally1.rallydev.com
    ```
 
 ### Configuration
 
-Configure Rally workspace mapping:
+The workspace comes from `RALLY_WORKSPACE` in `~/.overdeck.env`. Map the Rally project in `projects.yaml`:
 
 ```yaml
 # ~/.overdeck/projects.yaml
@@ -200,8 +201,7 @@ projects:
     path: /home/user/projects/enterprise
     tracker: rally
     issue_prefixes: [F, US, DE, TA, TC]  # All Rally artifact types → this project
-    rally_workspace: YOUR_WORKSPACE_OID
-    rally_project: YOUR_PROJECT_OID
+    rally_project: /project/67890
 ```
 
 ### Rally ID Formats
@@ -227,24 +227,6 @@ With this configuration:
 - `pan workspace create US12345` → resolves to your project
 - `pan workspace create DE118304` → resolves to your project
 
-### Shadow Mode
-
-Rally integration supports **shadow mode** — tracking Rally issues locally without modifying the tracker. This is useful for teams transitioning to Overdeck or evaluating the workflow.
-
-```yaml
-projects:
-  enterprise-app:
-    shadow:
-      enabled: true
-      trackers:
-        rally: true
-```
-
-In shadow mode:
-- Issue states are tracked locally in Overdeck
-- No updates are sent to Rally
-- Agents can read Rally data but changes stay local
-
 ### Rally Troubleshooting
 
 #### WSAPI Query Parse Errors
@@ -269,7 +251,7 @@ If you see errors like `Could not parse: Error parsing expression`, check:
    This will log the actual WSAPI queries being sent to Rally, which helps diagnose parse errors.
 
 4. **Test Configuration**
-   Use the Settings page "Test Connection" button to validate Rally setup, or call the API directly:
+   Validate by calling the API directly. The body also accepts an optional `server`:
    ```bash
    curl -X POST http://localhost:3011/api/rally/validate \
      -H 'Content-Type: application/json' \
@@ -393,12 +375,30 @@ The same Jira email and API token that authenticate the tracker also sign agents
 - HTTP 429 (rate limited) is retried after the `Retry-After` delay, up to three times.
 - Search the dashboard log for `[jira]` (lifecycle writes) and `[jira-poll]` (polling) lines.
 
+Still stuck? Ask on the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file a [GitHub Issue](https://github.com/eltmon/overdeck/issues).
+
+## Shadow Mode
+
+**Shadow mode** tracks issue status locally in Overdeck instead of updating the tracker. It is useful while a team evaluates Overdeck. It is a tracker-wide setting: put a top-level `shadow:` block in `~/.overdeck/config.yaml` (or in a project's `.pan.yaml`):
+
+```yaml
+# ~/.overdeck/config.yaml
+shadow:
+  enabled: true
+  trackers:
+    linear: true
+```
+
+`SHADOW_MODE=1` in the environment turns on `enabled`, and `pan admin config shadow` edits the same settings. The `trackers` keys are `linear`, `github`, `gitlab` and `rally`; shadow mode does not apply to Jira. Each `trackers` entry overrides `enabled`, and every entry defaults to `false`. Today only `pan start` checks shadow mode, and it reads the `trackers.linear` entry for every issue, whatever its tracker. So set `trackers.linear: true`, as above, to turn shadow mode on; `enabled: true` alone has no effect.
+
+When shadow mode applies, `pan start` records the issue as in progress in Overdeck's local shadow state, and the **Board** shows that status next to the tracker's.
+
 ## Unified Dashboard
 
 The dashboard shows issues from all configured trackers:
 
-- **Kanban board** displays issues by status
-- **Filter by tracker** to focus on specific systems
+- **Board** (`/board`) displays issues by status
+- Filter by project and cycle on the **Board**
 - **Create workspaces** from any tracker
 - **Spawn agents** regardless of tracker source
 
@@ -447,10 +447,9 @@ projects:
 
 ### Syncing Between Trackers
 
-Overdeck doesn't sync issues between trackers — each issue lives in its source system. However, agents can reference issues from multiple trackers:
+Overdeck doesn't sync issues between trackers; each issue lives in its source system. However, agents can reference issues from multiple trackers:
 
 ```markdown
-<!-- In an agent's STATE.md -->
 Related issues:
 - MIN-123 (Linear) - Parent feature
 - PAN-45 (GitHub) - Dependency fix needed

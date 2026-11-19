@@ -5,8 +5,8 @@ description: Opt-in, off-by-default desktop control (accessibility tree, clicks,
 
 # Computer use
 
-Overdeck agents can read and operate a local desktop app — the accessibility tree, clicks,
-typing, keys, scrolling, dragging, and screenshots — through `pan computer`. It is
+Overdeck agents can read and operate a local desktop app (the accessibility tree, clicks,
+typing, keys, scrolling, dragging, and screenshots) through `pan computer`. It is
 **off by default** and works on **Linux, macOS (see [macOS](#macos)), or Windows through WSL2**.
 
 
@@ -16,7 +16,7 @@ typing, keys, scrolling, dragging, and screenshots — through `pan computer`. I
 MIT, see [its README](https://github.com/eltmon/overdeck/blob/main/native/computer-use-linux/README.md)).
 The helper reads the AT-SPI accessibility tree, takes window screenshots, and sends input
 through AT-SPI actions, XTest and `xdotool`. Agents use it to read a window's state, find
-elements by their accessibility tree index, and act on them — the way a person would, when no
+elements by their accessibility tree index, and act on them the way a person would, when no
 programmatic path (shell, files, git, HTTP, an existing CLI) can reach the same app.
 
 When Overdeck runs inside WSL2, `pan computer` drives the Windows desktop instead, with Orca's
@@ -32,7 +32,8 @@ running Overdeck:
 
 1. **Installs missing system packages.** Overdeck runs your package manager through `pkexec`, so your
    desktop asks for your password once. Overdeck never sees the password and never runs
-   `apt-get update`. The package names are fixed on the server:
+   `apt-get update`. If apt reports "Unable to locate package", run `sudo apt-get update`, then press
+   **Try again**. The package names are fixed on the server:
 
    | Needed for | `apt-get` | `dnf` | `pacman` |
    | --- | --- | --- | --- |
@@ -179,7 +180,7 @@ The commands, flags and output are the same as on Linux.
   and are deleted after each call. The WSL path of that folder is cached in
   `~/.overdeck/computer-use/windows-helper-dir.txt`.
 - Each command starts one `powershell.exe` with `-ExecutionPolicy Bypass`. The bypass applies to
-  that one process only and needs no administrator rights. Each command takes 1–3 s, because the
+  that one process only and needs no administrator rights. Each command takes 1 to 3 s, because the
   helper compiles its Windows API bindings on every start.
 - A command that runs longer than 30 s is killed with `helper_timeout`. Killing it from WSL may
   leave the Windows `powershell.exe` running; the helper's own steps are short, so this is rare.
@@ -258,7 +259,7 @@ Everything lives under `~/.overdeck/computer-use/`:
 ## Limits
 
 - Wayland can't do hotkeys (`xdotool` needs X11); screenshots there need `grim`.
-- No remote hosts — a linked machine with no logged-in desktop session always refuses.
+- No remote hosts: a linked machine with no logged-in desktop session always refuses.
 - On some multi-monitor setups, AT-SPI can report a window's bounds at `(0,0)` instead of its
   real screen position. When that happens, its screenshot can show the wrong area of the
   desktop, and `click`/`scroll`/`drag` coordinates computed from that screenshot can miss the
@@ -293,3 +294,5 @@ Under WSL2, `pan doctor` and the **What Overdeck checked** list show four checks
 If the CLI works but the dashboard's helper test fails with "Exec format error" or a vsock error,
 the dashboard service may be missing the WSL interop socket. Overdeck sets `WSL_INTEROP` from
 `/run/WSL/` when it's missing; report the error with your WSL version if it persists.
+
+Still stuck? Ask on the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file a [GitHub Issue](https://github.com/eltmon/overdeck/issues).

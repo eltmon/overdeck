@@ -7,16 +7,16 @@ Overdeck ships two complete, named design languages for the dashboard, and the c
 
 ## The two themes
 
-- **Ledger** — the classic dense monitoring style: DM Sans for prose, SF Mono for technical identifiers (code, IDs, hashes — same as Broadsheet), a flat medium-weight cap on everything else, panel-first layout. The one exception is the "Overdeck" sidebar wordmark, set in Space Grotesk. Ledger is now the **frozen legacy theme** — it keeps working exactly as it does today and continues to receive bug fixes, but it does not gain new visual patterns going forward.
-- **Broadsheet** — the **default** theme. Geist and Geist Mono typefaces, a real type hierarchy (body text through page-level display headings), chips, soft cards, hero placeholders, and dot-metadata lines. New Overdeck UI patterns land here first, and only here.
+- **Ledger**: the classic dense monitoring style. DM Sans for prose, SF Mono for technical identifiers (code, IDs, hashes), a flat medium-weight cap on everything else, panel-first layout. Display text (the wordmark, project names and a few titles) uses Space Grotesk under Ledger. Ledger is now the **frozen legacy theme**. It keeps working exactly as it does today and continues to receive bug fixes, but it does not gain new visual patterns going forward.
+- **Broadsheet**: the **default** theme. Geist and Geist Mono typefaces, a real type hierarchy (body text through page-level display headings), chips, soft cards, hero placeholders, and dot-metadata lines. New Overdeck UI patterns land here first, and only here.
 
-Both themes are fully self-hosted — the dashboard makes zero external font requests in either theme, so switching (or working offline) never depends on a CDN.
+Both themes are fully self-hosted. The dashboard makes zero external font requests in either theme, so switching (or working offline) never depends on a CDN.
 
 ## Choosing a theme
 
 Go to **Settings → Appearance**. The **Overdeck Theme** picker shows both themes as selectable cards, each with a one-line description and a live mini-specimen rendered in that theme's own fonts, so you can compare them side by side before choosing.
 
-Selecting a card applies the theme immediately — no page reload, no rebuild, no restart. Your choice is saved to `~/.overdeck/config.yaml` and mirrored to the browser so it survives a reload.
+Selecting a card applies the theme immediately: no page reload, no rebuild, no restart. Your choice is saved to `~/.overdeck/config.yaml` and mirrored to the browser so it survives a reload.
 
 ## Configuration
 
@@ -29,7 +29,7 @@ ui:
 
 - Accepted values are `ledger` and `broadsheet`.
 - Leaving it unset resolves to `broadsheet`.
-- Any other value fails loudly with a clear error naming the field and the two allowed values — Overdeck never silently falls back to a default when a config value is invalid.
+- Any other value fails loudly with a clear error naming the field and the two allowed values. Overdeck never silently falls back to a default when a config value is invalid.
 
 ## What stays the same either way
 
@@ -37,9 +37,11 @@ The Overdeck Theme picker above is a typography, texture, and scale change. The 
 
 ## Color themes
 
-A color theme is a separate, named set of colors — terminal palette, chat code-block syntax colors, and a small UI token subset — layered on top of the Overdeck Theme and mode choices above. Two built-ins ship in the box, `overdeck-dark` and `overdeck-light`; they carry today's terminal palette and change nothing else.
+A color theme is a separate, named set of colors (terminal palette, chat code-block syntax colors, and a small UI token subset) layered on top of the Overdeck Theme and mode choices above. Two built-ins ship in the box, `overdeck-dark` and `overdeck-light`; they carry today's terminal palette and change nothing else.
 
-**Settings → Appearance** shows a light-mode picker and a dark-mode picker under the Overdeck Theme cards. Each lists only themes of its own type (a light-mode picker never offers a dark theme). Switching the dashboard's light/dark mode swaps between the two selections immediately, with no reload.
+**Settings → Appearance** shows a **Color theme** block under the Overdeck Theme cards, with a **Light mode** picker and a **Dark mode** picker. Each lists only themes of its own type (the Light mode picker never offers a dark theme). Switching the dashboard's light/dark mode swaps between the two selections immediately, with no reload.
+
+Below the color themes, the **Ready to Merge shimmer** toggle animates the Ready to Merge badge with a subtle shimmer on cards awaiting merge approval. It is on by default and is saved in the browser, not in `config.yaml`.
 
 ### Configuration
 
@@ -53,12 +55,12 @@ ui:
 ```
 
 - Each mode's id is independent; either or both may be unset.
-- An id that names no file, or names a theme of the wrong type for that mode (a light theme under `dark`), falls back to the built-in for that mode and logs a warning — config loading never fails on these keys.
+- An id that names no file, or names a theme of the wrong type for that mode (a light theme under `dark`), falls back to the built-in for that mode and logs a warning. Config loading never fails on these keys.
 - A general dashboard settings save never removes `ui.color_theme`.
 
 ### User themes
 
-A theme other than the two built-ins lives as a file at `~/.overdeck/themes/<id>.json` — the file name is the id. Hand-editing or dropping in a new file there is picked up on the next reload; no restart beyond that is needed. The on-disk shape:
+A theme other than the two built-ins lives as a file at `~/.overdeck/themes/<id>.json`; the file name is the id. Hand-editing or dropping in a new file there is picked up on the next reload; no restart beyond that is needed. The on-disk shape:
 
 ```jsonc
 {
@@ -70,11 +72,11 @@ A theme other than the two built-ins lives as a file at `~/.overdeck/themes/<id>
 }
 ```
 
-Any color the theme omits falls back to the matching built-in of the same `type` — a theme that sets only `terminal.background` still gets a complete, usable terminal palette.
+Any color the theme omits falls back to the matching built-in of the same `type`. A theme that sets only `terminal.background` still gets a complete, usable terminal palette.
 
 ### Importing a VS Code theme
 
-Choose **Import VS Code theme** next to the pickers and pick a `.json` theme file or a `.vsix` extension package (JSON-with-comments is fine — VS Code theme files commonly carry comments). Overdeck maps it onto the shape above and shows a preview — name, swatches, and a highlighted code sample — before anything is saved:
+Choose **Import VS Code theme** next to the pickers and pick a `.json` theme file or a `.vsix` extension package (JSON-with-comments is fine; VS Code theme files commonly carry comments). Overdeck maps it onto the shape above and shows a preview (name, swatches, and a highlighted code sample) before anything is saved:
 
 | VS Code key | Theme field |
 | --- | --- |
@@ -108,26 +110,22 @@ The limits are 10 MB for the archive, 2 MB for each theme file, and 20 themes pe
 
 ### Editing a theme
 
-The theme list under the pickers shows every theme, built-in and user. The editor is an inline panel in the Appearance section by design, matching how imports already preview inline — Overdeck is moving *new* creation flows to pages (see "Creation flows are pages, not modals" below), but an inline editor for an existing settings list doesn't contradict that.
+The theme list under the pickers shows every theme, built-in and user. The editor is an inline panel in the Appearance section, matching how imports preview inline.
 
-**Duplicate and edit**, on every theme, opens the editor seeded with that theme's colors and the name `"<name> copy"` (then `"<name> copy 2"`, …). Saving creates a new file with a new id; the original theme is never changed. **Edit** exists only on user themes — built-in themes are read-only, since they live in code, not on disk — and saves in place, keeping the same id and file.
+**Duplicate and edit**, on every theme, opens the editor seeded with that theme's colors and the name `"<name> copy"` (then `"<name> copy 2"`, and so on). Saving creates a new file with a new id; the original theme is never changed. **Edit** exists only on user themes (built-in themes are read-only, since they live in code, not on disk) and saves in place, keeping the same id and file.
 
 The editor has three groups of color pickers:
 
-- **Terminal** — 20 of the 21 terminal keys: `background`, `foreground`, `cursor`, `selectionBackground`, and the 16 ANSI colors (`black` … `brightWhite`). `cursorAccent` is not editable.
-- **Interface** — the seven `ui` keys: `background`, `surface`, `overlay`, `border`, `foreground`, `muted`, `accent`.
-- **Syntax** — the foreground of seven common scopes: Comment (`comment`), String (`string`), Keyword (`keyword`), Function (`entity.name.function`), Variable (`variable`), Number (`constant.numeric`), and Type (`entity.name.type`).
+- **Terminal**: 20 of the 21 terminal keys, namely `background`, `foreground`, `cursor`, `selectionBackground`, and the 16 ANSI colors (`black` … `brightWhite`). `cursorAccent` is not editable.
+- **Interface**: the seven `ui` keys: `background`, `surface`, `overlay`, `border`, `foreground`, `muted`, `accent`.
+- **Syntax**: the foreground of seven common scopes: Comment (`comment`), String (`string`), Keyword (`keyword`), Function (`entity.name.function`), Variable (`variable`), Number (`constant.numeric`), and Type (`entity.name.type`).
 
-A picker showing "Not set" means that key inherits the dashboard defaults and is written only once you change it. The preview updates as you pick colors, and nothing is saved until you press Save. Saving the currently selected theme re-applies its terminal, syntax, and UI colors immediately, with no reload. A newly saved duplicate is not selected automatically — pick it from the light/dark dropdown above. Alpha channels can't be edited: an untouched color (including one with an alpha channel) keeps its original value exactly. If you have the theme's terminal open in an existing tmux session, that session keeps its old background until it restarts.
+A picker showing "Not set" means that key inherits the dashboard defaults and is written only once you change it. The preview updates as you pick colors, and nothing is saved until you press Save. Saving the currently selected theme re-applies its terminal, syntax, and UI colors immediately, with no reload. A newly saved duplicate is not selected automatically; pick it from the **Light mode** or **Dark mode** picker above. Alpha channels can't be edited: an untouched color (including one with an alpha channel) keeps its original value exactly. If you have the theme's terminal open in an existing tmux session, that session keeps its old background until it restarts.
 
 ### What color themes never change
 
-Signal and state colors — `--destructive*`, `--info*`, `--success*`, `--warning*`, and every `--signal-*`/`--state-*` token — are fixed by the pan-style-guide color law and are never set by a color theme's `ui` group, built-in or imported. A color theme changes terminal colors, chat syntax highlighting, and a small background/surface/overlay/border/foreground/muted/accent subset of the UI — never what a status color means.
-
-## Creation flows are pages, not modals
-
-Independent of which theme you use, Overdeck is moving major creation and composition flows — new project, new workspace, and future editors — out of modal dialogs and into full routed pages. Modals remain for what they're good at: confirmations and short forms of four fields or fewer. You'll see this rolled out incrementally, starting with the New Workspace flow; existing modal-based flows are migrated one at a time rather than all at once.
+Signal and state colors (`--destructive*`, `--info*`, `--success*`, `--warning*`, and every `--signal-*`/`--state-*` token) are fixed by the pan-style-guide color law and are never set by a color theme's `ui` group, built-in or imported. A color theme changes terminal colors, chat syntax highlighting, and a small background/surface/overlay/border/foreground/muted/accent subset of the UI, never what a status color means.
 
 ## For developers: why this is safe to adopt gradually
 
-New dashboard surfaces are written against the Broadsheet vocabulary directly — no per-component "if the theme is X" logic. The display-scale utilities (page and section headings) and the eyebrow label resolve to a matching, already-shipped Ledger style when Broadsheet isn't active, so a surface built only from those renders correctly under either theme without extra work: it just looks a little denser and smaller under Ledger. The newer component vocabulary — chips, soft cards, hero placeholders, the large CTA + keycap pattern, and dot-metadata lines — has no Ledger equivalent at all; a surface built with those is a Broadsheet-only surface by design (Ledger is frozen legacy and doesn't receive new patterns). See `design/style-guide/STYLE-GUIDE.md` for the full component-level specification, including which utilities fall into each category.
+New dashboard surfaces are written against the Broadsheet vocabulary directly, with no per-component "if the theme is X" logic. The display-scale utilities (page and section headings) and the eyebrow label resolve to a matching, already-shipped Ledger style when Broadsheet isn't active, so a surface built only from those renders correctly under either theme without extra work: it just looks a little denser and smaller under Ledger. The newer component vocabulary (chips, soft cards, hero placeholders, the large CTA + keycap pattern, and dot-metadata lines) has no Ledger equivalent at all; a surface built with those is a Broadsheet-only surface by design (Ledger is frozen legacy and doesn't receive new patterns). See `design/style-guide/STYLE-GUIDE.md` for the full component-level specification, including which utilities fall into each category.

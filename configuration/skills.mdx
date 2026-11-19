@@ -1,5 +1,6 @@
 ---
-title: Skill Settings
+title: "Skill settings: packs, overrides, SageOx and Deft"
+sidebarTitle: "Skill Settings"
 description: Every config key for skills, skill packs, SageOx and Deft
 ---
 
@@ -11,11 +12,11 @@ integrations. For the on/off model itself, see [Skills](/features/skills)
 and [Skill Packs](/features/skill-packs). For what makes a repository a
 valid pack, see [Authoring a skill pack](/guides/skill-pack-authoring).
 
-No schema validates any of these keys — each reader parses its own file
+No schema validates any of these keys. Each reader parses its own file
 by hand, and a malformed value is simply ignored rather than rejected.
 Prefer the CLI (`pan skills set`, `pan skills pack …`) to hand-editing
 these files; a hand edit that breaks the YAML is read as if the file
-were empty for most reads, silently — `pan skills set` against a broken
+were empty for most reads, silently. `pan skills set` against a broken
 global `config.yaml` is the exception and exits 1 with `cannot parse
 <path>`.
 
@@ -26,7 +27,7 @@ global `config.yaml` is the exception and exits 1 with `cannot parse
 | Global | `~/.overdeck/config.yaml` |
 | Project | `~/.overdeck/projects.yaml` |
 | Issue | `<planHome>/.pan/skill-overrides/<ISSUE>.yaml` |
-| Conversation | the `conversations.skill_overrides` column in `~/.overdeck/overdeck.db`, set only when the conversation is created |
+| Conversation | the `conversations.skill_overrides` column in `~/.overdeck/overdeck.db`, set when the conversation is created, and later by `pan skills add <conversation>`, the `add_skills` MCP tool, or **Add skills…** in the conversation menu |
 
 Precedence, narrowest first: **conversation > issue > project > global >
 default**. A native skill with no value anywhere defaults to **on**. A
@@ -57,7 +58,7 @@ skills:
 | `url` | non-empty string | none; required unless the pack id is known | `pan skills pack add`, or the dashboard's **Add…** (`POST /api/skills/packs`) |
 | `ref` | non-empty string (tag, branch, or SHA) | none; `pstack`, `sageox`, `atlassian` and the video packs (`remotion`, `hyperframes`, `openmontage`, `video-use`) default it | `pan skills pack add\|update`, or the dashboard's **Add…** (`POST /api/skills/packs`) |
 | `commit` | 40 lowercase hex characters | the commit the ref resolved to | `pan skills pack add\|update`, or the dashboard's **Add…** (`POST /api/skills/packs`) |
-| `adapter` | one of `plain`, `claude-plugin`, `deft-readonly`, `gstack-runtime` | unset — resolved from `KNOWN_PACKS` or detection when absent | `pan skills pack add --adapter` only |
+| `adapter` | one of `plain`, `claude-plugin`, `deft-readonly`, `gstack-runtime` | unset; resolved from `KNOWN_PACKS` or detection when absent | `pan skills pack add --adapter` only |
 | `browser` | `true` only | unset (no consent recorded) | `pan skills pack browser <id> on\|off` |
 | `mcp` | `true` only | unset | `pan skills pack add\|update` or the dashboard's **Add…** (written when the confirmed preview listed MCP servers) |
 
@@ -138,7 +139,7 @@ upstream. When the push fails, the commit stays local and `pan skills set`
 prints `push pending: <reason>`.
 
 An issue file whose YAML fails to parse is read as empty, and the next
-`pan skills set --issue` rewrites the whole file with only the new value —
+`pan skills set --issue` rewrites the whole file with only the new value;
 it does not merge with whatever was unparseable. That is the current
 behavior; a follow-up issue tracks fixing it. Writers: `pan skills set …
 --issue`, the dashboard, and `pan skills deft use|back`.
@@ -149,15 +150,15 @@ On a harness that declares the `skillSlashCommands` capability (Claude Code
 today), the dashboard composer's `/` menu lists every enabled skill as a
 `/<skill-name>` entry under a **Skills** group, scoped to the open
 conversation's own cwd, issue, and per-conversation overrides. A skill turned
-off at any level — global, project, issue, or conversation — disappears from
+off at any level (global, project, issue, or conversation) disappears from
 that group the next time the menu opens; it does not disappear from an
 already-open menu.
 
 ## Related
 
-- [Skills](/features/skills) — the on/off model and where overrides apply.
-- [Skill Packs](/features/skill-packs) — the pack catalog and trust model.
-- [Authoring a skill pack](/guides/skill-pack-authoring) — what makes a
+- [Skills](/features/skills): the on/off model and where overrides apply.
+- [Skill Packs](/features/skill-packs): the pack catalog and trust model.
+- [Authoring a skill pack](/guides/skill-pack-authoring): what makes a
   repository a valid pack.
-- [Skills Commands](/cli/skills-commands) — every CLI flag that writes
+- [Skills Commands](/cli/skills-commands): every CLI flag that writes
   these keys.
