@@ -38,7 +38,7 @@ Before PAN-5349, `pan open <issue>` opened the issue's workspace in an editor. T
 
 When several dashboard tabs are open, the tab you focused last opens the path, and its window comes to the front. If that tab is gone (it crashed or its record is older than a day), any visible tab opens it after a short wait. When no dashboard tab is open, `pan open` opens the link below in your browser instead.
 
-When a dashboard tab opens the path, `pan open` prints `Opened <path> in <project>`, naming the project as the project switcher shows it, or `Opened the <issue> workspace in <project>` for an issue workspace. The dashboard shows the same message.
+When a dashboard tab opens the path, `pan open` prints `Opened <path> in <project>`, naming the project as the project switcher shows it, or `Opened the <issue> workspace in <project>` for an issue workspace, or `Opened root folder in <project>` for a root folder. The path it names is relative to the project or workspace folder. The dashboard shows the same message.
 
 ### The `/open` link
 
@@ -58,7 +58,7 @@ pan integrate file-manager --dry-run   # print what would be written, change not
 pan integrate file-manager --remove    # remove exactly what was added
 ```
 
-Every entry runs the absolute path of `pan` (the shim `pan sync` writes in `~/.overdeck/cli-bin`, or the first `pan` on PATH), so it works without a login shell. If no `pan` is found, the command stops and tells you to run `pan sync` first. All entries are per user; nothing needs root or an administrator.
+Every entry runs the absolute path of `pan` (on Linux and macOS the shim `pan sync` writes in `~/.overdeck/cli-bin`, or the first `pan` on PATH; on Windows the first `pan.cmd` or `pan.exe` on PATH), so it works without a login shell. If no `pan` is found, the command stops and tells you to run `pan sync` first. All entries are per user; nothing needs root or an administrator.
 
 `pan install` offers the same entries after the Ollama step: on a terminal it asks `Add "Open in Overdeck" to your file manager's right-click menu?` (default No). `pan install --file-manager-integration` adds them without asking, and `--skip-file-manager-integration` neither asks nor adds them. A failed install of the entries is a warning; it never fails `pan install`.
 
