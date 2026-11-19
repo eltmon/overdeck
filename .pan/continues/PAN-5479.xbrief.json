@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5479",
   "created": "2026-11-19T01:28:31.320Z",
-  "updated": "2026-11-19T01:38:31.159Z",
+  "updated": "2026-11-19T01:39:15.862Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -154,9 +154,18 @@
       "doneAt": "2026-11-19T01:38:23.227Z"
     },
     "w10-settings-link": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5479",
-      "claimedAt": "2026-11-19T01:38:31.159Z"
+      "claimedAt": "2026-11-19T01:38:31.159Z",
+      "doneAt": "2026-11-19T01:39:15.862Z"
+    },
+    "w10-settings-link.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:39:15.862Z"
+    },
+    "w10-settings-link.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:39:15.862Z"
     }
   }
 }
