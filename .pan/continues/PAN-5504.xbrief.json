@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5504",
   "created": "2026-11-19T07:15:41.251Z",
-  "updated": "2026-11-19T07:29:22.795Z",
+  "updated": "2026-11-19T07:30:33.738Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -206,9 +206,26 @@
       "doneAt": "2026-11-19T07:29:18.236Z"
     },
     "audit-lanes": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5504",
-      "claimedAt": "2026-11-19T07:29:22.794Z"
+      "claimedAt": "2026-11-19T07:29:22.794Z",
+      "doneAt": "2026-11-19T07:30:33.738Z"
+    },
+    "audit-lanes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T07:30:33.738Z"
+    },
+    "audit-lanes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T07:30:33.738Z"
+    },
+    "audit-lanes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T07:30:33.738Z"
+    },
+    "audit-lanes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T07:30:33.738Z"
     }
   }
 }
