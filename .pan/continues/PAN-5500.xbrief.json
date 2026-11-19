@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5500",
   "created": "2026-11-19T03:34:33.510Z",
-  "updated": "2026-11-19T03:45:35.867Z",
+  "updated": "2026-11-19T03:45:43.557Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -130,6 +130,11 @@
     "linked-machines-top.ac5": {
       "status": "completed",
       "doneAt": "2026-11-19T03:45:35.867Z"
+    },
+    "linked-machines-bottom": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5500",
+      "claimedAt": "2026-11-19T03:45:43.557Z"
     }
   }
 }
