@@ -4,93 +4,59 @@ sidebarTitle: "Architecture"
 description: "How Overdeck fits together: the pan CLI, the dashboard server, the agents it runs in workspaces, health monitoring and where agent state lives."
 ---
 
-import { ThemedImage } from "/snippets/themed-image.mdx";
-
 Deep dive into Overdeck's technical architecture and design decisions.
 
 ## System Overview
 
 Overdeck consists of three main components:
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         DASHBOARD                                │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐            │
-│  │   React     │  │   Vite      │  │   Express   │            │
-│  │   Frontend  │──│   Build     │──│   API       │            │
-│  └─────────────┘  └─────────────┘  └─────────────┘            │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                           CLI                                    │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐            │
-│  │   Commands  │  │   Skills    │  │   Hooks     │            │
-│  └─────────────┘  └─────────────┘  └─────────────┘            │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                        CLOISTER                                  │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐            │
-│  │  Heartbeat  │  │  Handoff    │  │ Specialists │            │
-│  │  Monitor    │  │  Manager    │  │ (review,    │            │
-│  └─────────────┘  └─────────────┘  │ test, inspect│           │
-│                                    │ uat, merge) │            │
-│                                    └─────────────┘            │
-└─────────────────────────────────────────────────────────────────┘
-```
+- **Dashboard**: a React + Vite single-page app, served with the `/api/*` routes by an Effect HTTP server that runs on Node 22 (port 3011). The frontend gets live state over the `/ws/rpc` WebSocket and agent terminals over `/ws/terminal`.
+- **CLI**: the `pan` commands, plus the skills and hooks that `pan sync` installs for each harness.
+- **Cloister**: the agent lifecycle manager. It dispatches review, test and merge work, and its Deacon patrol watches running agents (see [Health Monitoring](#health-monitoring-deacon-pattern)).
 
-The dashboard uses **React + Vite** for the frontend and **Express** for the API server. There is no SSR layer — the frontend is a standard SPA served by the Express API.
+Agents run in panes of the terminal backend: Herdr by default, or tmux when `terminal.backend: tmux` is set. Each issue gets its own workspace, a git worktree under `workspaces/feature-<issue>/`.
 
-Because the `projects.yaml` registry (see [Directory Structure](#directory-structure)) lets one Overdeck instance manage many repositories at once, the dashboard's **God View** aggregates every project's agents and conversations into a single cross-project surface — one place to see what every agent is doing, regardless of which repo it belongs to.
-
-<ThemedImage
-  light="/images/dashboard/god-view-light.png"
-  dark="/images/dashboard/god-view-dark.png"
-  alt="God View: aggregate cross-project view of all agent activity across every registered project"
-/>
+Because the `projects.yaml` registry (see [Directory Structure](#directory-structure)) lets one Overdeck instance manage many repositories at once, the dashboard's **God View** (experimental: turn on Settings → Experimental → **Experimental features** to show it) gathers every project's issues, agents and conversations on one cross-project canvas, so you can see what every agent is doing whichever repo it belongs to. See [God View](/reference/god-view).
 
 ### Conversation subagents
 
-When a Claude Code or Codex conversation starts subagents, the conversation panel shows an **Agents** rail on the right. Each row shows the subagent type, description, live status, and nesting depth. Select a row—or choose **Open subagent transcript** from its expanded tool row—to read the subagent's full transcript without leaving the parent conversation.
+When a Claude Code or Codex conversation starts subagents, the conversation panel shows an **Agents** rail on the right. Each row shows the subagent type, description, live status, and nesting depth. Select a row, or choose **Open subagent transcript** from its expanded tool row, to read the subagent's full transcript without leaving the parent conversation.
 
 The selected subagent is stored in the `?subagent=<id>` URL parameter, so a direct link reopens the same transcript. The rail stays hidden when a conversation has no subagents. Codex children use the same interaction, including live updates and reopening completed transcripts. The rail includes nested children. Pi conversations do not currently expose subagents in this view.
 
 ## Directory Structure
 
-Overdeck stores all runtime state in `~/.overdeck/`:
+Overdeck keeps its machine-wide runtime state in `~/.overdeck/`:
 
 ```
 ~/.overdeck/
   config.yaml           # Main configuration
   projects.yaml         # Multi-project registry with issue routing
+  cloister.toml         # Cloister settings (concurrency, close-out)
+  overdeck.db           # Local SQLite database (see the state model)
   project-mappings.json # Linear project → local path mappings (legacy)
 
   skills/               # Shared skills (SKILL.md format)
   commands/             # Slash commands
-  agents/               # Subagent templates (.md files)
+  agent-definitions/    # Subagent templates (.md files)
+  rules/                # Rules distributed by pan sync
   bin/                  # Hook scripts (synced via pan sync)
-    heartbeat-hook      # Real-time activity monitoring hook
+    heartbeat-hook      # Activity hook run after each tool call
 
   agents/               # Per-agent runtime state
     agent-min-123/
-      state.json        # Agent state (model, phase, complexity)
+      state.json        # Agent state (harness, role, model, status)
       health.json       # Health status
       hook.json         # FPP work queue
       cv.json           # Work history
       mail/             # Incoming messages
       handoffs/         # Handoff prompts (for debugging)
 
-  cloister/             # Cloister AI lifecycle manager
-    config.json         # Cloister settings
-    state.json          # Running state
-    events.jsonl        # Handoff event log
-
   heartbeats/           # Real-time agent activity
     agent-min-123.json  # Last heartbeat from agent
 
   logs/                 # Log files
+    deacon.log          # Deacon patrol actions
     handoffs.jsonl      # All handoff events (for analytics)
 
   costs/                # Raw cost logs (JSONL)
@@ -109,34 +75,39 @@ Each agent's state is tracked in `~/.overdeck/agents/{agent-id}/state.json`:
   "id": "agent-min-123",
   "issueId": "MIN-123",
   "workspace": "/home/user/projects/myapp/workspaces/feature-min-123",
+  "harness": "claude-code",
+  "role": "work",
+  "model": "claude-opus-5-5",
+  "status": "running",
+  "startedAt": "2026-11-19T10:00:00.000Z",
+  "lastActivity": "2026-11-19T10:30:00.000Z",
   "branch": "feature/min-123",
-  "phase": "implementation",
-  "model": "kimi-k2.5",
-  "complexity": "medium",
-  "handoffCount": 0,
   "sessionId": "abc123",
-  "createdAt": "2024-01-22T10:00:00-08:00",
-  "updatedAt": "2024-01-22T10:30:00-08:00"
+  "backend": "herdr",
+  "paneId": "w2AD:p3"
 }
 ```
 
 | Field | Description |
 |-------|-------------|
-| `phase` | Current work phase: `planning`, `implementation`, `testing`, `review`, `merging` |
-| `model` | Current model: `haiku`, `sonnet`, `opus`, `kimi-k2.5`, or other provider models |
-| `complexity` | Detected complexity: `trivial`, `simple`, `medium`, `complex`, `expert` |
-| `handoffCount` | Number of times the agent has been handed off to a different model |
-| `sessionId` | Claude Code session ID (for resuming after handoff) |
+| `harness` | Coding-agent harness the agent runs under, such as `claude-code`, `codex` or `pi` |
+| `role` | `plan`, `work`, `review`, `test`, `ship`, `flywheel`, `strike`, `sequencer`, `knowledge` or `worker` |
+| `model` | Model the agent launched with |
+| `status` | `starting`, `running`, `stopped` or `error` |
+| `sessionId` | Harness session ID, used to resume the agent |
+| `backend`, `paneId` | Terminal backend (`herdr` or `tmux`) and the pane the agent runs in |
 
-**State Cleanup:** When an agent is killed or aborted (`pan kill`), Overdeck automatically cleans up its state files to prevent stale data from affecting future runs.
+**State cleanup:** `pan kill` closes the agent's pane and marks its state `stopped`. Neither `pan kill` nor `pan wipe` deletes `state.json` or transcripts; `pan wipe` prunes only lock files, sockets and cached Codex files from the agent's directory.
 
 ## Remote Workspaces
 
 Overdeck supports remote workspace execution via Fly.io Machines. Remote workspaces provide:
 
-- **Cloud-hosted agent environments** — run agents on remote machines without local resource constraints
-- **On-demand provisioning** — Fly.io Machines spin up per workspace and shut down after merge
-- **Same workflow** — `pan admin remote` commands mirror local workspace operations
+- **Cloud-hosted agent environments**: run agents on remote machines without local resource constraints
+- **Started like a local workspace**: `pan start <id> --remote` creates the workspace on a Fly machine
+- **Automatic hand-off**: when a remote agent finishes, the Deacon patrol hands it to the review pipeline and stops its machine
+
+See [Remote workspaces on Fly](/features/workspaces#remote-workspaces-on-fly) for setup.
 
 Remote workspace management:
 ```bash
@@ -144,6 +115,7 @@ pan admin remote init        # Initialize the Fly.io app for workspace machines
 pan admin remote setup       # Install flyctl and configure auth
 pan admin remote status      # Check Fly.io connection and machine status
 pan admin remote resources   # Show RAM/disk usage across VMs
+pan admin remote reap        # Hand finished remote agents to review and stop their machines
 ```
 
 ## Deep Wipe
@@ -156,45 +128,39 @@ pan wipe MIN-123 -y             # Skip confirmation
 ```
 
 **Deep wipe cleans up:**
-- Tmux sessions (`planning-min-123`, `agent-min-123`)
-- Agent state directories (`~/.overdeck/agents/planning-*`, `agent-*`)
+- Agent panes in the terminal backend (Herdr panes, or tmux sessions such as `planning-min-123` and `agent-min-123`)
+- Lock files, sockets and cached Codex files in the issue's agent directories under `~/.overdeck/agents/` (`state.json` and transcripts are kept)
 - Legacy planning directories (`project/.planning/min-123/`)
-- Workspace files and the issue's branches
-- Issue tracker status (reset to Backlog/Open)
+- Workspace files, the workspace's Docker stack, and the issue's branches
+- Issue tracker status (reset to Todo; a GitHub issue is reopened and loses its pipeline labels)
 
 **Dashboard UI:** When aborting planning, choose **Reset to Todo** from the issue's right-click menu for a complete reset. (`pan wipe` remains available from the CLI.)
 
 ## Health Monitoring (Deacon Pattern)
 
-Overdeck implements the Deacon pattern for stuck agent detection:
+Cloister checks running agents every 60 seconds. An agent with no activity for 15 minutes is in *warning*, and one idle for 30 minutes is *stuck*. Cloister nudges both, at most once every 30 minutes per agent. It force-kills a stuck agent only when you set `kill_on_stuck = true` under `[auto_actions]` in `~/.overdeck/cloister.toml`; that is off by default.
 
-- **Ping timeout**: 30 seconds
-- **Consecutive failures**: 3 before recovery
-- **Cooldown**: 5 minutes between force-kills
+The Deacon is Cloister's background patrol. It also runs every 60 seconds, and each pass:
 
-When an agent is stuck (no activity for 30+ minutes), Overdeck will:
-1. Force kill the tmux session
-2. Record the kill in health.json
-3. Respawn with crash recovery context
+- Nudges a work agent that has been idle for 20 minutes with commits not pushed to its upstream branch, at most once an hour per agent.
+- Nudges an agent that stopped on a transient API error to retry, at most once every 5 minutes per agent.
+- Compares the terminal backend's live panes with the dashboard, and resumes a work agent whose harness died without a recorded stop.
+- Stops agents whose issue has closed, re-dispatches stalled or silent reviews, and hands finished remote agents to review.
 
-The dashboard's **Metrics** page shows today's cost, agent health counts and the top spenders, served by `/api/metrics/summary` and `/api/metrics/costs` from Cloister's cost tracking.
+Each Deacon action is logged to `~/.overdeck/logs/deacon.log`.
 
-<ThemedImage
-  light="/images/dashboard/metrics-light.png"
-  dark="/images/dashboard/metrics-dark.png"
-  alt="Metrics page: runtime comparison and performance analytics across models"
-/>
+The dashboard's **Metrics** page (experimental: turn on Settings → Experimental → **Experimental features** to show it) shows today's cost, active and stuck agent counts, and the top agents and issues by cost, served by `/api/metrics/summary` and `/api/metrics/costs` from Cloister's cost tracking.
 
 ## FPP (Fixed Point Principle)
 
 > "Any runnable action is a fixed point and must resolve before the system can rest."
 
-*Inspired by Doctor Who: a fixed point in time must occur — it cannot be avoided.*
+*Inspired by Doctor Who: a fixed point in time must occur; it cannot be avoided.*
 
-**Fixed Point Principle (FPP):** Any runnable bead, hook, or agent action represents a fixed point in execution and must be resolved immediately. Overdeck continues executing until no fixed points remain.
+**Fixed Point Principle (FPP):** Any runnable hook item or agent action represents a fixed point in execution and must be resolved immediately. Overdeck continues executing until no fixed points remain.
 
 FPP ensures agents are self-propelling:
-1. Work items are pushed to the agent's hook
+1. Work items are pushed to the agent's hook (`pan admin fpp push`)
 2. On spawn/recovery, the hook is checked
 3. Pending work is injected into the agent's prompt
 4. Completed work is popped from the hook
@@ -219,16 +185,17 @@ Both dev and production versions read/write the same config, so you can switch b
 ### Running in Development Mode
 
 ```bash
-# Clone and setup
+# Clone and set up
 git clone https://github.com/eltmon/overdeck.git
 cd overdeck
-npm install
+bun install
+npm run build
 
-# Link dev version globally (makes 'pan' use your local code)
+# Link dev version globally (makes 'pan' use your local build)
 npm link
 
-# Start the dashboard (with hot reload)
-npm run dev
+# Start the dashboard with hot reload
+pan dev
 # → Frontend: http://localhost:3010
 # → API: http://localhost:3011
 ```
@@ -248,8 +215,8 @@ npm install -g @overdeck/core
 
 | Mode | Command | Use Case |
 |------|---------|----------|
-| **Production** | `pan up` | Daily usage, HTTPS at https://overdeck.localhost |
-| **Dev** | `npm run dev` | Only for active development on Overdeck itself |
+| **Production** | `pan up` | Daily usage, at http://localhost:3011, or https://overdeck.localhost when Traefik is enabled |
+| **Dev** | `pan dev` | Only for active development on Overdeck itself |
 
 **Note:** Use `pan up` for normal usage. Only use dev mode when actively working on Overdeck's codebase.
 
@@ -257,48 +224,14 @@ npm install -g @overdeck/core
 
 If you're both developing Overdeck AND using it for your own projects:
 
-1. **Use `npm link`** so CLI changes take effect immediately
-2. **Run dashboard from source** for hot reload on UI changes
+1. **Use `npm link`** so `pan` runs your local build; run `npm run build` after CLI changes
+2. **Run `pan dev`** for hot reload on UI changes
 3. **Config is shared** - workspaces/agents work the same either way
 4. **Test in a real project** - your own usage is the best test
 
-## PRD Architecture
+## Planning artifacts
 
-### PRD Types
-
-```
-myproject/
-├── docs/
-│   └── PRD.md                   # Canonical PRD (always on main)
-└── workspaces/
-    └── feature-min-123/
-        └── docs/
-            └── MIN-123-plan.md   # Feature PRD (lives in feature branch)
-```
-
-| PRD Type | Location | Purpose |
-|----------|----------|---------|
-| **Canonical PRD** | `docs/PRD.md` | Core product definition, always on main |
-| **Feature PRD** | `workspaces/feature-{issue}/docs/{ISSUE}-plan.md` | Feature spec, lives in feature branch, merged with PR |
-
-### Feature PRDs Live in Workspaces
-
-When you start planning an issue, Overdeck creates:
-1. A git worktree (workspace) for the feature branch
-2. A planning session that generates a feature PRD
-
-The feature PRD **lives in the workspace** (feature branch) because:
-- It gets merged with the PR (documentation travels with code)
-- If you abort planning and delete the workspace, you don't want orphaned PRDs
-- Clean separation - each feature is self-contained
-
-### PRD Naming Convention
-
-| Document | Naming | Example |
-|----------|--------|---------|
-| Canonical PRD | `PRD.md` | `docs/PRD.md` |
-| Feature PRD | `{ISSUE}-plan.md` | `MIN-123-plan.md`, `PAN-4-plan.md` |
-| Planning artifacts | In `.planning/{issue}/` | `.planning/min-123/STATE.md` |
+When you plan an issue, Overdeck writes its PRD to `.pan/drafts/<issue>.md` and its xBRIEF plan to `.pan/specs/`, and tracks which plan items are done in `.pan/continues/<issue>.xbrief.json`. These files are committed on the issue's feature branch, so they merge with the PR. A polyrepo project keeps them in its plan home, the repo named by `pan_records.repo` in `projects.yaml`. See [State model](/reference/state-model) for the full layout.
 
 ## Developer Skills
 
@@ -306,22 +239,19 @@ Overdeck has two types of skills:
 
 | Directory | Purpose | Synced When |
 |-----------|---------|-------------|
-| `skills/` | User-facing skills for all Overdeck users | Always via `pan sync` |
-| `dev-skills/` | Developer-only skills for Overdeck contributors | Only in dev mode |
+| `sync-sources/skills/` | User-facing skills for all Overdeck users | Always via `pan sync` |
+| `sync-sources/dev-skills/` | Developer-only skills for Overdeck contributors | Only in dev mode |
 
-**Dev mode is automatically detected** when running from the Overdeck source repo (npm link). Skills in `dev-skills/` are:
+**Dev mode is automatically detected** when `pan` runs from an Overdeck source checkout (one with a `src/` directory, as with `npm link`). Skills in `sync-sources/dev-skills/` are:
 - Checked into the repo and version-controlled
 - Only synced to developers' machines, not end users
-- Shown with `[dev]` label in `pan sync --dry-run`
 
 ```bash
-# Check what will be synced (including dev-skills)
+# Check what will be synced
 pan sync --dry-run
 
-# Output shows:
+# In dev mode the output starts with:
 # Developer mode detected - dev-skills will be synced
-# ...
-#   + skill/test-specialist-workflow [dev]
 ```
 
 ## Related Guides
