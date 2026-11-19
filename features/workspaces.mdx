@@ -137,7 +137,7 @@ pan workspace create MIN-123 --docker
 
 **Docker Project Naming:**
 
-Each workspace's Docker Compose project name is the one its compose file declares in its top-level `name:` field, or `COMPOSE_PROJECT_NAME` in the workspace's `dev` script. With neither, Overdeck uses `overdeck-feature-<issue>`.
+`pan workspace create --docker` passes no project name, so Docker Compose picks it: the compose file's top-level `name:` field, else `COMPOSE_PROJECT_NAME`, else the name of the folder that holds the compose file. Overdeck's own stack lookups, such as stack health, read the same `name:` field or `COMPOSE_PROJECT_NAME` in the workspace's `dev` script, and fall back to `overdeck-feature-<issue>`.
 - Example: a compose file with `name: myn-feature-min-123`
 - Container names: `{compose-project}-{service}-1`
 
@@ -369,10 +369,11 @@ export OVERDECK_AUTO_REVERT_CHECKOUT=1  # Add to .bashrc/.zshrc
 
 Planning refuses to start while a work agent (`agent-<issue>`) is running for the issue ("Cannot start planning: work agent already running"). A work agent refuses to start until the issue has a finalized xBRIEF plan with items.
 
-To move from planning to work:
-1. **Accept the plan** - the **Accept plan** action finalizes it (`pan plan finalize`)
-2. **Or abort** - **Abort Planning** in the planning dialog returns the issue to Todo and keeps the workspace
-3. **Or stop the planning agent** - `pan kill planning-<issue>`
+To move from planning to work, accept the plan: the **Accept plan** action finalizes it (`pan plan finalize`).
+
+To stop planning instead (neither of these finalizes the plan, so work stays blocked):
+- **Abort Planning** in the planning dialog returns the issue to Todo and keeps the workspace.
+- `pan kill planning-<issue>` stops the planning agent.
 
 ### Agent safeguards
 

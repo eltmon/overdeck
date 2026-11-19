@@ -143,7 +143,8 @@ Describe when this skill should be invoked.
 - Tip 2
 EOF
 
-# Install it for every harness
+# Install it for every harness. This overwrites a different file at the same
+# path in ~/.claude/skills, so keep personal skills only in ~/.overdeck/skills.
 pan sync
 ```
 
@@ -222,9 +223,9 @@ pan sync --dry-run
 
 The `pan sync` command:
 - Copies skills from `~/.overdeck/skills/` to `~/.claude/skills` and `~/.agents/skills`
-- Overwrites installed skill files you have not edited; a file you edited since Overdeck installed it is skipped and reported as user-modified (`pan sync --force` overwrites it)
+- Overwrites installed skill files you have not edited; a file you edited since Overdeck installed it is skipped and reported as user-modified (`pan sync --force` overwrites it). The vendored `okf` skill is the exception: when its skill directory is a real directory, not a symlink, `pan sync` replaces edited `okf` files in both targets and reports them as replaced vendored files
 - Removes manifest-managed skills from harness directories after their bundled source is removed
-- Preserves files Overdeck did not install, except that in `~/.claude/skills` a file at the same path as a bundled skill file is overwritten and reported as adopted; when a bundled skill is removed, an installed copy you edited is reported instead of deleted
+- Preserves files Overdeck did not install, except that in `~/.claude/skills` a file at the same path as any skill file in `~/.overdeck/skills`, bundled or your own, is overwritten and reported as adopted; when a bundled skill is removed, an installed copy you edited is reported instead of deleted
 - Ignores empty bundled skill directories so they do not reappear in caches or harness targets
 
 ## Turning skills on and off

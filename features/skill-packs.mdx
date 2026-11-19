@@ -770,7 +770,7 @@ pan skills set --pack atlassian on --issue <id>
 
 **Skills.** Three are on with the pack toggle: `atlassian-mcp-code-search`, `jira-sprint-dashboard` (read-only unless you ask it to write), and `search-company-knowledge`. Four are opt-in, because they create or edit Jira or Confluence content, so the pack toggle never turns them on: `capture-tasks-from-meeting-notes`, `generate-status-report`, `spec-to-backlog`, and `triage-issue`.
 
-**Auth.** When your Jira email and API token are set (Settings → Tracker Keys, or `JIRA_EMAIL`/`JIRA_API_TOKEN` in `~/.overdeck.env`), Overdeck sends them to the server as `Authorization: Basic base64(email:token)`, but only for a Jira Cloud site (`*.atlassian.net`); with a Data Center base URL no header is sent. An org admin must have enabled API token auth for the Rovo MCP server, and the token needs MCP scopes.
+**Auth.** When your Jira email and API token are set (Settings → Tracker Keys, or `JIRA_EMAIL`/`JIRA_API_TOKEN` in `~/.overdeck.env`), Overdeck sends them to the server as `Authorization: Basic base64(email:token)`. With a Data Center Jira base URL no header is sent; with a Jira Cloud base URL (`*.atlassian.net`), or no base URL at all, the header is sent. An org admin must have enabled API token auth for the Rovo MCP server, and the token needs MCP scopes.
 
 Without those keys, a Claude Code agent reuses your own sign-in: run `claude mcp add --transport http atlassian https://mcp.atlassian.com/v2/mcp` and `/mcp` once, from your own Claude Code session, with the same server name and URL the launch file uses. Agents cannot complete that interactive sign-in themselves. Codex agents have no such session to reuse, so without the Jira email and API token a Codex launch gets no `atlassian` server at all.
 

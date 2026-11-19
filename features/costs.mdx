@@ -37,13 +37,14 @@ page and in `pan cost` is what the same tokens would cost at list API prices, no
 actually pay, and there is no separate plan-cost view.
 
 A model with no row in the price table records no cost: the Claude Code hook skips the event
-entirely, and Pi, Grok and Muse record it with a cost of `0` and (for Pi) an `unpriced-model` warning.
+entirely, and Pi, Grok and Muse record it with a cost of `0` and (for Pi) an `unpriced-model` warning. A Pi or Grok
+session that reported its own cost for the message records that cost instead.
 Mis-priced models are tracked in [#4844](https://github.com/eltmon/overdeck/issues/4844).
 
 ## How spend is attributed
 
 Every cost event carries the issue id and agent id that Overdeck set when it launched the agent.
-A Claude Code session with no issue id falls back to its git branch: if the branch name contains
+A Claude Code session with no issue id falls back to its git branch, then to its working directory: if either contains
 one of five tracker prefixes (`pan`, `min`, `aud`, `krux`, `cli`) followed by a hyphen and a number (for example `feature/pan-123`), the event
 is recorded against that issue. Do not expect this fallback to work for other prefixes or for
 other harnesses.

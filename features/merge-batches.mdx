@@ -83,7 +83,9 @@ Each card has:
    whole batch).
 2. **Accumulate.** New ready features trigger a new, larger generation in the
    background. Generations accumulate, so you can test and promote an earlier,
-   smaller batch if the newest isn't what you want.
+   smaller batch if the newest isn't what you want. With the batch window on,
+   a live batch keeps its members, and new ready features wait for the next
+   batch.
 3. **Test.** Click **Open UAT** (**Start & open** when its stack is not running) to exercise the combined branch on a
    real running stack. The checklist pulls each feature's acceptance criteria,
    plus an explicit "verify the touchpoint" item wherever a conflict was resolved.
