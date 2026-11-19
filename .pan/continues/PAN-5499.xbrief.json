@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5499",
   "created": "2026-11-19T02:52:23.250Z",
-  "updated": "2026-11-19T02:56:04.876Z",
+  "updated": "2026-11-19T02:56:11.513Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -78,6 +78,11 @@
     "concepts-command-deck.ac4": {
       "status": "completed",
       "doneAt": "2026-11-19T02:56:04.875Z"
+    },
+    "concepts-pipeline-and-rest": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5499",
+      "claimedAt": "2026-11-19T02:56:11.513Z"
     }
   }
 }
