@@ -4,8 +4,6 @@ sidebarTitle: "Troubleshooting"
 description: "Fixes for common Overdeck problems, from stuck pull requests and refused starts to a missing pan command and WSL2 issues, plus where to get help."
 ---
 
-import { ThemedImage } from "/snippets/themed-image.mdx";
-
 Solutions to common problems and issues with Overdeck.
 
 ## PR stuck with stale failed checks after main recovers
@@ -406,8 +404,7 @@ pan start MIN-123
 
 To attach from a shell, run the `Attach:` command that `pan start MIN-123`
 prints (it prints it again when the agent is already running), or open the
-agent in the dashboard. See "Reaching an agent from a shell" in
-`docs/TERMINAL-BACKENDS.md`.
+agent in the dashboard. See [Reaching an agent from a shell](/configuration/terminal-backend#reaching-an-agent-from-a-shell).
 
 ### Launches refused: Overdeck is shutting down
 
@@ -422,11 +419,9 @@ See [Safe shutdown](/features/safe-shutdown).
 
 ### Agent keeps failing
 
-Check the handoff count in state.json. If it's high, the task may be too complex:
-
-```bash
-cat ~/.overdeck/agents/agent-min-123/state.json | jq .handoffCount
-```
+Run `pan show MIN-123` to read the issue's derived state, the agent's work
+history and its health (`pan show MIN-123 --health` prints health and heartbeat
+only). If the agent keeps failing on the same work, the task may be too complex.
 
 Consider:
 - Breaking the issue into smaller tasks
@@ -441,8 +436,8 @@ Use the proper messaging API:
 # Correct
 pan tell MIN-123 "Your message"
 
-# NOT this (won't send without Enter)
-tmux send-keys -t agent-min-123 "Your message"
+# NOT this (tmux backend; won't send without Enter)
+tmux -L overdeck send-keys -t agent-min-123 "Your message"
 ```
 
 ## Command Deck Issues
@@ -475,7 +470,7 @@ pan projects list
 
 ### Conversation creation fails from a launcher
 
-When a launcher cannot create a conversation, the failure appears inline beside
+When a launcher cannot create a conversation, the failure appears inline below
 the composer and the typed query remains available for correction or retry. The
 launcher blocks duplicate keyboard and pointer submissions while creation is in
 progress, and it opens a conversation pane only after the server reports a
@@ -547,16 +542,11 @@ docker system prune -a
 
 ### Health page
 
-The dashboard's **Health** page reports live host, admission, agent, and
-optional-service health. Use it when the running fleet looks unhealthy: it
-shows current pressure evidence, spawn headroom, agent/session state, and
-service state without turning unavailable measurements into zeroes.
-
-<ThemedImage
-  light="/images/dashboard/health-light.png"
-  dark="/images/dashboard/health-dark.png"
-  alt="Overdeck Health page showing system health checks and diagnostics"
-/>
+The dashboard's **Health** page (experimental: turn on Settings → Experimental →
+**Experimental features** to show it) shows host health (CPU and memory), the
+Overdeck Anywhere and Deacon status, agent health counts, and reclaimable
+sessions. Use it when the running fleet looks unhealthy. A measurement it can't
+read shows as unavailable, never as zero.
 
 <Tip>
 These surfaces answer different questions. `pan health` reports runtime health
@@ -584,8 +574,8 @@ tail -50 ~/.overdeck/logs/*.log
 
 ### Resources
 
-- **GitHub Issues:** https://github.com/eltmon/overdeck/issues
-- **Discord:** [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P), for questions and help from the community
+Still stuck? Ask on the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file a [GitHub Issue](https://github.com/eltmon/overdeck/issues).
+
 - **Documentation:** https://docs.overdeck.ai
 - **CLI Help:** `pan --help` or `pan <command> --help`
 
