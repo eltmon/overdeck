@@ -241,11 +241,10 @@ The dashboard shows a **File watchers running low / exhausted** banner when usag
 
 ## Corrupted Workspaces
 
-A workspace can become "corrupted" when it exists as a directory but is no longer a valid git worktree. The dashboard will show a yellow "Workspace Corrupted" warning with an option to clean and recreate.
+A workspace can become "corrupted" when it exists as a directory but is no longer a valid git worktree.
 
 ### Symptoms
 
-- Dashboard shows "Workspace Corrupted" warning
 - `git status` in the workspace fails with "not a git repository"
 - The `.git` file is missing from the workspace directory
 
@@ -260,16 +259,6 @@ A workspace can become "corrupted" when it exists as a directory but is no longe
 | **Force-deleted main repo** | The main repository was moved or deleted while workspaces existed |
 
 ### Resolution
-
-**Via Dashboard (recommended):**
-
-1. Click on the issue to open the detail panel
-2. Click "Clean & Recreate" button
-3. Review the files that will be deleted
-4. Check "Create backup" to preserve your work (recommended)
-5. Click "Backup & Recreate"
-
-**Via CLI:**
 
 ```bash
 # Option 1: Manual cleanup
@@ -287,15 +276,11 @@ pan workspace create ISSUE-123
 
 - Don't interrupt `pan workspace create` commands
 - Don't run `git worktree prune` in the main repo without checking for active workspaces
-- Keep free space above the 10 GiB floor: Overdeck holds new workspace starts below it (see "Disk low — new workspace starts are held" below)
+- Keep free space above the 10 GiB floor: Overdeck holds new workspace starts below it (see [Disk low: new workspace starts are held](#disk-low-new-workspace-starts-are-held) below)
 
-## Disk low — new workspace starts are held
+## Disk low: new workspace starts are held
 
-Overdeck refuses a workspace start, or a workspace Docker stack rebuild, with a message that starts:
-
-```text
-Disk low — new workspace starts are held: …
-```
+Overdeck refuses a workspace start, or a workspace Docker stack rebuild, with a message that starts with `Disk low` and says new workspace starts are held.
 
 ### What is held
 
@@ -321,7 +306,7 @@ pan workspace reap --apply
 pan workspace destroy ISSUE-123
 ```
 
-The **Resources** page (`/resources`) shows what is using the disk. Starts resume when you retry them after space returns; nothing needs to be reset.
+The **Resources** page at `/resources` (experimental: turn on Settings → Experimental → **Experimental features** to show it) shows what is using the disk. Starts resume when you retry them after space returns; nothing needs to be reset.
 
 ## Docker Issues
 
@@ -367,7 +352,7 @@ show up instantly everywhere. It looks again within 60 seconds on its own,
 and immediately after any `PUT /api/settings` save (saving settings from the
 UI, even unrelated settings, is a quick way to force a re-check). To see
 exactly what this machine resolves right now, run `pan doctor` and read its
-"Host tools" row — it names each tool's resolved path or `missing`.
+"Host tools" row, which names each tool's resolved path or `missing`.
 
 ## Network Issues
 
@@ -381,7 +366,7 @@ exactly what this machine resolves right now, run `pan doctor` and read its
 2. Regenerate if missing:
    ```bash
    cd ~/.overdeck/traefik/certs
-   mkcert localhost "*.localhost" 127.0.0.1 ::1
+   mkcert -cert-file _wildcard.overdeck.localhost.pem -key-file _wildcard.overdeck.localhost-key.pem overdeck.localhost "*.overdeck.localhost" "*.localhost" localhost 127.0.0.1 ::1
    ```
 
 3. Install the CA:
