@@ -1,0 +1,234 @@
+{
+  "version": "1",
+  "issueId": "PAN-5499",
+  "created": "2026-11-19T02:52:23.250Z",
+  "updated": "2026-11-19T03:26:20.066Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-19T03:26Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-19T03:26:20.065Z"
+    }
+  ],
+  "items": {
+    "intro-audit": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5499",
+      "claimedAt": "2026-11-19T02:52:23.250Z",
+      "doneAt": "2026-11-19T02:53:21.755Z"
+    },
+    "intro-audit.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:53:21.755Z"
+    },
+    "intro-audit.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:53:21.755Z"
+    },
+    "intro-audit.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:53:21.755Z"
+    },
+    "intro-audit.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:53:21.755Z"
+    },
+    "quickstart-audit": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5499",
+      "claimedAt": "2026-11-19T02:53:25.911Z",
+      "doneAt": "2026-11-19T02:54:56.189Z"
+    },
+    "quickstart-audit.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:54:56.189Z"
+    },
+    "quickstart-audit.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:54:56.189Z"
+    },
+    "quickstart-audit.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:54:56.189Z"
+    },
+    "quickstart-audit.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:54:56.189Z"
+    },
+    "quickstart-audit.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:54:56.189Z"
+    },
+    "concepts-command-deck": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5499",
+      "claimedAt": "2026-11-19T02:55:05.339Z",
+      "doneAt": "2026-11-19T02:56:04.875Z"
+    },
+    "concepts-command-deck.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:56:04.875Z"
+    },
+    "concepts-command-deck.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:56:04.875Z"
+    },
+    "concepts-command-deck.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:56:04.875Z"
+    },
+    "concepts-command-deck.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:56:04.875Z"
+    },
+    "concepts-pipeline-and-rest": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5499",
+      "claimedAt": "2026-11-19T02:56:11.513Z",
+      "doneAt": "2026-11-19T02:57:35.282Z"
+    },
+    "concepts-pipeline-and-rest.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:57:35.282Z"
+    },
+    "concepts-pipeline-and-rest.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:57:35.282Z"
+    },
+    "concepts-pipeline-and-rest.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:57:35.282Z"
+    },
+    "concepts-pipeline-and-rest.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:57:35.282Z"
+    },
+    "concepts-pipeline-and-rest.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:57:35.282Z"
+    },
+    "vision-autonomy-and-merge": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5499",
+      "claimedAt": "2026-11-19T02:57:38.972Z",
+      "doneAt": "2026-11-19T02:59:33.525Z"
+    },
+    "vision-autonomy-and-merge.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:59:33.525Z"
+    },
+    "vision-autonomy-and-merge.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:59:33.525Z"
+    },
+    "vision-autonomy-and-merge.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:59:33.525Z"
+    },
+    "vision-autonomy-and-merge.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:59:33.525Z"
+    },
+    "vision-criteria-and-appendix": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5499",
+      "claimedAt": "2026-11-19T02:59:40.259Z",
+      "doneAt": "2026-11-19T03:02:29.469Z"
+    },
+    "vision-criteria-and-appendix.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:02:29.469Z"
+    },
+    "vision-criteria-and-appendix.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:02:29.469Z"
+    },
+    "vision-criteria-and-appendix.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:02:29.469Z"
+    },
+    "vision-criteria-and-appendix.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:02:29.469Z"
+    },
+    "changelog-intro": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5499",
+      "claimedAt": "2026-11-19T03:02:34.289Z",
+      "doneAt": "2026-11-19T03:03:22.867Z"
+    },
+    "changelog-intro.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:03:22.867Z"
+    },
+    "changelog-intro.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:03:22.867Z"
+    },
+    "changelog-intro.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:03:22.867Z"
+    },
+    "changelog-intro.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:03:22.867Z"
+    },
+    "recapture-doc-shots": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5499",
+      "claimedAt": "2026-11-19T03:03:27.022Z",
+      "doneAt": "2026-11-19T03:12:57.136Z"
+    },
+    "recapture-doc-shots.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:12:57.136Z"
+    },
+    "recapture-doc-shots.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:12:57.136Z"
+    },
+    "recapture-doc-shots.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:12:57.136Z"
+    },
+    "recapture-doc-shots.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:12:57.136Z"
+    },
+    "validate-and-pr-body": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5499",
+      "claimedAt": "2026-11-19T03:13:00.892Z",
+      "doneAt": "2026-11-19T03:15:57.535Z"
+    },
+    "validate-and-pr-body.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:15:57.535Z"
+    },
+    "validate-and-pr-body.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:15:57.535Z"
+    },
+    "validate-and-pr-body.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:15:57.535Z"
+    },
+    "validate-and-pr-body.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:15:57.535Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-19T03:26:20Z",
+      "markdownBody": "# CodeRabbit findings for PAN-5499 (PR #5580)\n\nCodeRabbit posted 6 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4623953087 · .pan/drafts/PAN-5499.md:284 [Minor]: Describe the global setting as an inherited default.\n  https://github.com/eltmon/overdeck/pull/5580#discussion_r4623953087\n- Thread 4623953089 · .pan/drafts/PAN-5499.md:313 [Minor]: Resolve the prohibited changelog edits before prescribing WI-5.\n  https://github.com/eltmon/overdeck/pull/5580#discussion_r4623953089\n- Thread 4623953093 · changelog.mdx:2 [Minor]: Keep direct edits out of the changelog header.\n  https://github.com/eltmon/overdeck/pull/5580#discussion_r4623953093\n- Thread 4623953097 · changelog.mdx:8 [Minor]: Include the installed package version in the sync startup gate.\n  https://github.com/eltmon/overdeck/pull/5580#discussion_r4623953097\n- Thread 4623953100 · vision.mdx:104 [Minor]: Align the bot identity with the operating prompts.\n  https://github.com/eltmon/overdeck/pull/5580#discussion_r4623953100\n- Thread 4623953104 · vision.mdx:132 [Major]: Describe the global setting as a fallback, not an unconditional hold.\n  https://github.com/eltmon/overdeck/pull/5580#discussion_r4623953104\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5580/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-5499 -m \"CodeRabbit <thread ids>: <what you changed>\"`.\n   If you only replied, you are done.\n5. If PR #5580 has already merged when you read this, stop: after the merge Overdeck files a follow-up issue\n   for every thread with no reply, no later commit to its file, and no re-review request naming its thread id."
+    }
+  ]
+}

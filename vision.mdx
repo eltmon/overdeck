@@ -1,12 +1,13 @@
 ---
-title: Flywheel Vision
+title: "Flywheel vision and v1.0 readiness criteria"
+sidebarTitle: "Flywheel Vision"
 description: "The roadmap for the Overdeck Flywheel: a dev loop that builds Overdeck today, and the readiness criteria for a user-facing delivery pipeline at v1.0."
 ---
 
 **A living north-star document.** It explains *why* the Flywheel exists and what it is
-becoming. The operational *how* lives in [`roles/flywheel.md`](https://github.com/eltmon/overdeck/blob/main/roles/flywheel.md); the
-per-run *what* lives in `docs/flywheel-brief.md`. When the role or
-the brief ever drifts from this doc, the vision wins — fix the role or the brief.
+becoming. The operational *how* lives in [`roles/flywheel.md`](https://github.com/eltmon/overdeck/blob/main/roles/flywheel.md).
+The loop's operating prompt is the [`pan-flywheel` skill](https://github.com/eltmon/overdeck/blob/main/sync-sources/skills/pan-flywheel/SKILL.md), and a bound order book under `.pan/orders/` sets the scope of a run.
+If the role or the skill drifts from this page, this page wins: fix the role or the skill.
 
 To run the Flywheel today, see [Flywheel](/features/flywheel).
 
@@ -27,8 +28,8 @@ This document names the mental model, the vocabulary, and the measurable criteri
 ### Today: the Flywheel as substrate dev-loop
 
 The Flywheel takes whatever work is moving through Overdeck and watches it flow. When a stage
-misbehaves — a review specialist fails to block obvious issues, a test agent loops, a merge
-gate confuses itself, a planning artifact lands at the wrong path — the failure is a defect in
+misbehaves (a review specialist fails to block obvious issues, a test agent loops, a merge
+gate confuses itself, a planning artifact lands at the wrong path), the failure is a defect in
 Overdeck, not in the work. We call those **substrate bugs**.
 
 The work issue is almost a vehicle. The real product of a revolution is:
@@ -38,7 +39,7 @@ The work issue is almost a vehicle. The real product of a revolution is:
 3. Zero or more substrate-bug fixes merged (often before the original work merges).
 
 Every substrate bug is a step toward v1.0. The Flywheel exists to expose them faster than we'd
-find them with manual usage — and to fix them at the root, so each revolution leaves the
+find them with manual usage, and to fix them at the root, so each revolution leaves the
 substrate permanently better. **A workaround is a failed tick.**
 
 ### v1.0: the Flywheel as user-facing pipeline
@@ -52,7 +53,7 @@ human approves.
 At v1.0, **the only required human input is UAT (optional, per-issue) and merge approval.**
 Users who trust the system more flip per-issue toggles to skip UAT for low-risk classes of
 work; users who trust it less keep UAT required for everything. The substrate doesn't change
-either way — only the human checkpoints do.
+either way: only the human checkpoints do.
 
 ### What changes between today and v1.0
 
@@ -60,84 +61,89 @@ either way — only the human checkpoints do.
 |---|---|---|
 | Who files issues | Mostly us, often Overdeck agents | Mostly users |
 | Who picks up from backlog | Operator releases each item (`auto_pickup_backlog` OFF) | The pipeline, by sequencer priority (`auto_pickup_backlog` ON) |
-| Substrate-bug discovery rate | High — expected, that's the point | Low — bounded by error budget |
+| Substrate-bug discovery rate | High: expected, that's the point | Low: bounded by error budget |
 | Required human input | UAT + merge + frequent intervention | UAT (optional) + merge |
 | Flywheel posture | Surface and fix our own defects | Deliver user work |
 
-The Flywheel doesn't disappear at v1.0. It changes role — from "exposes our own defects" to
-"drives the user's pipeline" — the same orchestration loop with different defaults and a much
+The Flywheel doesn't disappear at v1.0. It changes role, from "exposes our own defects" to
+"drives the user's pipeline": the same orchestration loop with different defaults and a much
 smaller intervention rate.
 
 ## Definitions
 
-- **Substrate bug** — a defect in Overdeck itself: a broken route, a misbehaving role prompt, a
+- **Substrate bug**: a defect in Overdeck itself: a broken route, a misbehaving role prompt, a
   wrong gate condition, a flaky lifecycle transition, a UI that lies about state. Substrate
   bugs are filed against `eltmon/overdeck` and fixed through the normal Overdeck pipeline.
-- **Work-code bug** — a defect in the application code an issue agent is producing. Work-code
-  bugs are normal pipeline operation, not a v1.0 signal — review and test agents catch them.
-- **Pipeline run** — one issue's journey from `start` to `merged` (or to `parked`/`cancelled`).
+- **Work-code bug**: a defect in the application code an issue agent is producing. Work-code
+  bugs are normal pipeline operation, not a v1.0 signal: review agents and CI tests catch them.
+- **Pipeline run**: one issue's journey from `start` to `merged` (or to `parked`/`cancelled`).
   The Flywheel may have many issues in flight; each is its own run for measurement.
-- **Pipeline pass** — a single end-to-end completion: plan → work → review → test → merge. A
-  run may take multiple passes if review or test rejects work and the agent re-submits.
-- **Operator intervention** — any human action on a run beyond clicking merge: filing a
+- **Pipeline pass**: a single end-to-end completion: plan, work, review, tests, merge. Tests run
+  as CI on the PR head; the automatic test-agent step after review does not run today
+  ([#5537](https://github.com/eltmon/overdeck/issues/5537)). A run may take multiple passes if
+  review or test rejects work and the agent re-submits.
+- **Operator intervention**: any human action on a run beyond clicking merge: filing a
   substrate bug, telling an agent something, pausing/resuming, restarting a review cycle,
-  editing a workspace file, manual merge resolution. UAT is *not* an intervention — it's the
+  editing a workspace file, manual merge resolution. UAT is *not* an intervention: it's the
   expected human checkpoint.
-- **Substrate-bug discovery rate** — substrate bugs filed per pipeline run, over a rolling
+- **Substrate-bug discovery rate**: substrate bugs filed per pipeline run, over a rolling
   window. The headline v1.0 metric.
 
 ## The autonomy model
 
 Three properties govern how much the Flywheel does on its own. The first is a permanent
-security invariant; the other two are operator toggles (persisted in the `app_settings` SQLite
-table, user-machine level) that move the human checkpoints without changing the substrate.
+security invariant; the other two are operator toggles (persisted as `flywheel.auto_pickup_backlog`
+and `flywheel.require_uat_before_merge` in the `app_settings` SQLite table, user-machine level)
+that move the human checkpoints without changing the substrate.
 
 ### Author + assignee invariant (security-critical, always on)
 
 The Flywheel includes an issue in inventory and suggestions **only if at least one of**:
 
 - `author.login` is `eltmon` (project owner), **OR**
-- `author.login` is `panopticon-agent[bot]` (the Overdeck GitHub App), **OR**
+- `author.login` is `overdeck-agent[bot]` (the Overdeck GitHub App), **OR**
 - `assignees[].login` contains `eltmon` (operator has personally assigned the issue).
 
-Any other state — third-party author and `eltmon` not among assignees — is out of scope. When
+Any other state (third-party author and `eltmon` not among assignees) is out of scope. When
 auto-pickup is ON, this filter is the only safeguard between an attacker filing a malicious
 issue and the Flywheel autonomously running an agent against it. It applies *always*,
 regardless of any toggle, and has no relaxation flag.
 
-### Auto-pickup from backlog (`auto_pickup_backlog`, default OFF) — the master autonomy switch
+### Auto-pickup from backlog (`auto_pickup_backlog`, default OFF): the master autonomy switch
 
-- **OFF (dev-loop today):** the Flywheel works only in-flight work plus emergency `blocks-main`
-  unblockers. Routine backlog stays off the start list; the operator feeds specific items in by
-  **Releasing** them. The Flywheel still *plans* ready backlog aggressively, so a deep
-  *awaiting-release* queue is always there for the operator.
+- **OFF (dev-loop today):** the Flywheel works in-flight issues and the issues the operator
+  releases, either with the `released` label or by adding them to the active order book. The
+  Flywheel still *plans* ready backlog aggressively, so a deep *awaiting-release* queue is
+  always there for the operator.
 - **ON (v1.0 posture):** the toggle is a **blanket release**. The Flywheel auto-starts `ready
-  && planned` backlog in **sequencer-priority order**, bounded by `roles.flywheel.maxAgents`.
-  The gates that still apply are `vetoed` (absolute stop), `parked`/`needs-design`/
-  `needs-discussion`, `objection` (an AI relevance hold), and the relevance-vet.
+  && planned` backlog in **sequencer-priority order**, bounded by `roles.flywheel.maxAgents`
+  (default 30). The gates that still apply are `vetoed` (absolute stop), `parked`/`needs-design`/
+  `needs-discussion` (the legacy spellings of `parked`) and `objection` (an AI relevance hold).
 
 A single predicate is the source of truth: `isAutoPickable` in
 [`src/lib/backlog/pickup.ts`](https://github.com/eltmon/overdeck/blob/main/src/lib/backlog/pickup.ts), shared by the dashboard forecast
 and the Flywheel so they can never disagree:
 
-    ready && planned && (released || auto_pickup_backlog) && !parked && !vetoed && !objection && !inPipeline && !epic
+    ready && planned && (released || auto_pickup_backlog || activeBookMember) && !parked && !vetoed && !objection && !inPipeline && !epic
 
 ### UAT-required-before-merge (`require_uat_before_merge`, default ON)
 
-"Human merges" and "human UATs" are independent constraints. When `true` (today's default),
-merge cannot proceed until a human marks UAT passed. When `false`, the merge gate only requires
-the configured CI checks (`overdeck/review` + `overdeck/test`); the human still clicks merge.
-The "auto-merge" side — automatically clicking MERGE after a cooldown when every gate is green
-— composes orthogonally:
+This setting decides whether Overdeck may merge a pull request on its own, unless an issue or project override applies.
+When it is on (the default), every issue defaults to **held**: Overdeck never merges the PR itself, and a human tests it
+and clicks Merge. When it is off, issues default to **auto**: once the PR is approved at its head commit, every check is
+green and GitHub says it is mergeable, Overdeck waits five minutes, so you can cancel, and then merges it. On a held
+issue, a failed browser UAT verdict also blocks the Merge button.
 
-| `require_uat_before_merge` | auto-merge enabled | Behavior |
-|---|---|---|
-| `true` (default) | `false` (default) | Human UATs, human clicks merge |
-| `true` | `true` | Human UATs, system auto-merges after cooldown |
-| `false` | `false` | Human merges without requiring UAT |
-| `false` | `true` | Unattended merge after cooldown; only for trusted classes of work |
+The setting is the last of three tiers, and the first one that is set wins:
 
-The model we want for v1.0 is "relax UAT for trusted work, but a human always owns the merge."
+1. The issue's `auto-merge` or `hold-for-uat` label (the auto-merge toggle on the issue sets it).
+2. The project's `auto_merge_default` (`auto` or `hold`) in `projects.yaml`.
+3. The global `require_uat_before_merge`.
+
+`OVERDECK_DISABLE_AUTO_MERGE=1` turns automatic merging off on a machine. See [Auto-merge](/configuration/auto-merge).
+
+The model we want for v1.0 is "relax UAT for trusted work, but a human always owns the merge." Auto mode already
+merges without a click, so today that goal holds only for held issues.
 
 ## v1.0 readiness criteria
 
@@ -150,11 +156,15 @@ days**:
 |---|---|---|---|
 | 1 | [Substrate-bug discovery rate (per pipeline run)](https://github.com/eltmon/overdeck/blob/main/docs/FLYWHEEL.md) | **< 2%** (≤ 1 per 50 runs) | Best-in-class defect escape rate (&lt;2%, Capers Jones) |
 | 2 | [Critical/P0 substrate bugs](https://github.com/eltmon/overdeck/blob/main/docs/FLYWHEEL.md) | **0** in rolling 30-day window | DRE convention: zero critical escapes |
-| 3 | [Pipeline pass success rate (substrate-attributable failures only)](https://github.com/eltmon/overdeck/blob/main/docs/FLYWHEEL.md) | **≥ 99%** | Google/Shopify CI SLO framing |
-| 4 | [MTTR for a filed substrate bug (filed → fix merged)](https://github.com/eltmon/overdeck/blob/main/docs/FLYWHEEL.md) | **< 24h median, < 1 week p95** | DORA Elite (&lt;1hr) scaled for internal tooling |
-| 5 | [Operator intervention rate per pipeline run](https://github.com/eltmon/overdeck/blob/main/docs/FLYWHEEL.md) | **< 5%** | Inverted from frontier agent autonomy on SWE-bench Verified |
-| 6 | [Time-in-pipeline consistency, per complexity bucket](https://github.com/eltmon/overdeck/blob/main/docs/FLYWHEEL.md) | **p95 within 2× median** | Shopify CI p95 < 2.5× target |
-| 7 | [Flake rate on substrate-attributable failures](https://github.com/eltmon/overdeck/blob/main/docs/FLYWHEEL.md) | **< 5%** | Tighter than Google's 16% / Microsoft's 13% |
+| 3 | Pipeline pass success rate (substrate-attributable failures only) | **≥ 99%** | Google/Shopify CI SLO framing |
+| 4 | MTTR for a filed substrate bug (filed → fix merged) | **< 24h median, < 1 week p95** | DORA Elite (&lt;1hr) scaled for internal tooling |
+| 5 | Operator intervention rate per pipeline run | **< 5%** | Inverted from frontier agent autonomy on SWE-bench Verified |
+| 6 | Time-in-pipeline consistency, per complexity bucket | **p95 within 2× median** | Shopify CI p95 < 2.5× target |
+| 7 | Flake rate on substrate-attributable failures | **< 5%** | Tighter than Google's 16% / Microsoft's 13% |
+
+Overdeck measures criteria 1 and 2 today with `pan flywheel stats`: criterion 1 as substrate bugs
+(issues labeled `substrate-improvement`) filed per merged PR. Criteria 3 to 7 have no telemetry
+yet.
 
 Why "all of the above" and not a weighted score: a single metric can be gamed (fewer runs →
 fewer bugs) or hidden (intervene constantly → success rate looks fine). The combination forces
@@ -163,7 +173,7 @@ afterward we re-affirm v1.0 or name the bottleneck criterion.
 
 **What "v1.0" does not mean:** not "no bugs ever" (criterion 1 leaves an error budget); not "no
 human in the loop" (humans still UAT and approve merges); not "all features done" (v1.0 is
-about substrate reliability — feature work continues after).
+about substrate reliability; feature work continues after).
 
 ## How we measure
 
@@ -176,7 +186,7 @@ per pipeline run" has no direct published benchmark:
 2. **Pass success rate ↔ CI/CD SLO.** Google SRE and Shopify treat CI/CD as a 99%-availability
    service with a 1% error budget; we scope the 99% to substrate-attributable failures.
 3. **Intervention rate ↔ agent-autonomy benchmarks.** Top SWE-bench Verified systems sit at
-   80–94%; our &lt;5% intervention target is *stricter than the agent layer* because the substrate
+   80 to 94%; our &lt;5% intervention target is *stricter than the agent layer* because the substrate
    is supposed to be the reliable part.
 
 Sources: [DORA 2024](https://dora.dev/research/2024/dora-report/) ·
@@ -191,31 +201,20 @@ This is why the criteria are **draft** and revisited after ~1 month of data.
 
 ## The path there
 
-The work that gets us to v1.0 is tracked by the `v1.0-required` GitHub label, which is the
-canonical, always-current list — this doc deliberately does not inline it, because a snapshot
-here goes stale while the label stays true:
-
-> **Live critical path:** [open `v1.0-required` issues](https://github.com/eltmon/overdeck/issues?q=is%3Aissue+is%3Aopen+label%3A%22v1.0-required%22)
+The `v1.0-required` GitHub label marks work on the path to v1.0. It has no open issues right now:
+[`v1.0-required` issues](https://github.com/eltmon/overdeck/issues?q=is%3Aissue+label%3A%22v1.0-required%22).
 
 The minimum bar underneath every criterion is **substrate-bug provenance + telemetry** (so the
 seven criteria can be measured at all) and **metric-aware prioritization** (so the bottleneck
-criterion bubbles to the top of the sequencer rather than P-level and age alone). Substrate bugs
-declare affected v1.0 criteria via the `Flywheel-Affects-Criterion` trailer; `pan flywheel weights --json`
-computes a per-bug weight from live telemetry, and the Flywheel orders substrate-hardening
-suggestions by that weight within the tier. See `docs/FLYWHEEL.md` for the trailer format and the
-weight model. The Flywheel and the backlog sequencer prioritize substrate-hardening epics first:
-a stable substrate is the prerequisite for everything else on the path.
+criterion bubbles to the top of the sequencer rather than P-level and age alone). `pan flywheel
+stats --json` reports the substrate-bug rate and the P0 count. The Flywheel and the backlog
+sequencer prioritize substrate-hardening epics first: a stable substrate is the prerequisite for
+everything else on the path.
 
 ## Open questions
 
 Decisions we haven't made and don't need to make today, but should revisit before v1.0:
 
-- **Per-issue UAT override.** Once the global `require_uat_before_merge` flag exists, do we add
-  a per-issue override (a `bypass-uat` label or an xBRIEF field)? Defer until after the global
-  toggle has run for a while.
-- **Substrate-bug label.** A dedicated `substrate-bug` label for visibility, separate from the
-  commit-trailer provenance? Probably yes for visibility — but it never replaces provenance
-  (labels can be edited; trailers can't).
 - **What counts as a pipeline run for measurement?** Does a parked/cancelled issue count? We may
   scope the denominator to runs that reach at least the work stage.
 - **When to retire this doc.** At v1.0 it transitions from "north star" to "history of how we got
@@ -226,11 +225,11 @@ Decisions we haven't made and don't need to make today, but should revisit befor
 - [`roles/flywheel.md`](https://github.com/eltmon/overdeck/blob/main/roles/flywheel.md): the **durable doctrine**, root-cause rules and
   the load-bearing rails (author/assignee gate, pickup gate, veto, saturation cap). The tick
   loop itself is the `pan-flywheel` skill.
-- `docs/flywheel-brief.md`: the **per-run scope contract**, scope
-  and this run's config. The *what-this-run*.
+- [`sync-sources/skills/pan-flywheel/SKILL.md`](https://github.com/eltmon/overdeck/blob/main/sync-sources/skills/pan-flywheel/SKILL.md): the
+  tick loop, and `.pan/orders/`: the order books that scope a run.
 - [`docs/FLYWHEEL.md`](https://github.com/eltmon/overdeck/blob/main/docs/FLYWHEEL.md): technical reference for the contract, lifecycle, and
   dashboard surfaces.
-- `docs/FLYWHEEL-STATE.md`: durable cumulative memory authored by the
-  orchestrator across runs.
-- [`packages/contracts/src/flywheel.ts`](https://github.com/eltmon/overdeck/blob/main/packages/contracts/src/flywheel.ts): the
-  `FlywheelStatus` schema the orchestrator emits each tick.
+- `.pan/flywheel/state.md`: the loop's memory across runs, and `.pan/flywheel/report.md`: the
+  latest run report.
+- [`packages/contracts/src/flywheel-derived.ts`](https://github.com/eltmon/overdeck/blob/main/packages/contracts/src/flywheel-derived.ts): the
+  `FlywheelDerivedStatus` shape that `pan flywheel status` and the Flywheel page compute on read.
