@@ -1,6 +1,7 @@
 ---
-title: Skills Commands
-description: List skills, set on/off overrides, and manage skill packs
+title: "Skills commands: pan skills, overrides and skill packs"
+sidebarTitle: "Skills Commands"
+description: "List skills, set on, off or inherit overrides per level, add skills to a running conversation, and add, update and remove skill packs."
 ---
 
 # Skills Commands
@@ -39,9 +40,11 @@ no error is shown.
 ```bash
 pan skills set <skill> <state>
 pan skills set --pack <id> <state>
+pan skills set --group <name> <state>
 ```
 
-Sets a native skill, a pack skill (`<pack>/<skill>`), or a whole pack to
+Sets a native skill, a pack skill (`<pack>/<skill>`), a whole pack, or every
+pack of a [pack group](/features/skill-packs#pack-groups) to
 `on`, `off`, or `inherit`, at the global, project, or issue level.
 
 | Flag | Effect |
@@ -49,15 +52,16 @@ Sets a native skill, a pack skill (`<pack>/<skill>`), or a whole pack to
 | `--project <key>` | Project override |
 | `--issue <id>` | Issue override |
 | `--pack <id>` | Set a whole skill pack instead of one skill |
+| `--group <name>` | Set every pack of a [pack group](/features/skill-packs#pack-groups) (for example `video`); every member must be added first |
 
 ```bash
 pan skills set mattpocock/grilling on --project myapp
 ```
 
-Takes exactly one positional (the state) with `--pack`, two (the skill and
-the state) without it. Exits 1 on the wrong positional count, a state that
-is not `on`, `off`, or `inherit`, or passing `--project` and `--issue`
-together.
+Takes exactly one positional (the state) with `--pack` or `--group`, two
+(the skill and the state) without them. Exits 1 on the wrong positional
+count, a state that is not `on`, `off`, or `inherit`, passing `--pack` and
+`--group` together, or passing `--project` and `--issue` together.
 
 It also exits 1 on any of these store errors, each with its own message:
 
@@ -70,6 +74,10 @@ It also exits 1 on any of these store errors, each with its own message:
 - `cannot parse <path>: …` (the global `config.yaml`)
 - `could not commit <path>: …`
 
+With `--group`, it also exits 1 with `unknown pack group: <name> (known: …)`,
+or with `pack <id> is not added; run pan skills pack add --group <name>` for
+each member that is not added; nothing is set then.
+
 With `--issue`, `set` writes `<planHome>/.pan/skill-overrides/<ISSUE>.yaml`, committed in the plan home on its checked-out branch (normally `main`) and pushed to that branch's upstream, and prints `(committed <sha>, pushed)` or `(committed <sha>, push pending: <reason>)`.
 
 ## pan skills add
@@ -79,8 +87,9 @@ pan skills add <conversation> [--pack <id>]... [--skill <id>]... [--off <id>]...
 ```
 
 Adds pack skills to a conversation that is already running, and loads them.
-A Claude Code conversation loads them in place with `/reload-plugins` and
-keeps its context; Codex, native skills and launch-wired packs (`deft`,
+In the dashboard, the same action is **Add skills…** in the conversation
+menus. A Claude Code conversation loads them in place with `/reload-plugins`
+and keeps its context; Codex, native skills and launch-wired packs (`deft`,
 `sageox`, gstack-runtime packs, packs with MCP servers) need a restart.
 `<conversation>` is a conversation name, or `self` for the conversation the
 command runs in.
@@ -99,21 +108,25 @@ pan skills add conv-20261117-ab12 --pack mattpocock
 Prints one sentence for the outcome (`hot`, `sent`, `queued`,
 `needs-restart`, `restarted` or `next-launch`; see
 [Adding skills to a running conversation](/features/skill-packs#adding-skills-to-a-running-conversation)),
-then each warning on its own line. It exits 1 when the dashboard is not
-reachable, when the dashboard refuses the request (the message is printed),
-for `self` outside a conversation, and for `self --restart`, which a
-conversation cannot do to itself.
+then each warning on its own line. Only Claude Code and Codex conversations
+take skill packs; for any other harness the dashboard refuses with
+`Skill packs apply only to Claude Code and Codex conversations`. It exits 1
+when the dashboard is not reachable, when the dashboard refuses the request
+(the message is printed), for `self` outside a conversation, and for
+`self --restart`, which a conversation cannot do to itself.
 
 ## pan skills pack add
 
 ```bash
 pan skills pack add <id> [url] [--ref <ref>] [--adapter <adapter>] [--browser] [--yes]
+pan skills pack add --group <name> [--yes]
 ```
 
 Registers a git skill pack at the commit a ref resolves to and trusts it;
 enables nothing. Known packs (`mattpocock`, `pstack`, `gstack`, `deft`,
-`sageox`, `atlassian`) default the url and, for `pstack`, `sageox` and
-`atlassian`, the ref. For `sageox`, the preview also lists the `go build`
+`sageox`, `atlassian`, `remotion`, `hyperframes`, `openmontage`, `video-use`)
+default the url and, for every one except `mattpocock`, `gstack` and `deft`,
+the ref. For `sageox`, the preview also lists the `go build`
 commands, the paths they write and the downloads, and trusting the commit
 builds `ox` and its two adapters before the pack is registered. When a
 `claude-plugin` pack declares applied MCP servers (see
@@ -123,6 +136,7 @@ commit records your consent to them.
 
 | Flag | Effect |
 | --- | --- |
+| `--group <name>` | Add every pack of a [pack group](/features/skill-packs#pack-groups) (for example `video`) in order, each with its known url and ref |
 | `--ref <ref>` | Tag, branch or commit to pin (default: the known pack ref) |
 | `--adapter <adapter>` | `plain`, `claude-plugin`, `deft-readonly`, or `gstack-runtime` |
 | `--browser` | Also build the browser runtime (gstack; asks separately) |
@@ -140,7 +154,10 @@ or a failed build is a pack source error. With
 `--browser`, the pack is registered as soon as the commit is trusted; a
 declined or failed browser-runtime step then exits 1 with the pack already
 registered. Finish it with `pan skills pack browser <id>` rather than
-retrying `pack add`.
+retrying `pack add`. With `--group`, a member that is already added prints
+`<id>: already added` and is skipped; any declined or failed member exits 1
+after the rest are tried. `--group` takes no id, url, `--ref`, `--adapter`
+or `--browser`.
 
 ## pan skills pack update
 
@@ -171,8 +188,11 @@ Exits 1 on a pack source error, or when the new commit was not trusted.
 pan skills pack list [--json] [--offline]
 ```
 
-Lists registered skill packs with their source, cache state, license,
-skill count, and what is not applied.
+Lists registered skill packs with their source, cache state, license, skill
+count, what is not applied, and `update available: <commit>` when the ref
+has moved. Text output then lists the known packs you have not added, each
+with the command that adds it, and the pack groups with any members not
+added; `--json` prints only the registered packs.
 
 | Flag | Effect |
 | --- | --- |
@@ -336,7 +356,8 @@ committed link is used. When a link is already stored, it prints
 it prints `the SageOx ledger is not cloned yet; ox clones it in the
 background. Check with: <bin> status` and still exits 0.
 
-Exits 1 on an unknown project, when `ox` is not built
+Exits 1 on an unknown project, when the `sageox` pack is not registered
+(`pan skills pack add sageox`), when `ox` is not built
 (`pan skills pack sync sageox`), when the login file is missing
 (`SageOx login not found. Run: <bin> login`), when the fetch fails, when
 `ox init` fails (the last 20 lines of its output are printed), or when

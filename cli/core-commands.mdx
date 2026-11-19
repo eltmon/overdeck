@@ -1,9 +1,8 @@
 ---
-title: Core Commands
+title: "Core pan commands: install, sync, doctor, up, restart and reload"
+sidebarTitle: "Core Commands"
 description: "Core pan commands to install, sync, run, reload, restart, shut down, update and check Overdeck, plus costs and presets."
 ---
-
-import { ThemedImage } from "/snippets/themed-image.mdx";
 
 Core system management commands for Overdeck.
 
@@ -17,24 +16,31 @@ pan install
 
 # Minimal install (skip Traefik, use ports)
 pan install --minimal
+
+# Check prerequisites only
+pan install --check
 ```
 
 This command:
 - Installs ttyd (web terminal)
+- Installs and verifies Herdr, the default terminal backend (`--skip-herdr` on tmux-only hosts)
 - Installs the tools Overdeck needs for managed workspaces
 - Optionally sets up Traefik and mkcert for HTTPS
 - Creates necessary configuration directories
-- Sets up git hooks for registered projects
+- Installs the Claude Code heartbeat hooks (git hooks for registered projects come from `pan sync`)
 
 The prerequisite gate only fails on Node, git, and (under the tmux backend) tmux. Docker, ast-grep, and (under Herdr) tmux print a yellow warning instead of failing, and installation continues.
 
 ## pan sync
 
-Sync skills and configuration to all AI tools.
+Sync skills and render managed launch context for the harnesses Overdeck runs.
 
 ```bash
 pan sync
+pan sync --dry-run   # show what would be synced
 ```
+
+`--force` overwrites files you modified since Overdeck installed them; `--diff` shows those changes.
 
 This command:
 - Copies skills from `~/.overdeck/skills/` to AI tool directories
@@ -42,7 +48,7 @@ This command:
 - Prunes managed cache and target files when their bundled source is removed
 - Preserves user-owned files and reports user-modified stale files instead of deleting them
 - Skips empty bundled skill directories instead of propagating them into caches
-- Syncs to Codex, Cursor, Gemini CLI, and Google Antigravity
+- Copies native skill bundles to `~/.agents/skills/`, where Codex, Pi and Oh My Pi discover them
 - Installs/updates git hooks in all registered projects
 
 Run this after:
@@ -60,16 +66,17 @@ pan doctor
 ```
 
 Checks:
-- Node.js version (22+ required)
+- Node.js and the Claude CLI are installed (errors when missing; the CLI itself needs Node 22.16 or later)
 - Git installation
-- Docker installation and status
+- Docker installation (an optional warning), its bridge-network pool and compose-label drift
 - tmux installation (a warning, not an error, when Herdr is the terminal backend)
+- Herdr terminal backend: binary, server and config (errors when Herdr is selected but unavailable)
 - Claude Code and GitHub CLI login state (warnings)
-- Required CLI tools (gh, glab)
-- Configuration files
-- API key validity
-- Workspace health
-- Traefik status (if installed)
+- GitHub CLI (an optional warning)
+- Overdeck directories (`~/.overdeck`, skills, commands, agents) and `~/.overdeck.env`
+- Whether `LINEAR_API_KEY` is set (presence only, a warning)
+- Agent and workspace drift: closed-issue agent dirs, stopped-list classification and orphaned proposed specs
+- Traefik port binding (when `traefik.enabled` is true)
 
 Returns a health report with recommendations for any issues found.
 
@@ -98,6 +105,8 @@ pan doctor --json
 
 The exit code matches text mode: `1` when any check is `error`, or when any
 check is `warn` and `--strict` was passed; otherwise `0`.
+
+`pan doctor github-quota` shows GitHub API quota use per caller, active pauses and skipped projects.
 
 ## pan semgrep ci-setup
 
@@ -129,13 +138,13 @@ pan computer get-app-state --app gnome-calculator --query 7
 pan computer click --app gnome-calculator --element-index 12
 ```
 
-It needs `computer_use.enabled: true` (global config only) and a Linux desktop
-with a logged-in session. See [Computer use](/configuration/computer-use).
+It needs `computer_use.enabled: true` (global config only) and a logged-in desktop
+session on Linux, macOS, or Windows through WSL2. See [Computer use](/configuration/computer-use).
 
 ## pan diagnose
 
 Collect a redacted diagnostic bundle and, with your consent, start Claude
-Code or Codex in that bundle's directory to find and fix the problem. It
+Code or Codex, pointed at that bundle, to find and fix the problem. It
 works even when the dashboard, the supervisor, or Herdr is down, which is
 exactly when you need it most.
 
@@ -152,7 +161,7 @@ Flags: `--harness <claude-code|codex>`, `--describe <text>`, `--bundle-only`
 launch confirmation).
 
 Before starting a harness, `pan diagnose` always prints the bundle path and
-its file list, then asks for confirmation; nothing launches without it. See
+its file list, then asks for confirmation unless you pass `--yes`. See
 [DIAGNOSTICS-BUNDLE.md](https://github.com/eltmon/overdeck/blob/main/docs/DIAGNOSTICS-BUNDLE.md)
 for exactly what the bundle holds, what is redacted, and what is never
 collected.
@@ -176,44 +185,36 @@ Start the Overdeck dashboard and services.
 # Start with default settings
 pan up
 
-# Minimal mode (without Traefik)
-pan up --minimal
+# Skip Traefik startup
+pan up --skip-traefik
+
+# Run in the background
+pan up --detach
 ```
 
+`pan up` runs in the foreground by default.
+
 Starts:
-- **Frontend** - React dashboard (default: http://localhost:3010)
-- **API Server** - Backend API (default: http://localhost:3011)
-- **Traefik** - Reverse proxy (if installed)
+- **Dashboard** - the React dashboard and its API, served by one Node server (default: http://localhost:3011)
+- **Traefik** - Reverse proxy (when `traefik.enabled` is true; skip with `--skip-traefik`)
 
 With HTTPS enabled:
 - Dashboard: https://overdeck.localhost
-- Traefik UI: https://traefik.overdeck.localhost:8080
+- Traefik UI: https://traefik.overdeck.localhost (or http://localhost:8080)
 
 The dashboard provides:
-- Kanban board of issues
-- Agent monitoring
-- Real-time activity logs
-- Cost tracking
+- Board (Kanban view of issues)
+- Agent monitoring (Agents page, behind Settings → Experimental)
+- Real-time activity logs (behind Settings → Experimental)
+- Cost tracking (Costs page, behind Settings → Experimental)
 - Skills browser
-- Health checks
+- Health checks (Health page, behind Settings → Experimental)
 
 Beyond the board, the dashboard is where you watch and steer live agent
 conversations and the work moving through the pipeline. The Pipeline page
-groups every active issue by phase (Ship, Review, and Verifying) above a
-metric strip tracking active issues, work running, the review queue, ship
-count, and spend, with a live activity feed alongside.
-
-<ThemedImage
-  light="/images/dashboard/pipeline-light.png"
-  dark="/images/dashboard/pipeline-dark.png"
-  alt="Pipeline page: a metric strip (Active issues, Work running, Review queue, Ship, Spend) over phase-grouped issue rows for Ship, Review, and Verifying, with an activity feed on the right"
-/>
-
-<Tip>
-  The metric strip is the fastest way to answer "where are we?" at a glance:
-  it surfaces how many agents are working, how deep the review queue is, and
-  the running spend without opening any individual issue.
-</Tip>
+groups every active issue by phase (Ship, Review, Work, Plan and Ready) under
+a metric strip of active issues, work running, review running, ready to ship
+and 24-hour spend. See [Dashboard views](/features/dashboard-views).
 
 ## pan down
 
@@ -224,12 +225,12 @@ pan down
 ```
 
 This command:
-- Stops the frontend and API server
-- Optionally stops Traefik
-- Does NOT stop running agents (use `pan kill` for that)
+- Stops the dashboard, the supervisor sidecar, the smee-client relay, review sessions and the CLIProxy sidecar
+- Stops Traefik when it is enabled, unless you pass `--skip-traefik`
+- Does NOT stop work agents or conversations (use `pan kill` for that); review sessions are stopped
 - Does NOT affect workspaces or containers
 
-Agents continue running independently in tmux sessions.
+Agents keep running in their terminal-backend sessions (Herdr by default).
 
 ## pan restart
 
@@ -320,8 +321,9 @@ See [Safe shutdown](/features/safe-shutdown) for what happens phase by phase.
 
 ## pan update
 
-Check npm for the latest `@overdeck/core`, install it globally, run an automatic sync, then tell
-you to restart the dashboard and running agents.
+Check npm for the latest `@overdeck/core`, install it (globally, or into `~/.overdeck/runtime` for
+a runtime install), run `pan sync` when `sync.auto_sync` is on (off by default), then tell you to
+restart running agents (global install) or the dashboard (runtime install).
 
 ```bash
 pan update
@@ -428,7 +430,7 @@ pan tts test "deployment finished"
 
 ## pan backup
 
-`pan sync` backs up the synced skill and command directories before each sync and prunes old
+`pan sync` backs up the synced skill, command and agent directories before each sync and prunes old
 backups automatically; backups live in `~/.overdeck/backups/`.
 
 ```bash
@@ -448,32 +450,24 @@ from the 10 newest.
 
 ```bash
 pan restore
-pan restore 2026-11-01T04-52-00
+pan restore 2026-11-01T04-52-00-000Z
 ```
 
 ## pan health
 
-Check the health of all Overdeck services.
+Check whether the dashboard, the smee-client webhook relay and the CLIProxy sidecar are running.
 
 ```bash
 pan health
 ```
 
 Shows status of:
-- Dashboard (frontend) - Running/stopped
-- API server - Running/stopped + health endpoint check
-- Traefik - Running/stopped (if installed)
-- Running agents - Count and session IDs
-- Workspaces - Count and disk usage
-- Docker containers - Count and status
-
-Returns:
-- Exit code 0 if all services healthy
-- Exit code 1 if any service is down
+- Dashboard - running, or not running (`/api/health` check)
+- smee-client webhook relay - running, configured but not running, or not configured
+- CLIProxy sidecar - running or not running
 
 Useful for:
 - Pre-flight checks before spawning agents
-- Monitoring in automation scripts
 - Troubleshooting issues
 
 ## Next Steps

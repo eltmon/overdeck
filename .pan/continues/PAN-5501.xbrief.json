@@ -1,0 +1,374 @@
+{
+  "version": "1",
+  "issueId": "PAN-5501",
+  "created": "2026-11-19T01:05:44.105Z",
+  "updated": "2026-11-19T02:01:11.115Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-19T01:55Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-19T01:55:10.303Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-19T02:01:11.115Z"
+    }
+  ],
+  "items": {
+    "overview-page": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5501",
+      "claimedAt": "2026-11-19T01:05:44.105Z",
+      "doneAt": "2026-11-19T01:09:28.326Z"
+    },
+    "overview-page.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:09:28.326Z"
+    },
+    "overview-page.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:09:28.326Z"
+    },
+    "overview-page.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:09:28.326Z"
+    },
+    "overview-page.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:09:28.326Z"
+    },
+    "overview-page.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:09:28.326Z"
+    },
+    "core-install-to-hygiene": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5501",
+      "claimedAt": "2026-11-19T01:09:50.593Z",
+      "doneAt": "2026-11-19T01:13:41.434Z"
+    },
+    "core-install-to-hygiene.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:13:41.434Z"
+    },
+    "core-install-to-hygiene.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:13:41.434Z"
+    },
+    "core-install-to-hygiene.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:13:41.434Z"
+    },
+    "core-install-to-hygiene.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:13:41.434Z"
+    },
+    "core-install-to-hygiene.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:13:41.434Z"
+    },
+    "core-up-down": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5501",
+      "claimedAt": "2026-11-19T01:13:50.479Z",
+      "doneAt": "2026-11-19T01:15:14.860Z"
+    },
+    "core-up-down.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:15:14.860Z"
+    },
+    "core-up-down.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:15:14.860Z"
+    },
+    "core-up-down.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:15:14.860Z"
+    },
+    "core-up-down.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:15:14.860Z"
+    },
+    "core-restart-to-restore": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5501",
+      "claimedAt": "2026-11-19T01:15:22.905Z",
+      "doneAt": "2026-11-19T01:16:28.918Z"
+    },
+    "core-restart-to-restore.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:16:28.918Z"
+    },
+    "core-restart-to-restore.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:16:28.918Z"
+    },
+    "core-health-and-page-checks": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5501",
+      "claimedAt": "2026-11-19T01:16:34.188Z",
+      "doneAt": "2026-11-19T01:17:31.519Z"
+    },
+    "core-health-and-page-checks.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:17:31.519Z"
+    },
+    "core-health-and-page-checks.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:17:31.519Z"
+    },
+    "core-health-and-page-checks.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:17:31.519Z"
+    },
+    "hygiene-page": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5501",
+      "claimedAt": "2026-11-19T01:17:39.425Z",
+      "doneAt": "2026-11-19T01:18:39.806Z"
+    },
+    "hygiene-page.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:18:39.806Z"
+    },
+    "hygiene-page.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:18:39.806Z"
+    },
+    "hygiene-page.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:18:39.806Z"
+    },
+    "hygiene-page.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:18:39.806Z"
+    },
+    "agent-start-to-tell": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5501",
+      "claimedAt": "2026-11-19T01:18:47.212Z",
+      "doneAt": "2026-11-19T01:20:46.343Z"
+    },
+    "agent-start-to-tell.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:20:46.343Z"
+    },
+    "agent-start-to-tell.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:20:46.343Z"
+    },
+    "agent-start-to-tell.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:20:46.343Z"
+    },
+    "agent-start-to-tell.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:20:46.343Z"
+    },
+    "agent-pause-to-end": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5501",
+      "claimedAt": "2026-11-19T01:20:55.294Z",
+      "doneAt": "2026-11-19T01:22:27.869Z"
+    },
+    "agent-pause-to-end.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:22:27.869Z"
+    },
+    "agent-pause-to-end.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:22:27.869Z"
+    },
+    "agent-pause-to-end.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:22:27.869Z"
+    },
+    "agent-pause-to-end.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:22:27.869Z"
+    },
+    "review-page": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5501",
+      "claimedAt": "2026-11-19T01:22:35.049Z",
+      "doneAt": "2026-11-19T01:23:59.667Z"
+    },
+    "review-page.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:23:59.667Z"
+    },
+    "review-page.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:23:59.667Z"
+    },
+    "review-page.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:23:59.667Z"
+    },
+    "review-page.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:23:59.667Z"
+    },
+    "skills-page": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5501",
+      "claimedAt": "2026-11-19T01:24:06.807Z",
+      "doneAt": "2026-11-19T01:26:42.120Z"
+    },
+    "skills-page.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:26:42.120Z"
+    },
+    "skills-page.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:26:42.120Z"
+    },
+    "skills-page.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:26:42.120Z"
+    },
+    "skills-page.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:26:42.120Z"
+    },
+    "workspace-overview-and-docker": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5501",
+      "claimedAt": "2026-11-19T01:26:49.552Z",
+      "doneAt": "2026-11-19T01:31:39.725Z"
+    },
+    "workspace-overview-and-docker.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:31:39.725Z"
+    },
+    "workspace-overview-and-docker.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:31:39.725Z"
+    },
+    "workspace-overview-and-docker.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:31:39.725Z"
+    },
+    "workspace-list-to-safeguards": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5501",
+      "claimedAt": "2026-11-19T01:31:47.447Z",
+      "doneAt": "2026-11-19T01:34:01.419Z"
+    },
+    "workspace-list-to-safeguards.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:34:01.419Z"
+    },
+    "workspace-list-to-safeguards.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:34:01.419Z"
+    },
+    "workspace-list-to-safeguards.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:34:01.419Z"
+    },
+    "workspace-list-to-safeguards.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:34:01.419Z"
+    },
+    "conversation-page": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5501",
+      "claimedAt": "2026-11-19T01:34:09.253Z",
+      "doneAt": "2026-11-19T01:36:17.819Z"
+    },
+    "conversation-page.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:36:17.819Z"
+    },
+    "conversation-page.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:36:17.819Z"
+    },
+    "conversation-page.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:36:17.819Z"
+    },
+    "conversation-page.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:36:17.819Z"
+    },
+    "memory-page": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5501",
+      "claimedAt": "2026-11-19T01:36:25.366Z",
+      "doneAt": "2026-11-19T01:37:42.264Z"
+    },
+    "memory-page.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:37:42.264Z"
+    },
+    "memory-page.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:37:42.264Z"
+    },
+    "memory-page.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:37:42.264Z"
+    },
+    "pipeline-page": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5501",
+      "claimedAt": "2026-11-19T01:37:50.604Z",
+      "doneAt": "2026-11-19T01:40:37.194Z"
+    },
+    "pipeline-page.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:40:37.194Z"
+    },
+    "pipeline-page.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:40:37.194Z"
+    },
+    "pipeline-page.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:40:37.194Z"
+    },
+    "pipeline-page.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:40:37.194Z"
+    },
+    "validate-and-pr-body": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5501",
+      "claimedAt": "2026-11-19T01:40:44.897Z",
+      "doneAt": "2026-11-19T01:46:26.210Z"
+    },
+    "validate-and-pr-body.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:46:26.210Z"
+    },
+    "validate-and-pr-body.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:46:26.210Z"
+    },
+    "validate-and-pr-body.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:46:26.210Z"
+    },
+    "validate-and-pr-body.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:46:26.210Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-19T01:55:10Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5501\n\nPull request: https://github.com/eltmon/overdeck/pull/5573 (head `c3af268b`)\n\nSource: check_run:test-shard (1/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-shard (1/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/135276853123/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/44439600709/job/135276853123  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/__tests__/agent-text-cli-verbs.test.ts\u001b[2m > \u001b[22magent-facing text names only registered pan commands (PAN-3868, PAN-3934)\u001b[2m > \u001b[22mresolves every pan command in hooks, prompts, agents, rules, skills and CLI docs\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/__tests__/agent-text-cli-verbs.test.ts\u001b[2m > \u001b[22magent-facing text names only registered pan commands (PAN-3868, PAN-3934)\u001b[2m > \u001b[22mresolves every pan command in hooks, prompts, agents, rules, skills and CLI docs\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected [ 'cli/overview.mdx:104: pan help' ] to deeply equal []\u001b[39m\n\n\u001b[32m- Expected\u001b[39m\n\u001b[31m+ Received\u001b[39m\n\n\u001b[32m- []\u001b[39m\n\u001b[31m+ [\u001b[39m\n\u001b[31m+   \"cli/overview.mdx:104: pan help\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n\n\u001b[36m \u001b[2m❯\u001b[22m src/lib/__tests__/agent-text-cli-verbs.test.ts:\u001b[2m182:20\u001b[22m\u001b[39m\n    \u001b[90m180|\u001b[39m describe('agent-facing text names only registered pan commands (PAN-38…\n    \u001b[90m181|\u001b[39m   it('resolves every pan command in hooks, prompts, agents, rules, ski…\n    \u001b[90m182|\u001b[39m     \u001b[34mexpect\u001b[39m(\u001b[34mscan\u001b[39m())\u001b[33m.\u001b[39m\u001b[34mtoEqual\u001b[39m([])\u001b[33m;\u001b[39m\n    \u001b[90m   |\u001b[39m                    \u001b[31m^\u001b[39m\n    \u001b[90m183|\u001b[39m   })\u001b[33m;\u001b[39m\n    \u001b[90m184|\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\u001b[22m\u001b[39m\n\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m701 passed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[33m2 skipped\u001b[39m\u001b[90m (704)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ],
+  "agentModel": "claude-opus-5-5"
+}

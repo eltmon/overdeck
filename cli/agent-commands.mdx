@@ -1,22 +1,21 @@
 ---
-title: Agent Commands
+title: "Agent commands: pan start, status, tell, pause, kill and recover"
+sidebarTitle: "Agent Commands"
 description: "Commands that start, message, pause and stop Overdeck agents: pan start, pan status, pan tell, pan kill, pan reopen and related controls."
 ---
-
-import { ThemedImage } from "/snippets/themed-image.mdx";
 
 Spawn, monitor, and control autonomous AI coding agents.
 
 ## pan start
 
-Spawn an agent for a Linear or GitHub issue.
+Spawn an agent for an issue from a GitHub, Linear, Rally or Jira project.
 
 ```bash
 # Spawn an agent for a Linear issue
 pan start MIN-123
 
-# Spawn an agent for a GitHub issue
-pan start 42
+# GitHub issue #42 in the project whose issue_prefix is PAN
+pan start PAN-42
 ```
 
 This command:
@@ -36,6 +35,10 @@ pan start PAN-123 --machine desk
 pan start PAN-123 --machine auto --needs docker
 ```
 
+Other options: `--model`, `--harness` and `--effort` override the work role; `--force`
+clears paused, troubled and pending-decision gates; `--fresh` drops the saved session;
+`--remote` runs on a Fly.io workspace; `--dry-run` shows what would be created.
+
 ## pan status
 
 List all running agents and their status.
@@ -46,22 +49,20 @@ pan status --json
 ```
 
 Shows:
-- Agent session ID
-- Issue number and title
+- Agent ID (for example agent-pan-123)
+- Issue ID
 - Current status
 - Runtime duration
 - Workspace location
+- Harness, model, effort and role
+- A Gate line when paused or troubled, and STACK BROKEN when the workspace Docker stack is broken
 
-The dashboard's **Agents** page is the visual counterpart to this command. A metric strip across the top tallies how many agents are running, how many are stuck, and the rolling cost and token spend over the last 24 hours, with each agent rendered as a card showing its model, runtime, and last activity.
+`pan status --context` also shows each agent's context-window use.
 
-<ThemedImage
-  light="/images/dashboard/agents-light.png"
-  dark="/images/dashboard/agents-dark.png"
-  alt="Agents page: a metric strip for Running, Stuck, Cost 24h, Tokens 24h, runtime, and Queue over agent cards showing each agent's model, runtime, and last activity"
-/>
+The dashboard's **Agents** page is the visual counterpart to this command. It is experimental: turn on Settings → Experimental → **Experimental features** to show it. It opens on a Live view that groups running and in-pipeline agents into Needs you, Live and Waiting, one row per agent with its issue, reason, current tool and age, beside a preview of the selected agent's transcript. History lists finished agents.
 
 <Tip>
-Use `pan status` from the terminal for a quick check, and the Agents page when you want to watch many agents at once and spot stuck ones at a glance.
+Use `pan status` from the terminal for a quick check, and the Agents page (experimental) when you want to watch many agents at once and see which ones need you.
 </Tip>
 
 ## Targeting an agent
@@ -72,10 +73,10 @@ Use `pan status` from the terminal for a quick check, and the Agents page when y
 | --- | --- | --- |
 | Issue ID | `PAN-1148` | The issue's work agent (or its one registered non-work agent, such as a strike session) |
 | Agent ID | `agent-pan-1148`, `strike-pan-1723`, `conv-20260928-7563` | Exactly that agent |
-| Conversation | `conv/2972`, `conv:2972`, or a dashboard URL such as `https://overdeck.localhost/conv/2972` | The conversation's agent |
+| Conversation | its name `20260928-7563`, `conv/2972`, `conv:2972`, or a dashboard URL such as `https://overdeck.localhost/conv/2972` | The conversation's agent |
 | Bare number | `2972` | An issue agent if exactly one matches; otherwise that conversation, if one exists |
 
-A bare number is convenient but can be ambiguous: a conversation's dashboard number and an issue's number can coincide. When a bare number matches more than one target (an issue agent *and* a conversation, or two issue agents), the command refuses and lists every candidate with its explicit form (`PAN-2972`, `conv/2972`, …) so you can pick one. Use the explicit form whenever you already know it.
+A bare number is convenient but can be ambiguous: a conversation's dashboard number and an issue's number can coincide. When a bare number or a bare name matches more than one target (an issue agent *and* a conversation, or two issue agents), the command refuses and lists every candidate with its explicit form (`PAN-2972`, `conv/2972`, …) so you can pick one. Use the explicit form whenever you already know it.
 
 ## pan tell
 
@@ -94,6 +95,12 @@ This command:
 - Sends your message to the agent's pane
 - The agent receives it and responds accordingly
 - Useful for providing feedback, clarification, or guidance
+
+`--steer` interrupts the running turn and sends now. `--when-limit-resets` queues the
+message on the server until a conversation's usage limit resets. `--force` delivers to a
+critic or verifier lane that already filed its verdict. When a message cannot be
+delivered, the command says why and exits 1; the text may be saved under
+`~/.overdeck/agents/<agent>/mail/`.
 
 ### A conversation on a linked machine
 
@@ -114,7 +121,10 @@ and `--force` exit 1 for a remote target. Only conversations are accepted after
 
 ## pan pause
 
-Pause a running agent. It stops accepting new work until unpaused. See [Targeting an agent](#targeting-an-agent) for every accepted `<id>` form, including `conv/<n>` and dashboard URLs.
+Pause an agent. The pause persists, a running agent is stopped, and pausing an issue's
+work agent also stops that issue's review and test agents. `--reason "<text>"` stores
+why. See [Targeting an agent](#targeting-an-agent) for every accepted `<id>` form,
+including `conv/<n>` and dashboard URLs.
 
 ```bash
 pan pause min-123
@@ -126,6 +136,14 @@ Clear a pause gate set by `pan pause` and resume the agent immediately if it has
 
 ```bash
 pan unpause min-123
+```
+
+## pan untroubled
+
+Clear an agent's troubled gate. It does not start the agent; run `pan start <id>` afterwards.
+
+```bash
+pan untroubled min-123
 ```
 
 ## pan kill
@@ -140,7 +158,16 @@ pan kill min-123
 pan kill conv/2972
 ```
 
-Stops the agent. The workspace, branch, and any uncommitted work remain intact.
+Stops the agent, and stops the workspace's Docker stack unless another agent of the
+issue is still live. The workspace, branch, and any uncommitted work remain intact.
+
+## pan reset-session
+
+Clear an agent's saved session pointers so its next start creates a fresh session.
+
+```bash
+pan reset-session min-123
+```
 
 ## Reviewing and approving work
 
@@ -154,7 +181,7 @@ gh pr list
 gh pr review <pr-number> --approve
 ```
 
-Merge from the dashboard's **MERGE** button. Merge readiness is derived live
+Merge from the dashboard's **Merge** button. Merge readiness is derived live
 from the PR: approvals, green checks, and forge mergeability.
 
 ## pan issues
@@ -168,7 +195,9 @@ pan issues
 pan issues --triage
 ```
 
-Shows issues from Linear, GitHub, or GitLab based on your configuration.
+Options: `--mine`, `--all` (include closed), `--tracker <type>`, `--all-trackers`, `--json`.
+
+Shows issues from GitHub, Linear, Rally or Jira based on your configuration.
 
 ## pan reopen
 
@@ -179,6 +208,7 @@ pan reopen min-123 --reason "Regression found in staging"
 ```
 
 For an issue that is still in progress, use `pan review restart` or `pan start` instead.
+`--force` skips the in-progress guard and the confirmation prompt.
 
 ## pan review request
 
@@ -205,6 +235,7 @@ This is a nuclear option that:
 - Removes the workspace files
 - Deletes the issue's branches
 - Resets the issue tracker status
+- Clears review state and xBRIEF task state, and resets the issue to Todo
 
 ## pan recover
 
@@ -216,9 +247,18 @@ pan recover min-123
 
 # Recover all crashed agents
 pan recover --all
+
+# Compact-respawn a context-wedged agent
+pan recover min-123 --compact
+
+# Switch the model on recovery
+pan recover min-123 --model sonnet
 ```
 
-Attempts to resume agents that crashed or were interrupted.
+Resumes a crashed or stopped agent. With no ID it lists crashed agents; `--all` recovers
+them all. `--compact` compact-respawns a context-wedged agent, including troubled or
+user-stopped work agents that automatic recovery will not resume, and `--model <model>`
+switches its model.
 
 ## pan admin specialists
 
@@ -234,6 +274,8 @@ pan admin specialists wake review-agent --task "review MIN-123"
 # Reset a specialist (clear session, start fresh)
 pan admin specialists reset review-agent
 ```
+
+`pan admin specialists reset --all` resets every specialist.
 
 See [Specialist Agents](/features/specialists) for detailed information on each specialist type.
 
@@ -269,6 +311,10 @@ pan admin remote status
 pan admin remote resources
 ```
 
+`pan admin remote reap` hands completed remote agents to the review pipeline and stops
+their machines. Remote workspaces stay off until `enabled = true` is set under
+`[remote]` in `~/.overdeck/config.toml`.
+
 See [Workspaces](/features/workspaces#remote-workspaces-on-fly) for details on remote workspace execution.
 
 ## Next Steps
@@ -278,3 +324,5 @@ See [Workspaces](/features/workspaces#remote-workspaces-on-fly) for details on r
 - [Workspace Commands](/cli/workspace-commands) - Manage workspaces
 - [Review Commands](/cli/review-commands) - Request, restart, and abort code review
 - [Core Concepts](/concepts) - Understand agents and workspaces
+- [Workers](/reference/workers) - Delegate a bounded task with `pan worker run`
+- [Agents Directory](/reference/agents-directory) - Finished agents and their transcripts

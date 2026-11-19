@@ -1,6 +1,7 @@
 ---
-title: Hygiene Check
-description: Audit commit, push, PR, agent, session, branch, workspace, and disk state
+title: "pan hygiene: audit pushes, PRs, agents, branches and disk"
+sidebarTitle: "Hygiene Check"
+description: "Audit unpushed commits, dirty trees, PR blockers, stuck agents, stale sessions, merged branches, finished worktrees and free disk space with pan hygiene."
 ---
 
 # `pan hygiene`
@@ -8,7 +9,9 @@ description: Audit commit, push, PR, agent, session, branch, workspace, and disk
 `pan hygiene` answers whether orchestration work has reached its durable and
 reviewable destination. Run it before a release, after a large merge drain, or
 whenever an agent claims everything is pushed but the repository still looks
-unclean.
+unclean. It audits the git repository in the current directory, so run it from
+the project root. Pull-request and closed-issue data come from the GitHub CLI
+(`gh`); when `gh` fails, those checks report nothing.
 
 ```bash
 pan hygiene
@@ -17,10 +20,14 @@ pan hygiene --strict
 ```
 
 The report covers local commits ahead of `origin/main`, unexpected working-tree
-changes and backup files, open pull-request blockers, troubled or paused agents,
-tmux sessions whose agent is stopped, merged feature branches that remain, stale
-terminal worktrees, and available disk space. The default stale threshold is
-four weeks; override it with `--since 7d`.
+changes and backup files, open pull-request blockers (awaiting UAT, failing
+checks, pending tests, pending review), troubled, paused or errored agents,
+tmux sessions whose agent is stopped, feature branches whose pull request
+merged and that are older than the stale threshold, feature worktrees whose
+pull request merged or whose issue is closed, and free disk space on the
+repository and ~/.overdeck volumes against a 10 GB floor. The default stale
+threshold is four weeks; override it with `--since 7d`. Durations use h, d or
+w, such as 24h, 7d or 4w.
 
 ## Safe remediation
 
@@ -29,12 +36,17 @@ pan hygiene --fix-safe
 pan hygiene --fix-safe --fix-disk-pressure-floor 25
 ```
 
-`--fix-safe` deletes a feature branch only after GitHub reports its pull request
-merged. When disk is below the configured floor, it may also remove an oldest
-terminal worktree only when the branch is gone and the worktree has no open PR,
-live session, or uncommitted changes. It never stashes, force-deletes, resets,
+`--fix-safe` deletes a feature branch, locally and on origin, only after
+GitHub reports its pull request merged and is older than the stale threshold.
+When free disk is below the floor (10 GB, or the value of
+`--fix-disk-pressure-floor`), it also removes stale worktrees, oldest first,
+until free space is back above the floor, skipping any whose branch still
+exists, that has an open PR, whose issue has a tmux session, or that has
+uncommitted changes. It never stashes, force-deletes, resets,
 force-pushes, or tears down a workspace whose contents may be recoverable.
 
 By default findings are informational and the command exits successfully. Add
 `--strict` to exit with status 1 whenever anything needs attention. Use
-`--skip push tree` to omit named checks in constrained environments.
+`--skip push tree` to omit named checks in constrained environments. The
+check names are push, tree, prs, agents, sessions, branches and workspaces;
+the disk check always runs.

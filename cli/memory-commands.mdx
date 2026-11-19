@@ -39,9 +39,9 @@ pan memory sync --status
 | --- | --- |
 | `pan memory search <query>` | Searches memory observations |
 | `pan memory status [issue]` | Shows current memory status for an issue, a workspace, or the current directory |
-| `pan memory timeline` | Prints chronological observations for a workspace or the current directory |
+| `pan memory timeline` | Prints chronological observations for a workspace or the current directory (last 7 days by default; `--days <n>`) |
 | `pan memory summary [issue]` | Generates a daily markdown memory summary for an issue, a workspace, or the current directory |
-| `pan memory reset <scope> <scopeId>` | Creates a memory reset marker |
+| `pan memory reset <scope> <scopeId>` | Creates a memory reset marker; `--reason <text>` is required |
 | `pan memory backfill` | Backfills memory observations from historical Claude Code JSONL transcripts |
 | `pan memory doctor` | Prints memory health, pending counts, and provider configuration |
 | `pan memory config` | Shows memory provider and rollup configuration |
@@ -54,6 +54,10 @@ pan memory sync --status
 | `pan memory pin <doc-path>` | Pins a doc for prompt-time memory injection |
 | `pan memory unpin <doc-path>` | Removes a pinned doc |
 | `pan memory pins` | Lists pinned docs for a project or workspace |
+
+`pin`, `unpin` and `pins` take `--workspace <id>` for workspace scope or `--project <key>` for
+project scope; `--project` defaults to `overdeck`, not the project owning the cwd, so pass it in
+any other project.
 
 Run `pan memory <subcommand> --help` for its options. The subcommands below also take an options
 table.
@@ -78,8 +82,8 @@ table.
 
 | Option | What it does |
 | --- | --- |
-| `--type <type>` | Fact type: `feedback`, `project`, `reference` or `user` |
-| `--description <text>` | One-line index description, 200 characters or fewer |
+| `--type <type>` | Required. Fact type: `feedback`, `project`, `reference` or `user` |
+| `--description <text>` | Required. One-line index description, 200 characters or fewer |
 | `--title <text>` | Fact title (defaults to the id, dashes turned to spaces and capitalized) |
 | `--body <text>` | Fact body |
 | `--body-file <path>` | Reads the fact body from a file |
@@ -219,7 +223,7 @@ See [Knowledge](/configuration/knowledge).
 ## pan docs
 
 Query and maintain Overdeck's own documentation retrieval index, which chunks `docs/`, skills,
-rules and `CLAUDE.md` files so agents can pull relevant snippets into their context; PRDs are
+rules and the root `CLAUDE.md` so agents can pull relevant snippets into their context; PRDs are
 chunked too, but only when that corpus source is turned on. Disabling injection stops that
 automatic retrieval without touching the index itself.
 
@@ -241,8 +245,10 @@ See [Docs RAG](/configuration/docs-rag) for when snippets are injected and how t
 
 ## pan briefing
 
-Print the live Overdeck session briefing markdown: the same context a managed session receives at
-launch.
+Print the live Overdeck session briefing markdown for a terminal-only session. Its Current
+Workspace section comes from the current directory (or `--cwd`) and it lists no Knowledge
+Registry entries; managed sessions get the copy the dashboard keeps at
+`~/.overdeck/session-context.md`, built from live dashboard state.
 
 ```bash
 pan briefing

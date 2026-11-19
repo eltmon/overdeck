@@ -1,38 +1,33 @@
 ---
-title: Workspace Commands
+title: "Workspace commands: create, list and destroy issue worktrees"
+sidebarTitle: "Workspace Commands"
 description: "Commands that create, list and destroy Overdeck workspaces, the per-issue git worktrees where agents do their work."
 ---
-
-import { ThemedImage } from "/snippets/themed-image.mdx";
 
 Create and manage isolated workspaces for agent work.
 
 ## Overview
 
 **Workspaces are git worktrees** - isolated working directories for each issue/feature. Each workspace:
-- Has its own feature branch (e.g., `feature/min-123-add-login`)
+- Has its own feature branch, `feature/<issue-id>` in lowercase (e.g., `feature/min-123`)
 - Shares git history with the main repo (no separate clone)
 - Can run independently (separate node_modules, builds, etc.)
-- Is located at `{project}/workspaces/{issue-id}/`
+- Is located at `{project}/workspaces/feature-{issue-id}/` (issue ID in lowercase)
 
 This allows multiple agents to work on different features simultaneously without conflicts.
 
 Because each running workspace carries its own agent process, builds, and (when
 Dockerized) containers, several active at once add up. The dashboard's
-**Resources** page breaks down system RAM by agents, conversations, and other
-processes so you can see what each workspace is costing before spinning up
-another.
-
-<ThemedImage
-  light="/images/dashboard/resources-light.png"
-  dark="/images/dashboard/resources-dark.png"
-  alt="Resources page showing system RAM usage broken down by agents, conversations, and processes"
-/>
+**Resources** page (Settings → Experimental) shows host CPU, memory and disk,
+the running agents, each workspace's Docker stack, a reclaim advisor, core
+services and host processes, so you can see what each workspace is costing
+before spinning up another.
 
 <Tip>
-  Pair the **Resources** view with `pan resources` on the CLI to spot orphaned
-  workspace agents — processes still holding memory after their work is done — and
-  reclaim it before launching new workspaces.
+  Pair the **Resources** view with `pan resources` on the CLI, which lists RAM
+  per workspace agent and conversation and flags orphaned `claude` processes
+  (ones that belong to no workspace or conversation), so you can reclaim that
+  memory before launching new workspaces.
 </Tip>
 
 ## pan workspace create
@@ -46,6 +41,11 @@ pan workspace create MIN-123
 pan workspace create MIN-123 --docker
 ```
 
+`--dry-run` shows what would be created; `--no-skills` skips installing skills and
+agents; `--project <path>` overrides the registry; `--labels <labels>` routes by
+label; `--remote` / `--local` create the workspace on a Fly.io VM or locally (see
+[Workspaces](/features/workspaces)).
+
 ### Docker Integration
 
 The `--docker` flag automatically starts containers after workspace creation:
@@ -56,19 +56,16 @@ pan workspace create MIN-123 --docker
 
 **What it does:**
 1. Creates the workspace (git worktree or custom command)
-2. Looks for docker-compose files in:
-   - `{workspace}/docker-compose.yml`
-   - `{workspace}/docker-compose.yaml`
-   - `{workspace}/.devcontainer/docker-compose.yml`
-   - `{workspace}/.devcontainer/docker-compose.devcontainer.yml`
-   - `{workspace}/.devcontainer/compose.yml`
-3. Runs `docker compose -p "{project}-feature-{issue}" -f {file} up -d --build`
+2. Looks for a docker-compose file at the workspace root or under `.devcontainer/`
+3. Runs `docker compose -f {file} up -d --build` from the compose file's directory
+   (no `-p`: the compose file's own `name:` sets the project name)
 
 **Docker Project Naming:**
 
 Each workspace gets a unique Docker Compose project name to avoid container conflicts:
 - Format: `{project-name}-feature-{issue-id}` (e.g., `mind-your-now-feature-min-123`)
-- The project name comes from `name` in your `~/.overdeck/projects.yaml`
+- The project name is whatever the workspace declares: the compose file's top-level
+  `name:` field, or `COMPOSE_PROJECT_NAME` in the workspace's `dev` script
 - Container names follow: `{project}-{service}-1` (e.g., `mind-your-now-feature-min-123-api-1`)
 
 This allows multiple workspaces to run simultaneously without port or name conflicts.
@@ -95,23 +92,24 @@ pan workspace create MIN-123 --docker
 
 ## pan workspace list
 
-List all workspaces and their status:
+List the issue worktrees under `workspaces/` in the current repository (run it
+from the project root), with each one's branch and path. `--all` lists them
+for every registered project:
 
 ```bash
 pan workspace list
 ```
 
+Options: `--all` (every registered project), `--json`, `--stale` (merged
+branches still on disk, with sizes: reclaim candidates), `--kind
+main|issue|scratch` with `--archived`.
+
 Each workspace owns a feature branch, and when that branch is verified and ready
-the dashboard's **Awaiting Merge** page surfaces it for a human to merge — one
-card per feature branch, grouped alongside the issue it belongs to. The CLI list
+the dashboard's **Awaiting Merge** page lists it for a human to merge: one
+row per issue whose PR is approved, has green checks and is mergeable, with
+links to UAT the workspace and a merge button. The CLI list
 gives you the local view; the dashboard gives you the cross-workspace view of
 which branches are queued for the final merge step.
-
-<ThemedImage
-  light="/images/dashboard/awaiting-merge-light.png"
-  dark="/images/dashboard/awaiting-merge-dark.png"
-  alt="Awaiting Merge page showing feature branches from completed workspaces ready for human merge"
-/>
 
 ## pan workspace destroy
 
@@ -120,9 +118,28 @@ Clean up and remove a workspace:
 ```bash
 pan workspace destroy MIN-123
 
-# Force destroy (even with uncommitted changes)
+# --force is accepted, but a local worktree is always removed with
+# `git worktree remove --force`, uncommitted changes included
 pan workspace destroy MIN-123 --force
 ```
+
+Destroy removes every shape of the issue's workspace (base, strike and slot
+worktrees), stops its Docker stack, and deletes the local feature branch
+with `git branch -D`. `--shape base|strike|slot|all` limits it to one shape;
+`--project <path>` overrides the registry; `--purge-memory` also deletes the
+workspace's memory home (irreversible). Reclaim candidates: `pan workspace
+list --stale`.
+
+## Other workspace subcommands
+
+- `pan workspace new`, `main`, `get`, `activate`, `archive`, `relocate` - scratch and main workspaces, see [Scratch and main workspaces from the CLI](/features/workspaces#scratch-and-main-workspaces-from-the-cli)
+- `pan workspace add-repo` - add a repository to a progressive polyrepo workspace, see [Progressive polyrepo](/configuration/progressive-polyrepo)
+- `pan workspace update` - refresh skills, agents and rules in a workspace, see [Skills](/features/skills)
+- `pan workspace reap` - clean up orphaned Docker stacks, see [Troubleshooting](/reference/troubleshooting)
+- `pan workspace rebuild`, `render-devcontainer` - rebuild a workspace's Docker stack
+- `pan workspace deep-clean` - interactive `git clean -fd` for a workspace
+- `pan workspace use-config` - apply a workspace config template
+- `pan workspace migrate`, `ssh`, `sync-auth`, `start`, `stop` - manage a remote Fly.io workspace
 
 ## Main Project Branch Convention
 
@@ -139,7 +156,7 @@ pan workspace destroy MIN-123 --force
 > 2. Merge operations have a clean target
 > 3. Multiple agents don't interfere with each other
 >
-> If you see a warning like "Main project is on branch 'feature/xxx' instead of 'main'", something has incorrectly checked out a feature branch in the main project. Fix it with `git checkout main`.
+> If you see the warning "Main project directory is not on 'main' branch!", something has incorrectly checked out a feature branch in the main project. Fix it with `git checkout main`.
 
 ### Git Hooks for Branch Protection
 
@@ -178,12 +195,11 @@ The dashboard offers Start agent for an issue only after planning, and only when
 
 ### Specialist Agent Safeguards
 
-All specialist agents (review-agent, test-agent, merge-agent) are configured to:
+Review and test agents are configured to:
 1. **Run in workspaces only** - Never in the main project directory
 2. **Never checkout branches** - They work with the branch already in the workspace
-3. **Create workspaces if needed** - Use `pan workspace create <ISSUE-ID>` instead of `git checkout`
 
 These safeguards are enforced through:
-- **Prompt instructions** - Clear warnings in all specialist prompts
+- **Launch-context rules** - The bundled `worktree-discipline` rule, rendered into every managed session, forbids `git checkout` inside a workspace
 - **Code enforcement** - Specialists spawn with workspace as cwd
-- **Git hooks** - Auto-revert if checkout detected in tmux sessions
+- **Git hooks** - Auto-revert a checkout in the main project when it comes from an agent or planning session (detected by `OVERDECK_AGENT_ID`/`OVERDECK_PLANNING` in the environment, or a tmux session named `agent-*`, `planning-*` or `specialist-*`)
