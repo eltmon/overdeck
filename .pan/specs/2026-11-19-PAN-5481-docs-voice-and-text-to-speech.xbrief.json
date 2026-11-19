@@ -1,0 +1,479 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-19T02:30:30Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5481: docs: voice and text-to-speech",
+    "updated": "2026-11-19T02:36:50.662Z"
+  },
+  "plan": {
+    "id": "pan-5481",
+    "title": "docs: voice and text-to-speech",
+    "status": "proposed",
+    "uid": "0c9b08de-10b7-47e7-a470-856f5eeece3e",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-19T02:30:30Z",
+    "updated": "2026-11-19T02:36:50.662Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5481",
+        "label": "PAN-5481",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5467",
+        "label": "PAN-5467 docs overhaul epic",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5204",
+        "label": "PAN-5204 /ws/voice sample rates and AutoPreso leak",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5574",
+        "label": "PAN-5574 tts.rate ignored by the daemon",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5575",
+        "label": "PAN-5575 Voice Map keys nothing emits",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5576",
+        "label": "PAN-5576 Moonshine sidecar missing on npm installs",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5577",
+        "label": "PAN-5577 unused Voice device and volume settings",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5578",
+        "label": "PAN-5578 stale pan-tts skill and event-stream doc",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5481.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "docs",
+      "voice",
+      "tts",
+      "dictation",
+      "mintlify"
+    ],
+    "narratives": {
+      "Problem": "No published page explains voice. reference/settings.mdx says 'Not documented yet' for the Voice and TTS rows, the only TTS doc is the pan tts command table, and the pan-tts skill carries stale facts (port 3000, a private ~/Projects/pan-tts subscriber, 2048-dim embeddings). Users cannot learn how to dictate, what tts.enabled needs, which hardware the Qwen3-TTS daemon needs, or how voices are chosen.",
+      "Proposal": "Create configuration/voice.mdx with the exact text in the PRD (.pan/drafts/PAN-5481.md, W1): composer dictation (mic button, Ctrl/Cmd+Shift+M, Edit and Direct modes, limits), Settings → Voice and the Moonshine sidecar limits, how TTS works and its Linux/CUDA/PipeWire needs, setup steps, keeping the daemon running, voices (preset, design, clone; System and Status Voice), every tts.* control and the emitted event types, the summarizer, external sidecars via /events/stream and the token-protected daemon /speak, troubleshooting, known issues linking the filed bugs, and Get help. Add it to docs.json after configuration/appearance and link it from reference/settings.mdx, the pan tts section of cli/core-commands.mdx and the AutoPreso section of features/dashboard-views.mdx. Validate with npm run lint:docs and mint@4.3.49 validate, broken-links and broken-links --check-anchors.",
+      "NonGoals": "- No code changes; #5204, #5574, #5575, #5576 and #5577 are fixed separately.\n- No edits to sync-sources/skills/pan-tts/SKILL.md or docs/EXTERNAL-EVENT-STREAM.md; #5578 tracks them.\n- No new screenshots and no reuse of images/dashboard/settings-*.png.\n- No changes to other rows of reference/settings.mdx or to the pan tts command table.\n- No mention of the private ~/Projects/pan-tts subscriber, ~/.pan-tts/config.yaml, port 3000 or scripts/say.sh on the page.\n- No fixes to the 3 pre-existing anchor breaks in features/skills.mdx and guides/docker-setup.mdx.\n- No changelog.d entry (no behavior change)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Create one page, configuration/voice.mdx, placed in the docs.json Configuration group directly after configuration/appearance.",
+        "rationale": "The issue names configuration/voice.mdx; voice is a per-user preference like Appearance, so it sits next to it."
+      },
+      {
+        "summary": "Name controls that do nothing (Rate, Settings Voice Map and Utterance Templates keys, Voice device fields) and the Moonshine npm gap in one sentence each with the filed issue link, plus a short Known issues section, instead of leaving them out.",
+        "rationale": "The page lists every setting; describing Rate as a speed control or the Voice Map as working would be a false claim, and the epic requires every claim to match current code."
+      },
+      {
+        "summary": "File #5574, #5575, #5576, #5577 and #5578 for the bugs found during research and fix none of them here.",
+        "rationale": "The issue is docs-only; PAN-5480 set the precedent of filing bugs found while documenting (#5543)."
+      },
+      {
+        "summary": "Document the 18 event types (from 16 emitActivityTts call sites) Overdeck emits and tell users to set voiceMap and utteranceTemplates with pan tts voices map or the config file.",
+        "rationale": "No emitter uses the issueState.* and attention.* keys the Settings UI offers (#5575), so only the emitted types work."
+      },
+      {
+        "summary": "Describe external sidecars only as two interfaces: GET /events/stream?types=activity.tts and the token-protected daemon POST /speak.",
+        "rationale": "Overdeck ships no sidecar; the subscriber SKILL.md describes is a private local project (eltmon/pan-tts does not exist)."
+      },
+      {
+        "summary": "Use no screenshots.",
+        "rationale": "No image under images/ shows the voice panel or the Voice or TTS settings, and the issue forbids invented UI."
+      },
+      {
+        "summary": "Fold validation (lint:docs, mint validate, broken-links, --check-anchors) into every item instead of a separate validation item.",
+        "rationale": "Validation changes no file, so it cannot carry its own Item: commit; PAN-5480's plan did the same."
+      },
+      {
+        "summary": "Tell users that CLI and config-file changes to tts settings reach a running dashboard only after `pan restart`, in a 'When changes apply' subsection.",
+        "rationale": "refreshTtsRuntimeConfig runs only at boot, on a Settings save and on a model-preset apply; pan tts voices set-default and map write config.yaml only."
+      }
+    ],
+    "items": [
+      {
+        "id": "voice-page",
+        "title": "Create configuration/voice.mdx with the PRD's exact page text",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-19T02:30:30Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5481",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/voice.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "test -f configuration/voice.mdx",
+            "grep -nP '[\\x{2013}\\x{2014}]' configuration/voice.mdx; test $? -eq 1",
+            "grep -c '^## ' configuration/voice.mdx",
+            "grep -nE '127\\.0\\.0\\.1:3000|Projects/pan-tts|2048' configuration/voice.mdx; test $? -eq 1",
+            "npm run lint:docs",
+            "npx -y mint@4.3.49 validate",
+            "npx -y mint@4.3.49 broken-links",
+            "npx -y mint@4.3.49 broken-links --check-anchors"
+          ],
+          "expected_outputs": [
+            "the file exists",
+            "the dash grep prints nothing",
+            "the heading count prints 12",
+            "the stale-fact grep prints nothing",
+            "lint:docs exits 0",
+            "mint validate exits 0 and names no touched file among its warnings",
+            "mint broken-links prints 'no broken links found'",
+            "broken-links --check-anchors lists no line containing configuration/voice (planning dry run: only 3 pre-existing breaks in features/skills.mdx and guides/docker-setup.mdx)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-6",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Open .pan/drafts/PAN-5481.md, section 'W1. Create configuration/voice.mdx'. Copy the text between the `````mdx and ````` fences (exclusive) into the new file configuration/voice.mdx, byte for byte. Do not reword anything, including the 145-character description and the U+2026 ellipses in UI labels. Keep {issueId}, <name>, <token> and the JSON body inside backticks or code blocks. Do not rename the headings 'Choose the speech-to-text provider' or 'Control what is spoken'; other items link their anchors. Run the W1 test commands 1 to 6 from the PRD and the three mint commands. Never run `mint validate --fix` or `mint@latest`."
+        },
+        "items": [
+          {
+            "id": "voice-page.ac1",
+            "title": "Given the new configuration/voice.mdx, when its frontmatter is read, then title is 'Voice and text-to-speech: dictation and spoken agent activity', sidebarTitle is 'Voice and TTS', and the description is the PRD's 145-character string",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "voice-page.ac2",
+            "title": "Given the new file, when `awk '/^`````mdx$/{f=1;next} /^`````$/{f=0} f' .pan/drafts/PAN-5481.md | diff - configuration/voice.mdx` runs, then it prints nothing and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "voice-page.ac3",
+            "title": "Given the new file, when `grep -nP '[\\x{2013}\\x{2014}]' configuration/voice.mdx` and `grep -nE '127\\.0\\.0\\.1:3000|Projects/pan-tts|2048' configuration/voice.mdx` run, then both print nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "voice-page.ac4",
+            "title": "Given the new file, when `grep -c 'discord.gg/ZpHE2ZTv5P' configuration/voice.mdx` runs, then it prints 1, and the Known issues section links #5204, #5574, #5575, #5576 and #5577",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "voice-page.ac5",
+            "title": "When `npm run lint:docs` and `npx -y mint@4.3.49 validate` run, then both exit 0 and validate lists no warning under configuration/voice.mdx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-nav",
+        "title": "Add configuration/voice to the docs.json Configuration group after configuration/appearance",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T02:30:30Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5481",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node -e \"const s=JSON.stringify(require('./docs.json'));process.exit(s.includes('\\\"configuration/appearance\\\",\\\"configuration/voice\\\",\\\"configuration/issue-trackers\\\"')?0:1)\"",
+            "npx -y mint@4.3.49 validate",
+            "npx -y mint@4.3.49 broken-links",
+            "npx -y mint@4.3.49 broken-links --check-anchors"
+          ],
+          "expected_outputs": [
+            "the node check exits 0",
+            "mint validate exits 0 and names no touched file among its warnings",
+            "mint broken-links prints 'no broken links found'",
+            "broken-links --check-anchors lists no line containing configuration/voice (planning dry run: only 3 pre-existing breaks in features/skills.mdx and guides/docker-setup.mdx)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In docs.json, Configuration group (line 154 on 2026-11-18), insert the line `              \"configuration/voice\",` directly after `              \"configuration/appearance\",`. Change nothing else. See PRD W2. Then run the three mint commands. After all five items are committed, run `npm run lint:docs`, `npx -y mint@4.3.49 validate` and `npx -y mint@4.3.49 broken-links` once more and paste the validate and broken-links output in the PR body (PRD W6)."
+        },
+        "items": [
+          {
+            "id": "docs-nav.ac1",
+            "title": "Given the edited docs.json, when the node check in verify_commands runs, then it exits 0 because configuration/voice sits between configuration/appearance and configuration/issue-trackers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-nav.ac2",
+            "title": "When `npx -y mint@4.3.49 validate` runs, then it exits 0 and reports 'build passed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-nav.ac3",
+            "title": "When `git diff $(git merge-base origin/main HEAD) -- docs.json` runs, then it shows exactly one added line (`\"configuration/voice\",`) and no removed line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-nav.ac4",
+            "title": "Given the PR for this issue, when its body is read, then it contains the output of `npx -y mint@4.3.49 validate` (exit 0) and of `npx -y mint@4.3.49 broken-links` (the 'no broken links found' line), both run after all five items are committed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-links",
+        "title": "Link the Voice and TTS rows of reference/settings.mdx to the new page",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T02:30:30Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5481",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "reference/settings.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '/configuration/voice#' reference/settings.mdx",
+            "grep -n '^| Voice \\|^| TTS ' reference/settings.mdx | grep -c 'Not documented yet'; true",
+            "npx -y mint@4.3.49 validate",
+            "npx -y mint@4.3.49 broken-links",
+            "npx -y mint@4.3.49 broken-links --check-anchors"
+          ],
+          "expected_outputs": [
+            "the first grep prints 2",
+            "the second grep prints 0",
+            "mint validate exits 0 and names no touched file among its warnings",
+            "mint broken-links prints 'no broken links found'",
+            "broken-links --check-anchors lists no line containing configuration/voice (planning dry run: only 3 pre-existing breaks in features/skills.mdx and guides/docker-setup.mdx)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In reference/settings.mdx, change only the last cell of the Voice row (line 26) to `[Voice and TTS](/configuration/voice#choose-the-speech-to-text-provider); see also [AutoPreso](/features/dashboard-views#autopreso)` and the last cell of the TTS row (line 31) to `[Voice and TTS](/configuration/voice#control-what-is-spoken)`. Exact before and after text is in PRD W3. Change no other row."
+        },
+        "items": [
+          {
+            "id": "settings-links.ac1",
+            "title": "Given the edited reference/settings.mdx, when `grep -c '/configuration/voice#' reference/settings.mdx` runs, then it prints 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-links.ac2",
+            "title": "Given the edited file, when the Voice and TTS rows are read, then neither contains 'Not documented yet' and the Voice row still links /features/dashboard-views#autopreso",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-links.ac3",
+            "title": "When `npx -y mint@4.3.49 broken-links --check-anchors` runs, then it lists no line under reference/settings.mdx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-tts-link",
+        "title": "Link the pan tts section of cli/core-commands.mdx to the new page",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T02:30:30Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5481",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/core-commands.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '](/configuration/voice)' cli/core-commands.mdx",
+            "npx -y mint@4.3.49 validate",
+            "npx -y mint@4.3.49 broken-links",
+            "npx -y mint@4.3.49 broken-links --check-anchors"
+          ],
+          "expected_outputs": [
+            "the grep prints 1",
+            "mint validate exits 0 and names no touched file among its warnings",
+            "mint broken-links prints 'no broken links found'",
+            "broken-links --check-anchors lists no line containing configuration/voice (planning dry run: only 3 pre-existing breaks in features/skills.mdx and guides/docker-setup.mdx)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In cli/core-commands.mdx, after the `pan tts test [text]` table row (line 427 on 2026-11-18) and before `## pan backup`, add a blank line and the sentence `See [Voice and text-to-speech](/configuration/voice) for setup, saved voices and every `tts` setting.` followed by a blank line, exactly as in PRD W4. Change nothing else."
+        },
+        "items": [
+          {
+            "id": "cli-tts-link.ac1",
+            "title": "Given the edited cli/core-commands.mdx, when `grep -c '](/configuration/voice)' cli/core-commands.mdx` runs, then it prints 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-tts-link.ac2",
+            "title": "Given the edited file, when the `## pan tts` section is read, then the link sentence appears after the command table and before `## pan backup`, and the table rows are unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "autopreso-link",
+        "title": "Link the AutoPreso section of features/dashboard-views.mdx to the new page's STT section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T02:30:30Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5481",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/dashboard-views.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'configuration/voice#choose-the-speech-to-text-provider' features/dashboard-views.mdx",
+            "npx -y mint@4.3.49 validate",
+            "npx -y mint@4.3.49 broken-links",
+            "npx -y mint@4.3.49 broken-links --check-anchors"
+          ],
+          "expected_outputs": [
+            "the grep prints 1",
+            "mint validate exits 0 and names no touched file among its warnings",
+            "mint broken-links prints 'no broken links found'",
+            "broken-links --check-anchors lists no line containing configuration/voice (planning dry run: only 3 pre-existing breaks in features/skills.mdx and guides/docker-setup.mdx)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In features/dashboard-views.mdx, `## AutoPreso`, append ` See [Voice and text-to-speech](/configuration/voice#choose-the-speech-to-text-provider).` to the end of the paragraph that starts 'Once live, each spoken turn' (line 235 on 2026-11-18), exactly as in PRD W5. Change nothing else."
+        },
+        "items": [
+          {
+            "id": "autopreso-link.ac1",
+            "title": "Given the edited features/dashboard-views.mdx, when `grep -c 'configuration/voice#choose-the-speech-to-text-provider' features/dashboard-views.mdx` runs, then it prints 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "autopreso-link.ac2",
+            "title": "When `npx -y mint@4.3.49 broken-links --check-anchors` runs, then it lists no line under features/dashboard-views.mdx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "voice-page",
+        "to": "docs-nav",
+        "type": "blocks"
+      },
+      {
+        "from": "voice-page",
+        "to": "settings-links",
+        "type": "blocks"
+      },
+      {
+        "from": "voice-page",
+        "to": "cli-tts-link",
+        "type": "blocks"
+      },
+      {
+        "from": "voice-page",
+        "to": "autopreso-link",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-19-PAN-5481-docs-voice-and-text-to-speech.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
