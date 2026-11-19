@@ -62,7 +62,7 @@ server setting.
 **Simple Home** leads with a headline that counts what needs you (or reads "Hello."), three stats
 (`being worked on`, `ready to merge`, `finished this week`), the composer, and the Get set up card.
 Below that, sections appear in order: Needs you, Ready to start (only when non-empty), Having trouble
-(only when non-empty), Just filed, Working now, Ready to merge, and Finished (up to 8 rows). Simple
+(only when non-empty), Just filed, Working now, Ready to merge, and Finished (up to 8 rows); only Needs you and Working now show when empty. Simple
 Home never merges on its own; you click **Merge to main** yourself.
 
 **Advanced Home** leads with the title "System briefing", the composer and the Get set up card, then
@@ -83,7 +83,7 @@ before filing anything). A project chip picks which project the work lands in; i
 best. Nothing here stops you from starting." Its rows cover signing in to Claude, connecting GitHub,
 getting agents ready (shown only when the terminal backend is not tmux), installing a terminal
 helper, and Docker (optional); Advanced mode adds a row for reaching the machine remotely when no
-machine is linked. A memory line warns that new agents may wait when free memory is low. **Set up**
+machine is linked and Tailscale is not ready yet. A memory line warns that new agents may wait when free memory is low. **Set up**
 expands a row to the commands to run yourself (the card never installs anything for you), and
 **Re-check** re-runs the checks. The **Hide** (×) button dismisses the card for your browser, but it
 comes back while a required check still fails. On every other view, a top banner offers the same
@@ -108,7 +108,7 @@ another column does nothing. To move an issue forward, use its action menu inste
 ## Pipeline
 
 The Pipeline (`/pipeline`) has a `List` / `Board` / `Analytics` switch (Board opens the Board view,
-Analytics opens Metrics) and five metric tiles: Active issues, Work running, Review running, Ship,
+Analytics opens Metrics, which is experimental, so with [Experimental features](#experimental-features) off it lands on Home) and five metric tiles: Active issues, Work running, Review running, Ship,
 and Spend (24h). Rows are grouped into five lanes, in order: **Ship**, **Review**, **Work**, **Plan**,
 **Ready**. Raw backlog issues are not shown; a backlog issue appears under Ready once it carries the
 `ready` label or the tracker marks it unstarted.
@@ -175,7 +175,7 @@ Edits go through `/okf author`; anything typed in the viewer itself is discarded
 Context (`/context`) is headed "Agent context". Pick where text applies (Machine context, Project
 context, Workspace context), **Edit source** it, or use **Preview for agent** to see what a given
 harness actually receives, then **Save** or **Save & refresh outputs**. From the CLI, `pan context`
-offers `list`, `edit`, `sync`, `diff`, `validate` and `migrate`. See
+offers `list`, `edit`, `sync`, `diff`, `validate`, `migrate` and `detach`. See
 [Context layers](/configuration/context-layers).
 
 ## Skills
