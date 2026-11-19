@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5499",
   "created": "2026-11-19T02:52:23.250Z",
-  "updated": "2026-11-19T02:59:40.259Z",
+  "updated": "2026-11-19T03:02:29.470Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -128,9 +128,26 @@
       "doneAt": "2026-11-19T02:59:33.525Z"
     },
     "vision-criteria-and-appendix": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5499",
-      "claimedAt": "2026-11-19T02:59:40.259Z"
+      "claimedAt": "2026-11-19T02:59:40.259Z",
+      "doneAt": "2026-11-19T03:02:29.469Z"
+    },
+    "vision-criteria-and-appendix.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:02:29.469Z"
+    },
+    "vision-criteria-and-appendix.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:02:29.469Z"
+    },
+    "vision-criteria-and-appendix.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:02:29.469Z"
+    },
+    "vision-criteria-and-appendix.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:02:29.469Z"
     }
   }
 }
