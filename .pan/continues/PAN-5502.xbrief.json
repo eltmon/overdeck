@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5502",
   "created": "2026-11-19T05:29:14.806Z",
-  "updated": "2026-11-19T05:39:10.007Z",
+  "updated": "2026-11-19T05:39:15.939Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -148,6 +148,11 @@
     "audit-safe-shutdown.ac3": {
       "status": "completed",
       "doneAt": "2026-11-19T05:39:10.007Z"
+    },
+    "audit-swarm": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5502",
+      "claimedAt": "2026-11-19T05:39:15.938Z"
     }
   }
 }
