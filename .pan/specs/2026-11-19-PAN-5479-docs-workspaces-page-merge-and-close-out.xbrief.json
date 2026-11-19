@@ -1,0 +1,791 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-19T01:21:32Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5479: docs: workspaces page merge and close-out",
+    "updated": "2026-11-19T01:27:42.922Z"
+  },
+  "plan": {
+    "id": "pan-5479",
+    "title": "docs: workspaces page merge and close-out",
+    "status": "proposed",
+    "uid": "e2ff9f2f-de54-4046-b623-dfbfd38bc102",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-19T01:21:32Z",
+    "updated": "2026-11-19T01:27:42.922Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5479",
+        "label": "PAN-5479",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5467",
+        "label": "PAN-5467 docs overhaul epic",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5502",
+        "label": "PAN-5502 Features accuracy audit (runs after this)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3579",
+        "label": "PAN-3579 CSRF bare-header mutation callers (blocks band docs)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5571",
+        "label": "PAN-5571 Workspaces Archived row never renders",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5479.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "docs",
+      "workspaces",
+      "memory",
+      "close-out",
+      "mintlify"
+    ],
+    "narratives": {
+      "Problem": "configuration/workspaces.mdx holds the only user docs for the New workspace page, the Workspaces list, scratch and main workspaces from the CLI, close-out settings and workspace observation memory, but it is not in docs.json navigation and duplicates the 'Workspaces' title. Several of its claims are wrong against current code (Archived (N) row, Home button placement, typed destroy confirmation, fallback_chain, hitCounts, rag-decision reasons, the GitHub-pause backstop) and it omits that the closed-issue reaper deletes branches regardless of close-out settings. A link to /features/workspaces#remote-workspaces-flyio is already broken.",
+      "Proposal": "Copy the verified After text from .pan/drafts/PAN-5479.md into features/workspaces.mdx (kinds, finding, creating, managing, CLI, close-out) and configuration/memory.mdx (a Workspace observation memory section with search, pins, reading back, providers, health and RAG logs), retitle both pages, fix the Remote anchor and dashes, delete the old page with a docs.json redirect, repoint reference/settings.mdx, and validate with lint:docs and mint@4.3.49 validate, broken-links and --check-anchors.",
+      "NonGoals": "- No line-by-line audit of the rest of features/workspaces.mdx; #5502 does it after this merges.\n- No quick-action band docs until #3579 fixes its CSRF headers.\n- No routes table for /api/workspace-registry.\n- No code changes (the Archived row is #5571, CSRF callers are #3579).\n- No edits to docs/WORKSPACES-AND-PROJECTS.md, cli/workspace-commands.mdx or cli/memory-commands.mdx.\n- No new screenshots, no docs.json navigation change, no changelog.d entry.\n- No fixes to the three other pre-existing broken anchors (features/skills.mdx, guides/docker-setup.mdx).\n- Never run mint validate --fix or mint@latest."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Delete configuration/workspaces.mdx, redirect /configuration/workspaces to /features/workspaces, and repoint reference/settings.mdx to the new close-out anchor.",
+        "rationale": "The page is unpublished and duplicates the Workspaces title; the issue asks to merge it away, and a redirect keeps any old link working."
+      },
+      {
+        "summary": "Merge into features/workspaces.mdx without auditing its stale sections (.planning/, beads, Docker, hooks).",
+        "rationale": "#5502 explicitly audits features/workspaces.mdx after this PR merges; the stale-claim list was posted on #5502."
+      },
+      {
+        "summary": "Leave the quick-action band out of the docs; keep corrected band text in the PRD Appendix A.",
+        "rationale": "Its Pull, Run, Save and Files requests send no CSRF header to guarded routes (tracked in #3579), so documenting those buttons would describe actions that likely fail."
+      },
+      {
+        "summary": "Drop the /api/workspace-registry routes table.",
+        "rationale": "It is internal API the dashboard drives; docs/WORKSPACES-AND-PROJECTS.md keeps the developer view."
+      },
+      {
+        "summary": "Put the memory content under one new '## Workspace observation memory' section before '## Previewing', retitle the memory page 'Agent memory: curated facts and workspace observations' (sidebar 'Agent Memory'), and drop its '# Project Memory' H1.",
+        "rationale": "The page now covers both curated facts and observation memory; 'Memory' alone would clash with 'Memory Governor' in the same nav group."
+      },
+      {
+        "summary": "Rename '## Remote Workspaces (Fly.io)' to '## Remote workspaces on Fly' and fix the cli/agent-commands.mdx link.",
+        "rationale": "mint broken-links --check-anchors already reports #remote-workspaces-flyio as broken; a punctuation-free heading gives a predictable slug."
+      },
+      {
+        "summary": "Remove every em/en dash from the four edited pages, including two lines in cli/agent-commands.mdx.",
+        "rationale": "Issue rule: remove dashes from bodies you edit."
+      },
+      {
+        "summary": "Correct every verified error from the old page instead of copying it (More menu, no Archived (N) row, destroy is issue-only with no typed confirmation, fallback_chain first entry only, hitCounts.facts, rag-decision reason rules, reaper overlap, GitHub-pause backstop).",
+        "rationale": "Issue rule: every claim must match current code; verification evidence is in the PRD Problem table."
+      },
+      {
+        "summary": "File the dead Archived (N) row as #5571 and add the band and Cmd-K CSRF callers to #3579 instead of fixing code here.",
+        "rationale": "This is a docs-only issue."
+      }
+    ],
+    "items": [
+      {
+        "id": "w1-features-kinds",
+        "title": "Features page: new frontmatter and a Workspace kinds section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T01:21:32Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5479",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/workspaces.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '^## Workspace kinds$' features/workspaces.mdx",
+            "grep -c 'configuration/memory#workspace-observation-memory' features/workspaces.mdx",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the heading grep prints 1",
+            "the link grep prints 1",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Open .pan/drafts/PAN-5479.md, section 'W1'. Replace the frontmatter of features/workspaces.mdx (lines 1-5) with the W1 frontmatter block, byte for byte. Insert the W1 '## Workspace kinds' block after the board ThemedImage and before '## What Are Workspaces?'. Copy text between the ````mdx fences exactly; do not reword."
+        },
+        "items": [
+          {
+            "id": "w1-features-kinds.ac1",
+            "title": "Given features/workspaces.mdx after this item, when `grep -c '^## Workspace kinds$' features/workspaces.mdx` runs, then it prints 1 and the section sits before `## What Are Workspaces?`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-features-kinds.ac2",
+            "title": "Given the new frontmatter, when `grep -c 'title: \"Workspaces: issue worktrees, scratch work and the main checkout\"' features/workspaces.mdx` runs, then it prints 1 and the description line is the 139-character text from the PRD",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-features-kinds.ac3",
+            "title": "Given the kinds section, when `grep -cE '^- \\*\\*(Issue|Scratch|Main)\\*\\*:' features/workspaces.mdx` runs, then it prints 3, and `grep -c 'configuration/memory#workspace-observation-memory' features/workspaces.mdx` prints 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w2-features-dashboard",
+        "title": "Features page: finding, creating and managing workspaces in the dashboard",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T01:21:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5479",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/workspaces.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -cE '^## (Finding a workspace|Creating a workspace from the dashboard|Managing a scratch or main workspace)$' features/workspaces.mdx",
+            "grep -nE 'Archived \\(N\\)|typed confirmation|Smart\\*\\*|next to Terminal and Web' features/workspaces.mdx; test $? -eq 1",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the heading grep prints 3",
+            "the stale-claim grep prints nothing",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Open .pan/drafts/PAN-5479.md, section 'W2'. Insert the W2 block (## Finding a workspace, ## Creating a workspace from the dashboard, ## Managing a scratch or main workspace) immediately before the line '## Main Project Branch Convention' in features/workspaces.mdx, byte for byte. Do not copy anything from configuration/workspaces.mdx; the PRD text already carries the verified corrections (More menu, no Archived (N) row, no typed confirmation, no 'Smart' label)."
+        },
+        "items": [
+          {
+            "id": "w2-features-dashboard.ac1",
+            "title": "Given features/workspaces.mdx after this item, when `grep -cE '^## (Finding a workspace|Creating a workspace from the dashboard|Managing a scratch or main workspace)$'` runs, then it prints 3",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-features-dashboard.ac2",
+            "title": "Given the new sections, when `grep -nE 'Archived \\(N\\)|typed confirmation|Smart\\*\\*|next to Terminal and Web' features/workspaces.mdx` runs, then it returns no matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-features-dashboard.ac3",
+            "title": "Given the Creating section, when `grep -c 'new-workspace-page-light.png' features/workspaces.mdx` runs, then it prints 1, and `grep -c 'More\\*\\*, then \\*\\*New workspace' features/workspaces.mdx` prints 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w3-features-cli",
+        "title": "Features page: scratch and main workspaces from the CLI",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T01:21:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5479",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/workspaces.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '^## Scratch and main workspaces from the CLI$' features/workspaces.mdx",
+            "pan workspace new --help | grep -c -- '--origin'",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the heading grep prints 1",
+            "the help grep prints 1 or more",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Open .pan/drafts/PAN-5479.md, section 'W3'. Insert the W3 block (## Scratch and main workspaces from the CLI with its ### Targeting and relocating subsection) immediately after the W2 block, still before '## Main Project Branch Convention', byte for byte."
+        },
+        "items": [
+          {
+            "id": "w3-features-cli.ac1",
+            "title": "Given features/workspaces.mdx after this item, when `grep -c '^## Scratch and main workspaces from the CLI$'` runs, then it prints 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-features-cli.ac2",
+            "title": "Given the CLI block, when `pan workspace new --help`, `pan workspace relocate --help` and `pan workspace list --help` run, then their output contains every flag the block shows (--isolated, --parent-branch, --target-path, --dry-run, --origin, --path, --force, --kind, --archived)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-features-cli.ac3",
+            "title": "Given the Targeting and relocating subsection, when `grep -c 'pan workspace archive` refuses the main workspace' features/workspaces.mdx` and `grep -c 'refuses issue workspaces' features/workspaces.mdx` run, then each prints 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w4-features-closeout",
+        "title": "Features page: Cleaning up after close-out section and the Cleanup step pointer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T01:21:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5479",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/workspaces.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '^## Cleaning up after close-out$' features/workspaces.mdx",
+            "grep -c '#cleaning-up-after-close-out' features/workspaces.mdx",
+            "grep -c 'Resume Deacon' features/workspaces.mdx",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the heading grep prints 1",
+            "the anchor grep prints 1",
+            "the Resume Deacon grep prints 1",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Open .pan/drafts/PAN-5479.md, section 'W4'. Insert the W4 '## Cleaning up after close-out' block immediately after the W3 block (still before '## Main Project Branch Convention'), byte for byte. Then add the W4 step-2 paragraph after the line '5. Unregisters from Overdeck' in '### 3. Cleanup'."
+        },
+        "items": [
+          {
+            "id": "w4-features-closeout.ac1",
+            "title": "Given features/workspaces.mdx after this item, when `grep -c '^## Cleaning up after close-out$'` runs, then it prints 1, and `grep -cE '^\\| (Remove the workspace|Delete the feature branch|Close out merged issues|Automatic close-out delay)' features/workspaces.mdx` prints 4",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-features-closeout.ac2",
+            "title": "Given the close-out Note, when `grep -c 'whatever these two settings say' features/workspaces.mdx` and `grep -c 'Resume Deacon' features/workspaces.mdx` run, then each prints 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-features-closeout.ac3",
+            "title": "Given the Cleanup step, when `grep -c '#cleaning-up-after-close-out' features/workspaces.mdx` runs, then it prints 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w5-remote-heading-dashes",
+        "title": "Remote heading rename, its inbound link, and dash removal on the two pages",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T01:21:32Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5479",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/workspaces.mdx",
+            "cli/agent-commands.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' features/workspaces.mdx cli/agent-commands.mdx; test $? -eq 1",
+            "grep -c 'features/workspaces#remote-workspaces-on-fly' cli/agent-commands.mdx",
+            "npx -y mint@4.3.49 broken-links --check-anchors"
+          ],
+          "expected_outputs": [
+            "the dash grep prints nothing",
+            "the link grep prints 1",
+            "--check-anchors lists no cli/agent-commands.mdx entry"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Open .pan/drafts/PAN-5479.md, section 'W5'. Rename '## Remote Workspaces (Fly.io)' to '## Remote workspaces on Fly'; replace the three dash bullets under 'Why Remote Workspaces?' with the W5 text; in cli/agent-commands.mdx change the link on line 272 to #remote-workspaces-on-fly and fix the dashes on lines 78 and 117 exactly as W5 says."
+        },
+        "items": [
+          {
+            "id": "w5-remote-heading-dashes.ac1",
+            "title": "Given both files after this item, when `grep -nP '[\\x{2013}\\x{2014}]' features/workspaces.mdx cli/agent-commands.mdx` runs, then it returns no matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-remote-heading-dashes.ac2",
+            "title": "Given cli/agent-commands.mdx, when `grep -c 'features/workspaces#remote-workspaces-on-fly' cli/agent-commands.mdx` runs, then it prints 1 and `grep -c 'remote-workspaces-flyio'` prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-remote-heading-dashes.ac3",
+            "title": "Given the rename, when `npx -y mint@4.3.49 broken-links --check-anchors` runs, then its output contains no line naming cli/agent-commands.mdx, and `grep -c '^## Remote workspaces on Fly$' features/workspaces.mdx` prints 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w6-memory-core",
+        "title": "Memory page: retitle and the Workspace observation memory section (search, pins, reading back)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T01:21:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5479",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/memory.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '^## Workspace observation memory$' configuration/memory.mdx",
+            "grep -c '^# Project Memory' configuration/memory.mdx; true",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the section grep prints 1",
+            "the H1 grep prints 0",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Open .pan/drafts/PAN-5479.md, section 'W6'. Replace lines 1-7 of configuration/memory.mdx (frontmatter, blank line, '# Project Memory') with the W6 frontmatter. Insert the W6 '## Workspace observation memory' block (with '### Searching and pinning' and '### Reading a workspace's memory back') immediately before '## Previewing', byte for byte."
+        },
+        "items": [
+          {
+            "id": "w6-memory-core.ac1",
+            "title": "Given configuration/memory.mdx after this item, when `grep -c '^## Workspace observation memory$'` runs, then it prints 1 and `grep -c '^# Project Memory'` prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-memory-core.ac2",
+            "title": "Given the new frontmatter, when `grep -c 'title: \"Agent memory: curated facts and workspace observations\"' configuration/memory.mdx` runs, then it prints 1 and sidebarTitle is \"Agent Memory\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-memory-core.ac3",
+            "title": "Given the Searching and pinning subsection, when `grep -c 'without either, `pin` uses the project `overdeck`' configuration/memory.mdx` runs, then it prints 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w7-memory-providers",
+        "title": "Memory page: Extraction providers and Extraction health subsections",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T01:21:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5479",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/memory.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -cE '^### (Extraction providers|Extraction health)$' configuration/memory.mdx",
+            "grep -c 'only its first entry is tried' configuration/memory.mdx",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the heading grep prints 2",
+            "the fallback grep prints 1",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Open .pan/drafts/PAN-5479.md, section 'W7'. Insert the W7 block ('### Extraction providers' and '### Extraction health' with its reason table) immediately after the W6 block, still before '## Previewing', byte for byte."
+        },
+        "items": [
+          {
+            "id": "w7-memory-providers.ac1",
+            "title": "Given configuration/memory.mdx after this item, when `grep -cE '^### (Extraction providers|Extraction health)$'` runs, then it prints 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w7-memory-providers.ac2",
+            "title": "Given the providers subsection, when `grep -c 'only its first entry is tried' configuration/memory.mdx` runs, then it prints 1 and `grep -c '2-6 seconds'` prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w7-memory-providers.ac3",
+            "title": "Given the health subsection, when `grep -c 'pan memory doctor --project' configuration/memory.mdx` and `grep -c 'write-failed' configuration/memory.mdx` run, then each prints 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w8-memory-rag-logs",
+        "title": "Memory page: Reading RAG decision logs subsection and the Per-turn retrieval link",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T01:21:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5479",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/memory.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '\"facts\": 0' configuration/memory.mdx",
+            "grep -c '#reading-rag-decision-logs' configuration/memory.mdx",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the facts grep prints 1",
+            "the link grep prints 1",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Open .pan/drafts/PAN-5479.md, section 'W8'. Insert the W8 '### Reading RAG decision logs' block immediately after the W7 block, still before '## Previewing', byte for byte. Then replace the two-line rag-runs sentence at the end of '## Per-turn retrieval' with the W8 step-2 text."
+        },
+        "items": [
+          {
+            "id": "w8-memory-rag-logs.ac1",
+            "title": "Given configuration/memory.mdx after this item, when `grep -c '\"facts\": 0' configuration/memory.mdx` runs, then it prints 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w8-memory-rag-logs.ac2",
+            "title": "Given the reason table, when `grep -cE 'prompt-time-injection-disabled|memory-context-exceeds-token-budget|memory-context-truncated-to-budget|no-memory-hits' configuration/memory.mdx` runs, then it prints 4",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w8-memory-rag-logs.ac3",
+            "title": "Given the Per-turn retrieval section, when `grep -c '#reading-rag-decision-logs' configuration/memory.mdx` runs, then it prints 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w9-delete-redirect",
+        "title": "Delete configuration/workspaces.mdx, redirect its URL, and run the whole-PR docs validation",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T01:21:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5479",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/workspaces.mdx",
+            "docs.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "test ! -e configuration/workspaces.mdx",
+            "grep -nP '[\\x{2013}\\x{2014}]' features/workspaces.mdx configuration/memory.mdx reference/settings.mdx cli/agent-commands.mdx; test $? -eq 1",
+            "npm run lint:docs",
+            "npx -y mint@4.3.49 validate",
+            "npx -y mint@4.3.49 broken-links",
+            "npx -y mint@4.3.49 broken-links --check-anchors"
+          ],
+          "expected_outputs": [
+            "test exits 0",
+            "the dash grep prints nothing",
+            "lint:docs exits 0",
+            "validate ends 'success build passed' with no warning under the four touched pages (about 40 duplicate-h1 warnings elsewhere)",
+            "broken-links prints 'no broken links found'",
+            "--check-anchors lists only features/skills.mdx (2) and guides/docker-setup.mdx (1)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Open .pan/drafts/PAN-5479.md, section 'W9'. This item runs last. Run `git rm configuration/workspaces.mdx`. Add the W9 redirect object to the docs.json redirects array after the /configuration/meta-repos entry, keeping valid JSON. Then run the five validation commands in W9 step 3 and fix any finding in the touched pages only. Paste the mint validate tail and both broken-links outputs into the PR body. Never run `mint validate --fix` or mint@latest."
+        },
+        "items": [
+          {
+            "id": "w9-delete-redirect.ac1",
+            "title": "Given the tree after this item, when `test ! -e configuration/workspaces.mdx` runs, then it exits 0, and `node -e \"const d=require('./docs.json');process.exit(d.redirects.some(r=>r.source==='/configuration/workspaces'&&r.destination==='/features/workspaces')?0:1)\"` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w9-delete-redirect.ac2",
+            "title": "Given all items, when `grep -nP '[\\x{2013}\\x{2014}]' features/workspaces.mdx configuration/memory.mdx reference/settings.mdx cli/agent-commands.mdx` runs, then it prints nothing, and `npm run lint:docs` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w9-delete-redirect.ac3",
+            "title": "Given all items, when `npx -y mint@4.3.49 validate` runs, then it prints 'success build passed' and lists no warning under features/workspaces.mdx, configuration/memory.mdx, reference/settings.mdx, cli/agent-commands.mdx or configuration/workspaces.mdx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w9-delete-redirect.ac4",
+            "title": "Given all items, when `npx -y mint@4.3.49 broken-links` runs, then it prints 'no broken links found', and `npx -y mint@4.3.49 broken-links --check-anchors` lists only the pre-existing breaks in features/skills.mdx (2) and guides/docker-setup.mdx (1)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w10-settings-link",
+        "title": "Repoint the Close-out row in reference/settings.mdx to the new close-out anchor",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T01:21:32Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5479",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "reference/settings.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git grep -n 'configuration/workspaces' -- '*.mdx'; test $? -eq 1",
+            "grep -c 'features/workspaces#cleaning-up-after-close-out' reference/settings.mdx"
+          ],
+          "expected_outputs": [
+            "the git grep prints nothing",
+            "the anchor grep prints 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Open .pan/drafts/PAN-5479.md, section 'W10'. In reference/settings.mdx line 20 change [Workspaces](/configuration/workspaces) to [Workspaces](/features/workspaces#cleaning-up-after-close-out)."
+        },
+        "items": [
+          {
+            "id": "w10-settings-link.ac1",
+            "title": "Given the tree after this item, when `git grep -n 'configuration/workspaces' -- '*.mdx'` runs, then it returns no matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w10-settings-link.ac2",
+            "title": "Given reference/settings.mdx, when `grep -c 'features/workspaces#cleaning-up-after-close-out' reference/settings.mdx` runs, then it prints 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "w1-features-kinds",
+        "to": "w2-features-dashboard",
+        "type": "blocks"
+      },
+      {
+        "from": "w2-features-dashboard",
+        "to": "w3-features-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "w3-features-cli",
+        "to": "w4-features-closeout",
+        "type": "blocks"
+      },
+      {
+        "from": "w4-features-closeout",
+        "to": "w5-remote-heading-dashes",
+        "type": "blocks"
+      },
+      {
+        "from": "w6-memory-core",
+        "to": "w7-memory-providers",
+        "type": "blocks"
+      },
+      {
+        "from": "w7-memory-providers",
+        "to": "w8-memory-rag-logs",
+        "type": "blocks"
+      },
+      {
+        "from": "w4-features-closeout",
+        "to": "w9-delete-redirect",
+        "type": "blocks"
+      },
+      {
+        "from": "w8-memory-rag-logs",
+        "to": "w9-delete-redirect",
+        "type": "blocks"
+      },
+      {
+        "from": "w4-features-closeout",
+        "to": "w10-settings-link",
+        "type": "blocks"
+      },
+      {
+        "from": "w5-remote-heading-dashes",
+        "to": "w9-delete-redirect",
+        "type": "blocks"
+      },
+      {
+        "from": "w10-settings-link",
+        "to": "w9-delete-redirect",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-19-PAN-5479-docs-workspaces-page-merge-and-close-out.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
