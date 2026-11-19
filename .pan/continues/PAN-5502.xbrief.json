@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5502",
   "created": "2026-11-19T05:29:14.806Z",
-  "updated": "2026-11-19T05:39:59.155Z",
+  "updated": "2026-11-19T05:40:57.191Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -168,9 +168,30 @@
       "doneAt": "2026-11-19T05:39:50.442Z"
     },
     "workspaces-layout-to-lifecycle": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5502",
-      "claimedAt": "2026-11-19T05:39:59.155Z"
+      "claimedAt": "2026-11-19T05:39:59.155Z",
+      "doneAt": "2026-11-19T05:40:57.191Z"
+    },
+    "workspaces-layout-to-lifecycle.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:40:57.191Z"
+    },
+    "workspaces-layout-to-lifecycle.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:40:57.191Z"
+    },
+    "workspaces-layout-to-lifecycle.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:40:57.191Z"
+    },
+    "workspaces-layout-to-lifecycle.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:40:57.191Z"
+    },
+    "workspaces-layout-to-lifecycle.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:40:57.191Z"
     }
   }
 }
