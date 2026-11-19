@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5504",
   "created": "2026-11-19T07:15:41.251Z",
-  "updated": "2026-11-19T07:40:47.910Z",
+  "updated": "2026-11-19T07:40:52.872Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -420,6 +420,11 @@
     "audit-skill-pack-authoring.ac4": {
       "status": "completed",
       "doneAt": "2026-11-19T07:40:47.910Z"
+    },
+    "audit-stitch-integration": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5504",
+      "claimedAt": "2026-11-19T07:40:52.872Z"
     }
   }
 }
