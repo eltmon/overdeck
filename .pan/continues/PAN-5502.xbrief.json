@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5502",
   "created": "2026-11-19T05:29:14.806Z",
-  "updated": "2026-11-19T05:47:11.837Z",
+  "updated": "2026-11-19T05:47:52.668Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -314,9 +314,22 @@
       "doneAt": "2026-11-19T05:47:06.151Z"
     },
     "audit-keyboard-shortcuts": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5502",
-      "claimedAt": "2026-11-19T05:47:11.837Z"
+      "claimedAt": "2026-11-19T05:47:11.837Z",
+      "doneAt": "2026-11-19T05:47:52.668Z"
+    },
+    "audit-keyboard-shortcuts.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:47:52.668Z"
+    },
+    "audit-keyboard-shortcuts.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:47:52.668Z"
+    },
+    "audit-keyboard-shortcuts.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:47:52.668Z"
     }
   }
 }
