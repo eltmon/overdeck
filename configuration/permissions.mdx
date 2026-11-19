@@ -1,0 +1,62 @@
+---
+title: "Permissions and agent guardrails: what Overdeck agents may do"
+sidebarTitle: "Permissions"
+description: "Choose Auto or Bypass for Claude Code and a Codex mode, answer permission prompts, and see what agents are refused."
+---
+
+Every agent Overdeck launches runs under a permission mode that decides whether a tool call stops for your approval.
+This page covers the Claude Code and Codex modes, how to override the mode for a single command, how to answer a
+permission prompt from the dashboard, and the separate guardrails (operator-only labels, the agent `git` shim,
+primary checkout refusals, and a few others) that apply no matter which mode is active.
+
+## Claude Code permission modes
+
+Claude Code sessions run in one of two modes, **Auto** or **Bypass** (`claude.permissionMode` in
+`~/.overdeck/config.yaml`). Auto passes `--permission-mode default` to the `claude` binary; Bypass passes
+`--permission-mode bypassPermissions`. Every launch path that starts a Claude Code session uses this same resolver,
+including work agents, resumed sessions, planning, conversations, smart compaction, and remote agents.
+
+New installations default to Auto. An installation that already existed before Overdeck v0.80.0 was pinned once to
+Bypass: the first time that version ran, if `claude.permissionMode` was absent or invalid, Overdeck wrote
+`claude.permissionMode: bypass` into `~/.overdeck/config.yaml` and recorded the decision in
+`~/.overdeck/.claude-permission-mode-pin.json` so it never repeats. An existing install can move to Auto at any time
+by choosing it in Settings.
+
+**Where to set it:** Settings > Permissions > Claude Code offers **Auto (recommended)** and **Bypass (yolo)**. It
+writes `claude.permissionMode` into `~/.overdeck/config.yaml`:
+
+```yaml
+claude:
+  permissionMode: auto # or bypass
+```
+
+**What Auto actually does.** Under Auto, Claude Code keeps its normal permission gating, and a `PreToolUse` hook
+(the auto-approve hook, installed by `pan sync`) approves tool calls for the sessions Overdeck launches: issue agents
+such as work, review, test and worker agents, planning agents, conversations, the Flywheel, strike and inspect
+agents, and the backlog sequencer. It approves every tool call for those sessions except `AskUserQuestion`, which
+always keeps its own dialog. It does not inspect the command, the path, or anything else. A `claude` session you
+start yourself, outside Overdeck, has no Overdeck agent id, so the hook leaves it alone and it keeps Claude Code's
+normal prompts.
+
+The Settings description and `pan --help` currently say Auto stops dangerous commands; it does not
+([#5566](https://github.com/eltmon/overdeck/issues/5566)).
+
+**So, in practice**, a session Overdeck launches runs without stopping for routine approval under either mode.
+Bypass gets there by turning off Claude Code's own gating; Auto keeps that gating on and relies on the hook, which
+approves only sessions carrying an Overdeck agent id. Neither mode is a sandbox: see the guardrail sections below for
+what actually stops specific mistakes.
+
+**Launch guard under Auto.** Before starting a Claude Code session under Auto, Overdeck checks that the auto-approve
+hook is registered in `~/.claude/settings.json` and tries to register it if not; if it still cannot register the
+hook (registering it needs `jq`), the launch is refused rather than starting a session that would stop at every tool
+call. The error names `pan sync` and the Bypass option. Under Bypass this check does nothing.
+
+`pan doctor` reports a **Claude Permission Mode** row. Under Auto, it is an error when the hook is not registered,
+and the fix is to run `pan sync` (which needs `jq`) or switch to Bypass in Settings.
+
+**Remote Fly agents need Bypass.** A Fly VM has no Overdeck auto-approve hook installed, so starting a remote agent
+there under Auto is refused; the error points you to Bypass in Settings > Permissions, or to starting with
+`PAN_YOLO=true`.
+
+A mode change applies to new launches only. A Claude Code process already running keeps the flags it started with;
+agents and conversations already running keep their old mode until they are restarted or resumed.
