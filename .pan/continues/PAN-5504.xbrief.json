@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5504",
   "created": "2026-11-19T07:15:41.251Z",
-  "updated": "2026-11-19T07:36:29.905Z",
+  "updated": "2026-11-19T07:37:50.798Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -334,9 +334,26 @@
       "doneAt": "2026-11-19T07:36:20.810Z"
     },
     "audit-docker-setup": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5504",
-      "claimedAt": "2026-11-19T07:36:29.905Z"
+      "claimedAt": "2026-11-19T07:36:29.905Z",
+      "doneAt": "2026-11-19T07:37:50.798Z"
+    },
+    "audit-docker-setup.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T07:37:50.798Z"
+    },
+    "audit-docker-setup.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T07:37:50.798Z"
+    },
+    "audit-docker-setup.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T07:37:50.798Z"
+    },
+    "audit-docker-setup.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T07:37:50.798Z"
     }
   }
 }
