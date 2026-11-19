@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5479",
   "created": "2026-11-19T01:28:31.320Z",
-  "updated": "2026-11-19T01:31:17.236Z",
+  "updated": "2026-11-19T01:32:27.213Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,9 +46,22 @@
       "doneAt": "2026-11-19T01:31:11.019Z"
     },
     "w3-features-cli": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5479",
-      "claimedAt": "2026-11-19T01:31:17.236Z"
+      "claimedAt": "2026-11-19T01:31:17.236Z",
+      "doneAt": "2026-11-19T01:32:27.213Z"
+    },
+    "w3-features-cli.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:32:27.213Z"
+    },
+    "w3-features-cli.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:32:27.213Z"
+    },
+    "w3-features-cli.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:32:27.213Z"
     }
   }
 }
