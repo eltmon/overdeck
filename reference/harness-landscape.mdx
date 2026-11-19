@@ -462,7 +462,7 @@ models, effort, cost and known behavior.
 - **Cost:** each prompt result reports usage and `costUsdTicks`; Overdeck
   imports one cost event per turn.
 
-### Goose (Block) — Not supported (strongest "bundle" primitive)
+### Goose (Block): Not supported (strongest "bundle" primitive)
 
 - **Vendor / model:** Block. 15+ providers (Anthropic, OpenAI, Google, Ollama,
   OpenRouter, Bedrock, …); can also bridge existing subscriptions via the
@@ -472,51 +472,51 @@ models, effort, cost and known behavior.
   Foundation (Dec 2025), alongside MCP and AGENTS.md.
 - **Auth:** per-provider API keys; local models need none.
 - **Extensibility:**
-  - **Skills — yes**, `SKILL.md`; reads `~/.agents/skills/`, `.agents/skills/`,
+  - **Skills: yes**, `SKILL.md`; reads `~/.agents/skills/`, `.agents/skills/`,
     **`.claude/skills/`, `~/.claude/skills/`**, `.goose/skills/`.
-  - **⭐⭐ Recipes** — portable **YAML** files that bundle `title`,
+  - **⭐⭐ Recipes**: portable **YAML** files that bundle `title`,
     `description`, typed templated `parameters`, `prompt`, **required
     extensions**, retry logic, and **subrecipes**. Shareable, CI-runnable. This
     is the **strongest native "load a curated bundle into a session"
-    primitive** of any harness surveyed — it is, structurally, a "conversation
+    primitive** of any harness surveyed: it is, structurally, a "conversation
     template."
-  - **.goosehints** (persistent project context); **AGENTS.md — yes**.
-  - **Extensions = MCP** — 70+ first-party, plus the 3,000+ community MCP
+  - **.goosehints** (persistent project context); **AGENTS.md: yes**.
+  - **Extensions = MCP**: 70+ first-party, plus the 3,000+ community MCP
     servers.
 - **Headless / RPC:** `goose run` (`-t`, `--recipe`, `--no-session`); embeddable
   API.
 - **Why notable:** if Overdeck ever wants a *native* per-session bundle
-  instead of synthesizing one, Goose Recipes are the reference design — and a
+  instead of synthesizing one, Goose Recipes are the reference design, and a
   concrete reason to consider adopting Goose specifically.
 
-### Charm Crush — Not supported
+### Charm Crush: Not supported
 
-- **Vendor / model:** Charmbracelet. Multi-provider — Anthropic, OpenAI, Gemini,
+- **Vendor / model:** Charmbracelet. Multi-provider: Anthropic, OpenAI, Gemini,
   Groq, OpenRouter, Bedrock, Azure, Copilot, MiniMax, DashScope, +15 more.
 - **OSS / license:** **Source-available, FSL-1.1-MIT** (Functional Source
-  License — converts to MIT after a delay; not OSI-open at release). **Go**.
+  License: converts to MIT after a delay; not OSI-open at release). **Go**.
 - **Auth:** API keys; also subscription plans from Synthetic, Z.ai, Kimi,
   MiniMax, DashScope.
 - **Extensibility:**
-  - **Skills — yes**, open Agent Skills standard; `user-invocable: true`
+  - **Skills: yes**, open Agent Skills standard; `user-invocable: true`
     surfaces a skill in the command palette.
-  - **AGENTS.md — yes** (default generated context file; `CRUSH.md` also).
-  - **MCP — yes** (stdio/http/sse); **LSP** integration; preliminary **hooks**.
-- **Headless / RPC:** `crush run -q` (**⚠ verify** JSON output options — least
+  - **AGENTS.md: yes** (default generated context file; `CRUSH.md` also).
+  - **MCP: yes** (stdio/http/sse); **LSP** integration; preliminary **hooks**.
+- **Headless / RPC:** `crush run -q` (**⚠ verify** JSON output options; the least
   documented headless interface surveyed).
 - **Why not yet:** FSL licensing is a redistribution caveat; headless interface
   underdocumented.
 
-### Aider — Not supported (poor fit)
+### Aider: Not supported (poor fit)
 
-- **Vendor / model:** Aider-AI (Paul Gauthier). Widest model support surveyed —
+- **Vendor / model:** Aider-AI (Paul Gauthier). Widest model support surveyed:
   OpenAI, Anthropic, Gemini, Azure, DeepSeek, Bedrock, Vertex, xAI, OpenRouter,
   Groq, Copilot, local via Ollama/LM Studio, any OpenAI-compatible endpoint.
 - **OSS / license:** Open source, **Apache-2.0**. **Python**. v0.86.0
-  (2025-08-09 — **⚠ verify** newer release).
+  (2025-08-09; **⚠ verify** newer release).
 - **Auth:** API keys only.
-- **Extensibility — the field's outlier:**
-  - **No Agent Skills** — does not implement `SKILL.md`.
+- **Extensibility (the field's outlier):**
+  - **No Agent Skills**: does not implement `SKILL.md`.
   - **No native AGENTS.md.**
   - **No MCP** (open RFC only).
   - Customization is `CONVENTIONS.md` files loaded via `--read` / `/read` or
@@ -525,10 +525,10 @@ models, effort, cost and known behavior.
   unsupported, unstable Python API.
 - **Why a poor fit:** no skills, no MCP, no machine-readable output. Aider's
   one-commit-per-change model is excellent for solo pairing but ill-suited to an
-  orchestrator. Skill portability gives Overdeck *nothing* here — Aider can't
-  read the `skills/` tree at all.
+  orchestrator. Skill portability gives Overdeck *nothing* here: Aider can't
+  read Overdeck's skills at all.
 
-### Cline — Not supported
+### Cline: Not supported
 
 - **Vendor / model:** Cline Bot Inc. Multi-provider (Anthropic, OpenAI, Gemini,
   OpenRouter 200+, Bedrock, Vertex, Cerebras, Groq, Ollama, …).
@@ -537,49 +537,49 @@ models, effort, cost and known behavior.
   web Kanban multi-agent board.
 - **Auth:** per-provider API keys; optional Cline account.
 - **Extensibility:**
-  - **Rules** — `.clinerules/` directory; **⭐ each rule has a per-session
+  - **Rules**: `.clinerules/` directory; **⭐ each rule has a per-session
     UI toggle** (its main per-session-curation primitive).
-  - **AGENTS.md — yes** (Agent Rules spec v1.0).
-  - **Skills (`SKILL.md`) — ⚠ unverified, likely not first-class** — docs
+  - **AGENTS.md: yes** (Agent Rules spec v1.0).
+  - **Skills (`SKILL.md`): ⚠ unverified, likely not first-class**. Docs
     describe rules + Workflows, not the `SKILL.md` format.
-  - **MCP — yes** (first-class since 2024).
+  - **MCP: yes** (first-class since 2024).
 - **Headless / RPC:** preview CLI with JSON output; `@cline/sdk` programmatic
   agent API.
 - **Why not yet:** historically IDE-bound; uncertain `SKILL.md` support means
-  Overdeck's `skills/` tree may not port cleanly.
+  Overdeck's skills may not port cleanly.
 
-### Continue — Not supported (notable for the bundle primitive)
+### Continue: Not supported (notable for the bundle primitive)
 
 - **Vendor / model:** Continue.dev. Multi-provider. Open source. IDE extension
   plus a CLI (`cn`).
-- **Extensibility:** Its defining concept is **Continue Agents** — shareable,
+- **Extensibility:** Its defining concept is **Continue Agents**: shareable,
   remixable definitions in `config.yaml` that bundle **models + rules + tools
   (MCP servers)** together. `cn --rule <namespace/name>` pulls a specific
-  hub-hosted rule into one session. **AGENTS.md / SKILL.md — ⚠ unverified,
+  hub-hosted rule into one session. **AGENTS.md / SKILL.md: ⚠ unverified,
   likely not first-class.**
 - **Why notable:** like Goose Recipes, "Continue Agents" are a native
-  loadable-bundle primitive — a second reference design for template
+  loadable-bundle primitive, a second reference design for template
   conversations.
 
 ## Comparison matrix
 
 | Harness | OSS / License | Lang | `SKILL.md` | Reads `.claude/skills` | AGENTS.md | MCP | Headless JSON | Native per-session bundle | Overdeck |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| **Claude Code** | Proprietary | — | ✅ | ✅ (own) | Fallback only¹ | ✅ | ✅ | Synth via `--plugin-dir` | **Supported** |
+| **Claude Code** | Proprietary | n/a | ✅ | ✅ (own) | Fallback only¹ | ✅ | ✅ | Synth via `--plugin-dir` | **Supported** |
 | **Pi** | MIT | TS | ✅ | ✅ | ✅ | ❌ (by design) | ✅ (RPC) | `--skill` flag | **Supported** |
-| **Codex CLI** | Apache-2.0 | Rust | ✅ | ✅ | ✅ native | ✅ (+is a server) | ✅ | Profiles | Candidate |
+| **Codex CLI** | Apache-2.0 | Rust | ✅ | ✅ | ✅ native | ✅ (+is a server) | ✅ | Profiles | **Supported** |
 | **Gemini CLI** | Apache-2.0 | TS | ✅ | ✅ | Opt-in | ✅ | ✅ | ⭐ `/skills enable` | Candidate |
-| **Copilot CLI** | Proprietary | — | ✅ | ❌ (`~/.agents`) | ✅ native | ✅ | ❌ ⚠ | `.agent.md` | Candidate |
-| **Cursor CLI** | Proprietary | — | ✅ | ✅ | ✅ | ✅ | ✅ | Rule scopes | No |
+| **Copilot CLI** | Proprietary | n/a | ✅ | ❌ (`~/.agents`) | ✅ native | ✅ | ❌ ⚠ | `.agent.md` | Candidate |
+| **Cursor CLI** | Proprietary | n/a | ✅ | ✅ | ✅ | ✅ | ✅ | Rule scopes | No |
 | **Warp / Oz** | ⚠ AGPL-3.0? | Rust | ✅ | ✅ (+all dirs) | ✅ | ✅ (imports) | ✅ | Oz `--profile` | No |
-| **Amp** | Proprietary | — | ✅ | ❌ | ✅ | ✅ | ✅ | TS plugins | No |
-| **OpenCode** | OSS ⚠ | TS | ✅ | ✅ | ✅ | ✅ | ✅ | ⭐ Custom Agents | Go and Zen via ACP |
-| **Grok Build** | Proprietary ⚠ | — | ✅ | ⚠ | ✅ | ✅ | ✅ (ACP) | Plugins | **Supported** via ACP |
+| **Amp** | Proprietary | n/a | ✅ | ❌ | ✅ | ✅ | ✅ | TS plugins | No |
+| **OpenCode** | OSS ⚠ | TS | ✅ | ✅ | ✅ | ✅ | ✅ | ⭐ Custom Agents | **Supported** (Go and Zen, via ACP) |
+| **Grok Build** | Proprietary ⚠ | n/a | ✅ | ⚠ | ✅ | ✅ | ✅ (ACP) | Plugins | **Supported** via ACP |
 | **Goose** | Apache-2.0 | Rust | ✅ | ✅ | ✅ | ✅ (=ext) | ✅ | ⭐⭐ Recipes | Candidate |
-| **Crush** | FSL-1.1-MIT | Go | ✅ | ⚠ | ✅ | ✅ | ⚠ | — | No |
-| **Aider** | Apache-2.0 | Python | ❌ | ❌ | ❌ | ❌ | ❌ | — | No (poor fit) |
-| **Cline** | Apache-2.0 | TS | ⚠ | — | ✅ | ✅ | ✅ | ⭐ rule toggles | No |
-| **Continue** | OSS | TS | ⚠ | — | ⚠ | ✅ | ✅ | ⭐ Continue Agents | No |
+| **Crush** | FSL-1.1-MIT | Go | ✅ | ⚠ | ✅ | ✅ | ⚠ | none | No |
+| **Aider** | Apache-2.0 | Python | ❌ | ❌ | ❌ | ❌ | ❌ | none | No (poor fit) |
+| **Cline** | Apache-2.0 | TS | ⚠ | ⚠ | ✅ | ✅ | ✅ | ⭐ rule toggles | No |
+| **Continue** | OSS | TS | ⚠ | ⚠ | ⚠ | ✅ | ✅ | ⭐ Continue Agents | No |
 
 ¹ Claude Code uses `CLAUDE.md`; AGENTS.md works only as a fallback when no
 `CLAUDE.md` exists, or via explicit `@AGENTS.md` import. Native support is an
@@ -589,49 +589,51 @@ open feature request ([anthropics/claude-code#34235](https://github.com/anthropi
 
 ## Implications for Overdeck
 
-1. **Skill portability is real and already paid for.** Overdeck's `skills/`
-   tree is `SKILL.md`-format. Codex, Gemini CLI, Cursor, OpenCode, Goose, Amp,
-   Warp, and ohmypi all read `SKILL.md`, and most read `.claude/skills/` directly.
-   Adding any of them is a *runtime adapter* problem, not a *skill re-authoring*
-   problem. **Aider is the lone exception** — no skills, no MCP, no JSON output;
-   not worth pursuing.
+1. **Skill portability is real and already paid for.** Overdeck's skills
+   (`sync-sources/skills/`) are `SKILL.md`-format. Codex, Gemini CLI, Cursor,
+   OpenCode, Goose, Amp, Warp, pi and ohmypi all read `SKILL.md`, and most read
+   `.claude/skills/` directly. Codex, OpenCode, pi and ohmypi already run as
+   Overdeck harnesses; adding any of the others is a *runtime adapter*
+   problem, not a *skill re-authoring* problem. **Aider is the lone
+   exception**: no skills, no MCP, no JSON output; not worth pursuing.
 
-2. **Codex CLI is the highest-value next harness.** Apache-2.0, native
-   AGENTS.md + skills, a best-in-class headless interface (`codex exec --json`,
-   and it can *be* an MCP server), and Overdeck **already mints
-   ChatGPT-subscription tokens via CLIProxy**. The Codex harness would give
-   GPT-subscription users a first-party OpenAI agent loop instead of routing GPT
-   through Claude Code.
+2. **Codex CLI shipped as a supported harness.** Apache-2.0, native AGENTS.md
+   + skills, and a best-in-class headless interface (`codex exec --json`, and
+   it can *be* an MCP server). It's the built-in harness for OpenAI models, so
+   GPT-subscription users get a first-party OpenAI agent loop instead of
+   routing GPT through Claude Code.
 
 3. **For template conversations, harness choice matters.** Three harnesses ship
    a *native* loadable-bundle primitive that Overdeck would otherwise have to
    synthesize:
-   - **Goose Recipes** — parameterized YAML bundles of prompt + extensions +
+   - **Goose Recipes**: parameterized YAML bundles of prompt + extensions +
      subrecipes. Structurally identical to a "conversation template."
-   - **Continue Agents** — `config.yaml` bundles of models + rules + tools.
-   - **Gemini CLI `/skills enable/disable`** — true per-session skill toggling.
+   - **Continue Agents**: `config.yaml` bundles of models + rules + tools.
+   - **Gemini CLI `/skills enable/disable`**: true per-session skill toggling.
 
    Claude Code and ohmypi have no native bundle object, but **can synthesize one**:
    Claude Code via `--plugin-dir`, ohmypi via repeatable `--skill`. The
    [template-conversations proposal](/reference/template-conversations) builds
    on those. "Adding a harness specifically for its bundle primitive" is
-   therefore a *real option* — Goose is the candidate if Overdeck wants the
+   therefore a *real option*: Goose is the candidate if Overdeck wants the
    primitive native rather than synthesized.
 
-4. **MCP is near-universal; ohmypi is the exception.** Any feature that assumes MCP
-   availability must account for ohmypi rejecting MCP by design.
+4. **MCP is near-universal; pi and ohmypi are the exceptions.** Neither has a built-in MCP client.
+   Overdeck's own MCP server reaches Claude Code, Codex, ACP, OpenCode and
+   Grok Build launches, but not pi, ohmypi, Kimi Code, Muse Code or Prime
+   Agent, so a feature that assumes MCP must account for those harnesses.
 
 5. **Headless quality varies and gates orchestration.** Codex, Gemini CLI,
    Cursor, and Amp have first-class JSON/stream interfaces. Aider has none.
    Crush's is underdocumented. **Copilot CLI has a non-interactive `--prompt`
-   mode but no documented machine-readable output** — a real gate, since
+   mode but no documented machine-readable output**: a real gate, since
    Overdeck parses an event/cost stream to drive readiness, heartbeat, and
    spend. A harness without a machine-readable interface is expensive for
    Overdeck to drive, regardless of how good its model access is.
 
-6. **Re-verify before deciding.** Flagged ⚠ items — Warp's license,
+6. **Re-verify before deciding.** Flagged ⚠ items (Warp's license,
    OpenCode/Crush licenses and headless schemas, Cline's
-   `SKILL.md` support, the Agent Skills spec date — must be confirmed against
+   `SKILL.md` support, the Agent Skills spec date) must be confirmed against
    primary sources at decision time. This document is a snapshot of a
    fast-moving field.
 
@@ -639,31 +641,31 @@ open feature request ([anthropics/claude-code#34235](https://github.com/anthropi
 
 Primary documentation consulted (May 2026):
 
-- Claude Code — [code.claude.com/docs](https://code.claude.com/docs/en/skills)
-- oh-my-pi — [oh-my-pi/pi-coding-agent](https://github.com/oh-my-pi/pi-coding-agent)
-- Codex CLI — [openai/codex](https://github.com/openai/codex),
+- Claude Code: [code.claude.com/docs](https://code.claude.com/docs/en/skills)
+- oh-my-pi: [oh-my-pi/pi-coding-agent](https://github.com/oh-my-pi/pi-coding-agent)
+- Codex CLI: [openai/codex](https://github.com/openai/codex),
   [developers.openai.com/codex](https://developers.openai.com/codex/cli)
-- Gemini CLI — [google-gemini/gemini-cli](https://github.com/google-gemini/gemini-cli)
-- Copilot CLI — [github/copilot-cli](https://github.com/github/copilot-cli),
+- Gemini CLI: [google-gemini/gemini-cli](https://github.com/google-gemini/gemini-cli)
+- Copilot CLI: [github/copilot-cli](https://github.com/github/copilot-cli),
   [docs.github.com/copilot/concepts/agents/about-copilot-cli](https://docs.github.com/en/copilot/concepts/agents/about-copilot-cli),
   [Agent Skills changelog (2025-12-18)](https://github.blog/changelog/2025-12-18-github-copilot-now-supports-agent-skills/)
-- Cursor — [cursor.com/docs/cli](https://cursor.com/docs/cli/overview)
-- Warp — [docs.warp.dev/agent-platform](https://docs.warp.dev/agent-platform/)
-- Amp — [ampcode.com/manual](https://ampcode.com/manual)
-- OpenCode — [opencode.ai/docs](https://opencode.ai/docs/)
-- Goose — [goose-docs.ai](https://goose-docs.ai/)
-- Crush — [charmbracelet/crush](https://github.com/charmbracelet/crush)
-- Aider — [aider.chat/docs](https://aider.chat/docs/)
-- Cline — [cline/cline](https://github.com/cline/cline)
-- Continue — [docs.continue.dev](https://docs.continue.dev/)
-- Standards — [agents.md](https://agents.md/),
+- Cursor: [cursor.com/docs/cli](https://cursor.com/docs/cli/overview)
+- Warp: [docs.warp.dev/agent-platform](https://docs.warp.dev/agent-platform/)
+- Amp: [ampcode.com/manual](https://ampcode.com/manual)
+- OpenCode: [opencode.ai/docs](https://opencode.ai/docs/)
+- Goose: [goose-docs.ai](https://goose-docs.ai/)
+- Crush: [charmbracelet/crush](https://github.com/charmbracelet/crush)
+- Aider: [aider.chat/docs](https://aider.chat/docs/)
+- Cline: [cline/cline](https://github.com/cline/cline)
+- Continue: [docs.continue.dev](https://docs.continue.dev/)
+- Standards: [agents.md](https://agents.md/),
   [agentskills/agentskills](https://github.com/agentskills/agentskills),
   [vercel-labs/skills](https://github.com/vercel-labs/skills)
 
 ## See also
 
-- [Harnesses](/configuration/harnesses) — operational guide for the two
+- [Harnesses](/configuration/harnesses): operational guide for the
   supported harnesses (install, picker locations, ToS rules, troubleshooting)
-- [Template Conversations](/reference/template-conversations) — proposal:
+- [Template Conversations](/reference/template-conversations): proposal for
   loading a curated skill set into a single conversation
-- [Skills System](/features/skills) — how Overdeck distributes skills
+- [Skills System](/features/skills): how Overdeck distributes skills
