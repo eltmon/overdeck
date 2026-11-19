@@ -137,6 +137,7 @@
               "configuration/telemetry",
               "configuration/knowledge",
               "configuration/harnesses",
+              "configuration/permissions",
               "configuration/model-routing",
               "configuration/model-presets",
               "configuration/local-models",
