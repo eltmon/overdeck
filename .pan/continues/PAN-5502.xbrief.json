@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5502",
   "created": "2026-11-19T05:29:14.806Z",
-  "updated": "2026-11-19T05:47:52.668Z",
+  "updated": "2026-11-19T05:48:01.111Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -330,6 +330,11 @@
     "audit-keyboard-shortcuts.ac3": {
       "status": "completed",
       "doneAt": "2026-11-19T05:47:52.668Z"
+    },
+    "audit-file-explorer": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5502",
+      "claimedAt": "2026-11-19T05:48:01.111Z"
     }
   }
 }
