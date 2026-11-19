@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-19T05:04:44.943028Z · model: claude-opus-5-5 · open: 944_
+_Last sequenced: 2026-11-19T05:39:37.620595Z · model: claude-opus-5-5 · open: 943_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -489,7 +489,6 @@ _Last sequenced: 2026-11-19T05:04:44.943028Z · model: claude-opus-5-5 · open: 
 | 457 | PAN-2976 | L | medium | ok |  |  | Generalize the ACP harness to any capability-passing ACP CLI: named adapters plus a config-declared custom-agent escape hatch. |
 | 458 | PAN-1444 | S | medium | ok |  |  | Follow-up to PAN-1416: dashboard port lockfile + pan doctor multi-instance check |
 | 459 | PAN-2469 | S | medium | ok |  |  | Assembly landed (mergeReadySlots + finalization); remaining: alarm when all slots merged but no review requested. Swarm dormant. |
-| 459 | PAN-5500 | L | medium | ok |  |  | Docs audit: line-by-line accuracy check of the 21 Overdeck Anywhere pages against main. Lane A item 11. |
 | 460 | PAN-1433 | S | medium | ok |  |  | Conversation agents can leave host main repo in abandoned git rebase state for hours |
 | 460 | PAN-5502 | L | medium | ok |  |  | Docs audit: line-by-line accuracy check of the 14 Features pages; PAN-5479/5482 merged, so it can run. |
 | 461 | PAN-1416 | S | medium | ok |  |  | Workspace-spawned dashboards must never claim the canonical dashboard port |
@@ -1279,10 +1278,10 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-19T05:04:44.943028Z",
+  "generatedAt": "2026-11-19T05:39:37.620595Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 944,
+  "openCount": 943,
   "nodes": [
     {
       "issue": "PAN-5013",
@@ -7404,19 +7403,6 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "rationale": "Demoted from 277 to 443: most of the assembly owner landed and pan swarm is dormant post-Cut (foreman is the default parallel path), leaving only a safety-net alarm.",
       "gate": "auto",
       "planning": "interactive"
-    },
-    {
-      "issue": "PAN-5500",
-      "rank": 459,
-      "size": "L",
-      "importance": "medium",
-      "score": 46,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Docs audit: line-by-line accuracy check of the 21 Overdeck Anywhere pages against main. Lane A item 11.",
-      "rationale": "New child of the docs epic: an accuracy audit that runs after the page PRs it names merge, so it ranks just behind the last of them in its order-book lane. PAN-5472 merged (#5535), so that dependency is removed.",
-      "gate": "auto",
-      "planning": "auto"
     },
     {
       "issue": "PAN-1433",
@@ -14274,13 +14260,6 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
     },
     {
       "from": "PAN-5467",
-      "to": "PAN-5500",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5467",
       "to": "PAN-5502",
       "type": "contains",
       "source": "github-ref",
@@ -14348,13 +14327,6 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-5500",
-      "to": "PAN-5582",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
     },
     {
       "from": "PAN-5532",
