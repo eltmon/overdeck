@@ -342,6 +342,91 @@ describe('RtcTransport candidate tallies (PAN-5242 WI-2)', () => {
     expect(bLines).toContainEqual(expect.stringMatching(/^rtc session [0-9a-f]{8} answered$/));
     expect([...aLines, ...bLines]).toContainEqual(expect.stringMatching(/ connected \(direct; gathered \d+ \(host /));
   }, 20_000);
+
+  it('applies trickle candidates that arrive while the offer is still waiting on ICE servers', async () => {
+    // A browser offer carries no a=candidate lines; the phone flushes its trickle burst on the
+    // socket immediately behind the offer. The answerer used to drop that burst because it waits
+    // on the directory for ICE servers before the session exists, so the answer logged received 0
+    // and ICE never paired (direct and relay).
+    const queued: Array<{ session: string; data: SignalData }> = [];
+    let toInitiator: SignalHandler | null = null;
+    let toAnswerer: SignalHandler | null = null;
+    let releaseIce: () => void = () => undefined;
+    const iceGate = new Promise<void>((resolve) => {
+      releaseIce = resolve;
+    });
+    const initiator: RtcSignalingPort = {
+      send(_to, session, _purpose, _relay, data) {
+        queued.push({ session, data });
+      },
+      onSignal(handler) {
+        toInitiator = handler;
+        return () => {
+          toInitiator = null;
+        };
+      },
+      iceServers: async () => [],
+    };
+    const answererLogs = { log: vi.fn(), debug: vi.fn() };
+    const answerer: RtcSignalingPort = {
+      send(_to, session, purpose, relay, data) {
+        setImmediate(() => toInitiator?.(B, session, purpose, relay, data));
+      },
+      onSignal(handler) {
+        toAnswerer = handler;
+        return () => {
+          toAnswerer = null;
+        };
+      },
+      iceServers: async () => {
+        await iceGate;
+        return [];
+      },
+    };
+    const incoming: Duplex[] = [];
+    const dialer = new RtcTransport(initiator, () => undefined);
+    const responder = new RtcTransport(answerer, (raw) => incoming.push(raw), answererLogs);
+    transports.push(dialer, responder);
+
+    const opened = dialer.dial(B, { relay: false, purpose: 'link', signal: new AbortController().signal });
+    // A failure before the await below must not surface as an unhandled rejection.
+    void opened.catch(() => undefined);
+    await vi.waitFor(() => expect(queued.some((frame) => frame.data.sdp?.type === 'offer')).toBe(true));
+    const offer = queued.find((frame) => frame.data.sdp?.type === 'offer')!;
+    const candidates = queued.filter((frame) => frame.data.candidate);
+    expect(candidates.length).toBeGreaterThan(0);
+    expect(offer.data.sdp!.sdp).toContain('a=candidate:');
+    // werift's gathered offer also carries a=end-of-candidates. Leaving that line makes the answerer
+    // ignore every candidate added afterwards, which a phone offer (gathering still open) does not.
+    const stripped = offer.data.sdp!.sdp
+      .split(/\r?\n/)
+      .filter((line) => !line.startsWith('a=candidate:') && line !== 'a=end-of-candidates')
+      .join(offer.data.sdp!.sdp.includes('\r\n') ? '\r\n' : '\n');
+    expect(stripped).not.toContain('a=candidate:');
+    expect(stripped).not.toContain('a=end-of-candidates');
+
+    toAnswerer!(A, offer.session, 'link', false, { sdp: { type: 'offer', sdp: stripped } });
+    const stranger = 'cccccccc-0000-4000-8000-00000000000c';
+    toAnswerer!(stranger, offer.session, 'link', false, {
+      candidate: { candidate: 'candidate:99 1 udp 1 198.51.100.9 9 typ host', sdpMid: '0', sdpMLineIndex: 0 },
+    });
+    for (const frame of candidates) toAnswerer!(A, offer.session, 'link', false, frame.data);
+
+    const debugLines = answererLogs.debug.mock.calls.map(([line]) => line as string);
+    expect(debugLines.some((line) => line.includes('unknown session'))).toBe(false);
+    expect(debugLines).toContain('rtc candidate dropped: session ' + offer.session.slice(0, 8) + ' belongs to 00000000, not cccccccc');
+    expect(debugLines.join('\n')).not.toContain('candidate:');
+
+    releaseIce();
+    await vi.waitFor(() =>
+      expect(answererLogs.log).toHaveBeenCalledWith(
+        expect.stringMatching(/^rtc session [0-9a-f]{8} answer to 00000000 \(direct\): received [1-9]\d* \(host [1-9]\d*, srflx \d+, relay 0\), gathered /),
+      ),
+    );
+    await vi.waitFor(() => expect(incoming).toHaveLength(1));
+    await opened;
+    expect(responder.peerConnectionCount()).toBe(1);
+  }, 20_000);
 });
 
 describe('RtcTransport relay fail-fast (PAN-5242 WI-3)', () => {
