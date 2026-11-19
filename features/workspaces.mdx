@@ -265,6 +265,54 @@ The header of a scratch or main workspace's view has three buttons:
 
 Issue workspaces show none of these, because Overdeck's pipeline owns their worktree. To remove an issue workspace by hand, use `pan workspace destroy <issueId>`; add `--purge-memory` to also delete its memory permanently. The workspace view has no delete button.
 
+## Scratch and main workspaces from the CLI
+
+`pan workspace new`, `main`, `get`, `activate`, `archive`, `relocate` and `list --kind` manage scratch and main workspaces. The older `pan workspace create` and `destroy` handle issue workspaces (see [Workspace Lifecycle](#workspace-lifecycle)).
+
+```bash
+# Create a scratch workspace that shares the project directory (the default)
+pan workspace new my-scratch-notes
+
+# --isolated creates its own git worktree on a scratch/<name> branch
+pan workspace new my-experiment --isolated --parent-branch main
+
+# --target-path points the workspace at any existing directory
+pan workspace new vendor-lens --target-path ~/code/some-vendored-repo
+
+# --dry-run prints the resolved intent as JSON and creates nothing
+pan workspace new my-scratch-notes --dry-run
+
+# Inside an Overdeck agent or conversation the default origin is agent, which
+# keeps the workspace off the Workspaces section; --origin operator keeps it on
+pan workspace new my-notes --origin operator
+
+# Point a workspace (by id or name) at another existing directory
+pan workspace relocate vendor-lens --path ~/code/moved-vendored-repo
+
+# Resolve the project's main workspace, creating it if needed
+pan workspace main
+
+# Show, activate or archive a workspace by id
+pan workspace get <id>
+pan workspace activate <id>
+pan workspace archive <id>
+
+# List one kind; --archived includes archived workspaces and needs --kind
+pan workspace list --kind scratch --archived
+```
+
+`pan workspace new` uses the project that owns your current directory, or the only registered project; pass `--project <key>` to choose another.
+
+### Targeting and relocating
+
+A workspace points at a directory, so more than one workspace can point at the same repository, and you can move a workspace later. The rules:
+
+- `--target-path` and `--isolated` cannot be combined, because an isolated worktree already decides its own path.
+- `pan workspace relocate` refuses issue workspaces, because the pipeline owns their path. It needs `--force` for the main workspace, because moving it makes the workspace differ from `projects.yaml`. The new path must be an existing directory.
+- `pan workspace archive` refuses the main workspace.
+
+Relocating never moves memory. A workspace's memory is stored by its id, not by its path or name.
+
 ## Main Project Branch Convention
 
 > **CRITICAL:** The main project directory must **ALWAYS** stay on the `main` branch. All feature work happens in workspaces.
