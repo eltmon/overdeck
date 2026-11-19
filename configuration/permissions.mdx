@@ -4,6 +4,8 @@ sidebarTitle: "Permissions"
 description: "Choose Auto or Bypass for Claude Code and a Codex mode, answer permission prompts, and see what agents are refused."
 ---
 
+# Permissions and agent guardrails
+
 Every agent Overdeck launches runs under a permission mode that decides whether a tool call stops for your approval.
 This page covers the Claude Code and Codex modes, how to override the mode for a single command, how to answer a
 permission prompt from the dashboard, and the separate guardrails (operator-only labels, the agent `git` shim,
@@ -11,10 +13,15 @@ primary checkout refusals, and a few others) that apply no matter which mode is 
 
 ## Claude Code permission modes
 
-Claude Code sessions run in one of two modes, **Auto** or **Bypass** (`claude.permissionMode` in
-`~/.overdeck/config.yaml`). Auto passes `--permission-mode default` to the `claude` binary; Bypass passes
-`--permission-mode bypassPermissions`. Every launch path that starts a Claude Code session uses this same resolver,
-including work agents, resumed sessions, planning, conversations, smart compaction, and remote agents.
+Claude Code sessions run in one of two modes (`claude.permissionMode` in `~/.overdeck/config.yaml`):
+
+| Mode | What Overdeck passes to Claude Code | Effect |
+| --- | --- | --- |
+| **Auto** | `--permission-mode default` | Claude Code's normal gating stays on; the auto-approve hook approves tool calls for Overdeck's own sessions. |
+| **Bypass** | `--permission-mode bypassPermissions` | Claude Code's own gating is off; no hook is needed. |
+
+Every launch path that starts a Claude Code session uses this same resolver, including work agents, resumed
+sessions, planning, conversations, smart compaction, and remote agents.
 
 New installations default to Auto. An installation that already existed before Overdeck v0.80.0 was pinned once to
 Bypass: the first time that version ran, if `claude.permissionMode` was absent or invalid, Overdeck wrote
@@ -22,7 +29,7 @@ Bypass: the first time that version ran, if `claude.permissionMode` was absent o
 `~/.overdeck/.claude-permission-mode-pin.json` so it never repeats. An existing install can move to Auto at any time
 by choosing it in Settings.
 
-**Where to set it:** Settings > Permissions > Claude Code offers **Auto (recommended)** and **Bypass (yolo)**. It
+**Where to set it:** Settings > **Permissions** > **Claude Code** offers **Auto (recommended)** and **Bypass (yolo)**. It
 writes `claude.permissionMode` into `~/.overdeck/config.yaml`:
 
 ```yaml
@@ -55,7 +62,7 @@ call. The error names `pan sync` and the Bypass option. Under Bypass this check 
 and the fix is to run `pan sync` (which needs `jq`) or switch to Bypass in Settings.
 
 **Remote Fly agents need Bypass.** A Fly VM has no Overdeck auto-approve hook installed, so starting a remote agent
-there under Auto is refused; the error points you to Bypass in Settings > Permissions, or to starting with
+there under Auto is refused; the error points you to Bypass in Settings > **Permissions**, or to starting with
 `PAN_YOLO=true`.
 
 A mode change applies to new launches only. A Claude Code process already running keeps the flags it started with;
@@ -89,7 +96,7 @@ single command, use Settings > **Permissions**.
 
 ## Codex permission modes
 
-Settings > Permissions > Codex has four options, saved as `codex.permissionMode`:
+Settings > **Permissions** > **Codex** has four options, saved as `codex.permissionMode`:
 
 | Option | `codex.permissionMode` | What Codex does |
 | --- | --- | --- |
@@ -108,8 +115,7 @@ Codex thread with on-request approval and the workspace-write sandbox, whatever 
 with `codex.transport: tui`
 ([#5567](https://github.com/eltmon/overdeck/issues/5567)).
 
-For the ACP harness (Kimi Code, OpenCode, Grok Build and the others), see
-[Harnesses](/configuration/harnesses).
+For the ACP harness, see [Harnesses](/configuration/harnesses).
 
 ## Answer permission prompts from the dashboard
 
@@ -168,11 +174,8 @@ sandbox: an absolute `/usr/bin/git` bypasses it, and file-system and network wri
 `pan fork` and `pan handoff` take a `--cwd <path>`. The path must be absolute, contain no `..`, exist as a
 directory, and resolve inside your home directory, or the dashboard answers `Invalid cwd`.
 
-A `--cwd` inside a project's primary checkout is refused:
-
-```text
-Invalid cwd: <path> is the primary checkout of <project>; use a worktree
-```
+A `--cwd` inside a project's primary checkout is refused with
+`Invalid cwd: <path> is the primary checkout of <project>; use a worktree`.
 
 `--allow-primary` overrides that refusal only when the caller is the operator; an agent session is refused even
 with the flag.
