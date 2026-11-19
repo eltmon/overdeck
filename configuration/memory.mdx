@@ -1,5 +1,6 @@
 ---
-title: Project Memory
+title: "Project memory: curated facts for every agent"
+sidebarTitle: "Project Memory"
 description: Curated facts stored in your repository and injected into every managed agent session
 ---
 
@@ -7,7 +8,7 @@ description: Curated facts stored in your repository and injected into every man
 
 Curated memory facts are short, human-reviewable truths committed in your repository: operator
 corrections, working agreements, non-obvious project facts. They are repo-owned, so every managed
-harness (Claude Code, Codex, Pi, ACP, Kimi Code, Muse, Prime Agent) sees the same list, on every
+harness (Claude Code, Codex, Pi, ACP, OpenCode, Grok, Kimi Code, Muse, Prime Agent) sees the same list, on every
 machine, after a normal `git pull`. This is distinct from Claude Code's own per-machine
 auto-memory, which Overdeck does not read.
 
@@ -41,7 +42,7 @@ an invalid `updated`.
 
 `type: user` is valid only in the operator and machine stores (below). The `id` must match
 `/^[a-z0-9][a-z0-9-]{0,79}$/`. A project-store or operator-store fact whose title, description, tags,
-or body contains a machine-specific path (an absolute path into a home directory) is refused — see
+or body contains a machine-specific path (an absolute path into a home directory) is refused; see
 **Several machines** below.
 
 ## Where facts live
@@ -85,21 +86,21 @@ type (`feedback`, `project`, `reference`, `user`), then by `updated` descending,
 project section is bounded at 12,000 characters, the operator
 section at 4,000, and the machine section at 2,000; once the budget is reached, the index stops and
 prints how many more facts to find with `pan memory list` (`--user`, `--machine`). A fact
-carrying a non-empty `review` marker is never injected — only `pan memory list --review` shows it.
+carrying a non-empty `review` marker is never injected; only `pan memory list --review` shows it.
 The index and `pan memory search` also leave out a fact with `status: superseded` or `status: retired`,
 and any fact that names a `superseded_by`, whatever its status says. `pan memory list` hides them too;
 `pan memory list --all` shows every fact, ending each inactive line with `[superseded by <id>]`,
 `[superseded]`, `[retired]` or `[review: <markers>]`.
 Only the index line is injected; open the fact file (`pan memory show <id>`) for its body. A fact
 added inside a workspace reaches every session's index once its branch merges and the primary
-checkout pulls — not the agent's own next session inside that same workspace.
+checkout pulls, not the agent's own next session inside that same workspace.
 
 ### Prompt-time retrieval
 
 The launch index above is budget-cut, so a large store can omit a fact's index line entirely. Beyond
-that index, Claude Code's and Pi's per-turn prompts, and every agent's first prompt, also rank the
+that index, Claude Code's, Codex app-server's and Pi's per-turn prompts, and every agent's first prompt, also rank the
 active, non-`always` facts across all three stores against the prompt and inject up to 6 of them,
-each with its description and body, under a shared 1,500-token budget — so a fact the launch index
+each with its description and body, under a shared 1,500-token budget, so a fact the launch index
 cut can still reach the turn that names its topic. An `always` fact is never a retrieval candidate; it
 only ever reaches an agent through the launch index, where it always sorts first (see **Adding and
 curating facts** below). Launch budgets and the overflow line are unchanged. Every retrieval decision
@@ -120,7 +121,7 @@ See [pan memory](/cli/memory-commands#pan-memory) for the full option reference.
 Writes land in your checkout; the PR is the review. `add`, `edit`, and `retire` write into the
 checkout that owns your current directory (or `--project <key>`'s primary checkout, `--user` for
 the operator store, or `--machine` for the machine store) and print the `git add`/`git rm` plus commit
-command to run for a project fact — Overdeck never commits a project fact for you. A `--user` write to a
+command to run for a project fact. Overdeck never commits a project fact for you. A `--user` write to a
 synced operator store runs one sync and prints its outcome; the fact is written even when that sync is
 offline. `add --type user` without `--user` or `--machine` is refused: user facts belong in the
 operator store. A fact whose text trips the secret scanner (an API key, a `token: value` pair) is
@@ -149,7 +150,7 @@ pan memory reindex --project overdeck --json
 `reindex` refreshes the project store (the same one `add`/`list` use, or `--project <key>`'s), the
 operator store, and the machine store, printing one `<scope>: <embedded> embedded, <reused> reused`
 line per store (or `--json`'s `{ stores: [...] }`). Unlike the best-effort refresh after a write, it
-exits 1 when embedding fails — it is the way you confirm the cache is healthy. Outside a registered
+exits 1 when embedding fails; it is the way you confirm the cache is healthy. Outside a registered
 project with no `--project`, it skips the project store with a note rather than failing. `pan memory
 sync` also refreshes the operator store's vectors, best-effort, after a `synced` outcome.
 
@@ -200,7 +201,7 @@ pan memory lint --threshold 0.7 --json
 
 The report has three sections:
 
-- **Links:** supersession problems — an id that names no fact, a link recorded on only one side, a
+- **Links:** supersession problems: an id that names no fact, a link recorded on only one side, a
   `status: superseded` without `superseded_by` (or the reverse), a supersession cycle, and an active
   fact whose description says it is superseded, with the `pan memory edit <new> --supersedes <id>` to
   run.
@@ -219,12 +220,12 @@ fact and its replacement are similar by design. `--json` prints the whole report
 
 `pan memory search <query>` prints matching curated facts first, under `Project memory:`,
 `Operator memory:` and `Machine memory:` headings, before the usual observation hits below them. `--json` output is
-unchanged — it is still the observation array only.
+unchanged: it is still the observation array only.
 
 Pass `--facts` with `--json` to get both at once, as a single line of JSON: `pan memory search
-"release" --facts --json` prints `{ facts, observations }`. `facts` holds up to 5 matches per store
-(this checkout's project store — the one `add` writes; the operator store; the machine store), each
-as `{ scope, type, id, title, description, tags, file }` with no body. `observations` holds the same
+"release" --facts --json` prints `{ facts, observations }`. `facts` holds up to 5 matches from each store:
+this checkout's project store (the one `add` writes), the operator store and the machine store. Each match
+is `{ scope, type, id, title, description, tags, file }` with no body. `observations` holds the same
 matches as plain `--json`, trimmed to a short form without the full narrative. Without a scope flag
 (`--project`, `--workspace`, `--issue`, `--global`), observations are scoped to the project that owns
 your current directory, falling back to `--global` when it owns none. `--facts` without `--json`
@@ -239,36 +240,35 @@ exits 1.
 | Where | `<planHome>/.overdeck/memory/` (repo), `~/.overdeck/context/memory/` (operator, synced when set up), `~/.overdeck/context/machine-memory/` (this machine) | `~/.overdeck/memory/{projectId}/{workspaceId}/` | A separate knowledge-bundle repository |
 | How injected | A rendered index every launch, plus up to 6 ranked facts per prompt-time turn (not `always` facts) | Prompt-time retrieval and rollups | Prompt-time concept index, when configured |
 
-Facts use the same frontmatter keys (`type`, `title`, `description`, `tags`) OKF's indexer reads, so
-`/okf author` can promote a fact into the knowledge bundle by moving the file and re-casing its type.
+Facts use the same frontmatter keys (`type`, `title`, `description`, `tags`) OKF's indexer reads.
 
 ## Per-turn retrieval
 
-Every prompt — not just session start — can pull relevant memory, briefing updates and docs context in
+Every prompt, not just session start, can pull relevant memory, briefing updates and docs context in
 front of it. Which harnesses get this, and how:
 
 - **Claude Code** calls it from the global `user-prompt-submit-hook`, registered once in your
   user-global `~/.claude/settings.json`. It fires for every Claude Code session on the machine, in any
-  cwd — a workspace or a project root.
+  cwd, a workspace or a project root.
 - **Codex** calls it from the app-server host, before each turn the host mediates: dashboard messages,
   `pan tell`, and pane-typed lines. The result is wrapped in `<overdeck-turn-context>` and prepended to
   the prompt; the chat timeline, titles, search and enrichment all strip that block back out, so you see
   only your own text. The native Codex terminal companion and `codex.transport: tui` do not call it.
 - **Pi** calls it for issue-linked conversations and work agents.
 
-A conversation's identity comes from the workspace row that owns it — its own `workspace_id`, else the
+A conversation's identity comes from the workspace row that owns it: its own `workspace_id`, else the
 project's main workspace for a project-root conversation. Dashboard boot creates any missing main
 workspace row for a registered project, so older projects (imported before workspaces existed) get
 identity too.
 
-Every call — hit, miss or error — is logged to
+Every call (hit, miss or error) is logged to
 `~/.overdeck/memory/<project>/<workspace>/rag-runs/<date>.jsonl`.
 
 ## Previewing
 
 The dashboard's **Context** page preview shows the same Project / Operator / Machine memory sections the
 launch composition injects, for the project the previewed layer belongs to. The preview places memory
-after the layers rather than before the workspace section — it is a source-labelled audit view, not a
+after the layers rather than before the workspace section; it is a source-labelled audit view, not a
 byte-identical copy of what a launch sends.
 
 ## Several machines
@@ -284,7 +284,7 @@ Because the project and operator stores reach other machines, a fact in either c
 into a home directory: it would be true only on the machine that wrote it. `pan memory add`/`edit`
 refuse such text with the exact match and a fix: rewrite it with `~` or a relative path, or keep it on
 this machine only with `--machine`. `pan done` refuses to finish an issue with an uncommitted fact still
-sitting in the working tree — commit it like any other change before signaling completion.
+sitting in the working tree; commit it like any other change before signaling completion.
 
 ## Syncing operator memory
 
@@ -319,6 +319,9 @@ pan memory list --user --review
 pan memory edit --user <id> --body "<the merged text>"
 pan memory retire --user <id>-conflict-<machine>
 ```
+
+To keep a conflict copy as its own fact instead of retiring it, clear its review flag with
+`pan memory edit <id> --clear-review` (add `--user` for the operator store), where `<id>` is the copy's id.
 
 An edit always beats a deletion. A changed fact whose text trips the secret scanner or contains a
 home-directory path is held back: it stays on this machine, uncommitted, and every sync reports it.

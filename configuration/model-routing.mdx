@@ -130,8 +130,9 @@ back to one entry).
 A **harness** is the coding-agent CLI that runs a model. `resolveHarness`
 (`src/lib/harness-resolve.ts`) picks it in this order:
 
-1. An explicit pick wins: `pan start --harness`, `pan plan --harness`, or a
-   launch panel or model picker row that names a harness.
+1. An explicit pick wins: `pan start --harness`, `pan plan --harness`,
+   `pan strike --harness`, or a launch panel or model picker row that names a
+   harness.
 2. Otherwise, the provider default harness set in Settings → Providers
    (`models.providers.<provider>.harness`).
 3. Otherwise, the provider's own built-in default.
@@ -223,7 +224,8 @@ For one item, `resolveTier` first checks for a `by_kind` match on the item's
 `kind`, then falls back to the item's `difficulty`. An item that matches
 neither falls through to `roles.work` instead of any tier. The harness for a
 staffed item comes from its tier (or the matching distribution entry), never
-from the model's provider default.
+from the model's provider default. An item's own `metadata.model` overrides
+its tier's model; the harness still comes from the tier.
 
 ### Who runs the work
 
@@ -247,7 +249,9 @@ In swarm mode only, once a slot merges, every live slot agent gets a
 read-only message with that item's title and diff, through the commit feed.
 `feed.exclude` drops matching paths from the diff it sends, and
 `feed.max_diff_bytes` swaps an oversized diff for a `--stat` summary instead
-(there is no size limit by default).
+(there is no size limit by default). `feed.exclude_subjects` lists commit
+subject prefixes: a commit whose subject starts with one of them is not sent
+at all.
 
 ### Fitness warnings
 
@@ -299,10 +303,13 @@ below item and plan effort, and above sub-role and role effort.
 
 ## Check what will run
 
-- `pan admin config tiers` prints the resolved `roles.work` model and, when
-  tiering is on, every tier's resolved model, harness and difficulties.
-- `GET /api/models/resolve` returns the model each role and each review lane
-  resolves to under the current config.
+- `pan admin config tiers` prints the resolved `roles.work` model and every
+  configured tier's resolved model, harness and difficulties. When tiering is
+  off it marks the tiers as unused; when the block is invalid it prints only
+  the reason.
+- `GET /api/models/resolve` returns the resolved model for plan, work,
+  strike, review, the four review lanes, test and ship. For a role split
+  across several models it shows the highest-weight entry.
 - `pan doctor` reports an invalid `tiered_execution` block and any fitness
   warning from the section above.
 

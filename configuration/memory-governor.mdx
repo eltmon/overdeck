@@ -1,5 +1,6 @@
 ---
-title: Memory governor
+title: "Memory governor: RAM and CPU admission"
+sidebarTitle: "Memory governor"
 description: Reserve and spawn-threshold defaults scale with RAM, how available memory and stall are measured on Linux vs macOS, and the CPU pressure keys
 ---
 
@@ -8,21 +9,24 @@ description: Reserve and spawn-threshold defaults scale with RAM, how available 
 The deacon's memory governor (`assessMemoryPressure` in
 `src/lib/cloister/memory-governor.ts`) watches available RAM and CPU pressure
 and reports what it sees to the activity feed through the memory-pressure
-patrol. Its verdict holds nothing back by itself: the preemptive scheduler's
-automatic resume (`preemption.ts:resumeYieldedAgents`) and the `shed()`
-reclaim function (stopping merged Docker stacks, pausing idle work agents)
-have no production caller. CPU pressure acts at the dispatch doors instead;
+patrol. Its verdict gates only automatic resumes: deacon-lite resumes a
+crashed work agent (`crashed-work-resume.ts`), and the dashboard's restart
+recovery resumes conversations (`backend-restart-recovery.ts`), only while the
+governor admits. The preemptive scheduler's automatic resume
+(`preemption.ts:resumeYieldedAgents`) and the `shed()` reclaim function
+(stopping merged Docker stacks, pausing idle work agents) have no production
+caller. CPU pressure acts at the dispatch doors instead;
 see [CPU pressure](#cpu-pressure).
 
 **The governor never blocks conversations, `pan start`, or dashboard Start.**
-A separate, unrelated check — `evaluateSpawnGuardrails` in
-`routes/agents/shared.ts` — is what actually gates `POST /api/agents` (the
+A separate, unrelated check, `evaluateSpawnGuardrails` in
+`routes/agents/shared.ts`, is what actually gates `POST /api/agents` (the
 operator's start button, the planning auto-handoff, and its deferred retry).
 
 ## Reserve defaults
 
 Four reserves, in `resources.governor_{hard,soft,watch,recovery}_reserve_gb`,
-each computed as `min(max(pct × totalGb, floorGb), cap × totalGb)` — a
+each computed as `min(max(pct × totalGb, floorGb), cap × totalGb)`: a
 percentage of total RAM, with an absolute floor for small hosts and a cap so
 the floor never swallows a small host whole:
 
@@ -33,12 +37,15 @@ the floor never swallows a small host whole:
 | `governor_watch_reserve_gb` | 20% | 10 GB | 25% | 2.0 | 4.0 | 8.0 | 12.8 |
 | `governor_recovery_reserve_gb` | 25% | 12 GB | 35% | 2.8 | 5.6 | 11.2 | 16.0 |
 
-At or above 40 GB, the cap and floor never bind and these match the
-pre-scaling (PAN-2500) values, so nothing changes on large hosts.
+At or above 40 GB the cap never binds, so these values match the defaults
+before PAN-4267 added the cap, and nothing changes on large hosts. The floors
+still bind above 40 GB: the 4 GB hard floor up to 50 GB, the 10 GB watch floor
+up to 50 GB, the 12 GB recovery floor up to 48 GB, and the 8 GB soft floor up
+to about 53 GB.
 
 The `POST /api/agents` spawn guardrail has its own pair,
 `resources.memory_warn_gb` / `resources.memory_block_gb`, scaled the same way
-but simpler — `min(4, totalGb / 8)` and `min(2, totalGb / 16)`:
+but simpler: `min(4, totalGb / 8)` and `min(2, totalGb / 16)`:
 
 | | 8 GB | 16 GB | 32 GB | 64 GB |
 | --- | --- | --- | --- | --- |
@@ -66,8 +73,9 @@ changed:
 ## Linux vs macOS measurement
 
 **Linux** reads `/proc/meminfo`'s `MemAvailable` and `/proc/pressure/memory`
-for PSI (pressure stall information); a swap-free-percent hold applies when
-PSI shows live stalls.
+for PSI (pressure stall information). Low free swap sheds only when PSI shows
+live stalls; where PSI is unavailable, low free swap holds, so the automatic
+resumes above wait.
 
 **macOS** has neither. `computeDarwinAvailableMemoryBytes`
 (`src/lib/system-health/darwin.ts`) is the one available-memory calculation
@@ -78,11 +86,11 @@ to the Activity Monitor `vm_stat` formula (`total - (anonymous - purgeable +
 wired + compressor) × page size`) when `memory_pressure` is unavailable.
 
 macOS also allocates swap on demand, so a low free-swap share is not
-pressure there — the governor ignores swap runway on darwin
+pressure there; the governor ignores swap runway on darwin
 (`swapGrowsOnDemand`). Its stall signal instead is the kernel's own
 `kern.memorystatus_vm_pressure_level` sysctl: level `4` (critical) sheds
 immediately regardless of the memory reserves, and level `1` (normal) counts
-as calm for the holding re-admit window — the same role Linux's PSI plays.
+as calm for the holding re-admit window, the same role Linux's PSI plays.
 
 ## Small Macs
 
@@ -96,8 +104,8 @@ this for a fresh install. If you still need to override the reserves by hand
 resources:
   governor_hard_reserve_gb: 0.5
   governor_soft_reserve_gb: 1
-  governor_watch_reserve_gb: 1
-  governor_recovery_reserve_gb: 1.5
+  governor_watch_reserve_gb: 1.5
+  governor_recovery_reserve_gb: 2
 ```
 
 Then `pan restart`. `normalizeGovernorReserves` will correct anything in this
@@ -137,6 +145,11 @@ gate holds a slot, because CPU contention only slows a gate down.
 A gate also waits while starting it would push MemAvailable below
 `resources.governor_soft_reserve_gb`, counting the memory that already-admitted
 gates are still expected to allocate and its own measured footprint.
+Later gates may pass a head that is waiting on memory. A
+gate at the head of the queue that has waited 5 minutes on memory can no
+longer be passed by later gates. The slots drain and it runs alone, as long
+as available memory minus its footprint stays at or above the hard reserve
+(PAN-5285).
 
 | Key | Default | What it does |
 | --- | --- | --- |
@@ -162,7 +175,7 @@ Separate from this page's memory and CPU guardrails: the disk alert
 (PAN-5093) watches free space on the filesystem holding the Overdeck home
 and raises a Needs-you item plus a phone push when it drops too low. It
 runs in the primary dashboard process (`src/dashboard/server/services/disk-alert-service.ts`),
-polling every 30 seconds — see
+polling every 30 seconds; see
 [Disk alert (PAN-5093)](https://github.com/eltmon/overdeck/blob/main/docs/PIPELINE-GATES.md#disk-alert-pan-5093) for
 the full design.
 

@@ -1,5 +1,6 @@
 ---
-title: Model presets
+title: "Model presets: one-click model lineups"
+sidebarTitle: "Model presets"
 description: One-click, eval-backed model lineups for Anthropic and OpenAI
 ---
 
@@ -81,7 +82,8 @@ its next autosave can write some of them back over the preset.
   blocked and nothing is written. The dialog and the CLI show the sign-in step.
 - **Anything without its harness.** If the preset's harness CLI (`claude` for
   the Anthropic presets, `codex` for the OpenAI preset) is not installed, the
-  whole preset is blocked, with the install command.
+  whole preset is blocked, and the preview says how to install the missing
+  harness.
 - **Anything the harness policy forbids.** Each change is checked against the
   harness that would run it. A role with an explicit harness that cannot run
   the preset's model (for example `roles.work.harness: kimi-code` with the
@@ -90,11 +92,11 @@ its next autosave can write some of them back over the preset.
   slots.
 - **Tiered execution structure.** A preset never turns tiered execution on or
   off, and never creates tiers or a supervisor. For each tier you already have,
-  it sets `model`, `harness` and `effort` from the tier's hardest difficulty:
-  `trivial` → the cheap slot; `simple` or `medium` → the mid slot; `complex` or
-  `expert` → the expensive slot. It removes a tier's `distribution`, and undo
-  restores it. If a supervisor exists, it gets `workhorse:expensive` and the
-  preset's harness.
+  it sets `model` and `harness`, and `effort` where the preset defines one, from
+  the tier's hardest difficulty: `trivial` → the cheap slot; `simple` or
+  `medium` → the mid slot; `complex` or `expert` → the expensive slot. It
+  removes a tier's `distribution`, and undo restores it. If a supervisor
+  exists, it gets `workhorse:expensive` and the preset's harness.
 
 Every effort a preset sets is `high`, the recommended default. No preset sets
 `xhigh` or `max`.
@@ -105,7 +107,7 @@ Every effort a preset sets is `high`, the recommended default. No preset sets
 | --- | --- | --- |
 | `workhorses.expensive` | `claude-opus-5-5` | The strongest evaluated Claude model. Fable 5.2 has no Overdeck eval and costs 2× Opus 5.5. |
 | `workhorses.mid` | `claude-opus-5-5` | `work`, `test`, `ship` and `worker` run on `mid`. The eval found no reason to move it: Sonnet 5.5 matched Opus only on single-turn, tool-less probes. |
-| `workhorses.cheap` | `claude-haiku-5-5` | Cheap slot for trivial tiers. The preset sets no effort there, so Haiku 5.5 runs at its default (medium). |
+| `workhorses.cheap` | `claude-haiku-5-5` | Cheap slot for trivial tiers. The preset writes no effort on the trivial tier, so a tier `effort` you already set is kept; without one the tier falls back to `roles.work.effort`, which the preset sets to `high`. |
 | `roles.review.model` | `workhorse:expensive` | E2 review recall, 2026-09-29: Opus 5.5 found the known blocker 30/60 times vs Sonnet 5.5's 10/60 (any severity, 3 reps × 20 cases). By majority per case, 11/20 vs 3/20; sign test 8 to 0, p ≈ 0.008. Review is pinned to the expensive slot so it stays on Opus even if you move `mid`. |
 | `roles.review.sub.<lane>.model` | `parent` | All four lanes (security, correctness, performance, requirements) inherit the review model. |
 | `roles.plan.model` | `workhorse:expensive` | E3 plan quality is one rep and `plan` is not a `mid` role, so the eval gives no reason to move it. |

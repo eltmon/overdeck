@@ -1,5 +1,6 @@
 ---
-title: Project Registry
+title: "Project registry: projects.yaml reference"
+sidebarTitle: "Project Registry"
 description: "Register projects in ~/.overdeck/projects.yaml, route issues to the right repository by label, and set per-project workspace and release settings."
 ---
 
@@ -11,16 +12,16 @@ Overdeck's project registry enables multi-project management with intelligent is
 
 Projects are registered in `~/.overdeck/projects.yaml`. Each project can have:
 
-- **Issue routing rules** - Route issues to different subdirectories based on labels
-- **Custom workspace commands** - For complex polyrepo setups
-- **Linear team mapping** - Connect projects to Linear teams
+- **Issue routing rules**: route issues to different subdirectories based on labels
+- **Custom workspace commands**: for complex polyrepo setups
+- **Linear team mapping**: connect projects to Linear teams
 
-While `projects.yaml` is the source of truth, much of this configuration is also surfaced in the dashboard's **Settings** page, alongside model routing for the agents and conversations Overdeck runs and tracker API keys.
+`projects.yaml` is where per-project configuration lives. The dashboard's **Settings** page holds model routing and tracker API keys, not per-project settings.
 
 <ThemedImage
   light="/images/dashboard/settings-light.png"
   dark="/images/dashboard/settings-dark.png"
-  alt="Overdeck Settings page showing model routing, tracker API keys, and project configuration"
+  alt="Overdeck Settings page showing model routing and tracker API keys"
 />
 
 <Note>
@@ -43,8 +44,8 @@ pan project clone git@github.com:owner/private.git
 pan project clone ssh://git@git.example.com:2222/team/repo.git
 ```
 
-The URL you type is the URL git receives — protocol, username, port and path
-unchanged — because all four decide how authentication happens. Only the bare
+The URL you type is the URL git receives (protocol, username, port and path
+unchanged), because all four decide how authentication happens. Only the bare
 `owner/repo` shorthand is expanded, into a GitHub HTTPS URL.
 
 Optional flags: `--parent <dir>` (default `~/Projects`), `--name <name>`,
@@ -55,13 +56,13 @@ pan project clone owner/repo --dry-run | jq '{key, path, repoSlug, defaultBranch
 ```
 
 `--dry-run` prints the resolved intent as a single JSON document and writes
-nothing — no directory, no registration, no context layer, no hooks. Credentials
+nothing: no directory, no registration, no context layer, no hooks. Credentials
 embedded in a URL are redacted from that output.
 
 **Credentials live on the server.** Clones run non-interactively
 (`GIT_TERMINAL_PROMPT=0`, `ssh -o BatchMode=yes`), so nothing can hang waiting on
 a prompt nobody can see. A private repository therefore needs credentials
-already available on the machine running Overdeck — an SSH key loaded into that
+already available on the machine running Overdeck: an SSH key loaded into that
 machine's agent, or a configured credential helper. When they are missing you
 get a typed message naming the problem, and it never suggests `ssh-add` for an
 HTTPS failure.
@@ -82,17 +83,21 @@ Register a repository that already exists on your machine:
 pan project add /path/to/your/project [--name <name>] [--dry-run]
 ```
 
+Optional tracker flags: `--linear-team <PREFIX>`, `--rally-project <oid>`, and
+`--tracker jira --jira-site <url>`.
+
 Registration detects:
-- `github_repo` / `gitlab_repo` — the remote slug
-- `tracker` — GitHub or GitLab, from the remote host
-- `workspace.default_branch` — the repository's default branch, or nothing at
+- `github_repo` / `gitlab_repo`: the remote slug
+- `tracker`: GitHub or GitLab, from the remote host
+- `workspace.default_branch`: the repository's default branch, or nothing at
   all when the repository is detached or has no commits yet (a guessed `main`
   would point every later workspace at a branch that may not exist). The diff
   panel's "vs main" view compares against this branch, so a project on
   `master` or `trunk` still gets a correct "vs main" view.
-- `issue_prefix` — proposed from the letters of the project key (digits and
-  dashes dropped), up to ten characters. A key with no letters gets no
-  proposal; pass `--issue-prefix`.
+- `issue_prefix`: proposed from the letters of the project key (digits and
+  dashes dropped), up to ten characters. A key with no letters cannot produce
+  a valid prefix, so registration stops with an error. Pass a `--name` with
+  letters, `--linear-team <PREFIX>` (add), or `--issue-prefix <PREFIX>` (clone).
 - The main workspace row
 
 Adding a **subdirectory** of a repository adds the repository root instead,
@@ -101,29 +106,33 @@ projects from fighting over one checkout. A name you pass with `--name` is kept;
 otherwise the name comes from the root folder. A home directory that is itself a
 repository (a dotfiles-managed `~`) is the one exception: folders under it stay
 plain folders. A linked worktree is recognized as a repository. A plain folder
-that is not a repository at all is fine — it registers as a project without one.
+that is not a repository at all is fine: it registers as a project without one.
 
 `workspaces/` is excluded through `<project>/.git/info/exclude`, which is local
-and untracked. Overdeck never edits your tracked `.gitignore`, so a freshly
+and untracked. Registration never edits your tracked `.gitignore`, so a freshly
 cloned repository does not come back dirty. If you want the exclusion shared
-with your team, add it to `.gitignore` yourself.
+with your team, add it to `.gitignore` yourself. Creating an issue workspace
+does append any missing Overdeck runtime entries (`.pan/events/`,
+`.pan/review/`, `.pan/prompts/`, `.pan/test/` and `.claude/skills/`) to the
+project's `.gitignore`.
 
-Issue workspaces also hide the files Overdeck copies into `.claude/` (skills,
-agents, `settings.json`, `settings.local.json`, `mcp.json`, and the two
-Overdeck marker files) through a git exclude file private to that workspace.
-So a fresh workspace starts clean, and those files cannot be committed by
-accident. Your repository's tracked `.gitignore` and your main checkout are
-not changed. If your project tracks one of these files, Overdeck's edits to
-it still count as changes. To commit a new file at one of these paths from an
-issue workspace, use `git add -f`.
+Single-repo issue workspaces also hide the files Overdeck copies into
+`.claude/` (skills, Overdeck's `pan-*.md` agents, `settings.json`,
+`settings.local.json`, `mcp.json`, and the two Overdeck marker files) through a
+git exclude file private to that workspace. So a fresh workspace starts clean,
+and those files cannot be committed by accident. The exclude file does not
+change your main checkout. If your project tracks one of these files,
+Overdeck's edits to it still count as changes. To commit a new file at one of
+these paths from an issue workspace, use `git add -f`. A polyrepo workspace
+uses its root `.gitignore` instead.
 
-Tests and quality gates are **not** detected. Configure those yourself — see
+Tests and quality gates are **not** detected. Configure those yourself; see
 [Project Configuration](#project-configuration).
 
 ### Finish an interrupted setup
 
-If creation stops after the project was registered — say the main workspace
-could not be created — the repository is on disk and the project exists. Repair
+If creation stops after the project was registered (say the main workspace
+could not be created), the repository is on disk and the project exists. Repair
 it instead of cloning again:
 
 ```bash
@@ -132,25 +141,26 @@ pan project finish-setup <key> [--path <expected-path>]
 
 It is idempotent: it never clones and never registers a second project, so
 running it on an already-complete project simply reports the result. `--path` is
-a consistency check, not a relocation — a mismatch refuses rather than repairing
+a consistency check, not a relocation: a mismatch refuses rather than repairing
 the wrong project.
 
 ### Dashboard
 
-The project switcher's **Add a project**, the command palette, the workspace-page chips, and the
-HomePage button open the **Add a project** dialog over the page you are on.
+The project switcher's **Add a project**, the Home composer's project chip, the
+New Workspace page's chips and the HomePage **+ New project** button open the
+**Add a project** dialog over the page you are on.
 `/projects/new` still works and shows the same dialog as a full page;
 `?mode=clone`, `?mode=existing` or `?mode=new` skips the first step.
 
 The first step focuses **Open a folder**; the arrow keys move between the
 choices and Enter picks one.
 
-- **Open a folder** — type a path or browse the server's folders, starting in
+- **Open a folder**: type a path or browse the server's folders, starting in
   `~/Projects`. What happens next depends on what the folder is:
-  - **A Git repository** — review it and add it. A folder *inside* a repository
+  - **A Git repository**: review it and add it. A folder *inside* a repository
     adds the repository root, with the note "Using the repository root
     ~/code/app."
-  - **A folder with repositories in it** — the dialog lists the repositories it
+  - **A folder with repositories in it**: the dialog lists the repositories it
     found, all checked. **Add N projects** adds each checked one as its own
     project; a failure on one row does not stop the rest. **Add this folder as
     one project** adds a single multi-repo project spanning the checked
@@ -158,12 +168,12 @@ choices and Enter picks one.
     `workspace.repos` entry per repository and keeps `.pan/` in the first one
     (`pan_records.repo`). No tracker is set, since several remotes do not name
     one; add it yourself. See [Polyrepo Configuration](/configuration/polyrepo).
-  - **A plain folder** — the dialog explains that agents and terminals work
+  - **A plain folder**: the dialog explains that agents and terminals work
     there but branches, isolated copies and pull requests won't, and offers
     **Add as folder** or **Back**.
-- **Clone from URL** — download a Git repository. Press Enter to clone once the
+- **Clone from URL**: download a Git repository. Press Enter to clone once the
   URL checks out.
-- **Create new project** — start an empty Git repository. Press Enter to create
+- **Create new project**: start an empty Git repository. Press Enter to create
   once the name checks out.
 
 Below the choices, **Repositories in ~/Projects** lists repositories already in
@@ -182,7 +192,7 @@ there survives a change to the URL or folder.
 
 While a clone runs, the form is frozen and shows git's own phases. Cancel stops
 the real process. If the connection drops, the page says so and keeps the
-operation rather than pretending it finished — it never re-enables Create on a
+operation rather than pretending it finished; it never re-enables Create on a
 result it has not seen. After a server restart an in-flight clone genuinely
 cannot be resolved from memory, so you are offered *Check again* rather than an
 automatic retry that might clone a second copy.
@@ -197,8 +207,14 @@ automatic retry that might clone a second copy.
 # List registered projects
 pan project list
 
+# Show one project's details
+pan project show <key>
+
 # Remove a project
 pan project remove myproject
+
+# Add a secondary target path (--primary makes it the primary target)
+pan project add-target <project> --path <p> [--primary]
 
 # Rename a project
 pan project rename <key> <newName>
@@ -207,18 +223,9 @@ pan project rename <key> <newName>
 pan project rename myn "Mind Your Now"
 ```
 
-### Rename a project
-
-```bash
-pan project rename <key> <newName>
-
-# Example: keep the stable `myn` key and change its display name
-pan project rename myn "Mind Your Now"
-```
-
 The registration key is the stable identifier stored as the project's YAML map key. It is derived when the project is registered and cannot be renamed. The display name is the human-facing label shown throughout Overdeck; it can be renamed, but it cannot match another project's registration key or display name, ignoring letter case.
 
-In the dashboard, use the pencil beside the name on the project page, or right-click the project tree row and choose **Rename project**. Both controls open an inline editor for the display name while preserving the registration key.
+In the dashboard, use the pencil beside the name on the project page, or right-click the **Issues** header in the left column and choose **Rename project**. Both controls open an inline editor for the display name while preserving the registration key.
 
 ## Project Configuration
 
@@ -250,12 +257,14 @@ projects:
 |-------|----------|-------------|
 | `name` | Yes | Human-readable project name |
 | `path` | Yes | Absolute path to project root |
-| `issue_prefix` | Yes* | Issue prefix for standard format IDs (e.g., "MIN", "PAN"). Automatically proposed during registration based on the repository name. 1 to 10 uppercase letters; digits are rejected because issue IDs must match `LETTERS-NUMBER`. For tracker IDs that do not fit, use `issue_pattern`. |
+| `issue_prefix` | Yes* | Issue prefix for standard format IDs (e.g., "MIN", "PAN"). Proposed during registration from the project key's letters (up to 10). 1 to 10 uppercase letters; digits are rejected because issue IDs must match `LETTERS-NUMBER`. |
 | `tracker` | No | Issue tracker type: `linear`, `github`, `gitlab`, `rally`, `jira`. Set it explicitly when the code host and issue tracker differ. |
+| `github_repo` | No | GitHub repository slug (`owner/repo`) where Overdeck reads pull requests. Registration detects it from the remote. |
+| `gitlab_repo` | No | GitLab project slug (`group/repo`) where Overdeck reads merge requests. Registration detects it from the remote. |
 | `owner` | No | The label of the owner group this project shows under in the dashboard's project switcher. Display only: it never changes which account acts on the repository. See [Owner groups](#owner-groups). |
 | `jira` | No | Jira settings for a `tracker: jira` project: `site` (Jira site URL), `deployment` (`cloud` or `datacenter`), and `status_map` (Jira status name per Overdeck state). See [Issue Tracker Integration](/configuration/issue-trackers#jira-integration). |
 | `issue_prefixes` | No | Array of prefixes for multi-prefix trackers (e.g., `[F, US, DE, TA]`) |
-| `issue_pattern` | No | Custom regex for issue ID parsing: `^(PREFIX)-(\\d+)$` |
+| `issue_pattern` | No | Accepted but not read today: issue IDs are always parsed as `PREFIX-NUMBER` or a Rally artifact ID. |
 | `issue_routing` | No | Label-based routing rules |
 | `workspace_command` | No | Custom workspace creation script |
 | `workspace_remove_command` | No | Custom workspace cleanup script |
@@ -263,6 +272,10 @@ projects:
 | `workspace.env.template` | No | Inline `.env` content (placeholders accepted) rendered to `<workspace>/.env` at workspace creation. |
 | `workspace.env.load` | No | When `true`, loads the rendered `<workspace>/.env` into agent launcher shells and host quality gates. Default `false`. See [dbt and data projects](#dbt-and-data-projects). |
 | `release` | No | Coordinated post-merge release configuration |
+| `auto_merge_default` | No | `auto` or `hold`: the auto-merge default for this project's issues that have no per-issue setting. Unset uses the global setting. See [Auto-Merge](/configuration/auto-merge#per-project-default). |
+| `merge_train` | No | `disabled` turns the merge train off for this project only; `enabled` or unset follows the global `merge_train.enabled` switch. |
+| `pan_records` | No | Where per-issue `.pan/` records live: `repo` (a `workspace.repos` name, or `.` for the project repo) and `path` (default `.pan`). |
+| `package_manager` | No | `bun`, `npm` or `pnpm`: the package manager for dependency installs in workspaces. |
 | `verification.tests` | No | `ci` or `local`: where the verification gate's `test` gate runs. `ci` skips the local `quality_gates.test` run and treats the CI test job on the PR head as the test gate; `local` runs it on the host. Default: `ci` when the project has `github_repo` and a GitHub Actions workflow that runs a job named `test`/`tests`/`test-*`/`test (…)` on pull requests, else `local`. |
 | `verification.sast` | No | `off`, `advisory` or `blocking`: the mode of the built-in Semgrep `sast` gate for this project only, overriding `security.semgrep.gate` in `~/.overdeck/config.yaml`. It cannot turn Semgrep on; with `security.semgrep.enabled: false` no scan runs. Unset uses the global mode (default `advisory`). See [Semgrep](/configuration/semgrep#verification-gate). |
 | `quality_gates` | No | Map of verification gates; see [Quality gates](#quality-gates). |
@@ -270,7 +283,7 @@ projects:
 | `mcp_strict` | No | `true` adds `--strict-mcp-config` to the project's Claude Code launches, so only Overdeck's, the project's and the role's MCP servers load. Default: `false`. |
 | `workspace.env.secrets_file` | No | Absolute or `~/` path to a dotenv file whose values reach this project's agents and host-run gates; see [Project credentials](#project-credentials). |
 
-*Not required if `issue_prefixes` or `issue_pattern` is specified.
+*Not required if `issue_prefixes` is specified.
 
 ### Owner groups
 
@@ -304,20 +317,23 @@ project's quality gates (see
 When a project declares no `quality_gates` at all, the verification gate runs
 `DEFAULT_GATES` instead: `typecheck`, `lint`, and `test`. A gate named `test`
 is skipped on the host when `verification.tests` resolves to `ci` (above).
+The default gates assume an npm project with `typecheck` and `lint` scripts
+and Vitest; the default `test` gate also runs Overdeck's own dashboard tests. An empty `quality_gates: {}` also uses them. Set `quality_gates`
+for any other stack.
 
 | Key | Required | Default | Description |
 |-----|----------|---------|-------------|
-| `command` | Yes for `type: command` gates | — | Shell command to run. |
+| `command` | Yes for `type: command` gates | none | Shell command to run. |
 | `path` | No | workspace root | Path relative to the workspace. For a container gate, the container's working directory is `/workspaces/feature/<path>`. |
 | `required` | No | `true` | When `true`, the first failed required gate stops the run; the gate's name becomes the run's `failedCheck`. |
-| `env` | No | — | Extra environment variables for the gate's process. Values accept the same placeholders as `command` (below). |
-| `phase` | No | `pre_push` | `pre_push` or `post_push`: when the gate runs relative to the push. |
+| `env` | No | none | Extra environment variables for the gate's process. Values accept the same placeholders as `command` (below). |
+| `phase` | No | `pre_push` | Only `pre_push` gates run. A `post_push` gate is accepted but never runs. |
 | `type` | No | `command` | `command` or `http_health`. |
-| `url` | No | — | URL to check; only used when `type: http_health`. |
+| `url` | No | none | URL to check; only used when `type: http_health`. |
 | `wait` | No | `120` | Seconds to wait before the first `http_health` check. |
 | `expect_status` | No | `200` | HTTP status the `http_health` check must return. |
 | `container` | No | `false` | Run the command with `docker exec` instead of on the host. |
-| `container_name` | No | — | Container name; supports placeholders (below). Used only when `container: true`; without it the gate runs on the host even if `container: true` is set. |
+| `container_name` | No | none | Container name; supports placeholders (below). Used only when `container: true`; without it the gate runs on the host even if `container: true` is set. |
 | `retry` | No | `0` | Extra attempts on failure before the gate counts as failed (PAN-2461: CI-parity for suites with known order-dependent flakes). |
 
 `command`, `container_name`, and `env` values accept every placeholder:
@@ -325,13 +341,13 @@ is skipped on the host when `verification.tests` resolves to `ci` (above).
 `{{BRANCH_NAME}}`, `{{COMPOSE_PROJECT}}`, `{{DOMAIN}}`, `{{PROJECT_NAME}}`,
 `{{PROJECT_PATH}}`, `{{PROJECTS_DIR}}`, `{{WORKSPACE_PATH}}`, `{{HOME}}`, and
 `{{CHANGED_BASE}}`. `{{FEATURE_IDENT}}` is `{{FEATURE_NAME}}` rewritten to a
-valid unquoted SQL identifier — lowercased, with every character that is not
-a letter, digit, or underscore replaced with `_` (`min-574` → `min_574`) —
+valid unquoted SQL identifier (lowercased, with every character that is not
+a letter, digit, or underscore replaced with `_`: `min-574` → `min_574`),
 for values like a dbt schema name where a raw hyphen is invalid. A gate's
 process does not inherit the agent's full environment: every `OVERDECK_*`
 variable except `OVERDECK_HOME` is dropped, as are `API_PORT`, `PORT`, and
 `DASHBOARD_URL` unless the gate sets them itself, and `SKIP_DOCS_INDEX=1` is
-always set. The
+set by default (a gate's `env` can override it). The
 project's `secrets_file` values are added to host gates, under the workspace
 `.env` and `gate.env`. See
 [Change-Scoped Verification Gates](https://github.com/eltmon/overdeck/blob/main/docs/CONFIGURATION.md#change-scoped-verification-gates)
@@ -407,7 +423,7 @@ keys in `~/.overdeck.env`. Opt-in isolation from those keys is tracked in
 ### dbt and data projects
 
 dbt reads its target schema from `env_var('DBT_SCHEMA')` in `profiles.yml`,
-and `env_var()` reads the process environment — not a `.env` file and not a
+and `env_var()` reads the process environment, not a `.env` file and not a
 placeholder in `profiles.yml` itself. Give each agent's workspace its own dev
 schema with `workspace.env.template` and `workspace.env.load: true`, then
 reference the same variable from a quality gate's `env`:
@@ -435,8 +451,9 @@ projects:
 ```
 
 `workspace.env.template` is inline `.env` content, rendered with the same
-placeholders as `command` and written verbatim to `<workspace>/.env` at
-workspace creation — it is not a path to a file in the project repo. With
+placeholders as `command` (except `{{CHANGED_BASE}}`, which exists only during
+verification) and written verbatim to `<workspace>/.env` at workspace
+creation. It is not a path to a file in the project repo. With
 `env.load: true` that `DBT_SCHEMA=dev_{{FEATURE_IDENT}}` line reaches both the
 agent's launcher shell and the gates above. `profiles.yml` then picks it up
 with:
@@ -448,12 +465,12 @@ outputs:
 ```
 
 Neither gate is named `test`: a project whose `verification.tests` resolves
-to `ci` (the default when the repo has a GitHub Actions `test` job — see
+to `ci` (the default when the repo has a GitHub Actions `test` job; see
 [Configuration Fields](#configuration-fields)) drops any gate named exactly
 `test` from the host run, treating the CI job as the test gate instead. Name
 dbt gates `dbt-parse` / `dbt-build` / `dbt-test`, never `test`.
 
-A dbt-duckdb project that costs nothing to run needs no warehouse at all —
+A dbt-duckdb project that costs nothing to run needs no warehouse at all:
 point it at a file inside the workspace instead of a schema:
 
 ```yaml
@@ -476,9 +493,9 @@ outputs:
 ```
 
 Warehouse credentials (a Snowflake/BigQuery/Redshift key, for example) belong
-in the dashboard's own environment — `~/.overdeck.env` (see
-[API Keys](https://github.com/eltmon/overdeck/blob/main/docs/CONFIGURATION.md#api-keys-overdeckenv))
-— not in the workspace `.env`: the workspace `.env` reaches agent launcher
+in the dashboard's own environment, `~/.overdeck.env` (see
+[API Keys](https://github.com/eltmon/overdeck/blob/main/docs/CONFIGURATION.md#api-keys-overdeckenv)),
+not in the workspace `.env`. The workspace `.env` reaches agent launcher
 shells and host quality gates only when `workspace.env.load: true`, and never
 reaches container or remote (`fly ssh`) gates, which stay on `docker exec`
 `-e` flags or SSH's own environment. A `dbt build` that seeds a real
@@ -560,31 +577,30 @@ projects:
 | Field | Required | Description |
 |-------|----------|-------------|
 | `provider` | No | Informational label for the deployment target (e.g. `kubernetes`, `vercel`) |
-| `trigger` | Yes | `auto` — wait for external deploy and verify; `manual` — pause for operator release; `skip` — exclude from the plan |
+| `trigger` | Yes | `auto`: wait for an external deploy and verify it. `manual`: Overdeck marks the component blocked (awaiting manual release) and the release ends `partial`. `skip`: exclude from the plan. |
 | `depends_on` | No | Array of other component keys that must release before this one |
 | `health_url` | No | URL Overdeck polls until it returns a successful response |
 | `version_check` | No | Shell command that must exit 0 after the component is healthy |
 | `smoke_test` | No | Shell command that must exit 0 to consider the component released |
-| `rollback` | No | Shell command to run when this component fails; success marks the issue `rolled_back` |
+| `rollback` | No | Shell command to run when this component fails; success marks the release set `rolled_back` |
 
 ### Release semantics
 
 - `trigger: auto` means Overdeck **waits and verifies** an external deploy; it does not invoke the provider deploy itself.
 - Components are released in `depends_on` order using a topological sort. A component is only started after its dependencies pass.
-- If any check fails, Overdeck stops all later components and records the final issue-level status.
-- Projects without a `release:` section are **skipped cleanly** — no failure is recorded.
+- If any check fails, Overdeck stops all later components and records the release set's final status.
 
 ### Release status lifecycle
 
-Issue-level `releaseStatus` moves through the following values:
+Each run records a release set (`pan rollout status <issue-id>`) with status
+`releasing`, then `passed`, `failed`, `partial` or `rolled_back`:
 
-`pending` → `releasing` → `passed`  
-`pending` → `releasing` → `failed`  
-`pending` → `releasing` → `partial`  
-`pending` → `releasing` → `rolled_back`  
-`pending` → `skipped`
+`releasing` → `passed`  
+`releasing` → `failed`  
+`releasing` → `partial`  
+`releasing` → `rolled_back`
 
-The seven possible values are: `pending`, `releasing`, `passed`, `failed`, `partial`, `rolled_back`, and `skipped`.
+A project without `release:` records none.
 
 Inspect or retry a release from the CLI with `pan rollout`:
 
@@ -621,34 +637,13 @@ projects:
 
 Issues are routed to different subdirectories based on their labels:
 
-1. **Labeled issues** - Matched against `issue_routing` rules in order
-2. **Default route** - Issues without matching labels use the `default: true` path
-3. **Fallback** - If no default, uses the project root path
+1. **Labeled issues**: matched against `issue_routing` rules in order
+2. **Default route**: issues without matching labels use the `default: true` path
+3. **Fallback**: if no default, uses the project root path
 
 **Example:** An issue with label "splash" in the MIN team would create its workspace at `/home/user/projects/myn/splash/workspaces/feature-min-xxx/`.
 
-## Linear Project Mapping
-
-If you have multiple Linear projects, configure which local directory each maps to. Create/edit `~/.overdeck/project-mappings.json`:
-
-```json
-[
-  {
-    "linearProjectId": "abc123",
-    "linearProjectName": "Mind Your Now",
-    "linearPrefix": "MIN",
-    "localPath": "/home/user/projects/myn"
-  },
-  {
-    "linearProjectId": "def456",
-    "linearProjectName": "Househunt",
-    "linearPrefix": "HH",
-    "localPath": "/home/user/projects/househunt"
-  }
-]
-```
-
-The dashboard uses this mapping to determine where to create workspaces when you click "Create Workspace" or "Start Agent" for an issue.
+Linear issues route to a project through `issue_prefix` (the team key) in `projects.yaml`.
 
 ## Custom Workspace Commands (Legacy)
 
@@ -669,7 +664,9 @@ projects:
 
 When `workspace_command` is specified, Overdeck calls your script instead of creating a standard git worktree. The script receives the normalized issue ID (e.g., `min-123`) as an argument.
 
-When `workspace_remove_command` is specified, Overdeck calls your script when deleting workspaces (e.g., aborting planning with "delete workspace" enabled). This is important for complex setups that need to:
+The script runs only when the project has no `workspace:` block. Registration writes `workspace.default_branch` when it detects a default branch, so remove that block to use a script. The script also receives `--docker` when that flag is passed.
+
+`pan workspace destroy` calls `workspace_remove_command` when the project has no `workspace:` block. This is important for complex setups that need to:
 - Stop Docker containers and remove volumes
 - Clean up root-owned files created by containers
 - Remove git worktrees from multiple repositories
@@ -701,20 +698,20 @@ sed "s/{{FEATURE_FOLDER}}/feature-$ISSUE_ID/g" template.yml > workspace/docker-c
 # ... additional setup
 ```
 
-The standard `pan workspace create` command will automatically detect and use your custom script.
+The standard `pan workspace create` command detects and uses your custom script when the project has no `workspace:` block.
 
 ## Project Initialization
 
-When registering a new project with Overdeck (`pan project add`), the system will:
+When you register a project (`pan project add`, `pan project clone`, or the dashboard's **Add a project** dialog), Overdeck:
 
-1. **Check for existing PRD** - Look for `docs/PRD.md`, `PRD.md`, `README.md`, or similar
-2. **If found**: Use it to create/update the canonical PRD format, prompting for any missing crucial information
-3. **If not found**: Generate one by:
-   - Analyzing the codebase structure
-   - Identifying key technologies and patterns
-   - Asking discovery questions about the product
+1. Writes the project to `projects.yaml` with the tracker, repository slug, issue prefix and default branch it detected.
+2. Seeds the project's context layer, `.overdeck/context/project.md`, when it does not exist yet. See [Context Layers](/configuration/context-layers).
+3. Pre-trusts the project directory for Claude Code.
+4. Installs Overdeck's git hooks, when the folder is a Git repository.
+5. Adds the workspaces directory (`workspaces/` by default) to `.git/info/exclude`.
+6. Creates the project's main workspace.
 
-This ensures every Overdeck-managed project has a well-defined canonical PRD that agents can reference.
+If setup stops after step 1, `pan project finish-setup <key>` runs steps 2 to 6 again without cloning or registering twice.
 
 ## Progressive Workspaces
 

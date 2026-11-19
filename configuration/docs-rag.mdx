@@ -10,11 +10,11 @@ Docs RAG is retrieval over Overdeck's own developer documentation, skills and ru
 
 Docs RAG indexes Overdeck's own package: the Markdown files under `docs/` (not `docs/prds/`), every `SKILL.md` under `sync-sources/skills/`, every rule under `sync-sources/rules/` and `.claude/rules/`, and the root `CLAUDE.md`. PRDs are not indexed. Search runs as SQLite full-text search plus local embeddings.
 
-The index lives at `~/.overdeck/docs/index.sqlite`, and a prebuilt copy ships as `dist/docs-index.sqlite`.
+Queries and injection read the index at `~/.overdeck/docs/index.sqlite` (`pan docs query --index-path` can point at another file). The published npm package also ships a prebuilt copy as `dist/docs-index.sqlite`, but no install or sync step copies it into place, and until `~/.overdeck/docs/index.sqlite` exists, injection silently adds nothing. On an npm install, run `pan docs reindex` once to build the index; it covers only the bundled skills and rules there. For the full prebuilt index instead, create `~/.overdeck/docs/` if it does not exist and copy `dist/docs-index.sqlite` from the installed package to `~/.overdeck/docs/index.sqlite`.
 
 ## When snippets are added to a prompt
 
-Injection is on by default. The trigger is nine case-insensitive patterns, matched as a substring anywhere in the prompt rather than as a whole word: a prompt containing "Japan" matches the `pan` pattern even though it does not contain the word `pan`. When one matches, Docs RAG adds a block of at most 5 snippets and 3000 tokens to the prompt, at most once every 10 turns:
+Injection is on by default once the index exists. The trigger is nine case-insensitive patterns, matched as a substring anywhere in the prompt rather than as a whole word: a prompt containing "Japan" matches the `pan` pattern even though it does not contain the word `pan`. When one matches, Docs RAG adds a block of at most 5 snippets and 3000 tokens to the prompt, at most once every 10 turns:
 
 ```text
 pan, overdeck, cloister, deacon, workspace, specialist, harness, vbrief, workhorse
@@ -29,9 +29,11 @@ pan docs query "how does the merge train work"
 pan docs reindex
 ```
 
+`pan docs query` takes `--top` (the snippet count, default 5), `--format` (`markdown`, `json` or `text`, default `markdown`) and `--kind` (one of `docs`, `skill`, `rule`, `claude-md` or `prd`).
+
 `pan docs reindex` rebuilds the index from this package's own `docs/` folder, using the default corpus and embedding settings rather than your `docs.*` configuration: it does not read `docs.corpus.prds` or any other `docs.corpus.*` key, so turning PRDs on in `config.yaml` does not bring them into a reindex.
 
-That `docs/` folder, `CLAUDE.md` and `.claude/rules/` do not ship in the published npm package. Running `pan docs reindex` from an installed copy does not fail or warn: it silently rebuilds from whatever sources are still present (Overdeck's bundled skills and rules) and replaces your existing index with that smaller one. Only run `pan docs reindex` from a source checkout of Overdeck.
+That `docs/` folder, `CLAUDE.md` and `.claude/rules/` do not ship in the published npm package. Running `pan docs reindex` from an installed copy does not fail or warn: it silently rebuilds from whatever sources are still present (Overdeck's bundled skills and rules) and replaces your existing index with that smaller one. That is enough to create a missing index on an npm install; rebuilding an index that covers `docs/` needs a source checkout of Overdeck.
 
 ## Turn it off
 
@@ -40,7 +42,7 @@ pan docs disable --scope global
 pan docs enable --scope global
 ```
 
-`pan docs disable --scope global` turns injection off everywhere; `pan docs enable --scope global` turns it back on. You can also set `docs.enabled: false` to turn off the whole feature, or `docs.prompt_injection: false` to keep the index but stop automatic injection into prompts, in `~/.overdeck/config.yaml`.
+`pan docs disable` and `pan docs enable` take `--scope session`, `--scope project` or `--scope global`, and the default is `session`. The command records no session ID or project path, so today the scopes behave differently than their names suggest: a `session` setting matches no agent session and has no effect, and a `project` setting applies to every session, because injection also sends no project path, and it takes precedence over a `global` setting. Use `--scope global`. `pan docs disable --scope global` turns injection off everywhere; `pan docs enable --scope global` turns it back on. You can also set `docs.enabled: false` to turn off the whole feature, or `docs.prompt_injection: false` to keep the index but stop automatic injection into prompts, in `~/.overdeck/config.yaml`.
 
 ## Configuration keys
 
@@ -57,6 +59,7 @@ All Docs RAG keys in `config.yaml` are snake_case, under the top-level `docs` ke
 | `docs.budget.turn_window` | The turn window the injection rate is measured over |
 | `docs.budget.max_tokens_per_injection` | The token cap on one injected block |
 | `docs.budget.max_chunks_per_injection` | The snippet-count cap on one injected block |
+| `docs.embedding.provider` / `.model` / `.dimensions` | The embedding model, default local `gte-small` at 384 dimensions. Curated memory fact vectors read this key; the docs index build always uses the default model |
 
 ## Get help
 

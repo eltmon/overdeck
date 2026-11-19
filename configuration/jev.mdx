@@ -28,7 +28,7 @@ You can reach Jev through OpenCode Zen or directly through TypeSafe.
 | Route | `jev.base_url` | `jev.model` | Key |
 | --- | --- | --- | --- |
 | Zen route | `https://opencode.ai/zen` | `jev-1.13-free` (limited time) or `jev-1.13` | An OpenCode Zen API key |
-| Direct route | unset (the SDK uses `https://api.typesafe.ai`) | a pinned version, for example `jev-1.13.0` | A key from [console.typesafe.ai](https://console.typesafe.ai/keys) |
+| Direct route | unset (the SDK uses `TYPESAFE_BASE_URL`, else `https://api.typesafe.ai`) | a pinned version, for example `jev-1.13.0` | A key from [console.typesafe.ai](https://console.typesafe.ai/keys) |
 
 The Zen route needs no new account if you already have an OpenCode Zen key. Both routes use the
 same key slot.
@@ -42,7 +42,7 @@ jev:
   base_url: https://opencode.ai/zen   # omit for the direct route
   model: jev-1.13-free                # required; there is no default
   api_key_ref: TYPESAFE_API_KEY       # env var used when api_keys.typesafe is empty
-  timeout_ms: 2000                    # per request, 1–30000
+  timeout_ms: 2000                    # per request, 1 to 30000
 
 api_keys:
   typesafe: <your TypeSafe or OpenCode Zen key>
@@ -77,36 +77,38 @@ does without Jev: no request, no startup check, and no warning.
 ### Set it in Settings
 
 **Settings → Background AI** also exposes the route, model and timeout directly, below the
-TypeSafe API key row — no manual YAML editing required (PAN-4508):
+TypeSafe API key row, so you do not need to edit YAML by hand (PAN-4508):
 
-- **Route** — a select with three options. **OpenCode Zen** sets `jev.base_url` to
+- **Route**: a select with three options. **OpenCode Zen** sets `jev.base_url` to
   `https://opencode.ai/zen`. **TypeSafe direct** removes `base_url`. A third option, **Custom**,
   appears only when `jev.base_url` is already some other URL; choosing it again keeps that URL
-  as-is — there is no field here to type a new custom URL.
-- **Model** — a text field with suggestions `jev-1.13-free`, `jev-1.13`, `jev-1.13.0`. It is
+  as-is. There is no field here to type a new custom URL.
+- **Model**: a text field with suggestions `jev-1.13-free`, `jev-1.13`, `jev-1.13.0`. It is
   required while any Jev toggle above is on; clearing it in that case shows an error and the
   change is not saved.
-- **Timeout** — a number field, 1–30000 ms.
+- **Timeout**: a number field, 1 to 30000 ms.
 
 Every field saves automatically as you edit it (debounced while typing) and applies to the next
-Jev request — no restart needed. `jev.api_key_ref` has no Settings control and stays
+Jev request, with no restart needed. `jev.api_key_ref` has no Settings control and stays
 config.yaml-only. Turning a Jev toggle on while `jev.model` is blank shows an error and the
 toggle change is not saved.
 
 ## What is sent to TypeSafe
 
 `jevTurnEndAssessment` and `jevAcceptanceCriteriaReview` are both live. `jevTurnEndAssessment`
-sends the agent's role and the tail (trimmed to 6,000 characters) of its last assistant message
-to TypeSafe, and nothing else from the transcript. It runs only for idle interactive agents —
-plan agents and conversations — whose transcript is a claude-code JSONL or a codex rollout; every
-other harness kind is `unsupported-harness` and never reaches Jev. `jevMemoryRelevance` is not
-yet called by anything; turning it on today sends no request.
+sends the agent's role and the tail (trimmed to about 6,000 characters) of its last assistant
+message to TypeSafe, and nothing else from the transcript. It runs for an agent whose turn ended
+(an **Answer the agent** row) and for any agent on a parked `idle-running` row, when the
+transcript is Claude Code JSONL or a Codex rollout. Flywheel, sequencer, conversation and
+knowledge agents are exempt from the parked case. Any other transcript kind is
+`unsupported-harness` and never reaches Jev. `jevMemoryRelevance` is not yet called by anything;
+turning it on today sends no request.
 
 Turning a toggle on sends the following data:
 
 | Toggle | What it sends |
 | --- | --- |
-| `jevTurnEndAssessment` | Sends an agent's last message (trimmed to 6,000 characters) and its role to TypeSafe to classify why the agent stopped. |
+| `jevTurnEndAssessment` | Sends an agent's last message (trimmed to about 6,000 characters) and its role to TypeSafe to classify why the agent stopped. |
 | `jevAcceptanceCriteriaReview` | Sends the id and title text of each acceptance criterion of the plan's non-cancelled items to TypeSafe at plan finalize, for advisory warnings. |
 | `jevMemoryRelevance` | Sends your prompt and up to 20 memory snippets (about 600 characters each) to TypeSafe to drop irrelevant memories before injection. |
 
@@ -117,23 +119,24 @@ treats the Jev result as advice only: it prints warnings and never blocks plan f
 
 ## Turn-end classification
 
-`jevTurnEndAssessment` (PAN-4371) reads why an idle interactive agent (a plan agent, or a
-conversation) stopped talking without opening a modal or asking through a tool call. Jev classifies
-the message into one of five kinds — `asks_operator`, `reports_complete`, `reports_blocked`,
-`progress_update`, `other` — and separately answers whether the message needs an operator answer.
+`jevTurnEndAssessment` (PAN-4371) reads why an agent stopped talking without opening a modal or
+asking through a tool call. It covers an agent whose turn ended (an **Answer the agent** row) and
+any agent on a parked `idle-running` row, except flywheel, sequencer, conversation and knowledge
+agents on that parked row. Jev classifies the message into one of five kinds (`asks_operator`, `reports_complete`, `reports_blocked`,
+`progress_update`, `other`) and separately answers whether the message needs an operator answer.
 Three of the five kinds replace the generic "Answer the agent" label with a specific one on the
 Needs-you row and on a parked `idle-running` row: **Asked you a question** (`asks_operator`),
 **Reported done** (`reports_complete`), and **Blocked** (`reports_blocked`); `progress_update` and
 `other` keep the generic label.
 
 A classification is shown only when Jev's confidence in the chosen kind is at least `0.7`
-(`TURN_END_MIN_CONFIDENCE`) — below that, nothing is attached and the row reads exactly as it did
+(`TURN_END_MIN_CONFIDENCE`). Below that, nothing is attached and the row reads exactly as it did
 before this feature existed. Nothing is persisted: the result lives only in an in-process, mtime-keyed
 store that a restart clears, and it is read back on the next poll tick or parked-population read.
 
 **Readiness:** advisory; accuracy under measurement. The 2026-09-29 measurement against a 40-row
 labeled fixture (`evals/jev-turn-end.eval.ts`, model `jev-1.13-free`) put `asks_operator` precision
-at 0.7778, recall 0.875 — below the 0.9 bar this feature would need to be called ready. See
+at 0.7778, recall 0.875, below the 0.9 bar this feature would need to be called ready. See
 `evals/README.md` for the full per-class table.
 
 ## Privacy
@@ -149,19 +152,19 @@ which also overrides a `TYPESAFE_LOG_LEVEL=debug` environment variable.
 
 Jev costs &#36;0.042 per million input tokens, and output is free. `jev-1.13-free` records &#36;0.
 
-Every real request (not a repeat served from Overdeck's in-process memo) appends one event to the
-cost ledger with the source `background:<feature>`, for example
-`background:jevTurnEndAssessment`. The 24-hour spend appears next to each toggle in
-Settings → Background AI.
+Every answered request appends one event to the cost ledger with the source
+`background:<feature>`, for example `background:jevTurnEndAssessment`; a failed request is written
+only to the usage log. A repeat served from Overdeck's in-process memo makes no request and records
+nothing. The 24-hour spend appears next to each toggle in Settings → Background AI.
 
 ## Usage readout
 
 The Jev settings panel also shows, per feature: **calls in the last 24 hours**, the **last call
-time**, and the **last error** (failure reason and HTTP status, if any) — so you can see whether
+time**, and the **last error** (failure reason and HTTP status, if any), so you can see whether
 Jev is actually doing anything without reading logs (PAN-4508).
 
 That readout is built from a plain-text usage log: every real (non-memo) Jev request appends one
 JSON line to `~/.overdeck/jev/usage/<UTC date>.jsonl`, with the time, feature, outcome
 (`answered` or `failed`), failure reason and HTTP status (on a failure), model, and request
 duration. The log never records the API key, the text sent to Jev, the answer, or an error
-message. A repeat served from the in-process memo is not counted — it made no request.
+message. A repeat served from the in-process memo is not counted, because it made no request.

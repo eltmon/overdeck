@@ -1,0 +1,530 @@
+{
+  "version": "1",
+  "issueId": "PAN-5503",
+  "created": "2026-11-18T23:39:30.709Z",
+  "updated": "2026-11-19T00:00:30.191Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "harnesses-intro-to-pi": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5503",
+      "claimedAt": "2026-11-18T23:39:30.709Z",
+      "doneAt": "2026-11-18T23:40:57.626Z"
+    },
+    "harnesses-intro-to-pi.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:40:57.626Z"
+    },
+    "harnesses-intro-to-pi.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:40:57.626Z"
+    },
+    "harnesses-intro-to-pi.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:40:57.626Z"
+    },
+    "harnesses-intro-to-pi.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:40:57.626Z"
+    },
+    "harnesses-ohmypi-to-opencode": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5503",
+      "claimedAt": "2026-11-18T23:43:24.073Z",
+      "doneAt": "2026-11-18T23:44:43.368Z"
+    },
+    "harnesses-ohmypi-to-opencode.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:44:43.368Z"
+    },
+    "harnesses-ohmypi-to-opencode.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:44:43.368Z"
+    },
+    "harnesses-ohmypi-to-opencode.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:44:43.368Z"
+    },
+    "harnesses-ohmypi-to-opencode.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:44:43.368Z"
+    },
+    "audit-telemetry": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:45:17.978Z"
+    },
+    "audit-telemetry.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:45:17.978Z"
+    },
+    "audit-telemetry.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:45:17.978Z"
+    },
+    "audit-progressive-polyrepo": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:45:42.316Z"
+    },
+    "audit-progressive-polyrepo.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:45:42.316Z"
+    },
+    "audit-progressive-polyrepo.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:45:42.316Z"
+    },
+    "audit-progressive-polyrepo.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:45:42.316Z"
+    },
+    "audit-model-routing": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:46:08.448Z"
+    },
+    "audit-model-routing.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:46:08.448Z"
+    },
+    "audit-model-routing.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:46:08.448Z"
+    },
+    "audit-model-routing.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:46:08.448Z"
+    },
+    "audit-auto-merge": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:46:37.782Z"
+    },
+    "audit-auto-merge.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:46:37.782Z"
+    },
+    "audit-auto-merge.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:46:37.782Z"
+    },
+    "audit-auto-merge.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:46:37.782Z"
+    },
+    "audit-auto-merge.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:46:37.782Z"
+    },
+    "audit-auto-merge.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:46:37.782Z"
+    },
+    "audit-polyrepo": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:47:03.266Z"
+    },
+    "audit-polyrepo.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:47:03.266Z"
+    },
+    "audit-polyrepo.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:47:03.266Z"
+    },
+    "audit-polyrepo.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:47:03.266Z"
+    },
+    "audit-polyrepo.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:47:03.266Z"
+    },
+    "audit-polyrepo.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:47:03.266Z"
+    },
+    "audit-order-books": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:47:29.794Z"
+    },
+    "audit-order-books.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:47:29.794Z"
+    },
+    "audit-order-books.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:47:29.794Z"
+    },
+    "audit-order-books.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:47:29.794Z"
+    },
+    "audit-order-books.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:47:29.794Z"
+    },
+    "audit-issue-trackers": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:48:45.485Z"
+    },
+    "audit-issue-trackers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:48:45.485Z"
+    },
+    "audit-issue-trackers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:48:45.485Z"
+    },
+    "audit-issue-trackers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:48:45.485Z"
+    },
+    "audit-issue-trackers.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:48:45.485Z"
+    },
+    "audit-issue-trackers.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:48:45.485Z"
+    },
+    "audit-model-presets": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:49:08.085Z"
+    },
+    "audit-model-presets.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:49:08.085Z"
+    },
+    "audit-model-presets.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:49:08.085Z"
+    },
+    "audit-model-presets.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:49:08.085Z"
+    },
+    "audit-terminal-backend": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:49:38.651Z"
+    },
+    "audit-terminal-backend.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:49:38.651Z"
+    },
+    "audit-terminal-backend.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:49:38.651Z"
+    },
+    "audit-terminal-backend.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:49:38.651Z"
+    },
+    "audit-terminal-backend.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:49:38.651Z"
+    },
+    "audit-jev": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:50:02.345Z"
+    },
+    "audit-jev.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:50:02.345Z"
+    },
+    "audit-jev.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:50:02.345Z"
+    },
+    "audit-jev.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:50:02.345Z"
+    },
+    "audit-jev.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:50:02.345Z"
+    },
+    "audit-local-models": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:50:27.613Z"
+    },
+    "audit-local-models.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:50:27.613Z"
+    },
+    "audit-local-models.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:50:27.613Z"
+    },
+    "audit-local-models.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:50:27.613Z"
+    },
+    "audit-local-models.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:50:27.613Z"
+    },
+    "audit-memory-governor": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:51:19.914Z"
+    },
+    "audit-memory-governor.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:51:19.914Z"
+    },
+    "audit-memory-governor.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:51:19.914Z"
+    },
+    "audit-memory-governor.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:51:19.914Z"
+    },
+    "audit-memory-governor.ac1": {
+      "status": "cancelled"
+    },
+    "audit-effort": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:51:52.941Z"
+    },
+    "audit-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:51:52.941Z"
+    },
+    "audit-effort.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:51:52.941Z"
+    },
+    "audit-effort.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:51:52.941Z"
+    },
+    "audit-effort.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:51:52.941Z"
+    },
+    "audit-effort.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:51:52.941Z"
+    },
+    "audit-computer-use": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:52:22.463Z"
+    },
+    "audit-computer-use.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:52:22.463Z"
+    },
+    "audit-computer-use.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:52:22.463Z"
+    },
+    "audit-skills": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:52:44.217Z"
+    },
+    "audit-skills.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:52:44.217Z"
+    },
+    "audit-skills.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:52:44.217Z"
+    },
+    "audit-knowledge": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:53:15.397Z"
+    },
+    "audit-knowledge.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:53:15.397Z"
+    },
+    "audit-knowledge.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:53:15.397Z"
+    },
+    "audit-knowledge.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:53:15.397Z"
+    },
+    "audit-semgrep": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:53:36.478Z"
+    },
+    "audit-semgrep.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:53:36.478Z"
+    },
+    "audit-semgrep.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:53:36.478Z"
+    },
+    "audit-semgrep.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:53:36.478Z"
+    },
+    "audit-memory": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:54:04.101Z"
+    },
+    "audit-memory.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:54:04.101Z"
+    },
+    "audit-memory.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:54:04.101Z"
+    },
+    "audit-memory.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:54:04.101Z"
+    },
+    "audit-appearance": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:54:24.162Z"
+    },
+    "audit-appearance.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:54:24.162Z"
+    },
+    "audit-appearance.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:54:24.162Z"
+    },
+    "audit-appearance.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:54:24.162Z"
+    },
+    "audit-context-layers": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:54:50.351Z"
+    },
+    "audit-context-layers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:54:50.351Z"
+    },
+    "audit-context-layers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:54:50.351Z"
+    },
+    "audit-context-layers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:54:50.351Z"
+    },
+    "audit-context-layers.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:54:50.351Z"
+    },
+    "audit-projects": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:55:21.563Z"
+    },
+    "audit-projects.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:55:21.563Z"
+    },
+    "audit-projects.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:55:21.563Z"
+    },
+    "audit-projects.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:55:21.563Z"
+    },
+    "audit-projects.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:55:21.563Z"
+    },
+    "audit-projects.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:55:21.563Z"
+    },
+    "audit-docs-rag": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:55:53.527Z"
+    },
+    "audit-docs-rag.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:55:53.527Z"
+    },
+    "audit-docs-rag.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:55:53.527Z"
+    },
+    "audit-docs-rag.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:55:53.527Z"
+    },
+    "harnesses-grok-to-tos": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5503",
+      "claimedAt": "2026-11-18T23:55:57.727Z",
+      "doneAt": "2026-11-18T23:57:19.150Z"
+    },
+    "harnesses-grok-to-tos.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:57:19.150Z"
+    },
+    "harnesses-grok-to-tos.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:57:19.150Z"
+    },
+    "harnesses-grok-to-tos.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:57:19.150Z"
+    },
+    "harnesses-grok-to-tos.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:57:19.150Z"
+    },
+    "harnesses-grok-to-tos.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:57:19.150Z"
+    },
+    "harnesses-troubleshooting-to-end": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5503",
+      "claimedAt": "2026-11-18T23:57:22.882Z",
+      "doneAt": "2026-11-18T23:58:47.573Z"
+    },
+    "harnesses-troubleshooting-to-end.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:58:47.573Z"
+    },
+    "harnesses-troubleshooting-to-end.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:58:47.573Z"
+    },
+    "harnesses-troubleshooting-to-end.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:58:47.573Z"
+    },
+    "harnesses-troubleshooting-to-end.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:58:47.573Z"
+    },
+    "validate-and-pr-body": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5503",
+      "claimedAt": "2026-11-18T23:58:58.586Z",
+      "doneAt": "2026-11-19T00:00:30.190Z"
+    },
+    "validate-and-pr-body.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T00:00:30.190Z"
+    },
+    "validate-and-pr-body.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T00:00:30.190Z"
+    },
+    "validate-and-pr-body.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T00:00:30.190Z"
+    },
+    "validate-and-pr-body.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T00:00:30.190Z"
+    }
+  }
+}

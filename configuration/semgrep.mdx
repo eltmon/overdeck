@@ -37,12 +37,12 @@ security:
 `mcp` and `edit_hook` each default to `false` and do nothing unless `enabled` is also `true`.
 The four gate keys show their defaults; see [Verification gate](#verification-gate).
 Then run `pan sync` (or `pan install`) to trigger the managed install. A config change reaches
-new agent sessions only — it does not affect an agent already running.
+new agent sessions only; it does not affect an agent already running.
 
 You can also set every key in the dashboard: **Settings → Security**. Each control saves only
 its own key, so comments and other settings in `config.yaml` are kept.
 
-A repo-committed `.pan.yaml` project layer **cannot** set `security` — any `security:` block
+A repo-committed `.pan.yaml` project layer **cannot** set `security`; any `security:` block
 there is silently ignored. A work agent can commit a `.pan.yaml` to its own feature branch, so
 a security setting that controls whether a scanner runs must come only from a file the operator
 owns, never from a file in the tree being scanned.
@@ -51,14 +51,14 @@ owns, never from a file in the tree being scanned.
 
 Semgrep Community Edition **1.180.0** (pinned), installed via [`uv`](https://docs.astral.sh/uv/)
 (falling back to `pipx` when `uv` is not available) into `~/.overdeck/tools/semgrep/`, with a
-launcher symlinked at `~/.overdeck/bin/semgrep` — the only path Overdeck ever runs Semgrep from.
+launcher symlinked at `~/.overdeck/bin/semgrep`, the only path Overdeck ever runs Semgrep from.
 The install is about 350&nbsp;MB and happens once per machine; a version check on every `pan sync`
 reinstalls only when the pinned version drifts.
 
 Your own Semgrep install, wherever it lives (`~/.local/bin/semgrep`, a different `uv tool`,
 `pipx`, Homebrew, or anywhere else on `PATH`), is never touched, overwritten, or removed.
 Overdeck's installer refuses to replace anything at `~/.overdeck/bin/semgrep` that it did not
-create itself — a regular file or a symlink pointing somewhere else there is left alone, and the
+create itself. A regular file or a symlink pointing somewhere else there is left alone, and the
 install reports `failed` with a fix telling you to move it out of the way first.
 
 If neither `uv` nor `pipx` is on the host, the install reports `failed` with the message
@@ -75,27 +75,29 @@ With the feature off, `pan doctor` prints no Semgrep rows at all. With it on:
 | Installed, version mismatch | `Installed <v>, expected 1.180.0` | warn, fix `pan sync` |
 | Installed, pinned version | `1.180.0 (pinned)` | ok |
 | `semgrep.dev` reachable | `semgrep.dev reachable` | ok |
-| `semgrep.dev` unreachable, non-2xx/3xx, or a 5s timeout | `semgrep.dev unreachable — registry rule packs such as p/default cannot be downloaded` | warn |
+| `semgrep.dev` unreachable, non-2xx/3xx, or a 5s timeout | `semgrep.dev unreachable`, followed by a note that registry rule packs such as `p/default` cannot be downloaded | warn |
 | Platform is Windows | `Enabled, but Semgrep support is Linux and macOS only` | warn |
 
 ## In-session tools
 
+No MCP server or edit hook runs in Docker workspaces or on Windows.
+
 ### semgrep MCP server
 
 With `security.semgrep.mcp: true`, work agents and the review security lane get a `semgrep`
-MCP server: `semgrep_scan_with_custom_rule`, `semgrep_rule_schema`, `get_abstract_syntax_tree`,
-and `get_supported_languages`. `semgrep_scan` is intentionally absent — it needs
-`--config auto`, which this setup never runs; use the CLI through the `semgrep` skill instead.
-The server adds about 100&nbsp;MB per agent.
+MCP server. The scan, findings and supply-chain tools are turned off because they fail without a
+Semgrep login or with metrics off. Scan with the CLI through the `semgrep` skill. The MCP server
+is skipped with a warning when the `semgrep` launcher is missing or not Overdeck's. The server
+adds about 100&nbsp;MB per agent.
 
 ### Post-edit scan hook
 
-With `security.semgrep.edit_hook: true`, a Claude Code work agent gets Semgrep's findings for
-each file it edits. The hook scans only the edited file with `p/default` plus the repo's own
-`.semgrep.yml`/`.semgrep/` rules, and takes about 2&nbsp;seconds per edit. It skips files over
+With `security.semgrep.edit_hook: true`, every Claude Code agent (not a conversation) gets
+Semgrep's findings for each file it edits. The hook scans only the edited file with `p/default`
+plus the repo's own `.semgrep.yml`/`.semgrep/` rules, and takes about 2&nbsp;seconds per edit. It skips files over
 1&nbsp;MiB, files under `node_modules/`, `.git/` or `dist/`, and non-code extensions such as
-`.md`, `.svg` or `.lock`. It stays silent when the scan is clean or on any error — it never
-blocks the edit — and a finding arrives as context for the agent to triage, not as a block.
+`.md`, `.svg` or `.lock`. It stays silent when the scan is clean or on any error (it never
+blocks the edit), and a finding arrives as context for the agent to triage, not as a block.
 
 ### semgrep skill
 
@@ -233,7 +235,7 @@ Each control writes only its own key, so comments and every other setting in `co
 survive the save, and an invalid value is rejected without writing anything.
 
 A gate mode, severity, rule configs or timeout change applies to the next verification run; the
-MCP server and edit hook apply to agent sessions started after the change — neither one affects
+MCP server and edit hook apply to agent sessions started after the change; neither one affects
 an agent already running.
 
 Project settings has a **Semgrep gate** control (Off / Advisory / Blocking / Global default)
@@ -261,7 +263,7 @@ turn Semgrep on.
 | Verification `sast` scan | `semgrep.dev` (registry download of each registry id in `configs`) | No |
 | CI workflow (GitHub Actions) | semgrep.dev (registry download) from GitHub's runner; GitHub code scanning with --sarif-upload | Code stays on GitHub's runner; with --sarif-upload, findings go to GitHub code scanning |
 | Version check / metrics | Disabled (`SEMGREP_ENABLE_VERSION_CHECK=0`, `SEMGREP_SEND_METRICS=off`) | n/a |
-| Semgrep Platform / Guardian | Not available in this release | — |
+| Semgrep Platform / Guardian | Not available in this release | n/a |
 
 MCP tracing is disabled (`SEMGREP_MCP_DISABLE_TRACING=true`), and every in-session and gate
 Semgrep process writes its state to `~/.overdeck/tools/semgrep/` instead of the default
@@ -272,10 +274,10 @@ environment.
 
 The Semgrep engine is licensed under LGPL-2.1. Registry rule packs (such as `p/default`) are
 licensed under the [Semgrep Rules License v1.0](https://semgrep.dev/legal/rules-license/) and
-are downloaded only by your own CLI, on your own machine, when a scan runs — Overdeck never
+are downloaded only by your own CLI, on your own machine, when a scan runs. Overdeck never
 bundles or serves rule packs itself.
 
 ## Platforms
 
-Linux and macOS. **Windows is unsupported** — `ensureSemgrepInstalled` returns `unsupported`
+Linux and macOS. **Windows is unsupported**: `ensureSemgrepInstalled` returns `unsupported`
 immediately on `win32`, before any install attempt.
