@@ -1,5 +1,6 @@
 ---
-title: pan token
+title: "pan token: create, list and revoke scoped API tokens"
+sidebarTitle: pan token
 description: "Create, list or revoke scoped API tokens for programs such as event sidecars and notifiers, instead of giving them a full device session."
 ---
 
@@ -32,8 +33,9 @@ Works without a running dashboard; it writes the registry directly.
 pan token list [--json]
 ```
 
-Lists access tokens with columns `ID NAME SCOPES CREATED LAST USED REVOKED`. Works without a
-running dashboard.
+Lists API tokens (your own, agent and OAuth tokens) with columns
+`ID NAME SCOPES CREATED LAST USED REVOKED`. Paired devices, linked machines, phones and
+connectors are not listed. Works without a running dashboard.
 
 | Flag | Effect |
 | --- | --- |
@@ -55,8 +57,7 @@ prints every field, including `agentId`, `agentKind` and `role` for an agent
 token and `oauthClientId`, `oauthFamilyId` and `expiresAt` for an OAuth token.
 An agent token leaves the list 7 days after it is revoked, and an expired OAuth
 token 7 days after it expires. A revoked OAuth token stays 90 days longer, so a
-later refresh with its old refresh token still sees the revocation
-(`pruneEndedAccessTokens`, `src/lib/access-tokens.ts`).
+later refresh with its old refresh token still sees the revocation.
 
 ## revoke
 
@@ -76,4 +77,12 @@ With no dashboard running it writes the registry and prints:
 Dashboard not running; revoked in the registry. No live connections were open.
 ```
 
-An unknown id prints `No access token with id <id>.` and exits 1.
+An unknown id prints `No access token with id <id>.` and exits 1. A dashboard that was
+not started by `pan up` (for example `pan serve`) rejects this machine's internal token;
+the command then says `pan token revoke` needs a dashboard started by `pan up` and exits
+1. Any other refusal prints `pan token revoke failed: <reason>` and exits 1.
+
+## Get help
+
+Still stuck? Ask on the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file a
+[GitHub Issue](https://github.com/eltmon/overdeck/issues).
