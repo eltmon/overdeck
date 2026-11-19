@@ -1,5 +1,6 @@
 ---
-title: Linked machines
+title: "Linked machines: pair Overdeck machines and work across them"
+sidebarTitle: Linked machines
 description: Link two machines' dashboards over an encrypted channel, learn routes, and watch each other's health
 ---
 
@@ -41,9 +42,10 @@ Both servers on one host (for a test) need `--allow-loopback`, because a `localh
 pairing link only works on the machine that printed it.
 
 An agent can ask you for a link. Its `link_machine` tool shows a **Machine link
-requested** card in the Decisions panel, and the card's **Link a machine…** button
-opens this dialog. After the link succeeds, the agent learns the new machine's label,
-never the pairing link. See [Machine links](/configuration/mcp#machine-links).
+requested** card in **Needs you** and at the top of the agent's conversation. In a
+browser on this machine, the card's **Link a machine…** button opens this dialog. After
+the link succeeds, the agent learns the new machine's label, never the pairing link. See
+[Machine links](/configuration/mcp#machine-links).
 
 ## SSH machines
 
@@ -64,7 +66,8 @@ so it works from any browser that can open this dashboard:
 4. It forwards a loopback port on this machine to the host's dashboard port.
 5. It pairs over that forwarded port and saves a machine link whose route has kind `ssh`.
 
-**Test** in the dialog (or `pan machines test-ssh <host>`) runs only step 2. The host field
+**Test** in the dialog (or `pan machines test-ssh <host>`) runs only steps 1 and 2: it
+connects over SSH and compares the `pan` versions. The host field
 suggests the concrete `Host` aliases of this machine's `~/.ssh/config`.
 
 To set a server up from the server itself instead (a lasting service that survives
@@ -123,6 +126,9 @@ npx @overdeck/core connect
 Then run the `pan machines link '…'` line it prints on your laptop. See
 [`pan connect`](/cli/machines#connect) for lingering, macOS, firewalls and removal.
 
+<Note>Running `npx @overdeck/core connect` as a systemd service on a fresh VPS has not yet
+been tested end to end on a real VPS ([#4863](https://github.com/eltmon/overdeck/issues/4863)).</Note>
+
 ## Fly machines
 
 A Fly machine is a [Fly.io](https://fly.io) VM that runs Overdeck (`pan serve`) and is
@@ -138,7 +144,7 @@ pan machines add-fly --project overdeck --harness codex --model gpt-6.1-sol --me
 Settings → Anywhere → Machines has the same door as a dialog: **Add a Fly machine**, next to
 **Add an SSH machine** (also the command palette's **Add a Fly machine**). It takes an
 optional project and, under Advanced, an optional
-region; it has no message, harness or model field, because it only links the machine — start
+region; it has no message, harness or model field, because it only links the machine: start
 a conversation on it from the new-conversation dialog's **Fly (new VM)** choice (see
 [Start work on another machine](#start-work-on-another-machine)) or with `--message` above.
 
@@ -152,7 +158,7 @@ This one command, which takes a few minutes:
    advertises no private addresses, so this machine reaches it only over
    `wss://<app>.fly.dev`.
 4. With `--project`, clones that project onto the VM (GitHub projects only).
-5. With `--message`, starts a Claude Code or Codex conversation (`--harness`) there and
+5. With `--message` (which needs `--project`), starts a Claude Code or Codex conversation (`--harness`) there and
    prints its URL.
 
 The conversation then streams in this dashboard like any linked conversation: use
@@ -172,7 +178,7 @@ also uses to start [work agents on Fly](#work-agents-on-fly):
 
   `remote.enabled` lives only in config.toml. The global `~/.overdeck/config.yaml`
   also has a `remote:` section, but it holds only `resiliency_tier` and
-  `max_concurrent_agents` — an `enabled` key there does nothing, and
+  `max_concurrent_agents`; an `enabled` key there does nothing, and
   `pan admin config set remote.enabled <value>` refuses rather than write it. In
   the dashboard, Settings → Anywhere → Machines → **Add a Fly machine** shows a
   "Remote is off" notice with a **Turn on remote** button that writes the
@@ -221,7 +227,7 @@ pan start PAN-123 --machine fly
 
 - The command pushes the feature branch, then asks the running dashboard to start a Fly
   machine with the project, add the issue's worktree there and start the work agent as a
-  conversation in it. It waits 5–15 minutes and prints the conversation's URL. It needs
+  conversation in it. It waits 5 to 15 minutes and prints the conversation's URL. It needs
   `pan up`.
 - The transcript streams in this dashboard while the agent works, with the `fly-<machineId>`
   chip. The issue's row in the project tree lists the conversation and opens it.
@@ -292,8 +298,9 @@ Everything, on every route. The channel is a Noise protocol session (X25519,
 ChaCha20-Poly1305) between the two machine keys; the pairing code only introduces the
 keys. Every request, the event stream and every terminal that crosses a link runs inside
 the channel. A machine's key lives in `~/.overdeck/machine-key.json`, mode 0600, and its
-fingerprint (five groups of four hex characters) is shown next to each link so you can
-compare it with the other machine's **This machine** line.
+fingerprint (five groups of four hex characters) is printed for each link by
+`pan machines list` and shown on each **Inbound** row in Settings → Anywhere → Machines,
+so you can compare it with the other machine's **This machine** line.
 
 ## Routes
 
@@ -320,9 +327,11 @@ it answered last time.
 overdeck.ai account, you can also link them without a pairing link: click **Link** in
 **Settings → Anywhere → Directory** (or run `pan machines join`), then approve on the other
 machine after checking that both screens show the same six-digit code. The directory also adds
-`direct` routes (`rtc://<environment id>`, a peer-to-peer WebRTC path) and, on the relay plan,
-`relay` routes (`rtc+turn://<environment id>`, through a TURN relay). The relay tries the TURN
-server over TLS on port 443 first, so a network that blocks UDP can still reach it. These routes are tried only when
+`direct` routes (`rtc://<environment id>`, a peer-to-peer WebRTC path) and, on the relay plan
+(paid plans are invite-only for now), `relay` routes (`rtc+turn://<environment id>`, through a
+TURN relay). The relay tries the TURN server over TLS on port 443 first, so a network that
+blocks UDP can still reach it. This TCP fallback is covered by tests but has not yet connected
+on a live Fly VM. These routes are tried only when
 no LAN, Tailscale, SSH or public route answers, appear with the source `directory`, and are
 never saved with the link. See
 [Find your machines through overdeck.ai](/configuration/remote-access#find-your-machines-through-overdeck-ai).
@@ -341,7 +350,7 @@ never saved with the link. See
 instead of the raw connection error. The dashboard only shows this when two signals agree:
 every LAN route to the peer failed with the same `EHOSTUNREACH` errno, and a probe of this
 process's own network access confirms macOS denied it. A powered-off peer, which also fails
-fast with `EHOSTUNREACH`, keeps the raw error instead — turning on Local Network access
+fast with `EHOSTUNREACH`, keeps the raw error instead, since turning on Local Network access
 would not help there.
 
 When a link drops, the row says why. **froze** means the other dashboard's event loop
@@ -417,9 +426,10 @@ the phone at `/m?conversation=@<environment-id>/<name>`. Its
 transcript streams live through this machine's server, and you can send, answer
 questions and approvals, stop, abort, switch model, compact and open its terminal, as if
 it were local. Images load from the owner. The owner's own access rules decide what is
-allowed: an **agent-fenced** link can read but not change the other machine's
-conversations, and an agent on a linked machine is always refused changes
-(`agent-fenced`).
+allowed: an **agent-fenced** link, and an agent on a linked machine, can read but not
+change the other machine's conversations (`agent-fenced`). The one exception is work this
+machine started there, which it may message and stop (see
+[Start work on another machine](#start-work-on-another-machine)).
 
 From the CLI, `pan tell @<machine>/<conv> "<message>"` delivers to a conversation on a
 linked machine (see [`pan tell`](/cli/agent-commands)).
