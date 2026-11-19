@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5504",
   "created": "2026-11-19T07:15:41.251Z",
-  "updated": "2026-11-19T07:24:32.343Z",
+  "updated": "2026-11-19T07:24:36.415Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -138,6 +138,11 @@
     "prompts-c.ac4": {
       "status": "completed",
       "doneAt": "2026-11-19T07:24:32.343Z"
+    },
+    "harness-landscape-a": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5504",
+      "claimedAt": "2026-11-19T07:24:36.415Z"
     }
   }
 }
