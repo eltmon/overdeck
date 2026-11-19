@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5504",
   "created": "2026-11-19T07:15:41.251Z",
-  "updated": "2026-11-19T07:21:42.362Z",
+  "updated": "2026-11-19T07:23:01.547Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -96,9 +96,26 @@
       "doneAt": "2026-11-19T07:21:38.327Z"
     },
     "prompts-b": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5504",
-      "claimedAt": "2026-11-19T07:21:42.362Z"
+      "claimedAt": "2026-11-19T07:21:42.362Z",
+      "doneAt": "2026-11-19T07:23:01.547Z"
+    },
+    "prompts-b.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T07:23:01.547Z"
+    },
+    "prompts-b.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T07:23:01.547Z"
+    },
+    "prompts-b.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T07:23:01.547Z"
+    },
+    "prompts-b.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T07:23:01.547Z"
     }
   }
 }
