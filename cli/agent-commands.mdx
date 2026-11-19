@@ -75,7 +75,7 @@ Use `pan status` from the terminal for a quick check, and the Agents page when y
 | Conversation | `conv/2972`, `conv:2972`, or a dashboard URL such as `https://overdeck.localhost/conv/2972` | The conversation's agent |
 | Bare number | `2972` | An issue agent if exactly one matches; otherwise that conversation, if one exists |
 
-A bare number is convenient but can be ambiguous — a conversation's dashboard number and an issue's number can coincide. When a bare number matches more than one target (an issue agent *and* a conversation, or two issue agents), the command refuses and lists every candidate with its explicit form (`PAN-2972`, `conv/2972`, …) so you can pick one. Use the explicit form whenever you already know it.
+A bare number is convenient but can be ambiguous: a conversation's dashboard number and an issue's number can coincide. When a bare number matches more than one target (an issue agent *and* a conversation, or two issue agents), the command refuses and lists every candidate with its explicit form (`PAN-2972`, `conv/2972`, …) so you can pick one. Use the explicit form whenever you already know it.
 
 ## pan tell
 
@@ -114,7 +114,7 @@ and `--force` exit 1 for a remote target. Only conversations are accepted after
 
 ## pan pause
 
-Pause a running agent — it stops accepting new work until unpaused. See [Targeting an agent](#targeting-an-agent) for every accepted `<id>` form, including `conv/<n>` and dashboard URLs.
+Pause a running agent. It stops accepting new work until unpaused. See [Targeting an agent](#targeting-an-agent) for every accepted `<id>` form, including `conv/<n>` and dashboard URLs.
 
 ```bash
 pan pause min-123
@@ -269,7 +269,7 @@ pan admin remote status
 pan admin remote resources
 ```
 
-See [Workspaces](/features/workspaces#remote-workspaces-flyio) for details on remote workspace execution.
+See [Workspaces](/features/workspaces#remote-workspaces-on-fly) for details on remote workspace execution.
 
 ## Next Steps
 
