@@ -330,7 +330,7 @@ Below the first control, a line reports how many closed issues still have a work
 > **CRITICAL:** The main project directory must **ALWAYS** stay on the `main` branch. All feature work happens in workspaces.
 
 **Why this matters:**
-- **Specialists** (review-agent, test-agent) need a stable reference point
+- **Review and test agents** need a stable reference point
 - **Merge operations** require a clean target
 - **Multiple agents** won't interfere with each other
 
@@ -367,24 +367,16 @@ export OVERDECK_AUTO_REVERT_CHECKOUT=1  # Add to .bashrc/.zshrc
 
 ### Planning vs Work Agent Safeguard
 
-The dashboard prevents starting a work agent (`agent-<issue>`) while a planning agent (`planning-<issue>`) is still running. This prevents conflicts where both agents try to modify the same workspace.
+Planning refuses to start while a work agent (`agent-<issue>`) is running for the issue ("Cannot start planning: work agent already running"). A work agent refuses to start until the issue has a finalized xBRIEF plan with items.
 
-If you see "Planning agent is still running":
-1. **Complete planning** - Use "Complete Planning" button
-2. **Or abort** - Use "Abort Planning" to discard
-3. **Or kill manually** - `pan kill planning-<issue>`
+To move from planning to work:
+1. **Accept the plan** - the **Accept plan** action finalizes it (`pan plan finalize`)
+2. **Or abort** - **Abort Planning** in the planning dialog returns the issue to Todo and keeps the workspace
+3. **Or stop the planning agent** - `pan kill planning-<issue>`
 
-### Specialist Agent Safeguards
+### Agent safeguards
 
-All specialist agents (review-agent, test-agent, merge-agent) are configured to:
-1. **Run in workspaces only** - Never in main project directory
-2. **Never checkout branches** - Work with branch already in workspace
-3. **Create workspaces if needed** - Use `pan workspace create` instead of `git checkout`
-
-These safeguards are enforced through:
-- **Prompt instructions** - Clear warnings in all specialist prompts
-- **Code enforcement** - Specialists spawn with workspace as cwd
-- **Git hooks** - Auto-revert if checkout detected in tmux sessions
+Planning, work, review and test agents start with the issue workspace as their working directory, never the main project directory. The work prompt tells the agent never to check out another branch in its workspace. The post-checkout hook auto-reverts a checkout in the main project directory when it runs inside an Overdeck agent (`OVERDECK_AGENT=1` or `OVERDECK_AGENT_ID` set), a planning session, or a tmux session named `agent-*`, `planning-*` or `specialist-*`.
 
 ## Use Cases
 
@@ -425,8 +417,8 @@ pan workspace create MIN-999-hotfix
 - Use `--docker` flag to warm up containers early
 
 **Branch Naming:**
-- Follow convention: `feature/{issue-id}-{description}`
-- Example: `feature/min-123-add-login`
+- Branches are named `feature/<issue>`, lowercase
+- Example: `feature/min-123`
 - Overdeck auto-generates appropriate names
 
 **Docker Usage:**
@@ -435,9 +427,9 @@ pan workspace create MIN-999-hotfix
 - Keep docker-compose.yml in workspace (not main project)
 
 **Planning Artifacts:**
-- `.planning/` is ephemeral - don't rely on it for cross-machine work
-- STATE.md and beads persist the important context
-- Feature PRD goes to `docs/prds/active/` for permanent storage
+- The PRD draft and xBRIEF plan live under `.pan/` and are committed on the feature branch, so they move with the branch
+- Item progress is kept in the continue file and updated with `pan task`
+- The PRD is `.pan/drafts/<issue>.md`
 
 ## Remote workspaces on Fly
 
@@ -446,7 +438,7 @@ Overdeck supports remote workspace execution via Fly.io Machines. Remote workspa
 ### Why Remote Workspaces?
 
 - **Resource isolation**: heavy builds and tests don't compete with your local machine.
-- **On-demand provisioning**: machines spin up per workspace and shut down after merge.
+- **On-demand provisioning**: machines spin up per workspace and are destroyed when the agent finishes and its branch is handed to review.
 - **Same workflow**: the CLI and dashboard work the same for local and remote workspaces.
 
 ### Setup
@@ -467,14 +459,14 @@ pan admin remote resources
 
 ### Creating Remote Workspaces
 
-Remote workspaces are created through the dashboard planning dialog or CLI:
+Remote workspaces are created from the planning dialog (**Workspace Location**: **Remote (Fly.io)**) or the CLI:
 
 ```bash
 # Create workspace with remote execution
 pan workspace create MIN-123 --remote
 ```
 
-The workspace is provisioned on a Fly.io Machine with your project's dependencies pre-installed. Agents connect to the remote environment via the same tmux-based interface used for local workspaces.
+The workspace is provisioned on a Fly.io Machine with your project's dependencies pre-installed. The agent runs in a tmux session on the machine.
 
 To start the work agent on Fly directly, use `pan start` with `--remote`:
 
@@ -505,7 +497,7 @@ git worktree remove workspaces/feature-min-123
 docker ps | grep feature-min-123
 
 # Stop conflicting containers
-docker compose -p mind-your-now-feature-min-123 down
+docker compose -p myn-feature-min-123 down  # the name: from the workspace's compose file
 ```
 
 **Main project on wrong branch:**
@@ -520,12 +512,13 @@ git checkout main
 # List all workspaces
 pan workspace list
 
-# Destroy completed workspaces
+# Show merged branches still on disk, with sizes, then destroy them
+pan workspace list --stale
 pan workspace destroy MIN-123
 pan workspace destroy MIN-456
 ```
 
-Because each running workspace carries its own agents, conversations, and processes, parallel work also consumes RAM. The dashboard's Resources page breaks down system memory by agents, conversations, and processes so you can see which workspaces are heaviest before deciding which to destroy.
+Because each running workspace carries its own agents, conversations, and processes, parallel work also consumes RAM. The dashboard's Resources page (experimental: turn on **Settings → Experimental → Experimental features**) breaks down system memory by agents, conversations, and processes so you can see which workspaces are heaviest before deciding which to destroy.
 
 <ThemedImage
   light="/images/dashboard/resources-light.png"
@@ -533,8 +526,10 @@ Because each running workspace carries its own agents, conversations, and proces
   alt="Resources page: system RAM usage broken down by agents, conversations, and processes"
 />
 
+Still stuck? Ask in [Discord](https://discord.gg/ZpHE2ZTv5P) or open an issue on [GitHub](https://github.com/eltmon/overdeck/issues).
+
 ## Related Guides
 
 - [Workspace Commands](/cli/workspace-commands) - CLI reference
-- [Specialists](/features/specialists) - Specialist agent workspace usage
+- [Review and test agents](/features/specialists) - How review and test agents check the work
 - [Planning](/features/planning) - Planning an issue before work starts
