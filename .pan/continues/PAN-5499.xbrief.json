@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5499",
   "created": "2026-11-19T02:52:23.250Z",
-  "updated": "2026-11-19T03:02:29.470Z",
+  "updated": "2026-11-19T03:02:34.290Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -148,6 +148,11 @@
     "vision-criteria-and-appendix.ac4": {
       "status": "completed",
       "doneAt": "2026-11-19T03:02:29.469Z"
+    },
+    "changelog-intro": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5499",
+      "claimedAt": "2026-11-19T03:02:34.289Z"
     }
   }
 }
