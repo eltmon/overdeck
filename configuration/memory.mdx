@@ -1,10 +1,8 @@
 ---
-title: "Project memory: curated facts for every agent"
-sidebarTitle: "Project Memory"
-description: Curated facts stored in your repository and injected into every managed agent session
+title: "Agent memory: curated facts and workspace observations"
+sidebarTitle: "Agent Memory"
+description: "Curated memory facts for every agent, plus the workspace observation memory Overdeck extracts from sessions: search, pins, providers and logs."
 ---
-
-# Project Memory
 
 Curated memory facts are short, human-reviewable truths committed in your repository: operator
 corrections, working agreements, non-obvious project facts. They are repo-owned, so every managed
@@ -263,6 +261,59 @@ identity too.
 
 Every call (hit, miss or error) is logged to
 `~/.overdeck/memory/<project>/<workspace>/rag-runs/<date>.jsonl`.
+
+## Workspace observation memory
+
+Besides curated facts, Overdeck extracts observations from every session automatically. They are stored per workspace, not per issue, under `~/.overdeck/memory/<project>/<workspaceId>/` (observations, status, summaries and logs). A scratch or main workspace with no issue agent still collects memory from the conversations that run in it. Relocating a workspace never moves its memory.
+
+### Searching and pinning
+
+```bash
+# Search one workspace (id or name), one project, or every registered project
+pan memory search "auth refactor" --workspace <id>
+pan memory search "auth refactor" --project myproject
+pan memory search "auth refactor" --global
+
+# Search every workspace that points at a directory (bare flag = current directory)
+pan memory search "auth refactor" --target
+pan memory search "auth refactor" --target ~/code/some-repo
+
+# Pin a doc into prompt-time memory for one workspace (by id) or a whole project
+pan memory pin docs/ARCHITECTURE.md --workspace <id>
+pan memory pin docs/ARCHITECTURE.md --project myproject
+pan memory pins --workspace <id>
+pan memory unpin docs/ARCHITECTURE.md --workspace <id>
+
+# Backfill observations from older Claude Code sessions, matched by working directory
+pan memory backfill --dry-run
+pan memory backfill --workspace <id>
+```
+
+`--target` cannot be combined with `--workspace`, `--issue` or `--global`. A pinned path must resolve to a file inside the project, and it is stored relative to the project root. Always pass `--workspace` or `--project` to `pin`, `pins` and `unpin`; without either, `pin` uses the project `overdeck`. A project pin lasts as long as the project; a workspace pin is deleted with its workspace.
+
+### Reading a workspace's memory back
+
+`status` and `summary` take an issue, `--workspace`, or neither. With neither, they use the workspace that owns your current directory.
+
+```bash
+# Current status by issue, by workspace, or from inside the workspace
+pan memory status PAN-123 --project myproject
+pan memory status --workspace my-scratch-notes
+pan memory status
+
+# The current status plus earlier archived statuses, newest first
+pan memory status --workspace my-scratch-notes --history 3
+
+# Observations, oldest first; the last 7 days (today counts as day 1) and 50 rows by default
+pan memory timeline --workspace my-scratch-notes
+pan memory timeline --days 2 --limit 20 --json
+
+# Print a file from the workspace's memory home, or a slice of it (--from is 1-based)
+pan memory read summaries/2026-07-30.md
+pan memory read summaries/2026-07-30.md --from 10 --lines 20
+```
+
+An issue id from a project other than `overdeck` needs `--project <key>`. `--history` is capped at 50, but Overdeck keeps only the three most recent archived statuses, so a larger number returns what is kept. `pan memory read` reaches only inside the workspace's own memory home: it refuses absolute paths, `../` and symlinks that point outside, so your session transcripts stay out of reach.
 
 ## Previewing
 
