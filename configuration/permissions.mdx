@@ -123,3 +123,21 @@ them from there.
 Permission prompts can also reach your phone; see [Push notifications](/configuration/push-notifications). An MCP
 client with the `approve` scope can answer a conversation's permission prompt with the `answer_permission` tool; see
 [MCP](/configuration/mcp).
+
+## Operator-only labels
+
+Four GitHub Issue labels carry operator decisions. No agent may add or remove them.
+
+| Label | What it means | More |
+| --- | --- | --- |
+| `released` | Lets the Flywheel pick the issue up. | [Flywheel](/features/flywheel) |
+| `vetoed` | Stops the Flywheel from ever picking the issue up, planning it, or striking it. | [Flywheel](/features/flywheel) |
+| `auto-merge` | Overrides the merge policy for this one issue. | [Auto-merge](/configuration/auto-merge) |
+| `hold-for-uat` | Overrides the merge policy for this one issue. | [Auto-merge](/configuration/auto-merge) |
+
+Work agents, conversations, and the Flywheel launch with a `gh` shim on their `PATH`. It refuses any command that
+would add or remove one of these labels, in any case or list form, whether through an issue or PR edit, an issue or
+PR create, or a non-GET `gh api` call that writes a label, and it tells the agent to ask the operator instead. The
+dashboard routes that write these labels also need `admin` access, which no agent token holds.
+
+This is a `PATH` shim that stops accidents, not a sandbox: an absolute `/usr/bin/gh` bypasses it.
