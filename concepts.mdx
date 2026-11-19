@@ -12,10 +12,10 @@ Learn the fundamental concepts that power Overdeck.
 
 The live development surface where you and your agents work together. A full-height **project sidebar** on the left owns project selection; everything to its right is scoped to the project you pick and updates in real time:
 
-- **App bar**: the project crumb, a project-scoped search, and status pills at a glance (Deacon health, running-agent count, stopped agents). No more persistent banners; attention items surface as compact pills.
-- **Tab strip**: every issue, agent, and conversation you open becomes a tab. Scroll on overflow, middle-click to close, right-click to pop out to a window or close others, and **split the view** (drag a tab to a pane's edge) to watch two panes side by side.
-- **Pane body**: the working area. A project's **Home cockpit** (issue swimlanes, recent spend, a stuck count), an **issue view** (a title row with the issue's state, cost and next actions; a pipeline strip; a needs-you banner when you must act; and tabs led by the agent's conversation (Conversation, Tasks, Plan, Changes, Activity, Discussion, Skills, Details). It is the same view the issue drawer shows), or an agent's live conversation and terminal.
-- **Activity feed**: the **Feed** tab on `/activity`, with **Needs-you / Project / Global** scopes, so anything waiting on your input is one page away; the top bar's **Needs you** menu lists the same items. Inside Project and Global, the **All / Chats / Activity** tabs: All lists what changed (created, ended, reported, merged) rather than every busy conversation, Chats lists the conversations active in the last day, and a gauntlet run appears as one card.
+- **App bar**: the project crumb, a search box that opens the command palette (Ctrl+K, or ⌘K on a Mac), an **N agents working** menu, **Needs you**, chips that appear only when something is wrong (Deacon frozen, stopped agents, low-cost mode, a stale build), and a system health menu.
+- **Tab strip**: every issue, agent, and conversation you open becomes a tab. Scroll on overflow, middle-click to close, right-click a tab to split it right or down, close it, or close all tabs; drag a conversation's tab off the bar, or use **Pop out to window** in its ⋮ menu, to open it in its own window, and **split the view** (drag a tab to a pane's edge) to watch two panes side by side.
+- **Pane body**: the working area. A project's **Home** (facts for agents working, needs you, in review, landed this week and spend this week, then the pipeline lanes, the merge train and recent changes), an **issue view** (a title row with the issue's state, cost and next actions; a pipeline strip; a needs-you banner when you must act; and tabs led by the agent's conversation (Conversation, Tasks, Plan, Changes, Activity, Decisions (Deft projects only), Discussion, Skills, Details). It is the same view the issue drawer shows), or an agent's live conversation and terminal.
+- **Activity feed**: the **Feed** tab on `/activity`, with **Needs you / Project / Global** scopes (Project appears when a project is selected), so anything waiting on your input is one page away; the top bar's **Needs you** menu lists the same items. Inside Project and Global, the **All / Chats / Activity** tabs: All lists activity events and the conversations that started or ended in the last day, Chats lists the conversations active in the last day, and a gauntlet run appears as one card.
 
 <ThemedImage
   light="/images/dashboard/command-deck-hero-light.png"
@@ -25,7 +25,7 @@ The live development surface where you and your agents work together. A full-hei
 
 Command Deck is where you *manage the conversation*, not just watch a workflow run. The center pane streams the agent's turn-by-turn reasoning and tool calls as they happen, the left column keeps the project's conversations, issues and workspaces one click away on every page, and the top bar's Needs you menu and the Activity feed on `/activity` collect anything that needs your attention.
 
-Everything is alive: no refresh buttons. Domain events trigger small, informative UI motion: cost increments animate, tool names fade in and out, status dots pulse.
+Views update live from domain events, so you rarely need to refresh. Domain events trigger small, informative UI motion: cost increments animate, tool names fade in and out, status dots pulse.
 
 <ThemedImage
   light="/images/command-deck/issue-cockpit-light.png"
@@ -33,7 +33,7 @@ Everything is alive: no refresh buttons. Domain events trigger small, informativ
   alt="The issue view in a Command Deck tab: title row with state, cost and actions, the pipeline strip, the tab strip led by Conversation, and the work agent's conversation"
 />
 
-The **issue view** above is the same view the issue drawer shows. It has a title row with the issue's state, cost and next actions; a pipeline strip with the checks and pickup controls; a needs-you banner when you must act; and tabs led by the agent's conversation: Conversation, Tasks, Plan, Changes, Activity, Discussion, Skills and Details. Details holds the status, the pipeline with per-agent cost, the ship progress, the workspace, and (in the Command Deck tab) the launcher and agent dock.
+The **issue view** above is the same view the issue drawer shows. It has a title row with the issue's state, cost and next actions; a pipeline strip with the checks and pickup controls; a needs-you banner when you must act; and tabs led by the agent's conversation: Conversation, Tasks, Plan, Changes, Activity, Decisions (Deft projects only), Discussion, Skills and Details. Details holds the status, the pipeline with per-agent cost, the ship progress, the workspace, and (in the Command Deck tab) the launcher and agent dock.
 
 ### What You Can Do From Command Deck
 
