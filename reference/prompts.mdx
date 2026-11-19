@@ -416,32 +416,45 @@ TypeScript call site composes a multi-line Markdown string based on runtime
 state, and passes that string in as a single optional variable. The template
 then conditionally renders the block via a Mustache section.
 
-### Example: `resume-work.md`
+### Example: the `work.md` feedback block
 
 ```mustache
-{{#PENDING_FEEDBACK_BLOCK}}
-{{PENDING_FEEDBACK_BLOCK}}
-{{/PENDING_FEEDBACK_BLOCK}}
+{{#PENDING_FEEDBACK}}
+## Specialist Feedback (ACTION REQUIRED)
+
+Specialist agents have left feedback that you MUST address:
+
+{{PENDING_FEEDBACK}}
+...
+{{/PENDING_FEEDBACK}}
 ```
 
-And the call site:
+And the call site in `src/lib/cloister/work-agent-prompt.ts`, which lists
+the workspace's feedback files and returns an empty string when there are
+none:
 
 ```typescript
-const pendingFeedbackBlock = ctx.pendingFeedback.length > 0
-  ? `## Pending Feedback (ACTION REQUIRED)\n\nThese feedback files exist in \`.planning/feedback/\` — read and address them:\n${ctx.pendingFeedback.map(f => `- \`.planning/feedback/${f}\``).join('\n')}`
-  : '';
+async function readPendingFeedback(workspacePath: string): Promise<string> {
+  // ...collect feedbackFilePaths
+  if (feedbackFilePaths.length === 0) return '';
 
-return renderPrompt({
-  name: 'resume-work',
+  const lines: string[] = [];
+  lines.push(`**${feedbackFilePaths.length} feedback file(s):**`);
+  // ...one bullet per file, then a "read the latest first" line
+  return lines.join('\n');
+}
+
+return await Effect.runPromise(renderPrompt({
+  name: 'work',
   vars: {
     // ...
-    PENDING_FEEDBACK_BLOCK: pendingFeedbackBlock,
+    PENDING_FEEDBACK: pendingFeedbackStr,
     // ...
   },
-});
+}));
 ```
 
-When `pendingFeedbackBlock` is non-empty, the section renders; when it's
+When `pendingFeedbackStr` is non-empty, the section renders; when it's
 empty, the section disappears entirely. The template stays readable (no
 nested conditionals, no formatting logic) and the TypeScript stays honest
 about what the block looks like.
@@ -453,10 +466,10 @@ about what the block looks like.
   based on a boolean flag. The `merge.md` push/no-push toggles are a good
   example: the alternative paths are both long, both fully specified in the
   template, and both known at template-authoring time.
-- **Pre-built blocks** are right when the block's content is dynamic — it
-  joins a list, formats a table, runs git commands, reads STATE.md — and
+- **Pre-built blocks** are right when the block's content is dynamic: it
+  joins a list, formats a table, runs git commands, reads feedback files, and
   the template's job is just to decide whether to include it. The
-  resume-work feedback list is a good example: the TypeScript knows how to
+  `work.md` feedback list is a good example: the TypeScript knows how to
   format it, the template just needs to show or hide it.
 
 If you're torn, default to pre-built blocks. It's always easier to read a
@@ -470,10 +483,10 @@ into three categories:
 
 ### 1. Loader contract tests
 
-These test the loader itself against small inline fixture templates created
-in a temp directory: missing frontmatter, invalid YAML, missing `requires`,
+These test the loader itself against small fixture templates. Each test writes one as `__test-scratch__.md` in `src/lib/cloister/prompts/` and deletes it afterwards. They cover
+missing frontmatter, invalid YAML, missing `requires`,
 unknown vars, empty strings as `requires`, Mustache section rendering, etc.
-They exercise every error path in `renderPrompt` and every branch of the
+They cover the main error paths in `renderPrompt` and the
 frontmatter parser.
 
 ### 2. Live-template smoke tests
@@ -484,15 +497,15 @@ tests are a good example: four tests covering the push+build flow, the
 validation-only flow, the `SKIP_DONE_REPORT` branch, and the polyrepo
 header.
 
-Smoke tests are load-bearing — they catch cases where someone edits a
+Smoke tests are load-bearing: they catch cases where someone edits a
 template in a way that looks fine to Mustache but breaks a downstream
 specialist's expectations.
 
 ### 3. Caller-side tests
 
 Tests that verify TypeScript call sites pass the right variables, live
-alongside the calling module (e.g., `build-test-prompt.test.ts` for the
-test-specialist dispatch path). These catch the "call site got out of sync
+alongside the calling module (e.g., `work-agent-prompt-tests-mode.test.ts` for
+`buildWorkAgentPrompt`). These catch the "call site got out of sync
 with the frontmatter" class of bug.
 
 ### Writing a new smoke test
@@ -504,8 +517,8 @@ When you add a template, add at least one smoke test that:
 3. Asserts the presence / absence of conditional blocks for each branch the
    template can take.
 
-Keep the fixture `vars` small and local to the test — no shared state, no
-global setup. The loader is pure, so tests can be dead simple.
+Keep the fixture `vars` small and local to the test: no shared state, no
+global setup. The loader caches only the prompts directory, so tests can stay simple.
 
 ## Authoring workflow
 
@@ -519,19 +532,20 @@ global setup. The loader is pure, so tests can be dead simple.
    for optional sections.
 4. Add a caller in TypeScript:
    ```typescript
+   import { Effect } from 'effect';
    import { renderPrompt } from './prompts.js';
 
-   const prompt = renderPrompt({
+   const prompt = await Effect.runPromise(renderPrompt({
      name: '<name>',
      vars: { /* every required variable */ },
-   });
+   }));
    ```
 5. Add at least one smoke test in `prompts.test.ts`.
-6. Run `npx vitest run src/lib/cloister/__tests__/prompts.test.ts` and
-   `npx tsc --noEmit`.
-7. Run `npm run build` — the build pipeline copies `*.md` from
-   `src/lib/cloister/prompts/` to `dist/dashboard/prompts/`. If you skip
-   this step, the production dashboard will throw a `PromptError` at
+6. Run `npx vitest run src/lib/cloister/__tests__/prompts.test.ts`,
+   `npm run typecheck` and `npm run lint`.
+7. Run `npm run build`. The build pipeline copies `*.md` from
+   `src/lib/cloister/prompts/` to `dist/dashboard/prompts/`, `dist/prompts/` and `dist/cli/prompts/`. If you skip
+   this step, the built dashboard and CLI fail with a `PromptError` at
    runtime.
 
 ### Editing an existing template
@@ -540,11 +554,11 @@ global setup. The loader is pure, so tests can be dead simple.
    required variable, remove one, or change the meaning of an existing
    one? If yes, update every call site in the same commit.
 2. Update the frontmatter. Adding a new variable means adding it to
-   `requires` or `optional` — the loader will refuse to render until you
+   `requires` or `optional`. The loader refuses to render until you
    do.
 3. Update the body.
 4. Update or add smoke tests.
-5. Run typecheck + prompts tests.
+5. Run `npm run typecheck`, the prompts tests and `npm run lint:prompts` (it checks required and forbidden strings in `work.md`, `planning.md` and some `roles/*.md` files).
 
 ### Migrating a legacy ad-hoc prompt
 
@@ -566,8 +580,8 @@ migration path is:
 
 The typical commit layout is: template + loader call + tests + deletion
 of the old code, all in one PR. The loader's fail-loud validation makes
-it very hard to leave a half-migrated path in place — either the call
-site works or it throws.
+it very hard to leave a half-migrated path in place: either the call
+site works or it fails.
 
 ## Troubleshooting
 
@@ -579,7 +593,7 @@ Provided: ISSUE_ID, SOURCE_BRANCH, PROJECT_PATH, DO_PUSH, DO_BUILD, API_URL
 ```
 
 The call site isn't passing a variable the template declares as required.
-Fix the call site — don't "fix" the template by moving the variable to
+Fix the call site. Don't "fix" the template by moving the variable to
 `optional`, unless the template genuinely works with it absent.
 
 ### "was passed unknown variables"
@@ -615,18 +629,18 @@ Three likely causes:
    is `work.md`.
 2. **Missing build copy.** You edited or added a template but didn't run
    `npm run build`, so `dist/dashboard/prompts/` is stale. Rebuild.
-3. **Wrong working directory.** The dashboard server resolves prompts
-   relative to `dist/dashboard/` — if you're running a script from some
-   other location and it imports the loader, double-check that the
-   `prompts/` directory actually exists where the loader expects it.
+3. **No `prompts/` next to the bundle.** The loader resolves `prompts/`
+   relative to its own module directory (`__dirname`), not the working
+   directory. If a script bundles the loader somewhere else, check that a
+   `prompts/` directory sits next to that bundle.
 
-### A template renders the literal `{{VAR}}` instead of a value
+### A variable renders as an empty string
 
-Mustache left the variable in place because nothing in `vars` matched that
-name. The loader would normally throw an "unknown variables" error if the
-variable was passed but undeclared — if you're seeing literal braces in the
-output, the variable isn't being passed at all *and* the template doesn't
-list it in `requires`.
+Mustache renders a variable that isn't in `vars` as an empty string, with no
+error. The loader only rejects keys that are passed but undeclared, and
+required keys that are missing. It never scans the body, so a `{{VAR}}` that
+the frontmatter doesn't list renders empty when the call site doesn't pass
+it.
 
 Either add the variable to `requires` (to force the call site to provide
 it) or fix the call site to pass it.
@@ -635,18 +649,19 @@ it) or fix the call site to pass it.
 
 Check whether the value you're passing is actually falsy by Mustache's
 rules. Empty string: falsy. `0`: falsy. `false`: falsy. `null` /
-`undefined`: falsy. An empty array: falsy. An empty object: **truthy** —
+`undefined`: falsy. An empty array: falsy. An empty object: **truthy**, so
 the section will render. This trips people up when they pass
 `{ some: 'object' }` expecting the section to hide.
 
 If you want a section to hide on "nothing to say", pass an empty string,
 not an empty object.
 
+Still stuck? Ask on the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file a [GitHub Issue](https://github.com/eltmon/overdeck/issues).
+
 ## Further reading
 
-- **Implementation:** [`src/lib/cloister/prompts.ts`](https://github.com/eltmon/overdeck/blob/main/src/lib/cloister/prompts.ts) — the full loader (~180 lines).
-- **Templates:** [`src/lib/cloister/prompts/`](https://github.com/eltmon/overdeck/tree/main/src/lib/cloister/prompts) — the current catalogue.
-- **Tests:** [`src/lib/cloister/__tests__/prompts.test.ts`](https://github.com/eltmon/overdeck/blob/main/src/lib/cloister/__tests__/prompts.test.ts) — loader contract tests + live smoke tests.
-- **Build pipeline:** [`docs/BUILD.md`](https://github.com/eltmon/overdeck/blob/main/docs/BUILD.md#specialist-prompt-templates) — how templates are copied into the bundled dashboard.
-- **Specialist pipeline:** [`docs/SPECIALIST_WORKFLOW.md`](https://github.com/eltmon/overdeck/blob/main/docs/SPECIALIST_WORKFLOW.md) — where each template sits in the lifecycle (work → review → test → merge).
-- **Mustache.js:** [github.com/janl/mustache.js](https://github.com/janl/mustache.js) — canonical reference for section syntax, context fall-through, and the set of things we deliberately don't use.
+- **Implementation:** [`src/lib/cloister/prompts.ts`](https://github.com/eltmon/overdeck/blob/main/src/lib/cloister/prompts.ts): the full loader (~180 lines).
+- **Templates:** [`src/lib/cloister/prompts/`](https://github.com/eltmon/overdeck/tree/main/src/lib/cloister/prompts): the current catalogue.
+- **Tests:** [`src/lib/cloister/__tests__/prompts.test.ts`](https://github.com/eltmon/overdeck/blob/main/src/lib/cloister/__tests__/prompts.test.ts): loader contract tests + live smoke tests.
+- **Build pipeline:** [`docs/BUILD.md`](https://github.com/eltmon/overdeck/blob/main/docs/BUILD.md#specialist-prompt-templates): how templates are copied into the bundled dashboard.
+- **Mustache.js:** [github.com/janl/mustache.js](https://github.com/janl/mustache.js): canonical reference for section syntax, context fall-through, and the set of things we deliberately don't use.
