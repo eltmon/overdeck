@@ -152,6 +152,7 @@
               "configuration/skills",
               "configuration/memory",
               "configuration/appearance",
+              "configuration/voice",
               "configuration/issue-trackers",
               "configuration/polyrepo",
               "configuration/progressive-polyrepo",
