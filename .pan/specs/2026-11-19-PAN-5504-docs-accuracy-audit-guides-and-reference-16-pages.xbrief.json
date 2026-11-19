@@ -1,0 +1,2061 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-19T09:30:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5504: docs: accuracy audit, Guides and Reference (16 pages)",
+    "updated": "2026-11-19T07:13:31.751Z"
+  },
+  "plan": {
+    "id": "pan-5504",
+    "title": "docs: accuracy audit, Guides and Reference (16 pages)",
+    "status": "proposed",
+    "uid": "a393212b-dc80-4e80-8b30-16fd8eb07643",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-19T09:30:00Z",
+    "updated": "2026-11-19T07:13:31.751Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5504",
+        "label": "PAN-5504",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5504.md",
+        "label": "PRD draft",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "docs",
+      "audit",
+      "mintlify",
+      "guides",
+      "reference"
+    ],
+    "metadata": {
+      "sizeJustification": "Every item edits one Mintlify page under guides/ or reference/; the finalize lint counts each page as its own subsystem, so 18 pages read as 18 subsystems. The epic (#5467) scopes one audit issue per docs nav group, and the pages share one validation pass and one PR body, so splitting into sibling issues would duplicate the validator and PR-body work without adding review isolation. The plan touches exactly 18 files, under the 25-file limit.",
+      "canonicalFilename": "2026-11-19-PAN-5504-docs-accuracy-audit-guides-and-reference-16-pages.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The Guides and Reference docs pages contain wrong, stale and removed-feature claims (old Traefik layout, a prompt loader described as owning every prompt, a support list missing four harnesses, the deleted state layer and re-trigger service, a token report from May), en and em dashes, generic titles and one broken anchor. The feature inventory checked coverage, not accuracy.",
+      "Proposal": "The planning session audited 18 pages (the 17 in the two nav groups plus the Roadmap page template-conversations) against code on base 574a6be2c29 and wrote per-page change tables with grep anchors, replacement text and code evidence into .pan/drafts/PAN-5504.md (Appendices A to H). One item per page, three chained section items for each page over 600 lines, then one validation item that runs lint, the two tests that read these pages, mint validate and mint broken-links --check-anchors, and drafts the PR body with one note per page.",
+      "NonGoals": "- No code, test, rule, docs.json, CLAUDE.md, README.md or changelog.d change; code bugs become PR-body Follow-ups.\n- No page outside the 18 in scope (vision belongs to #5499).\n- No new pages, navigation changes, file renames or slug changes.\n- No heading renames or deletions except those listed in the PRD's NFR-2.\n- No screenshots added, replaced or recaptured and no image files deleted; only alt text changes and the ThemedImage removals listed in FR-8.\n- No help section added to pages without a troubleshooting or help section.\n- No web research; third-party claims stay unless repo code contradicts them.\n- No description of intended behavior as current.\n- reference/template-conversations.mdx must not drop its statement that pan bundle and pan template do not exist."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Audit 18 pages (the 17 in the Guides and Reference nav groups plus reference/template-conversations), not only the 16 listed",
+        "rationale": "The issue's scope sentence is every published page in the groups; guides/operating and reference/settings were added on 2026-11-18 and no sibling audit issue covers them; PAN-5501 to PAN-5503 made the same call."
+      },
+      {
+        "summary": "Audit god-view and template-conversations on top of the merged PAN-5472 and PAN-5482 results",
+        "rationale": "Both PRs merged and their commits are in each page's history."
+      },
+      {
+        "summary": "Add the Discord and GitHub Issues sentence only to pages with a troubleshooting or help section",
+        "rationale": "The issue asks for the links where a page talks about getting help; docker-setup, stitch-integration and prompts are the pages with such a section and no links."
+      },
+      {
+        "summary": "Delete ThemedImage blocks that show removed UI; keep old-brand images whose content matches; list recaptures as Follow-ups",
+        "rationale": "A screenshot of removed UI is a wrong claim; recapturing needs a live dashboard and is outside a text audit; matches PAN-5502 D5."
+      },
+      {
+        "summary": "Retitle harness-landscape, prompts, state-model and agents-directory with sidebarTitle keeping the old label",
+        "rationale": "The issue asks for specific searchable titles; the issue's rule supersedes an older PAN-5483 'keep' note for prompts."
+      },
+      {
+        "summary": "Rename the troubleshooting Vite heading to a slash-free form and link it from docker-setup",
+        "rationale": "The only broken anchor on main; a slash in a URL fragment is fragile across the local checker and the live site, and no other page links the old heading."
+      },
+      {
+        "summary": "Paraphrase UI and CLI strings that contain an em dash instead of quoting them",
+        "rationale": "The dash rule applies to the whole page; changing the code strings is out of scope and goes to Follow-ups."
+      },
+      {
+        "summary": "Keep the short pointer sections the research proposed (MCP lane and worker tools, legacy orientation, pack MCP servers, shipped-since table)",
+        "rationale": "The issue asks to add what a user needs, briefly, linking the owning page."
+      },
+      {
+        "summary": "Keep harness-landscape's third-party 'omp has no MCP' claim and skip rows 8 and 20",
+        "rationale": "Only one code comment suggests omp connects MCP servers; the PRD's rule keeps third-party claims unless repo code contradicts them, and confirming it is a Follow-up."
+      },
+      {
+        "summary": "Split troubleshooting, prompts and harness-landscape into three chained section items each",
+        "rationale": "Each page is over 600 lines with 22 to 47 rows; section items stay reviewable and blocks edges serialize shared-file edits."
+      }
+    ],
+    "items": [
+      {
+        "id": "troubleshooting-a",
+        "title": "troubleshooting.mdx (part A): stuck-PR recovery, pan PATH, Vite heading",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T09:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5504",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "reference/troubleshooting.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items on the same page are chained by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply Appendix A rows marked (A) plus planner row V1 to reference/troubleshooting.mdx, range frontmatter through '## Dev server dies with ENOSPC' (the line before '## Corrupted Workspaces'). Row 1 replaces the stale-check section body with block R1; V1 renames the Vite heading (D9). Remove dashes in this range only. Follow the PRD Common procedure in .pan/drafts/PAN-5504.md: apply every change-table row first (grep anchor with grep -n -F), then the residual rule, then remove every en/em dash in the range, the frontmatter rule, the link check and MDX safety. Never change code, images, docs.json or any other file. Commit with Item: troubleshooting-a, the AC trailers and a 'PR-note: reference/troubleshooting.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "troubleshooting-a.ac1",
+            "title": "The page no longer contains `poll clears the stale blocker within about 10 minutes`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "troubleshooting-a.ac2",
+            "title": "The page contains the heading `## Slow Vite and React Frontend with Multiple Workspaces` and no longer contains `## Slow Vite/React Frontend`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "troubleshooting-a.ac3",
+            "title": "The page preserves the heading `## WSL2 Stability Issues (Windows Users)` unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "troubleshooting-a.ac4",
+            "title": "The commit message contains a `PR-note: reference/troubleshooting.mdx:` line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "troubleshooting-b",
+        "title": "troubleshooting.mdx (part B): corrupted workspaces, disk low, HTTPS",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T09:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5504",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "reference/troubleshooting.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items on the same page are chained by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply Appendix A rows marked (B) to reference/troubleshooting.mdx, range '## Corrupted Workspaces' through '## Network Issues'. Rows 5 to 7 remove the dashboard corrupted-workspace warning and Clean & Recreate steps; row 10 paraphrases the disk-low message (D11); row 12 replaces the mkcert command. Remove dashes in this range only. Follow the PRD Common procedure in .pan/drafts/PAN-5504.md: apply every change-table row first (grep anchor with grep -n -F), then the residual rule, then remove every en/em dash in the range, the frontmatter rule, the link check and MDX safety. Never change code, images, docs.json or any other file. Commit with Item: troubleshooting-b, the AC trailers and a 'PR-note: reference/troubleshooting.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "troubleshooting-b.ac1",
+            "title": "The page no longer contains `Workspace Corrupted`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "troubleshooting-b.ac2",
+            "title": "The page contains `_wildcard.overdeck.localhost.pem` in the certificate regeneration command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "troubleshooting-b.ac3",
+            "title": "The page contains `(experimental: turn on Settings → Experimental → **Experimental features** to show it)` next to the Resources page mention",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "troubleshooting-b.ac4",
+            "title": "The commit message contains a `PR-note: reference/troubleshooting.mdx:` line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "troubleshooting-c",
+        "title": "troubleshooting.mdx (part C): agent issues, Health page, help sentence",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T09:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5504",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "reference/troubleshooting.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' reference/troubleshooting.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items on the same page are chained by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply Appendix A rows marked (C) to reference/troubleshooting.mdx, range '## Agent Issues' to the end, then run the page-wide dash, frontmatter and link checks. Rows 18 to 20 rewrite the Health text, label it experimental and delete its image block and the now-unused ThemedImage import; rows 23 to 25 put the help sentence under '### Resources'. Follow the PRD Common procedure in .pan/drafts/PAN-5504.md: apply every change-table row first (grep anchor with grep -n -F), then the residual rule, then remove every en/em dash in the range, the frontmatter rule, the link check and MDX safety. Never change code, images, docs.json or any other file. Commit with Item: troubleshooting-c, the AC trailers and a 'PR-note: reference/troubleshooting.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "troubleshooting-c.ac1",
+            "title": "The page no longer contains `jq .handoffCount` and contains `tmux -L overdeck send-keys`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "troubleshooting-c.ac2",
+            "title": "The page no longer contains `<ThemedImage` or `import { ThemedImage }`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "troubleshooting-c.ac3",
+            "title": "The page contains `Still stuck? Ask on the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P)` under `### Resources`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "troubleshooting-c.ac4",
+            "title": "The dash grep over the whole page prints 0 and the commit message contains a `PR-note: reference/troubleshooting.mdx:` line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "prompts-a",
+        "title": "prompts.mdx (part A): renderPrompt API, real callers, retitle",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T09:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5504",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "reference/prompts.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items on the same page are chained by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply Appendix B rows F1, F2 and 1 to 16 to reference/prompts.mdx, range frontmatter through 'Prompts directory resolution' (the line before '## Frontmatter contract'). Apply rows before the dash pass: some anchors contain em dashes. Apply the retitle F1 (Decision D8 makes it mandatory) with sidebarTitle \"Prompt Templates\". The link to #prompts-outside-this-loader is checked in prompts-c. Remove dashes in this range only. Follow the PRD Common procedure in .pan/drafts/PAN-5504.md: apply every change-table row first (grep anchor with grep -n -F), then the residual rule, then remove every en/em dash in the range, the frontmatter rule, the link check and MDX safety. Never change code, images, docs.json or any other file. Commit with Item: prompts-a, the AC trailers and a 'PR-note: reference/prompts.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "prompts-a.ac1",
+            "title": "The frontmatter contains `title: \"Prompt Templates and the renderPrompt Loader\"` and `sidebarTitle: \"Prompt Templates\"`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prompts-a.ac2",
+            "title": "The page no longer contains `clearPromptCache` or `### Cache invalidation`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prompts-a.ac3",
+            "title": "The page contains `Effect.Effect<string, PromptE` in the renderPrompt signature",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prompts-a.ac4",
+            "title": "The commit message contains a `PR-note: reference/prompts.mdx:` line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "prompts-b",
+        "title": "prompts.mdx (part B): frontmatter contract, template catalogue, prompts outside the loader",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T09:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5504",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "reference/prompts.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items on the same page are chained by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply Appendix B rows 18 to 29 to reference/prompts.mdx, range '## Frontmatter contract' through 'Orchestration markers'. Block R9 replaces the made-up work.md frontmatter, block R11 the template catalogue (eleven templates, work-deft.md and uat-agent.md included), and row 27 adds the '### Prompts outside this loader' subsection. Remove dashes in this range only. Follow the PRD Common procedure in .pan/drafts/PAN-5504.md: apply every change-table row first (grep anchor with grep -n -F), then the residual rule, then remove every en/em dash in the range, the frontmatter rule, the link check and MDX safety. Never change code, images, docs.json or any other file. Commit with Item: prompts-b, the AC trailers and a 'PR-note: reference/prompts.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "prompts-b.ac1",
+            "title": "The page no longer contains `  - XBRIEF_PATH` or `The ten templates currently under`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prompts-b.ac2",
+            "title": "The page contains the heading `### Prompts outside this loader` and the text `Prompt-Change:`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prompts-b.ac3",
+            "title": "The template catalogue contains `work-deft.md`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prompts-b.ac4",
+            "title": "The commit message contains a `PR-note: reference/prompts.mdx:` line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "prompts-c",
+        "title": "prompts.mdx (part C): composition example, tests, troubleshooting and help",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T09:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5504",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "reference/prompts.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' reference/prompts.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items on the same page are chained by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply Appendix B rows 30 to 46 to reference/prompts.mdx, range '## Composition pattern' to the end, then run the page-wide dash, frontmatter and link checks (including #prompts-outside-this-loader). Block R13 replaces the resume-work example, block R15 the false literal-{{VAR}} entry, block R16 adds the help sentence; row 45 deletes the broken SPECIALIST_WORKFLOW link. Follow the PRD Common procedure in .pan/drafts/PAN-5504.md: apply every change-table row first (grep anchor with grep -n -F), then the residual rule, then remove every en/em dash in the range, the frontmatter rule, the link check and MDX safety. Never change code, images, docs.json or any other file. Commit with Item: prompts-c, the AC trailers and a 'PR-note: reference/prompts.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "prompts-c.ac1",
+            "title": "The page no longer contains `build-test-prompt.test.ts` or `docs/SPECIALIST_WORKFLOW.md`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prompts-c.ac2",
+            "title": "The page contains the heading `### A variable renders as an empty string` and `Still stuck? Ask on the [Overdeck Discord]`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prompts-c.ac3",
+            "title": "Every `#prompts-outside-this-loader` link on the page resolves to the heading added in prompts-b",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prompts-c.ac4",
+            "title": "The dash grep over the whole page prints 0 and the commit message contains a `PR-note: reference/prompts.mdx:` line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "harness-landscape-a",
+        "title": "harness-landscape.mdx (part A): support list of all ten harnesses, retitle",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T09:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5504",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "reference/harness-landscape.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items on the same page are chained by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply Appendix C rows marked (A), including row 31, to reference/harness-landscape.mdx, range frontmatter through '## ACP-capable agents' (the line before '## Harness profiles'). Row 11 replaces the support table with all ten harnesses; SKIP row 8 (D10); rows 1 and 2 retitle (add sidebarTitle \"Harness Landscape\") and replace the description. Remove dashes in this range only. Follow the PRD Common procedure in .pan/drafts/PAN-5504.md: apply every change-table row first (grep anchor with grep -n -F), then the residual rule, then remove every en/em dash in the range, the frontmatter rule, the link check and MDX safety. Never change code, images, docs.json or any other file. Commit with Item: harness-landscape-a, the AC trailers and a 'PR-note: reference/harness-landscape.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "harness-landscape-a.ac1",
+            "title": "The frontmatter contains `title: \"Coding agent harness survey: skills, MCP and AGENTS.md\"` and `sidebarTitle: \"Harness Landscape\"`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harness-landscape-a.ac2",
+            "title": "The support table contains rows for `muse`, `prime-agent`, `opencode` and `grok`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harness-landscape-a.ac3",
+            "title": "The page no longer contains `runs in tmux and drives a workspace`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harness-landscape-a.ac4",
+            "title": "The commit message contains a `PR-note: reference/harness-landscape.mdx:` line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "harness-landscape-b",
+        "title": "harness-landscape.mdx (part B): harness profiles, pi default, Codex auth",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T09:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5504",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "reference/harness-landscape.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items on the same page are chained by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply Appendix C rows marked (B) to reference/harness-landscape.mdx, range '## Harness profiles' through the Grok Build profile (the line before '### Goose (Block)'). Row 16 changes the pi heading, rows 17, 21 and 22 fix the pi default and Codex host/auth claims, row 18 fixes the pi MCP line and row 19 the omp skills path; SKIP row 20 and block R5 (D10). Remove the 66 dash lines in this range. Follow the PRD Common procedure in .pan/drafts/PAN-5504.md: apply every change-table row first (grep anchor with grep -n -F), then the residual rule, then remove every en/em dash in the range, the frontmatter rule, the link check and MDX safety. Never change code, images, docs.json or any other file. Commit with Item: harness-landscape-b, the AC trailers and a 'PR-note: reference/harness-landscape.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "harness-landscape-b.ac1",
+            "title": "The page no longer contains `default for non-Anthropic, non-OpenAI providers`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harness-landscape-b.ac2",
+            "title": "The page no longer contains `Overdeck's CLIProxy already mints ChatGPT-subscription tokens` and contains `codex login`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harness-landscape-b.ac3",
+            "title": "The page no longer contains `tmux-driven`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harness-landscape-b.ac4",
+            "title": "The commit message contains a `PR-note: reference/harness-landscape.mdx:` line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "harness-landscape-c",
+        "title": "harness-landscape.mdx (part C): survey matrix, implications, See also",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T09:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5504",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "reference/harness-landscape.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' reference/harness-landscape.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items on the same page are chained by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply Appendix C rows marked (C) to reference/harness-landscape.mdx, range '### Goose (Block)' to the end, then run the page-wide dash, frontmatter and link checks. Row 26 replaces the matrix (Codex no longer a candidate), blocks R8 to R10 replace implications 1, 2 and 4 (R10's first line as written in PRD D10), row 30 drops 'the two supported harnesses'. Follow the PRD Common procedure in .pan/drafts/PAN-5504.md: apply every change-table row first (grep anchor with grep -n -F), then the residual rule, then remove every en/em dash in the range, the frontmatter rule, the link check and MDX safety. Never change code, images, docs.json or any other file. Commit with Item: harness-landscape-c, the AC trailers and a 'PR-note: reference/harness-landscape.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "harness-landscape-c.ac1",
+            "title": "The page no longer contains `Codex CLI is the highest-value next harness`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harness-landscape-c.ac2",
+            "title": "The page no longer contains `operational guide for the two`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harness-landscape-c.ac3",
+            "title": "The page contains `read Overdeck's skills at all` and `Overdeck's skills may not port cleanly`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harness-landscape-c.ac4",
+            "title": "The dash grep over the whole page prints 0 and the commit message contains a `PR-note: reference/harness-landscape.mdx:` line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-lanes",
+        "title": "lanes.mdx: --force, refusals, lane names, experimental label",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T09:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5504",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "reference/lanes.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' reference/lanes.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items on the same page are chained by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-5",
+            "FR-7",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply Appendix D, reference/lanes.mdx (16 rows, blocks R1 to R4). Keep the heading '## Lanes on other machines' unchanged (inbound links). Row 14 paraphrases the disk-low message (D11). Follow the PRD Common procedure in .pan/drafts/PAN-5504.md: apply every change-table row first (grep anchor with grep -n -F), then the residual rule, then remove every en/em dash in the range, the frontmatter rule, the link check and MDX safety. Never change code, images, docs.json or any other file. Commit with Item: audit-lanes, the AC trailers and a 'PR-note: reference/lanes.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "audit-lanes.ac1",
+            "title": "The synopsis contains `[--reuse] [--replace] [--force] [--no-wait] [--json]`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-lanes.ac2",
+            "title": "The page no longer contains `` that reported `done` is frozen. ``",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-lanes.ac3",
+            "title": "The page contains `verdict PASS` and the Agents page experimental label",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-lanes.ac4",
+            "title": "The heading `## Lanes on other machines` is preserved and the commit message contains a `PR-note: reference/lanes.mdx:` line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-workers",
+        "title": "workers.mdx: remote stand-ins, .swarm ignore, external transcripts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T09:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5504",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "reference/workers.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' reference/workers.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items on the same page are chained by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-5",
+            "FR-7",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply Appendix D, reference/workers.mdx (15 rows, blocks W1, W2). Keep the heading '## Externally spawned agents' unchanged (inbound links). Rows 4 and 5 state today's remote stand-in behavior (D4). Follow the PRD Common procedure in .pan/drafts/PAN-5504.md: apply every change-table row first (grep anchor with grep -n -F), then the residual rule, then remove every en/em dash in the range, the frontmatter rule, the link check and MDX safety. Never change code, images, docs.json or any other file. Commit with Item: audit-workers, the AC trailers and a 'PR-note: reference/workers.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "audit-workers.ac1",
+            "title": "The page no longer contains `` `.swarm/` is in the repository's `.gitignore` ``",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-workers.ac2",
+            "title": "The page contains `pan worker list` shows the stand-in without its issue or parent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-workers.ac3",
+            "title": "The page contains `only Claude Code and Codex transcripts` in the done-detection sentence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-workers.ac4",
+            "title": "The heading `## Externally spawned agents` is preserved and the commit message contains a `PR-note: reference/workers.mdx:` line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-architecture",
+        "title": "architecture.mdx: Effect server, real state.json, health monitoring today, .pan note",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T09:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "docs",
+          "issueLabel": "pan-5504",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "reference/architecture.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' reference/architecture.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items on the same page are chained by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-5",
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply Appendix E, reference/architecture.mdx (23 rows, blocks R1 to R9). Rows 3 and 13 delete the god-view and metrics ThemedImage blocks (FR-8); row 21 replaces the PRD Architecture section with block R7; row 11 replaces the Deacon pattern text with block R5. Follow the PRD Common procedure in .pan/drafts/PAN-5504.md: apply every change-table row first (grep anchor with grep -n -F), then the residual rule, then remove every en/em dash in the range, the frontmatter rule, the link check and MDX safety. Never change code, images, docs.json or any other file. Commit with Item: audit-architecture, the AC trailers and a 'PR-note: reference/architecture.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "audit-architecture.ac1",
+            "title": "The page no longer contains `## PRD Architecture` or `.planning/{issue}/`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-architecture.ac2",
+            "title": "The page no longer contains `god-view-light.png` or `metrics-light.png`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-architecture.ac3",
+            "title": "The page no longer contains `Overdeck implements the Deacon pattern for stuck agent detection:`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-architecture.ac4",
+            "title": "The page contains the Metrics experimental label and the commit message contains a `PR-note: reference/architecture.mdx:` line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-state-model",
+        "title": "state-model.mdx: database-only rows, workspace origin, retitle",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T09:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5504",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "reference/state-model.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' reference/state-model.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items on the same page are chained by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply Appendix E, reference/state-model.mdx (13 rows, block R1). Retitle to \"Overdeck state model: where state lives\" with sidebarTitle \"State Model\" and the new description from the appendix's Frontmatter list (D8). The slug stays (docs.json redirects /configuration/state-branch here). Follow the PRD Common procedure in .pan/drafts/PAN-5504.md: apply every change-table row first (grep anchor with grep -n -F), then the residual rule, then remove every en/em dash in the range, the frontmatter rule, the link check and MDX safety. Never change code, images, docs.json or any other file. Commit with Item: audit-state-model, the AC trailers and a 'PR-note: reference/state-model.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "audit-state-model.ac1",
+            "title": "The frontmatter contains `title: \"Overdeck state model: where state lives\"` and `sidebarTitle: \"State Model\"`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-state-model.ac2",
+            "title": "The page no longer contains `The database stores nothing that cannot be recomputed`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-state-model.ac3",
+            "title": "The page contains `pan admin migrate-plan-home`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-state-model.ac4",
+            "title": "The commit message contains a `PR-note: reference/state-model.mdx:` line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-god-view",
+        "title": "god-view.mdx: top bar list, orb hover, Escape closes the rail",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T09:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5504",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "reference/god-view.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' reference/god-view.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items on the same page are chained by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply Appendix E, reference/god-view.mdx (4 rows). Keep the existing experimental Note. The page has no image. Follow the PRD Common procedure in .pan/drafts/PAN-5504.md: apply every change-table row first (grep anchor with grep -n -F), then the residual rule, then remove every en/em dash in the range, the frontmatter rule, the link check and MDX safety. Never change code, images, docs.json or any other file. Commit with Item: audit-god-view, the AC trailers and a 'PR-note: reference/god-view.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "audit-god-view.ac1",
+            "title": "The page contains `**VEL** (stage transitions in the last hour)` and `The right sidebar holds the activity feed`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-god-view.ac2",
+            "title": "The Escape row of the Keyboard controls table contains the issue rail",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-god-view.ac3",
+            "title": "The commit message contains a `PR-note: reference/god-view.mdx:` line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-settings",
+        "title": "settings.mdx: where each setting is saved, Anywhere labels, help sentence",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T09:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5504",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "reference/settings.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' reference/settings.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items on the same page are chained by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply Appendix E, reference/settings.mdx (11 rows). Row 10 swaps in the standard help sentence; row 5 adds the AutoPreso experimental label. Follow the PRD Common procedure in .pan/drafts/PAN-5504.md: apply every change-table row first (grep anchor with grep -n -F), then the residual rule, then remove every en/em dash in the range, the frontmatter rule, the link check and MDX safety. Never change code, images, docs.json or any other file. Commit with Item: audit-settings, the AC trailers and a 'PR-note: reference/settings.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "audit-settings.ac1",
+            "title": "The page contains `access-tokens.json` in the Access Tokens row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-settings.ac2",
+            "title": "The page no longer contains `Not documented yet` and links `/features/desktop-app`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-settings.ac3",
+            "title": "The page contains `Still stuck? Ask on the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P)`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-settings.ac4",
+            "title": "The commit message contains a `PR-note: reference/settings.mdx:` line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-docker-setup",
+        "title": "docker-setup.mdx: current Traefik layout, workspace keys, Vite anchor fix",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T09:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "docs",
+          "issueLabel": "pan-5504",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "guides/docker-setup.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' guides/docker-setup.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items on the same page are chained by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-5",
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply Appendix F, guides/docker-setup.mdx (22 rows, blocks R1 to R11) but SKIP row 22 and apply planner row V2 instead (D9). Row 11 renames '### Via Dashboard' to '### With pan up'; row 21 adds the help sentence (block R11). Follow the PRD Common procedure in .pan/drafts/PAN-5504.md: apply every change-table row first (grep anchor with grep -n -F), then the residual rule, then remove every en/em dash in the range, the frontmatter rule, the link check and MDX safety. Never change code, images, docs.json or any other file. Commit with Item: audit-docker-setup, the AC trailers and a 'PR-note: guides/docker-setup.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "audit-docker-setup.ac1",
+            "title": "The page no longer contains `/certs/localhost-key.pem` or `traefik:v2.10`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-docker-setup.ac2",
+            "title": "The page contains `/reference/troubleshooting#slow-vite-and-react-frontend-with-multiple-workspaces` and no longer contains `#slow-vitereact-frontend`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-docker-setup.ac3",
+            "title": "The page contains the heading `### With pan up` and no longer contains `### Via Dashboard`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-docker-setup.ac4",
+            "title": "The page contains `Still stuck? Ask on the [Overdeck Discord]` and the commit message contains a `PR-note: guides/docker-setup.mdx:` line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-legacy-codebases",
+        "title": "legacy-codebases.mdx: where captured skills live, context file, orientation section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T09:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5504",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "guides/legacy-codebases.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' guides/legacy-codebases.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items on the same page are chained by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply Appendix F, guides/legacy-codebases.mdx (8 rows, blocks R12 to R14) including the new description (row 1, quoted). Follow the PRD Common procedure in .pan/drafts/PAN-5504.md: apply every change-table row first (grep anchor with grep -n -F), then the residual rule, then remove every en/em dash in the range, the frontmatter rule, the link check and MDX safety. Never change code, images, docs.json or any other file. Commit with Item: audit-legacy-codebases, the AC trailers and a 'PR-note: guides/legacy-codebases.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "audit-legacy-codebases.ac1",
+            "title": "The page no longer contains `# In ~/.claude/CLAUDE.md (developer's personal config)` and contains `~/.overdeck/context/global.md`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-legacy-codebases.ac2",
+            "title": "The page no longer contains `Works across your entire AI toolchain (Claude, Codex, Cursor, Gemini)`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-legacy-codebases.ac3",
+            "title": "The description contains `Teach agents your legacy codebase` and is 50 to 160 characters",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-legacy-codebases.ac4",
+            "title": "The commit message contains a `PR-note: guides/legacy-codebases.mdx:` line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-operating",
+        "title": "operating.mdx: reload vs restart auto-resume, emergency stop, Resources label",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T09:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5504",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "guides/operating.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' guides/operating.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items on the same page are chained by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply Appendix F, guides/operating.mdx (9 rows, block R15). Keep the existing '## Get help' links. Follow the PRD Common procedure in .pan/drafts/PAN-5504.md: apply every change-table row first (grep anchor with grep -n -F), then the residual rule, then remove every en/em dash in the range, the frontmatter rule, the link check and MDX safety. Never change code, images, docs.json or any other file. Commit with Item: audit-operating, the AC trailers and a 'PR-note: guides/operating.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "audit-operating.ac1",
+            "title": "The page no longer contains `Both commands keep the running dashboard's auto-resume setting`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-operating.ac2",
+            "title": "The page contains a link to `/cli/conversation-commands#pan-resume`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-operating.ac3",
+            "title": "The page contains the Resources experimental label next to the Open Resources button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-operating.ac4",
+            "title": "The commit message contains a `PR-note: guides/operating.mdx:` line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-skill-pack-authoring",
+        "title": "skill-pack-authoring.mdx: pack MCP servers, license order, LFS",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T09:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5504",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "guides/skill-pack-authoring.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' guides/skill-pack-authoring.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items on the same page are chained by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply Appendix G, guides/skill-pack-authoring.mdx (8 rows, blocks R1 to R4). Row 7 adds a '## MCP servers' section linking /configuration/mcp#pack-mcp-servers. Remove the 18 dash lines. Follow the PRD Common procedure in .pan/drafts/PAN-5504.md: apply every change-table row first (grep anchor with grep -n -F), then the residual rule, then remove every en/em dash in the range, the frontmatter rule, the link check and MDX safety. Never change code, images, docs.json or any other file. Commit with Item: audit-skill-pack-authoring, the AC trailers and a 'PR-note: guides/skill-pack-authoring.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "audit-skill-pack-authoring.ac1",
+            "title": "The page no longer contains `Overdeck mounts skill directories only. Nothing else in your repository`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-skill-pack-authoring.ac2",
+            "title": "The page contains the heading `## MCP servers` and a link to `/configuration/mcp#pack-mcp-servers`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-skill-pack-authoring.ac3",
+            "title": "The page contains `GNU license title`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-skill-pack-authoring.ac4",
+            "title": "The commit message contains a `PR-note: guides/skill-pack-authoring.mdx:` line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-stitch-integration",
+        "title": "stitch-integration.mdx: /stitch-setup, PRD draft instead of STATE.md, help",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T09:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5504",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "guides/stitch-integration.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' guides/stitch-integration.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items on the same page are chained by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply Appendix G, guides/stitch-integration.mdx (14 rows, blocks S1 to S3). Row 8 renames '## STATE.md Integration' to '## Recording designs in the PRD draft'; row 14 adds the help sentence (block S3). Follow the PRD Common procedure in .pan/drafts/PAN-5504.md: apply every change-table row first (grep anchor with grep -n -F), then the residual rule, then remove every en/em dash in the range, the frontmatter rule, the link check and MDX safety. Never change code, images, docs.json or any other file. Commit with Item: audit-stitch-integration, the AC trailers and a 'PR-note: guides/stitch-integration.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "audit-stitch-integration.ac1",
+            "title": "The page no longer contains `/pan-stitch` or `STATE.md`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-stitch-integration.ac2",
+            "title": "The page contains `/stitch-setup` and the heading `## Recording designs in the PRD draft`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-stitch-integration.ac3",
+            "title": "The page contains `Still stuck? Ask on the [Overdeck Discord]`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-stitch-integration.ac4",
+            "title": "The commit message contains a `PR-note: guides/stitch-integration.mdx:` line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-posthog-agents",
+        "title": "posthog-agents.mdx: source maps upload in the pack job, telemetry link",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T09:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5504",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "reference/posthog-agents.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' reference/posthog-agents.mdx | wc -l",
+            "npm run lint:docs",
+            "npx vitest run tests/unit/telemetry-docs.test.ts"
+          ],
+          "expected_outputs": [
+            "the dash grep prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0",
+            "telemetry-docs.test.ts passes"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items on the same page are chained by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply Appendix G, reference/posthog-agents.mdx (3 rows). Never delete or move the page (tests/unit/telemetry-docs.test.ts requires it). Follow the PRD Common procedure in .pan/drafts/PAN-5504.md: apply every change-table row first (grep anchor with grep -n -F), then the residual rule, then remove every en/em dash in the range, the frontmatter rule, the link check and MDX safety. Never change code, images, docs.json or any other file. Commit with Item: audit-posthog-agents, the AC trailers and a 'PR-note: reference/posthog-agents.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "audit-posthog-agents.ac1",
+            "title": "The page contains `Injection and upload run in the release workflow's` and no longer contains `built by the npm`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-posthog-agents.ac2",
+            "title": "The page contains a link to `/configuration/telemetry`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-posthog-agents.ac3",
+            "title": "`npx vitest run tests/unit/telemetry-docs.test.ts` passes and the commit message contains a `PR-note: reference/posthog-agents.mdx:` line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-template-conversations",
+        "title": "template-conversations.mdx: what has shipped since the proposal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T09:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5504",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "reference/template-conversations.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' reference/template-conversations.mdx | wc -l",
+            "npm run lint:docs",
+            "npx vitest run src/lib/__tests__/agent-text-cli-verbs.test.ts"
+          ],
+          "expected_outputs": [
+            "the dash grep prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0",
+            "agent-text-cli-verbs.test.ts passes"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items on the same page are chained by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-10",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply Appendix H, reference/template-conversations.mdx (21 rows, blocks R1 to R3). Row 5 renames the heading to '## Why this was proposed'. The page must keep saying pan bundle and pan template do not exist (FR-10). Remove the 36 dash lines. Follow the PRD Common procedure in .pan/drafts/PAN-5504.md: apply every change-table row first (grep anchor with grep -n -F), then the residual rule, then remove every en/em dash in the range, the frontmatter rule, the link check and MDX safety. Never change code, images, docs.json or any other file. Commit with Item: audit-template-conversations, the AC trailers and a 'PR-note: reference/template-conversations.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "audit-template-conversations.ac1",
+            "title": "The page contains the heading `## What has shipped since this proposal`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-template-conversations.ac2",
+            "title": "The page still contains `pan template` do **not** exist today and `npx vitest run src/lib/__tests__/agent-text-cli-verbs.test.ts` passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-template-conversations.ac3",
+            "title": "The page no longer contains `pan-workflow`, `rebase-and-submit` or `~60 skills`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-template-conversations.ac4",
+            "title": "The commit message contains a `PR-note: reference/template-conversations.mdx:` line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-agents-directory",
+        "title": "agents-directory.mdx: experimental wording, stuck definition, retitle",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T09:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5504",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "reference/agents-directory.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' reference/agents-directory.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items on the same page are chained by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply Appendix H, reference/agents-directory.mdx (6 rows). Retitle to \"Agents Page and Agents Directory\" with sidebarTitle \"Agents page\" (D8). Row 6 paraphrases the idle label that contains an em dash (D11). Follow the PRD Common procedure in .pan/drafts/PAN-5504.md: apply every change-table row first (grep anchor with grep -n -F), then the residual rule, then remove every en/em dash in the range, the frontmatter rule, the link check and MDX safety. Never change code, images, docs.json or any other file. Commit with Item: audit-agents-directory, the AC trailers and a 'PR-note: reference/agents-directory.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "audit-agents-directory.ac1",
+            "title": "The frontmatter contains `title: \"Agents Page and Agents Directory\"` and `sidebarTitle: \"Agents page\"`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-agents-directory.ac2",
+            "title": "The page contains `(experimental: turn on Settings → Experimental → **Experimental features**` at the first `/agents` mention",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-agents-directory.ac3",
+            "title": "The page contains `idle with unpushed commits for 20 minutes`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-agents-directory.ac4",
+            "title": "The commit message contains a `PR-note: reference/agents-directory.mdx:` line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-token-spend-report",
+        "title": "token-spend-report.mdx: current report source and figures, metrics section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T09:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5504",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "reference/token-spend-report.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' reference/token-spend-report.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items on the same page are chained by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply Appendix H, reference/token-spend-report.mdx (9 rows, blocks R1 to R6) and the new description. Row 5 replaces '## Beyond Cost: Runtime Metrics' and its image block with block R4 (FR-8). Follow the PRD Common procedure in .pan/drafts/PAN-5504.md: apply every change-table row first (grep anchor with grep -n -F), then the residual rule, then remove every en/em dash in the range, the frontmatter rule, the link check and MDX safety. Never change code, images, docs.json or any other file. Commit with Item: audit-token-spend-report, the AC trailers and a 'PR-note: reference/token-spend-report.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "audit-token-spend-report.ac1",
+            "title": "The page no longer contains `- **Total spend:** &#36;54,116` or `- **Last updated:** 2026-05-25`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-token-spend-report.ac2",
+            "title": "The page contains `~/.overdeck/costs/events.jsonl`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-token-spend-report.ac3",
+            "title": "The page no longer contains `metrics-light.png` and contains the Costs and Metrics experimental labels",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-token-spend-report.ac4",
+            "title": "The commit message contains a `PR-note: reference/token-spend-report.mdx:` line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "validate-and-pr-body",
+        "title": "Run the group validators and draft the per-page PR body",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T09:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5504",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "guides/operating.mdx",
+            "guides/legacy-codebases.mdx",
+            "guides/skill-pack-authoring.mdx",
+            "guides/stitch-integration.mdx",
+            "guides/docker-setup.mdx",
+            "reference/architecture.mdx",
+            "reference/settings.mdx",
+            "reference/god-view.mdx",
+            "reference/agents-directory.mdx",
+            "reference/workers.mdx",
+            "reference/lanes.mdx",
+            "reference/state-model.mdx",
+            "reference/harness-landscape.mdx",
+            "reference/posthog-agents.mdx",
+            "reference/template-conversations.mdx",
+            "reference/prompts.mdx",
+            "reference/troubleshooting.mdx",
+            "reference/token-spend-report.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "npx vitest run src/lib/__tests__/agent-text-cli-verbs.test.ts tests/unit/telemetry-docs.test.ts",
+            "npx -y mint@4.3.49 validate",
+            "npx -y mint@4.3.49 broken-links --check-anchors"
+          ],
+          "expected_outputs": [
+            "lint:docs prints 'docs lint passed' and exits 0",
+            "both vitest files pass",
+            "mint validate prints no error for a guides/ or reference/ page",
+            "broken-links lists no guides/ or reference/ file"
+          ],
+          "readiness": "sequential",
+          "parallelSafeReason": "Runs last (blocked by every page item); touches a page only to fix a validator failure.",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-9",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Run WI-Z1 in .pan/drafts/PAN-5504.md after every page item: the dash loop over the 18 pages, the frontmatter check, npm run lint:docs, the two vitest files, npx -y mint@4.3.49 validate and npx -y mint@4.3.49 broken-links --check-anchors; fix any failure in a guides/ or reference/ page in scope; then write the PR body draft (18 ticked page lines from the PR-note lines, validation output, Follow-ups from the PRD and every appendix) into this item's commit message above the trailers. Commit with Item: validate-and-pr-body."
+        },
+        "items": [
+          {
+            "id": "validate-and-pr-body.ac1",
+            "title": "The dash loop over all 18 pages prints no line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate-and-pr-body.ac2",
+            "title": "`npm run lint:docs` exits 0 and `npx -y mint@4.3.49 validate` prints no error for a guides/ or reference/ page",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate-and-pr-body.ac3",
+            "title": "`npx -y mint@4.3.49 broken-links --check-anchors` prints no broken link in a guides/ or reference/ page",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate-and-pr-body.ac4",
+            "title": "The validate-and-pr-body commit message contains 18 lines starting `- [x] ` naming a guides/ or reference/ page and a `## Follow-ups` section",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "troubleshooting-a",
+        "to": "troubleshooting-b",
+        "type": "blocks"
+      },
+      {
+        "from": "troubleshooting-b",
+        "to": "troubleshooting-c",
+        "type": "blocks"
+      },
+      {
+        "from": "troubleshooting-a",
+        "to": "troubleshooting-c",
+        "type": "blocks"
+      },
+      {
+        "from": "prompts-a",
+        "to": "prompts-b",
+        "type": "blocks"
+      },
+      {
+        "from": "prompts-b",
+        "to": "prompts-c",
+        "type": "blocks"
+      },
+      {
+        "from": "prompts-a",
+        "to": "prompts-c",
+        "type": "blocks"
+      },
+      {
+        "from": "harness-landscape-a",
+        "to": "harness-landscape-b",
+        "type": "blocks"
+      },
+      {
+        "from": "harness-landscape-b",
+        "to": "harness-landscape-c",
+        "type": "blocks"
+      },
+      {
+        "from": "harness-landscape-a",
+        "to": "harness-landscape-c",
+        "type": "blocks"
+      },
+      {
+        "from": "troubleshooting-a",
+        "to": "audit-docker-setup",
+        "type": "blocks"
+      },
+      {
+        "from": "troubleshooting-a",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "troubleshooting-b",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "troubleshooting-c",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "prompts-a",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "prompts-b",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "prompts-c",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "harness-landscape-a",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "harness-landscape-b",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "harness-landscape-c",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-lanes",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-workers",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-architecture",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-state-model",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-god-view",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-settings",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-docker-setup",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-legacy-codebases",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-operating",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-skill-pack-authoring",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-stitch-integration",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-posthog-agents",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-template-conversations",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-agents-directory",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-token-spend-report",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
