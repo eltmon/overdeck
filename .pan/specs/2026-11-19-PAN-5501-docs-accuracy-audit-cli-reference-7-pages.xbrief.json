@@ -4,17 +4,17 @@
     "created": "2026-11-19T00:59:57Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5501: docs: accuracy audit, CLI Reference (7 pages)",
-    "updated": "2026-11-19T01:04:54.905Z"
+    "updated": "2026-11-19T01:05:30.336Z"
   },
   "plan": {
     "id": "pan-5501",
     "title": "docs: accuracy audit, CLI Reference (7 pages)",
-    "status": "proposed",
+    "status": "running",
     "uid": "00209371-a9f1-4361-b7b2-b4abf3421a9b",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-19T00:59:57Z",
-    "updated": "2026-11-19T01:04:54.905Z",
+    "updated": "2026-11-19T01:05:30.336Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5501",
@@ -1289,5 +1289,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
