@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5504",
   "created": "2026-11-19T07:15:41.251Z",
-  "updated": "2026-11-19T07:36:20.811Z",
+  "updated": "2026-11-19T07:36:29.905Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -332,6 +332,11 @@
     "audit-settings.ac4": {
       "status": "completed",
       "doneAt": "2026-11-19T07:36:20.810Z"
+    },
+    "audit-docker-setup": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5504",
+      "claimedAt": "2026-11-19T07:36:29.905Z"
     }
   }
 }
