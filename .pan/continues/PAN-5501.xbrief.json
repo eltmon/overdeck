@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5501",
   "created": "2026-11-19T01:05:44.105Z",
-  "updated": "2026-11-19T01:15:14.860Z",
+  "updated": "2026-11-19T01:15:22.906Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -82,6 +82,11 @@
     "core-up-down.ac4": {
       "status": "completed",
       "doneAt": "2026-11-19T01:15:14.860Z"
+    },
+    "core-restart-to-restore": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5501",
+      "claimedAt": "2026-11-19T01:15:22.905Z"
     }
   }
 }
