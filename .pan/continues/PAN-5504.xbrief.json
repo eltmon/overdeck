@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-5504",
   "created": "2026-11-19T07:15:41.251Z",
-  "updated": "2026-11-19T07:48:59.577Z",
+  "updated": "2026-11-19T08:03:19.874Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-19T08:03Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-19T08:03:19.874Z"
+    }
+  ],
   "items": {
     "troubleshooting-a": {
       "status": "completed",
@@ -549,5 +555,14 @@
       "status": "completed",
       "doneAt": "2026-11-19T07:48:59.577Z"
     }
-  }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-19T08:03:19Z",
+      "markdownBody": "# CodeRabbit findings for PAN-5504 (PR #5584)\n\nCodeRabbit posted 8 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4625882776 · guides/legacy-codebases.mdx:130 [Minor]: Include the required memory fact id.\n  https://github.com/eltmon/overdeck/pull/5584#discussion_r4625882776\n- Thread 4625882789 · guides/operating.mdx:75 [Minor]: Documented backup ordering does not hold for legacy skill removal.\n  https://github.com/eltmon/overdeck/pull/5584#discussion_r4625882789\n- Thread 4625882799 · reference/prompts.mdx:161 [Minor]: Limit the `PromptError` guarantee to validated failures.\n  https://github.com/eltmon/overdeck/pull/5584#discussion_r4625882799\n- Thread 4625882807 · reference/prompts.mdx:646 [Minor]: Declare the variable before passing it from the caller.\n  https://github.com/eltmon/overdeck/pull/5584#discussion_r4625882807\n- Thread 4625882818 · reference/state-model.mdx:69 [Minor]: Add conversation triage state to the database-only exceptions.\n  https://github.com/eltmon/overdeck/pull/5584#discussion_r4625882818\n- Thread 4625882826 · reference/state-model.mdx:97 [Major]: The state reference claims a rebuild that the command does not perform.\n  https://github.com/eltmon/overdeck/pull/5584#discussion_r4625882826\n- Thread 4625882869 · reference/template-conversations.mdx:286 [Minor]: Scope the \"not sandboxed\" statement to Overdeck's container isolation.\n  https://github.com/eltmon/overdeck/pull/5584#discussion_r4625882869\n- Thread 4625882886 · reference/workers.mdx:69 [Minor]: Limit the `--cwd` restriction to remote placement.\n  https://github.com/eltmon/overdeck/pull/5584#discussion_r4625882886\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5584/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-5504 -m \"CodeRabbit <thread ids>: <what you changed>\"`.\n   If you only replied, you are done.\n5. If PR #5584 has already merged when you read this, stop: after the merge Overdeck files a follow-up issue\n   for every thread with no reply, no later commit to its file, and no re-review request naming its thread id."
+    }
+  ]
 }
