@@ -260,7 +260,7 @@ workspace row for a registered project, so older projects (imported before works
 identity too.
 
 Every call (hit, miss or error) is logged to
-`~/.overdeck/memory/<project>/<workspace>/rag-runs/<date>.jsonl`.
+`~/.overdeck/memory/<project>/<workspace>/rag-runs/<date>.jsonl`; see [Reading RAG decision logs](#reading-rag-decision-logs).
 
 ## Workspace observation memory
 
@@ -341,6 +341,39 @@ Provider and parse failures use these reasons:
 | `provider-non-interactive` (query expansion only) | The provider and its fallback are background providers such as `claude-cli`, so query expansion did not call them. | None needed. Make `anthropic` or `cliproxy` the first fallback if you want expanded queries. |
 
 `timeout` and `provider-non-interactive` appear in the logs below, not in `health.json`. `health.json` also records failures in later pipeline stages, such as `write-failed` or `rollup-failed`.
+
+### Reading RAG decision logs
+
+Every prompt-time memory attempt, hit or miss, is logged to `~/.overdeck/memory/<project>/<workspaceId>/rag-runs/<date>.jsonl`, one JSON object per line. Two line types appear:
+
+- **`query-expansion`**: one per expansion attempt, with `outcome` (`expanded`, `cache-hit` or `expansion-failed`), the expanded `query` and `expandedTerms`, and `reason` (one of the reasons above, or `null` on success). No line is written while query expansion is turned off.
+- **`rag-decision`**: one per injection attempt: whether anything was injected, and why not.
+
+An annotated `rag-decision` line, trimmed to the fields that explain a decision:
+
+```json
+{
+  "id": "8f2c1e4a-...",
+  "type": "rag-decision",
+  "outcome": "injected",           // injected | skipped | no-hits | expansion-failed | context-too-large | budget-truncated
+  "reason": "provider-auth-failed", // see the rules below
+  "query": "verification gate block review findings", // the keyword query actually searched, not the raw prompt
+  "hitCounts": { "status": 1, "observations": 2, "summaries": 0, "sibling": 1, "knowledgeIndex": 0, "facts": 0 },
+  "expansion": { "status": "fallback", "reason": "provider-auth-failed", "cacheKey": "..." }
+}
+```
+
+This example is a failed expansion (`expansion.status: "fallback"`) that still injected memory (`hitCounts.observations: 2`). When expansion fails, prompt-time retrieval searches a keyword query built from the prompt (stopwords and short words removed) and matches any of its words, so it still finds observations that share words with the prompt.
+
+`reason` depends on `outcome`:
+
+| `outcome` | `reason` |
+| --- | --- |
+| `injected` | The expansion's reason, or `null` when expansion succeeded. |
+| `skipped` | `prompt-time-injection-disabled` |
+| `no-hits`, `expansion-failed` | The expansion's reason, else `no-memory-hits`. |
+| `context-too-large` | `memory-context-exceeds-token-budget` |
+| `budget-truncated` | `memory-context-truncated-to-budget` |
 
 ## Previewing
 
