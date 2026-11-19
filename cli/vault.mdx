@@ -1,5 +1,6 @@
 ---
-title: pan vault
+title: "pan vault: back up and resume agent conversations across machines"
+sidebarTitle: pan vault
 description: "Session Vault commands: encrypted off-machine storage and cross-machine resume for agent conversations"
 ---
 
@@ -27,6 +28,8 @@ may also be `dir:<path>` for a local directory or NAS mount.
 | `--generate-passphrase` | Also enable passphrase unlock with a generated 6-word passphrase, printed once. |
 | `--no-passphrase` | Do not offer passphrase unlock. |
 
+`--passphrase-file` and `--generate-passphrase` cannot be combined.
+
 ## join
 
 ```bash
@@ -40,6 +43,8 @@ phrase.
 | --- | --- |
 | `--phrase-file <path>` | Read the 24-word recovery phrase from a file instead of prompting. |
 | `--passphrase-file <path>` | Read the vault passphrase from a file instead of prompting. |
+
+`--phrase-file` and `--passphrase-file` cannot be combined.
 
 ## passphrase set
 
@@ -74,9 +79,11 @@ chunks readable, print a new recovery phrase.
 | Flag | Effect |
 | --- | --- |
 | `--yes` | Rotate without the confirmation prompt. |
-| `--passphrase-file <path>` | Re-wrap passphrase unlock under the new key with the passphrase in this file. |
-| `--generate-passphrase` | Re-wrap passphrase unlock under the new key with a generated 6-word passphrase, printed once. |
+| `--passphrase-file <path>` | Re-wrap passphrase unlock under the new key with the passphrase in this file. Also turns passphrase unlock on if it was off. |
+| `--generate-passphrase` | Re-wrap passphrase unlock under the new key with a generated 6-word passphrase, printed once. Also turns passphrase unlock on if it was off. |
 | `--no-passphrase` | Turn passphrase unlock off. |
+
+Only one of `--passphrase-file`, `--generate-passphrase` and `--no-passphrase` may be given.
 
 ## status
 
@@ -84,7 +91,8 @@ chunks readable, print a new recovery phrase.
 pan vault status
 ```
 
-Show backend, this machine, owned records, last sync and the machine list.
+Show the backend, when the key was last rotated, this machine, owned and listed records,
+last sync, whether eviction is on, and the machine list.
 
 | Flag | Effect |
 | --- | --- |
@@ -100,9 +108,9 @@ Settle one transcript (by session id or path) or many into the vault.
 
 | Flag | Effect |
 | --- | --- |
-| `--all` | Settle every discovered transcript. |
+| `--all` | Save every Claude Code transcript under `~/.claude/projects` and every Codex transcript under `~/.codex/sessions`. |
 | `--since <date>` | With `--all`: only transcripts modified on or after this date. |
-| `--harness <harness>` | With `--all`: only this harness (`claude-code`, `codex`, ...). |
+| `--harness <harness>` | With `--all`: only this harness, `claude-code` or `codex`. |
 | `--hook` | Claude Code Stop-hook mode: read `{session_id, transcript_path}` JSON from stdin, print nothing, exit 0. |
 
 ## sync
@@ -162,8 +170,9 @@ forks at that version instead of the latest.
 pan vault exclude [path]
 ```
 
-Exclude conversations by cwd path, git origin or session id. An excluded saved record
-becomes a tombstone.
+Exclude conversations by cwd path, git origin or session id. With `--session`, the
+conversation's saved record becomes a tombstone; a path or origin exclusion stops future
+saves only.
 
 | Flag | Effect |
 | --- | --- |
@@ -227,6 +236,16 @@ Rebuild an evicted transcript byte for byte at its original path.
 
 ## In the dashboard
 
-Settings → Session Vault and **Continue here** are in the next release (v0.65.0). Setting
-up, joining and unlocking the vault from the dashboard is planned:
-[PAN-4446](https://github.com/eltmon/overdeck/issues/4446).
+Settings → Session Vault sets up, joins and unlocks a vault, runs **Sync now**, lists the
+machines and reviews transcripts waiting for deletion. A conversation's ⋮ menu has
+**Continue on another device**, and a read-only copy from another machine has
+**Continue here**. See [Session Vault](/configuration/session-vault#from-the-dashboard).
+
+## Get help
+
+`Session Vault is off. Run: pan vault setup <git-url>` means no vault is configured yet.
+`Session Vault backend is set to <backend> but the key file is missing. Run: pan vault join
+<backend>` means this machine never joined, or lost its key file.
+
+Still stuck? Ask on the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file a
+[GitHub Issue](https://github.com/eltmon/overdeck/issues).
