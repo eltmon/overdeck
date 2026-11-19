@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5504",
   "created": "2026-11-19T07:15:41.251Z",
-  "updated": "2026-11-19T07:35:10.715Z",
+  "updated": "2026-11-19T07:35:15.227Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -310,6 +310,11 @@
     "audit-god-view.ac3": {
       "status": "completed",
       "doneAt": "2026-11-19T07:35:10.714Z"
+    },
+    "audit-settings": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5504",
+      "claimedAt": "2026-11-19T07:35:15.227Z"
     }
   }
 }
