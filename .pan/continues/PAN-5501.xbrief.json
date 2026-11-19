@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5501",
   "created": "2026-11-19T01:05:44.105Z",
-  "updated": "2026-11-19T01:20:46.343Z",
+  "updated": "2026-11-19T01:20:55.294Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -158,6 +158,11 @@
     "agent-start-to-tell.ac4": {
       "status": "completed",
       "doneAt": "2026-11-19T01:20:46.343Z"
+    },
+    "agent-pause-to-end": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5501",
+      "claimedAt": "2026-11-19T01:20:55.294Z"
     }
   }
 }
