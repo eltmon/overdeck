@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5500",
   "created": "2026-11-19T03:34:33.510Z",
-  "updated": "2026-11-19T03:41:15.584Z",
+  "updated": "2026-11-19T03:41:22.454Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -78,6 +78,11 @@
     "anywhere-reasoning-and-page.ac4": {
       "status": "completed",
       "doneAt": "2026-11-19T03:41:15.584Z"
+    },
+    "audit-account": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5500",
+      "claimedAt": "2026-11-19T03:41:22.454Z"
     }
   }
 }
