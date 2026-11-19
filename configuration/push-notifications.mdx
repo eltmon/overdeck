@@ -1,5 +1,6 @@
 ---
-title: "Push notifications"
+title: "Push notifications: get alerted when an agent needs you"
+sidebarTitle: "Push notifications"
 description: "Get a phone notification when an agent or conversation needs you, sent by your own machine with end-to-end encrypted Web Push and an optional ntfy topic"
 ---
 
@@ -19,11 +20,13 @@ A notification for four kinds of item:
 | **Question** | An agent or conversation asks an AskUserQuestion, or a `pan ask` decision is waiting for you. |
 | **Approval needed** | A plan waits for approval, or a permission prompt waits in an agent or conversation. |
 | **Finished** | A work agent ran `pan done` (verification started), or an issue merged. |
-| **Failed** | An agent stopped responding, a merge failed, a stalled review escalated, a conflict repair escalated, or free disk space dropped below the alert or critical level (PAN-5093). An agent that ended normally, such as a planning agent after its plan is finalized, does not notify. |
+| **Failed** | An agent stopped responding, a merge failed, a stalled review escalated, a conflict repair escalated, or free disk space dropped below the alert level (5 GiB by default, `resources.disk_warn_gb`) or the critical level (2 GiB by default, `resources.disk_critical_gb`). An agent that ended normally, such as a planning agent after its plan is finalized, does not notify. |
 
 Each item notifies once, when it first appears. When you answer it and a new
 question arrives later, that new question notifies again. A dashboard restart
-does not replay questions that were already waiting.
+does not replay questions or plan approvals that were already waiting a minute
+before it started. An agent's permission prompt has no start time, so a
+restart notifies it again.
 
 The default notification says what kind of item it is and where it is, for
 example `Question · Refactor the billing module` with the body `Tap to answer.`
@@ -63,9 +66,13 @@ A subscription to any other address is refused.
 
 ## Set up your phone
 
+This covers the browser phone view. If you use the Overdeck app instead, see
+[Phone](/configuration/phone#overdeck-app).
+
 1. **Reach the dashboard over HTTPS.** Browsers allow push only on a secure
-   page. `http://localhost` counts, but a phone needs HTTPS. Until the
-   **Set up Tailscale** action ships, run this on the machine:
+   page. `http://localhost` counts, but a phone needs HTTPS. Select
+   **Set up Tailscale** in Settings → Anywhere, or run `pan tailscale setup`.
+   To do it by hand, run this on the machine:
 
    ```bash
    tailscale serve --bg 3011
@@ -74,20 +81,24 @@ A subscription to any other address is refused.
    Then open the `https://<machine>.<tailnet>.ts.net` address on the phone. See
    [Remote access](/configuration/remote-access) for how other devices reach the
    dashboard.
-2. **Pair the phone.** Run `pan pair` and open the link on the phone, or use
-   **Pair a device** in Settings → Anywhere. See [`pan pair`](/cli/pair).
-3. **On iPhone, install the app first.** Safari offers push only to a Home
-   Screen web app (iOS 16.4 or later). Tap **Share → Add to Home Screen**, then
-   open Overdeck from the new icon.
-4. **Turn it on.** Open Settings → Anywhere → **Phone notifications** and tap
+2. **Pair the phone.** On the machine, open Settings → Anywhere → **Set up a
+   phone** → **Browser on the phone** and follow its steps; see
+   [Phone](/configuration/phone). On iPhone, add the app to the Home Screen
+   first (Safari offers push only to a Home Screen web app, iOS 16.4 or later)
+   and pair inside the installed app, because it cannot use a pairing made in
+   Safari. You can also run `pan pair` and open its link; see
+   [`pan pair`](/cli/pair).
+3. **Turn it on.** Open Settings → Anywhere → **Phone notifications** and tap
    **Turn on notifications**, then allow notifications when the browser asks.
-   Once the phone shell at `/m` ships, the same control is in its header.
-5. **Send a test.** Tap **Send test**. The phone should show
+   In the browser phone view (`/m`), the same control is in the banner below
+   the header and in Settings (the gear in the header).
+4. **Send a test.** Tap **Send test**. The phone should show
    `Overdeck test notification` within a few seconds.
 
 ## Configuration
 
-Push is on by default; subscribing a device is the opt-in. Every key is
+Push is on by default; subscribing a device is the opt-in. The block goes in
+`~/.overdeck/config.yaml`. Every key is
 optional. This is the full block with its defaults (the `ntfy` part is an
 example; it is off unless you set it):
 
@@ -107,9 +118,9 @@ push:
 
 | Key | Default | Effect |
 | --- | --- | --- |
-| `enabled` | `true` | `false` stops every push and the conversation scan. |
+| `enabled` | `true` | `false` stops every push except **Send test**, and stops the conversation scan. |
 | `events` | all four | Which kinds notify. Unknown entries are ignored. |
-| `includePreview` | `false` | Adds the first question text (or the plan's first line), cut to 140 characters, to Web Push notifications. Never sent to ntfy. |
+| `includePreview` | `false` | Adds the first question text (or the plan's first line), cut to 140 characters, to Web Push and Overdeck app notifications. Never sent to ntfy. |
 | `webpush.subject` | `https://overdeck.ai` | The VAPID contact URL. Apple rejects values that are not `https:` or `mailto:`. |
 | `ntfy.*` | off | See below. |
 
@@ -161,7 +172,7 @@ In the app's Settings, below the Notifications switch:
 
 Your machine applies pause and the muted types before sealing a notification,
 so a filtered notification never reaches connect.overdeck.ai, Apple or Google
-at all — it is simply not sent. **Send test** always arrives, pause or no
+at all: it is simply not sent. **Send test** always arrives, pause or no
 pause, because it is your own check that the pipe works.
 
 A machine only applies settings it has received: it must run a version that
@@ -208,7 +219,7 @@ else: no titles, no conversation text, no machine names.
   metadata, such as this phone's registration token, the message priority and
   when it was sent.
 - **When a notification cannot be opened**, the phone shows
-  "Overdeck — Something needs you" instead.
+  "Overdeck · Something needs you" instead.
 - **Tapping a notification** opens the machine and the screen it came from. A
   notification from a machine this phone is no longer paired with opens the
   machine list. A notification tapped while signed out waits until you sign in.
@@ -228,16 +239,19 @@ else: no titles, no conversation text, no machine names.
 Overdeck can publish to an ntfy topic as well as, or instead of, Web Push.
 
 An ntfy server sees what you publish in plain text, so Overdeck sends it
-**titles only**: the kind plus the issue id, or the words `a conversation`.
+**titles only**: the kind plus the issue id, or the words `a conversation`. A
+low-disk alert sends its own title, such as `Disk low · 3.2 GiB free`.
 Conversation titles, question text and previews never reach ntfy.
 
 - **Treat the topic name as a secret.** Anyone who knows it can subscribe to
   it. Use an unguessable topic, such as `deck-` followed by 16 or more random
-  characters.
+  characters. The topic must match `^[A-Za-z0-9_-]{1,64}$`; anything else shows
+  "topic must match ..." in the panel.
 - **Use a publish token** (`token`) so nobody else can post to your topic.
 - **Prefer a self-hosted server**, so the titles never leave your network.
 - Set `clickBaseUrl` to the HTTPS address of your dashboard if tapping the
-  ntfy notification should open it.
+  ntfy notification should open it. `url` must be an `http:` or `https:`
+  address.
 
 ## Privacy
 
@@ -286,12 +300,14 @@ that linked machine's list, so open that machine to see its items.
 **There is no Turn on notifications button.** The panel explains why in its
 place:
 
-- *Open this dashboard over HTTPS* — the page is not a secure context. Use the
+- *Open this dashboard over HTTPS*: the page is not a secure context. Use the
   Tailscale Serve address, or `http://localhost` on the machine itself.
-- *On iPhone, add Overdeck to your Home Screen* — Safari tabs cannot receive
+- *On iPhone, add Overdeck to your Home Screen*: Safari tabs cannot receive
   push. Install the app and open it from the Home Screen icon.
-- *Notifications are blocked for this site* — allow notifications for the
+- *Notifications are blocked for this site*: allow notifications for the
   dashboard's address in the browser's site settings.
+- *This browser cannot receive push notifications*: the browser has no
+  service worker or Push API support (outside iPhone).
 
 **The test sends, but nothing arrives.** Check the phone's notification
 settings for the browser or the installed app, and turn off Focus or Do Not
@@ -301,6 +317,11 @@ Disturb. On Android, check that battery saving does not restrict the browser.
 `410`, the subscription has expired or the browser removed it, so Overdeck
 deletes it. Tap **Turn on notifications** on that device again.
 
-**Notifications stopped after many failures.** The panel shows a failure count
-for each device. Other `4xx` answers count as failures; a successful send
-clears the count.
+**A device shows failures.** The panel shows a failure count
+for each device. Other `4xx` answers and network errors count as failures.
+Overdeck keeps sending to the device, and a successful send clears the count.
+If the count keeps growing, select **Remove** and tap **Turn on notifications**
+on that device again.
+
+Still stuck? Ask in the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or open a
+[GitHub issue](https://github.com/eltmon/overdeck/issues).
