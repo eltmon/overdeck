@@ -1,27 +1,27 @@
 ---
-title: UAT Batch Trains
-description: Always one tested batch of every ready feature, ready to merge in one click
+title: "Merge train: batch CI and UAT batches for ready pull requests"
+sidebarTitle: "UAT Batch Trains"
+description: "How the merge train batches ready PRs: batch CI, UAT batches you test and merge, the Auto and Hold policy, and the merge train card."
 ---
 
 # UAT Batch Trains
 
 When agents land merge-ready features faster than you can review and merge them
 one at a time, the bottleneck becomes the last-mile UAT. **UAT batch trains** fix
-that: Overdeck keeps **one assembled, testable batch of every ready feature**
-available at all times, so you can exercise the combined result and then land
-exactly what you tested — in a single click.
+that: Overdeck assembles ready features into **one testable batch**, so you can
+exercise the combined result and then land exactly what you tested in one
+merge.
 
 <Note>
 Batches run only while the **Merge train** switch on the [Flywheel](/features/flywheel) page header
-(`merge_train_enabled`) is on. With it on, normal-priority PRs in a project that
+(`merge_train_enabled`, off by default) is on. With it on, normal-priority PRs in a GitHub single-repo project that
 does not hold for UAT merge together automatically once the batch's own CI run
 is green: when `batch_size` PRs are ready (default 3) or the oldest has waited
 `batch_wait_minutes` (default 30; both in **Settings → Merge Train**).
 High-priority PRs (strikes, `critical`, `blocks-main`, `P0`, `urgent`, or
 `substrate-improvement` plus `bug`) merge on their own. A PR only you may merge
 (held for UAT, an auto-merge you cancelled, or a Deft human-merge policy) waits
-in its own batch for you. With the switch off, every ready PR merges on its own
-and nothing batches.
+in its own batch for you. With the switch off, nothing batches: every ready PR that is not held for UAT merges on its own five minutes after it is ready, and a held one waits for you to merge it from the issue page. GitLab and polyrepo projects never merge automatically: their batches wait for you to merge them, and with the switch off you merge each PR yourself.
 
 Automatic batches need batch CI: a GitHub Actions workflow named `CI` that runs
 on pushes to `uat/**` branches. Without it, a batch waits at most 10 minutes for
@@ -33,13 +33,13 @@ See [CI integrations](/integrations/ci#merge-train-batches-need-a-ci-workflow) f
 ## What you see
 
 The merge train shows as one card per project: on the Flywheel page rail (all
-projects, with filter chips) and on each project's Home (that project only).
+projects, with filter chips), on the Awaiting Merge page (all projects, under a global **Merge train** switch), and on each project's Home (that project only).
 Each card has:
 
 - **A mode chip and a Train switch.** **Auto-merge** projects merge ready work
   on their own; **Holds for UAT** projects wait for you to test and merge a
   batch. The switch turns the train off for that project. When the train is
-  off, a banner says no batches assemble and each ready PR merges on its own
+  off, a banner says no batches assemble. In a Holds for UAT project held features then wait until the train is on again; in an Auto-merge project each ready PR merges on its own
   after the cooldown.
 - **The current batch**, when there is one. It names its members and any
   held-out features with the reason, offers **Open UAT** (a live stack serving
@@ -76,29 +76,32 @@ Each card has:
 
 ## How it works
 
-1. **Assemble.** A 60-second reconciler builds a generation — a throwaway
-   `uat/<label>-<codename>-<MMDD>` branch off `main` — merging each ready feature
+1. **Assemble.** A 60-second reconciler builds a generation (a throwaway
+   `uat/<label>-<codename>-<MMDD>` branch off `main`), merging each ready feature
    in order. When two features conflict, a timeboxed assembly agent resolves the
    conflict *inside the batch*; if it can't, that feature is held out (never the
    whole batch).
 2. **Accumulate.** New ready features trigger a new, larger generation in the
-   background. Generations accumulate — you can test and promote an earlier,
+   background. Generations accumulate, so you can test and promote an earlier,
    smaller batch if the newest isn't what you want.
-3. **Test.** Click **Open UAT frontend** to exercise the combined branch on a
+3. **Test.** Click **Open UAT** (**Start & open** when its stack is not running) to exercise the combined branch on a
    real running stack. The checklist pulls each feature's acceptance criteria,
    plus an explicit "verify the touchpoint" item wherever a conflict was resolved.
-4. **Promote.** **Merge batch (N) to main** lands exactly the tree you tested —
-   conflict resolutions included — in one merge. Each feature then closes out
+4. **Promote.** **Merge batch (N) to main** lands exactly the tree you tested,
+   conflict resolutions included, in one merge. Each feature then closes out
    through the normal post-merge flow.
 
-Unless the ready feature is held for UAT, a batch assembles only when **two or
-more** features are ready. With exactly one, the page reads "1 feature ready —
-merges directly; batches assemble when 2+ are ready": a one-member batch is the
-PR branch itself and its CI run a duplicate, so that feature merges on its own
-(Merge button or `gh pr merge`). A feature held for UAT (its issue's
-`hold-for-uat` label, else the project's `auto_merge_default: hold`, else the
-global require-UAT setting when the project sets no default) keeps a batch when
-it is the only one ready, because that batch is the stack you test on.
+Outside the batch window, a batch assembles only when **two or more** features
+are ready, unless the one ready feature is held for UAT. With exactly one
+unheld feature ready, it merges on its own (Merge button or `gh pr merge`): a
+one-member batch is the PR branch itself and its CI run a duplicate. A feature
+held for UAT (its issue's `hold-for-uat` label, else the project's
+`auto_merge_default: hold`, else the global **Require UAT** switch on the
+Flywheel page header, which is on by default) keeps a batch when it is the
+only one ready, because that batch is the stack you test on. The batch window
+applies in a GitHub single-repo project that does not hold for UAT: there a
+batch, even of one PR, assembles once its oldest PR has waited
+`batch_wait_minutes`.
 
 **Each ready feature has one merge path.** Overdeck decides it with one rule,
 first match wins:
@@ -107,7 +110,7 @@ first match wins:
    default, else the global setting) waits for a batch you test and merge.
    A hold always wins, even over priority. In a project that holds for UAT,
    that is every feature, so nothing reaches `main` until you merge a batch.
-2. With the merge train off, every other feature merges on its own, five
+2. With the merge train off, every other feature merges on its own (GitHub single-repo projects only), five
    minutes after it is ready.
 3. A high-priority PR (a strike, or `critical`, `blocks-main`, `P0`, `urgent`,
    or `substrate-improvement` plus `bug`) merges on its own.
@@ -136,9 +139,11 @@ count toward that limit, so the train recovers once the cause is fixed.
 
 ## Projects that span several repos
 
-A polyrepo project — one where a single issue's work lands across several member
-repositories — gets batch trains too, on the same terms as a single-repo
-project. There is no separate setting: the merge-train flag is the only gate.
+A polyrepo project, one where a single issue's work lands across several member
+repositories, gets batch trains too. There is no separate setting: the
+merge-train flag is the only gate. Polyrepo batches never merge on their own:
+there is no batch window, no automatic batch merge and no per-PR auto-merge, so
+each batch waits for you to test and merge it.
 
 A feature is ready there when **every** pull or merge request it has open
 across the member repos is approved, has green checks and can merge. Each
@@ -153,7 +158,7 @@ actually touches**. Repos no feature touches are left alone entirely. The batch
 still behaves as one unit:
 
 - **A feature that conflicts anywhere is held out everywhere.** You never test a
-  feature that landed in the API repo but not the frontend one — if it can't be
+  feature that landed in the API repo but not the frontend one: if it can't be
   merged cleanly in every repo it contributes to, it waits for the next batch.
 - **Merging is all-or-nothing.** Overdeck first merges every repo locally,
   without publishing anything. Only once all of them succeed does it push. If
@@ -164,20 +169,20 @@ still behaves as one unit:
   pending, and never rewrites a repo's `main` to undo one. Clicking merge again
   skips what already landed and finishes the rest.
 
-The live UAT stack works the same way as for a single-repo project — one stack
+The live UAT stack works the same way as for a single-repo project: one stack
 per batch, serving all of its repos together.
 
 ## Live UAT stacks
 
 Each generation can serve a live dashboard at
-`uat-<codename>.overdeck.localhost`, spun on demand from the batch's worktree.
+`uat-<label>-<codename>-<mmdd>.overdeck.localhost`, spun on demand from the batch's worktree.
 Overdeck runs **at most two UAT stacks at once** (Docker's network pool is
 limited) and tears down the oldest when you start a third; promoting or
 invalidating a batch always tears its stack down.
 
 ## Honest controls
 
-Every action names its exact effect and confirms before anything happens —
+Every action names its exact effect and confirms before anything happens.
 "Merge batch (3) to main" lists the three issues and states that it lands the
 tree you tested. **Merge alone…** on a batch member merges that one feature
 now, which voids the batch; the confirmation names the batch, and its other
