@@ -3,36 +3,30 @@ title: Workspace Commands
 description: "Commands that create, list and destroy Overdeck workspaces, the per-issue git worktrees where agents do their work."
 ---
 
-import { ThemedImage } from "/snippets/themed-image.mdx";
-
 Create and manage isolated workspaces for agent work.
 
 ## Overview
 
 **Workspaces are git worktrees** - isolated working directories for each issue/feature. Each workspace:
-- Has its own feature branch (e.g., `feature/min-123-add-login`)
+- Has its own feature branch, `feature/<issue-id>` in lowercase (e.g., `feature/min-123`)
 - Shares git history with the main repo (no separate clone)
 - Can run independently (separate node_modules, builds, etc.)
-- Is located at `{project}/workspaces/{issue-id}/`
+- Is located at `{project}/workspaces/feature-{issue-id}/` (issue ID in lowercase)
 
 This allows multiple agents to work on different features simultaneously without conflicts.
 
 Because each running workspace carries its own agent process, builds, and (when
 Dockerized) containers, several active at once add up. The dashboard's
-**Resources** page breaks down system RAM by agents, conversations, and other
-processes so you can see what each workspace is costing before spinning up
-another.
-
-<ThemedImage
-  light="/images/dashboard/resources-light.png"
-  dark="/images/dashboard/resources-dark.png"
-  alt="Resources page showing system RAM usage broken down by agents, conversations, and processes"
-/>
+**Resources** page (Settings → Experimental) shows host CPU, memory and disk,
+the running agents, each workspace's Docker stack, a reclaim advisor, core
+services and host processes, so you can see what each workspace is costing
+before spinning up another.
 
 <Tip>
-  Pair the **Resources** view with `pan resources` on the CLI to spot orphaned
-  workspace agents — processes still holding memory after their work is done — and
-  reclaim it before launching new workspaces.
+  Pair the **Resources** view with `pan resources` on the CLI, which lists RAM
+  per workspace agent and conversation and flags orphaned `claude` processes
+  (ones that belong to no workspace or conversation), so you can reclaim that
+  memory before launching new workspaces.
 </Tip>
 
 ## pan workspace create
@@ -46,6 +40,11 @@ pan workspace create MIN-123
 pan workspace create MIN-123 --docker
 ```
 
+`--dry-run` shows what would be created; `--no-skills` skips installing skills and
+agents; `--project <path>` overrides the registry; `--labels <labels>` routes by
+label; `--remote` / `--local` create the workspace on a Fly.io VM or locally (see
+[Workspaces](/features/workspaces)).
+
 ### Docker Integration
 
 The `--docker` flag automatically starts containers after workspace creation:
@@ -56,19 +55,16 @@ pan workspace create MIN-123 --docker
 
 **What it does:**
 1. Creates the workspace (git worktree or custom command)
-2. Looks for docker-compose files in:
-   - `{workspace}/docker-compose.yml`
-   - `{workspace}/docker-compose.yaml`
-   - `{workspace}/.devcontainer/docker-compose.yml`
-   - `{workspace}/.devcontainer/docker-compose.devcontainer.yml`
-   - `{workspace}/.devcontainer/compose.yml`
-3. Runs `docker compose -p "{project}-feature-{issue}" -f {file} up -d --build`
+2. Looks for a docker-compose file at the workspace root or under `.devcontainer/`
+3. Runs `docker compose -f {file} up -d --build` from the compose file's directory
+   (no `-p`: the compose file's own `name:` sets the project name)
 
 **Docker Project Naming:**
 
 Each workspace gets a unique Docker Compose project name to avoid container conflicts:
 - Format: `{project-name}-feature-{issue-id}` (e.g., `mind-your-now-feature-min-123`)
-- The project name comes from `name` in your `~/.overdeck/projects.yaml`
+- The project name is whatever the workspace declares: the compose file's top-level
+  `name:` field, or `COMPOSE_PROJECT_NAME` in the workspace's `dev` script
 - Container names follow: `{project}-{service}-1` (e.g., `mind-your-now-feature-min-123-api-1`)
 
 This allows multiple workspaces to run simultaneously without port or name conflicts.
