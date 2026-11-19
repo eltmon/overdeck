@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5477",
   "created": "2026-11-19T00:10:58.762Z",
-  "updated": "2026-11-19T00:13:02.224Z",
+  "updated": "2026-11-19T00:14:06.798Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,9 +32,22 @@
       "doneAt": "2026-11-19T00:12:46.599Z"
     },
     "page-yolo": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5477",
-      "claimedAt": "2026-11-19T00:13:02.224Z"
+      "claimedAt": "2026-11-19T00:13:02.224Z",
+      "doneAt": "2026-11-19T00:14:06.798Z"
+    },
+    "page-yolo.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T00:14:06.798Z"
+    },
+    "page-yolo.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T00:14:06.798Z"
+    },
+    "page-yolo.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T00:14:06.798Z"
     }
   }
 }
