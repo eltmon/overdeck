@@ -85,4 +85,14 @@ describe('Breadcrumb (PAN-5292 WI-E8)', () => {
     renderCrumb(<Breadcrumb activeTab="flywheel" selectedProjectKey="panopticon-cli" />);
     expect(screen.getByTestId('topbar-crumb')).toHaveTextContent(/^Flywheel$/);
   });
+
+  it('hides the crumb below sm (PAN-5585)', () => {
+    const { unmount } = renderCrumb(<Breadcrumb activeTab="flywheel" selectedProjectKey="panopticon-cli" />);
+    expect(screen.getByTestId('topbar-crumb')).toHaveClass('max-sm:hidden');
+    unmount();
+
+    usePanesStore.getState().addPane('__no-project__', { paneType: 'terminal', label: 'Terminal' });
+    renderCrumb(<Breadcrumb activeTab="command-deck" selectedProjectKey="__no-project__" />);
+    expect(screen.getByTestId('topbar-crumb')).toHaveClass('max-sm:hidden');
+  });
 });

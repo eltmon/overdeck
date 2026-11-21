@@ -180,7 +180,7 @@ export function AppChrome({
           menu, Needs you, exception chips, health dot, theme. AppChrome calls no
           store selector: every count lives in its own leaf component (E-D1),
           including the shutdown banner and its HiddenWhenShutDown gate. */}
-      <div className="relative flex h-12 shrink-0 items-center gap-3 border-b border-border bg-background px-3">
+      <div data-testid="topbar" className="relative flex h-12 shrink-0 items-center gap-2 sm:gap-3 border-b border-border bg-background px-3">
         {/* PAN-5293 F-D18: below 900 px the left column is a drawer opened here. */}
         <button
           type="button"
@@ -197,13 +197,13 @@ export function AppChrome({
         <button
           type="button"
           onClick={onPaletteOpen}
-          className="mx-auto flex w-full min-w-0 max-w-md items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent"
+          className="mx-auto flex w-auto sm:w-full min-w-0 max-w-md items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent"
           title="Search"
           data-testid="topbar-search"
         >
           <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
-          <span className="truncate">{PALETTE_SEARCH_PLACEHOLDER}</span>
-          <kbd className="ml-auto shrink-0 rounded border border-border px-1.5 text-[11px]">{paletteKeycap()}</kbd>
+          <span className="truncate max-sm:hidden">{PALETTE_SEARCH_PLACEHOLDER}</span>
+          <kbd className="ml-auto shrink-0 rounded border border-border px-1.5 text-[11px] max-sm:hidden">{paletteKeycap()}</kbd>
         </button>
 
         <div className="flex shrink-0 items-center gap-1.5">
@@ -242,7 +242,7 @@ function BrandHome({ onGoHome }: { onGoHome: () => void }) {
       className="flex shrink-0 items-center gap-2 rounded-md px-1 py-1 transition-opacity hover:opacity-80"
     >
       <OverdeckMark className="h-5 w-5 shrink-0 text-primary" orbiting={busy} />
-      <span className="font-display text-base font-semibold text-foreground">Overdeck</span>
+      <span className="font-display text-base font-semibold text-foreground max-sm:hidden">Overdeck</span>
     </button>
   );
 }

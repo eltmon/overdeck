@@ -186,6 +186,16 @@ describe('AppChrome top bar (PAN-5292)', () => {
     expect(screen.queryByTestId('mock-degraded')).toBeNull();
   });
 
+  it('compacts the brand and search box below sm (PAN-5585)', () => {
+    renderChrome();
+    expect(screen.getByTestId('topbar')).toBeInTheDocument();
+    const brand = screen.getByTestId('topbar-brand');
+    expect(within(brand).getByText('Overdeck')).toHaveClass('max-sm:hidden');
+    const search = screen.getByTestId('topbar-search');
+    expect(within(search).getByText(PALETTE_SEARCH_PLACEHOLDER)).toHaveClass('max-sm:hidden');
+    expect(within(search).getByText(paletteKeycap())).toHaveClass('max-sm:hidden');
+  });
+
   it('hosts the quota, auto-resume, stopped-agents and system-controls sections in the health dot', () => {
     renderChrome();
     const dot = screen.getByTestId('mock-health-dot');

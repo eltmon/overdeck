@@ -17,7 +17,7 @@ import { useRootLabel } from '../../components/explorer/rootForConversation';
 import { selectActivePane, usePanesStore } from '../../lib/panesStore';
 import { projectCrumbLabel, TAB_TITLES } from '../appChromeLabels';
 
-const CRUMB_CLASS = 'flex min-w-0 shrink items-center gap-1.5 text-sm';
+const CRUMB_CLASS = 'flex min-w-0 shrink items-center gap-1.5 text-sm max-sm:hidden';
 
 function DeckCrumb({ projectKey }: { projectKey: string }) {
   const isNoProject = projectKey === NO_PROJECT_KEY;
