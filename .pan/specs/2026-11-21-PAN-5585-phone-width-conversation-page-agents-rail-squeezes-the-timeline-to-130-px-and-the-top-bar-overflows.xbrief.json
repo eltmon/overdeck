@@ -1,0 +1,708 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-21T22:30:45Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5585: Phone-width conversation page: Agents rail squeezes the timeline to 130 px and the top bar overflows",
+    "updated": "2026-11-21T22:41:15.900Z"
+  },
+  "plan": {
+    "id": "pan-5585",
+    "title": "Phone-width conversation page: Agents rail squeezes the timeline to 130 px and the top bar overflows",
+    "status": "proposed",
+    "uid": "53fde6e6-e96a-4641-ad9a-086ba8343a7a",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-21T22:30:45Z",
+    "updated": "2026-11-21T22:41:15.900Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5585",
+        "label": "PAN-5585",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-5585.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "frontend",
+      "mobile",
+      "responsive",
+      "conversation",
+      "top-bar"
+    ],
+    "metadata": {
+      "sizeJustification": "One cohesive phone-width fix. Code lives in two roots only (src/dashboard/frontend and apps/mobile/src/shell/ShellApp.tsx); the subsystem count of 7 comes from the naive first-two-segments heuristic counting each top-level doc file (docs/CONVERSATION-SUBAGENTS.md, docs/DASHBOARD-ARCHITECTURE.md, features/conversations.mdx, changelog.d/pan-5585.md, docs/screenshots/pan-5585) as its own subsystem. File count is 24, under the limit.",
+      "canonicalFilename": "2026-11-21-PAN-5585-phone-width-conversation-page-agents-rail-squeezes-the-timeline-to-130-px-and-the-top-bar-overflows.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "At phone width (393 px, 360 px) the conversation page is unusable: the open Agents rail (SubagentRail) is a 256 px inline flex sibling that leaves the timeline and composer about 137 px, the AppChrome top bar and its menus run past the viewport edges, the conversation header clips the Conversation | Terminal switch, and on iOS the keyboard pushes the phone shell's header under the status bar because the shells are fixed inset-0 / 100vh and do not follow window.visualViewport.",
+      "Proposal": "On a narrow pane (< 760 px) render the open rail as an absolute overlay inside the conversation row (min(100%,320px) from the right, above a scrim; strip stays in flow) that closes on scrim, X or any row tap. Below Tailwind sm (640 px) compact the top bar with CSS-only max-sm: variants (hide wordmark, crumb, search text/keycap, exception chips; Agents and Needs-you show dot + number) and anchor its three menus to the bar. Add a 520 px container query so the header title takes its own line and the actions wrap. Add lib/visualViewport.ts (useVisualViewportVars writes --app-height / --app-offset-top) and size #root, body, the App root and both phone shells (.app-viewport-shell) to them. Prove it with a WebKit iPhone Playwright spec on an isolated dashboard with seeded subagent transcripts, and update the docs and changelog.",
+      "NonGoals": "- Native changes: no @capacitor/keyboard, no iOS or Android project edits\n- Redesigning the composer toolbar or its picker labels\n- Escape-to-close or a focus trap for the overlay rail\n- Surfacing low-cost mode or build-behind-main on a phone (hidden below 640 px)\n- Changing StandaloneRoutes.tsx popout roots (h-screen) or the /m header layouts\n- Removing the MobileConversations.tsx header-wrap arbitrary variants\n- Any change to rail persistence keys, defaultCollapsed, or toggleSignal semantics\n- Any layout change at >= 640 px (top bar), >= 760 px pane width (rail), or > 520 px header container width\n- Adding the new Playwright spec to the CI test:playwright script"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Overlay rail is absolute inside the conversation row (row gains relative), not fixed or a portal.",
+        "rationale": "Narrow panes also occur in desktop split layouts; fixed would cover the whole window."
+      },
+      {
+        "summary": "The 30 px strip stays in flow while the overlay is open.",
+        "rationale": "Removing it would reflow the virtualized timeline on every open and close; the scrim covers it."
+      },
+      {
+        "summary": "Overlay width is w-[min(100%,320px)].",
+        "rationale": "It is one of the two options the issue lists and leaves a tappable scrim strip at 393 px."
+      },
+      {
+        "summary": "Exception chips are hidden below 640 px.",
+        "rationale": "At 360 px the bar budget (~306 px with compact chips) has no room for them; Deacon-frozen and stopped-agent state stay reachable in the System-health popover."
+      },
+      {
+        "summary": "Only the System-health popover gets bar anchoring below 640 px; the Agents and Needs-you menus are unchanged.",
+        "rationale": "They render through MenuSurface, which already caps width at 100vw-1rem and translates the surface back into the viewport; the System-health popover is a plain div with no constraint."
+      },
+      {
+        "summary": "Keyboard fix uses window.visualViewport via CSS variables, with 100dvh fallback; vars are removed while pinch-zoomed.",
+        "rationale": "dvh does not track the iOS software keyboard; visualViewport does. Removing vars at scale != 1 keeps pinch-zoom from dragging the shell."
+      },
+      {
+        "summary": "Composer footer truncation is treated as a consequence of the rail fix, asserted only as no overflow at 360 px.",
+        "rationale": "The issue's Fix and acceptance lists contain no composer item; the truncation came from the 137 px squeeze."
+      },
+      {
+        "summary": "The Playwright spec runs WebKit via devices['iPhone 15 Pro'], seeds real subagent files, and stays out of CI test:playwright.",
+        "rationale": "CI installs Chromium only and the spec seeds git repositories, like pan-5295; real files exercise the WS path a mocked /messages route would skip."
+      },
+      {
+        "summary": "iOS keyboard behavior is an implementation checkpoint: verified headless where possible, PR states device verification limits.",
+        "rationale": "The issue explicitly allows this; Playwright WebKit has no software keyboard."
+      },
+      {
+        "summary": "useVisualViewportVars is called in App, MobileApp and ShellApp instead of the two entry files.",
+        "rationale": "Keeps the plan under the 25-file surface limit; multiple callers write identical values."
+      }
+    ],
+    "items": [
+      {
+        "id": "rail-overlay",
+        "title": "Render the open Agents rail as an overlay on a narrow pane",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-21T22:30:45Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5585",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/SubagentRail.tsx",
+            "src/dashboard/frontend/src/components/chat/SubagentRail.test.tsx",
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/chat/SubagentRail.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "SubagentRail.test.tsx passes, including the 'SubagentRail narrow overlay (PAN-5585)' describe block",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1. ConversationPanel.tsx line 422 row div gains `relative` and data-testid=\"conversation-pane-row\". In SubagentRail.tsx: declare `select` after the `narrow` state and make it call setOverride(true) when narrow; extract the rail body (header with X plus Main agent and subagent rows) into a shared const; define the strip button once (ref={hostRef}, aria-label \"Show agents rail\"); render three branches: collapsed -> strip; open and narrow -> strip in flow + scrim button (aria-label \"Close agents rail\", data-testid agents-rail-scrim, absolute inset-0 z-20 bg-background/60, onClick toggleCollapsed(true)) + aside aria-label \"Conversation agents\" data-mode=\"overlay\" with classes `absolute inset-y-0 right-0 z-30 flex min-h-0 w-[min(100%,320px)] flex-col border-l border-border bg-card shadow-lg`; open and wide -> today's inline aside unchanged plus data-mode=\"inline\". Do not wrap the strip, scrim or aside in an extra element (hostRef measures parentElement). Add the five tests named in PRD WI-1 step 6 using the existing FakeResizeObserver/resize helpers."
+        },
+        "items": [
+          {
+            "id": "rail-overlay.ac1",
+            "title": "Given a host pane below 760 px, when the strip is clicked, then the complementary 'Conversation agents' renders with data-mode=\"overlay\", the 'Show agents rail' strip stays in the document, and a 'Close agents rail' scrim button renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rail-overlay.ac2",
+            "title": "Given the overlay is open, when the scrim is clicked, then the complementary is removed and only the strip renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rail-overlay.ac3",
+            "title": "Given the overlay is open, when the Explore subagent row is clicked, then window.location.search contains subagent=alpha and the complementary is removed; when the Main agent row is clicked, then the subagent param is removed and the complementary is removed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rail-overlay.ac4",
+            "title": "Given a host pane of 1000 px and stored preference 'false', then the rail renders inline with data-mode=\"inline\" and no 'Close agents rail' button, and every pre-existing SubagentRail test passes unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rail-overlay.ac5",
+            "title": "The conversation row div in ConversationPanel.tsx renders with class relative and data-testid=\"conversation-pane-row\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "topbar-left-compact",
+        "title": "Compact the top bar's brand, crumb and search box below 640 px",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-21T22:30:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5585",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/App/AppChrome.tsx",
+            "src/dashboard/frontend/src/App/topbar/Breadcrumb.tsx",
+            "src/dashboard/frontend/src/App/AppChrome.test.tsx",
+            "src/dashboard/frontend/src/App/topbar/Breadcrumb.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/App/AppChrome.test.tsx src/dashboard/frontend/src/App/topbar/Breadcrumb.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "AppChrome.test.tsx and Breadcrumb.test.tsx pass, including 'compacts the brand and search box below sm (PAN-5585)' and 'hides the crumb below sm (PAN-5585)'",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. AppChrome.tsx bar div (line 183): add data-testid=\"topbar\", change gap-3 to `gap-2 sm:gap-3`. BrandHome wordmark span: add max-sm:hidden. Search button: w-full -> `w-auto sm:w-full`; placeholder span -> `truncate max-sm:hidden`; kbd gains max-sm:hidden; keep title=\"Search\" and add no aria-label. Breadcrumb.tsx CRUMB_CLASS: append ` max-sm:hidden`. Add the AppChrome.test.tsx test asserting those classes on rendered DOM (no source reading). Add the Breadcrumb.test.tsx test 'hides the crumb below sm (PAN-5585)' asserting topbar-crumb has class max-sm:hidden for a non-deck tab and the no-project deck (AppChrome.test mocks the crumb)."
+        },
+        "items": [
+          {
+            "id": "topbar-left-compact.ac1",
+            "title": "Given AppChrome is rendered, the brand button renders the 'Overdeck' wordmark inside a span with class max-sm:hidden and still contains the text 'Overdeck'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "topbar-left-compact.ac2",
+            "title": "Given AppChrome is rendered, topbar-search renders its search-hint text span and its keycap kbd each with class max-sm:hidden, and the button renders classes w-auto and sm:w-full",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "topbar-left-compact.ac3",
+            "title": "Every crumb Breadcrumb renders (data-testid topbar-crumb) has class max-sm:hidden and the bar renders data-testid=\"topbar\"; existing AppChrome and Breadcrumb tests pass unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "topbar-right-compact",
+        "title": "Show the Agents and Needs-you triggers as a count and hide exception chips below 640 px",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-21T22:30:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5585",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/App/AppChrome.tsx",
+            "src/dashboard/frontend/src/App/topbar/AgentsMenu.tsx",
+            "src/dashboard/frontend/src/App/topbar/AgentsMenu.test.tsx",
+            "src/dashboard/frontend/src/components/flywheel/NeedsYouIndicator.tsx",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/NeedsYouIndicator.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/App/topbar/AgentsMenu.test.tsx src/dashboard/frontend/src/components/flywheel/__tests__/NeedsYouIndicator.test.tsx src/dashboard/frontend/src/App/AppChrome.test.tsx src/dashboard/frontend/src/App/__tests__/countAgreement.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "All four test files pass, including the new compact-trigger tests",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. AgentsMenu trigger: add aria-label={agentsWorkingLabel(count)}; wrap the label in <span className=\"max-sm:hidden\">, add <span className=\"sm:hidden\" aria-hidden=\"true\">{count}</span>, add max-sm:hidden to ChevronDown. NeedsYouIndicator line 113: `<span className=\"max-sm:hidden\">Needs you · </span>{count}`. AppChrome.tsx: wrap DeaconFrozenChip, StoppedAgentsBanner pill, LowCostModePill and StaleBuildChip in <div data-testid=\"topbar-exception-chips\" className=\"flex items-center gap-1.5 max-sm:hidden\">. Add one test each to AgentsMenu.test.tsx and NeedsYouIndicator.test.tsx."
+        },
+        "items": [
+          {
+            "id": "topbar-right-compact.ac1",
+            "title": "Given N working agents, the agents-menu-trigger button's accessible name equals agentsWorkingLabel(N) and it renders a sm:hidden span containing N and a max-sm:hidden span containing the label",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "topbar-right-compact.ac2",
+            "title": "The flywheel-needs-you-indicator renders 'Needs you · ' inside a max-sm:hidden span and its textContent still equals 'Needs you · N'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "topbar-right-compact.ac3",
+            "title": "AppChrome renders the four exception chips inside data-testid topbar-exception-chips with class max-sm:hidden, and the existing chip-order and countAgreement tests pass unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "topbar-menus-fit",
+        "title": "Anchor the System-health popover to the top bar below 640 px",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-21T22:30:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5585",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/SystemHealthPill.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/SystemHealthPill.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "SystemHealthPill.test.tsx passes unchanged",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4. SystemHealthPill.tsx line 364 wrapper `relative` -> `relative max-sm:static`; line 404 popover className: append ` max-sm:left-2 max-sm:right-2 max-sm:w-auto`. Leave outside-click handling and the max-height fit unchanged. Do NOT change AgentsMenu or NeedsYouIndicator menus: they render through MenuSurface (components/shared/ContextMenu.tsx), whose max-w-[calc(100vw-1rem)] and useViewportConstraint already keep them inside the viewport. The browser proof for all three menus is in phone-width-e2e."
+        },
+        "items": [
+          {
+            "id": "topbar-menus-fit.ac1",
+            "title": "The SystemHealthPill wrapper renders classes relative and max-sm:static, and the opened #system-health-popover renders classes max-sm:left-2, max-sm:right-2 and max-sm:w-auto while keeping w-[min(24rem,calc(100vw-1rem))]; AgentsMenu.tsx and NeedsYouIndicator.tsx menu classes are unchanged by this item",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "topbar-menus-fit.ac2",
+            "title": "Given a 360 px WebKit viewport, when the Agents menu, Needs-you menu and System-health popover each open, then each bounding rect has left >= 0 and right <= innerWidth (asserted by phone-width-e2e)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "header-wrap",
+        "title": "Wrap the conversation header actions below the title at 520 px container width",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-21T22:30:45Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "frontend",
+          "issueLabel": "pan-5585",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "build (tsdown + Vite) completes without CSS errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5: after the existing `@container (max-width: 520px) { .conversationHeaderContainer .terminalBranchBarMode ... }` block (line 2832) add a new `@container (max-width: 520px)` block that sets `.conversationHeaderContainer .conversationHeaderPrimary { flex-wrap: wrap }`, `.conversationHeaderContainer .conversationTerminalTitle { flex-basis: 100%; min-width: 0 }`, and `.conversationHeaderContainer .conversationHeaderActions { flex-wrap: wrap; flex-shrink: 1; min-width: 0; margin-left: 0 }`, with the PAN-5585 comment."
+        },
+        "items": [
+          {
+            "id": "header-wrap.ac1",
+            "title": "command-deck.module.css contains a 520 px container query applying flex-wrap: wrap to .conversationHeaderPrimary and .conversationHeaderActions and flex-basis: 100% plus min-width: 0 to .conversationTerminalTitle, all scoped under .conversationHeaderContainer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "header-wrap.ac2",
+            "title": "Given a 360 px WebKit viewport on a live conversation, both the Conversation and Terminal tabs render visible and no header descendant's right edge exceeds innerWidth (asserted by phone-width-e2e); at 1280 px the header renders on one row as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "viewport-vars",
+        "title": "Add useVisualViewportVars and size #root, body and the App root to the visual viewport",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-21T22:30:45Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5585",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "phone-shells"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/visualViewport.ts",
+            "src/dashboard/frontend/src/lib/visualViewport.test.ts",
+            "src/dashboard/frontend/src/index.css",
+            "src/dashboard/frontend/src/App.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/lib/visualViewport.test.ts src/dashboard/frontend/src/App.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "visualViewport.test.ts and App.test.tsx pass",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-6 exactly. Create lib/visualViewport.ts with APP_HEIGHT_VAR='--app-height', APP_OFFSET_TOP_VAR='--app-offset-top', applyVisualViewportVars(root, vv) (removes both vars when |scale-1| > 0.01, else sets Math.floor(height) and Math.floor(offsetTop) in px) and useVisualViewportVars() (useEffect: no-op without window.visualViewport; update once, then on visualViewport resize and scroll; cleanup removes only the listeners). Add visualViewport.test.ts with the three tests in WI-6 step 2 (stub window.visualViewport with an EventTarget-based fake; no timers). index.css @layer base: body keeps `min-height: 100vh` and adds `min-height: var(--app-height, 100dvh)`; #root keeps `height: 100vh` and adds `height: var(--app-height, 100dvh)`; add the `.app-viewport-shell` rule (position fixed; left 0; right 0; top var(--app-offset-top, 0px); height 100vh then var(--app-height, 100dvh)). App.tsx line 805: `h-screen` -> `h-[var(--app-height,100dvh)]` plus `pt-[env(safe-area-inset-top)]`; call useVisualViewportVars() right before `const [activeTab, setActiveTabState] = useState<Tab>(`."
+        },
+        "items": [
+          {
+            "id": "viewport-vars.ac1",
+            "title": "Given a visual viewport of height 400.7, offsetTop 120.5, scale 1, applyVisualViewportVars sets --app-height to '400px' and --app-offset-top to '120px' (floored) on the root element",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewport-vars.ac2",
+            "title": "Given scale 2 (pinch-zoom), applyVisualViewportVars removes both variables so the CSS falls back to 100dvh and 0px",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewport-vars.ac3",
+            "title": "Given a component using useVisualViewportVars, when the fake visualViewport dispatches resize with a new height, then --app-height updates; with window.visualViewport undefined the hook renders without throwing and sets nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewport-vars.ac4",
+            "title": "index.css sizes #root and body from var(--app-height, 100dvh) with a 100vh fallback declaration and defines .app-viewport-shell; the App root div renders classes h-[var(--app-height,100dvh)] and pt-[env(safe-area-inset-top)] instead of h-screen",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "phone-shells",
+        "title": "Pin MobileApp and the native ShellApp to the visual viewport",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-21T22:30:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5585",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/mobile/MobileApp.tsx",
+            "apps/mobile/src/shell/ShellApp.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/mobile/__tests__/MobileApp.test.tsx",
+            "cd apps/mobile && npx vitest run --config vitest.config.ts src/shell/__tests__/ShellApp.test.tsx",
+            "npm run typecheck:frontend",
+            "npm run typecheck:mobile"
+          ],
+          "expected_outputs": [
+            "MobileApp.test.tsx passes",
+            "apps/mobile ShellApp.test.tsx passes",
+            "typecheck:frontend and typecheck:mobile complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-7. MobileApp.tsx line 153 root: `fixed inset-0 flex flex-col ...` -> `app-viewport-shell flex flex-col bg-background text-foreground`; call useVisualViewportVars() at the top of MobileApp (import from '../../lib/visualViewport'); update the comment above the div to say the shell follows the visual viewport. ShellApp.tsx line 429 root: same class swap; call useVisualViewportVars() at the top of ShellApp (import '../../../../src/dashboard/frontend/src/lib/visualViewport'). If any test asserts the literal 'fixed inset-0' on these roots, update it to 'app-viewport-shell'. iOS keyboard behavior is checkpoint CP-1: state in the PR body what was verified headless; make no native change."
+        },
+        "items": [
+          {
+            "id": "phone-shells.ac1",
+            "title": "The data-component=\"mobile-app\" root renders class app-viewport-shell and no longer renders fixed inset-0, and MobileApp calls useVisualViewportVars",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phone-shells.ac2",
+            "title": "The data-component=\"mobile-shell\" root in ShellApp renders class app-viewport-shell, ShellApp calls useVisualViewportVars, and typecheck:mobile exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "phone-width-e2e",
+        "title": "Prove the phone-width layout with a WebKit iPhone Playwright spec and screenshots",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-21T22:30:45Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-5585",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan-5585-phone-width.spec.ts",
+            "docs/screenshots/pan-5585/*.png"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build",
+            "cd src/dashboard/frontend && npx playwright test tests/pan-5585-phone-width.spec.ts"
+          ],
+          "expected_outputs": [
+            "build completes",
+            "all tests in pan-5585-phone-width.spec.ts pass under WebKit and write rail-overlay-393.png, rail-overlay-360.png and topbar-360.png to docs/screenshots/pan-5585/"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-8. New spec modeled on tests/pan-5295-conversation-turn.spec.ts: file-level test.use({ ...devices['iPhone 15 Pro'] }); serial; 180 s timeout. beforeAll: temp dir with overdeck home and fake HOME, run scripts/dev/seed-workflow-fixture.ts as pan-5295 does, startIsolatedDashboard({ home, env: { HOME: fakeHome } }), GET /api/conversations/fixture-1 for id, cwd and claudeSessionId, then write two subagents (agent-pan5585a Explore 'Trace the phone layout' toolu_pan5585_a depth 1; agent-pan5585b general-purpose depth 1) as .jsonl + .meta.json under join(claudeProjectDir(cwd, claudeProjectsRoot(fakeHome)), claudeSessionId, 'subagents'); each JSONL = the parent transcript's FIRST line (user record) and LAST line (assistant text record) with sessionId, uuid, parentUuid and text replaced (the seed script's transcript() helper is not exported), assistant text 'Phone layout subagent reply'. beforeEach: patchLiveSession (sessionAlive true for fixture-1), dark theme init script, remove overdeck.ui.agentsRailCollapsed. Tests 4-7 from PRD WI-8: close the work dock if [data-testid=work-dock] is visible, then overlay at 393 and 360 with body width >= conversation-pane-row width - 31 and screenshots; row tap closes overlay and shows 'Phone layout subagent reply' with subagent=pan5585a in the URL; at 360 no descendant of [data-testid=topbar], [data-machine-state] or [class*=composerToolbar] has right > innerWidth + 0.5, both Conversation/Terminal tabs visible, and agents-menu, the 'Needs you' menu and #system-health-popover each open with left >= 0 and right <= innerWidth; --app-height equals innerHeight px and #root height equals innerHeight. Commit the three PNGs. Do not add the spec to test:playwright. If seeding subagents fails to surface the rail, debug the transcript path via GET /api/conversations/fixture-1/messages (its subagents array) before changing approach."
+        },
+        "items": [
+          {
+            "id": "phone-width-e2e.ac1",
+            "title": "Given 393 px and 360 px WebKit viewports with the work dock closed and the rail opened, the aside renders data-mode=\"overlay\" and the conversation body's width is >= the conversation-pane-row's width minus 31 px; rail-overlay-393.png and rail-overlay-360.png are written to docs/screenshots/pan-5585/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phone-width-e2e.ac2",
+            "title": "When the Explore row is tapped on the 393 px overlay, the aside is removed, the URL contains subagent=pan5585a, and 'Phone layout subagent reply' renders visible",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phone-width-e2e.ac3",
+            "title": "Given a 360 px WebKit viewport on /conv/<id>, no rendered descendant of the top bar, the conversation header or the composer toolbar has getBoundingClientRect().right > innerWidth + 0.5, and the spec writes topbar-360.png",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phone-width-e2e.ac4",
+            "title": "Given a 360 px WebKit viewport, when the Agents menu, Needs-you menu and System-health popover each open, then each rect has left >= 0 and right <= innerWidth; and the root renders --app-height equal to innerHeight px with #root height equal to innerHeight",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-changelog",
+        "title": "Document the overlay rail, phone-width top bar and visual-viewport shell, and add the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-21T22:30:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5585",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/CONVERSATION-SUBAGENTS.md",
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "features/conversations.mdx",
+            "changelog.d/pan-5585.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-9. docs/CONVERSATION-SUBAGENTS.md 'Agents rail collapse (PAN-4222)': after the PAN-5329 paragraph add the PAN-5585 overlay paragraph (absolute over the right of the row at min(100%, 320px) above a scrim; strip stays in flow; scrim, X and row taps close it, row taps select first; wide panes keep the inline 256 px rail). docs/DASHBOARD-ARCHITECTURE.md 'Top bar (PAN-5292)': after item 7 add the 'Phone width (PAN-5585)' paragraph; in the 'Layout' subsection add the --app-height/--app-offset-top, useVisualViewportVars, .app-viewport-shell and safe-area sentence. features/conversations.mdx ⋯ menu item 1: add the narrow-screen overlay sentence from the PRD. Create changelog.d/pan-5585.md with the exact '#### Fixed' bullet from the PRD."
+        },
+        "items": [
+          {
+            "id": "docs-changelog.ac1",
+            "title": "docs/CONVERSATION-SUBAGENTS.md states that on a pane below 760 px the open rail renders as an overlay at min(100%, 320px) above a scrim, the strip stays in flow, and scrim, X or row taps close it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac2",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains a 'Phone width (PAN-5585)' paragraph describing the below-640 px top bar (hidden wordmark, crumb, search text, exception chips; count-only Agents and Needs-you triggers; bar-anchored System-health popover) and a Layout sentence naming useVisualViewportVars, --app-height, --app-offset-top and .app-viewport-shell",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac3",
+            "title": "features/conversations.mdx tells the reader that on a narrow screen the rail opens over the conversation and closes on an outside tap or an agent pick, and changelog.d/pan-5585.md holds one '#### Fixed' bullet linking #5585; npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "topbar-left-compact",
+        "to": "topbar-right-compact",
+        "type": "blocks"
+      },
+      {
+        "from": "viewport-vars",
+        "to": "phone-shells",
+        "type": "blocks"
+      },
+      {
+        "from": "rail-overlay",
+        "to": "phone-width-e2e",
+        "type": "blocks"
+      },
+      {
+        "from": "topbar-menus-fit",
+        "to": "phone-width-e2e",
+        "type": "blocks"
+      },
+      {
+        "from": "header-wrap",
+        "to": "phone-width-e2e",
+        "type": "blocks"
+      },
+      {
+        "from": "viewport-vars",
+        "to": "phone-width-e2e",
+        "type": "blocks"
+      },
+      {
+        "from": "topbar-right-compact",
+        "to": "phone-width-e2e",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
