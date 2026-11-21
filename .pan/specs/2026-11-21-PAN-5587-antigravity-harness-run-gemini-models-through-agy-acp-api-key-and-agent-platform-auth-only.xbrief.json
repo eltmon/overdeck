@@ -1,0 +1,2008 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-21T22:58:40.011Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5587: Antigravity harness: run Gemini models through agy acp (API key and Agent Platform auth only)",
+    "updated": "2026-11-21T22:58:46.321Z"
+  },
+  "plan": {
+    "id": "pan-5587",
+    "title": "Antigravity harness: run Gemini models through agy acp (API key and Agent Platform auth only)",
+    "status": "proposed",
+    "uid": "ebf81933-c9d4-4b96-81e4-f27fee6efc6c",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-21T22:58:40.011Z",
+    "updated": "2026-11-21T22:58:46.321Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5587",
+        "label": "PAN-5587",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5078",
+        "label": "PAN-5078 (Grok Build harness precedent)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://antigravity.google/terms/",
+        "label": "Antigravity terms, clause 6",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "harness",
+      "acp",
+      "antigravity",
+      "gemini",
+      "google",
+      "tos"
+    ],
+    "metadata": {
+      "prd": ".pan/drafts/PAN-5587.md",
+      "sizeJustification": "Adding a literal to the Harness union forces coordinated edits across contracts, src/lib, CLI, dashboard server and frontend (type-forced Records plus hand-copied harness lists), and a harness that is selectable but not launchable delivers zero value. PAN-5078 (Grok Build) and PAN-3668 (Prime Agent) kept the same full scope for the same reason. The work is decomposed into 23 small items with explicit dependency edges so leaves run in parallel.",
+      "canonicalFilename": "2026-11-21-PAN-5587-antigravity-harness-run-gemini-models-through-agy-acp-api-key-and-agent-platform-auth-only.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Overdeck runs Gemini models only through pi or other API-key harnesses; it cannot run them inside Google's own agent CLI, Antigravity (agy), which replaced Gemini CLI for consumer users. Antigravity's terms (clause 6) forbid third-party software from using Antigravity OAuth, so any integration must use only a Gemini API key or Agent Platform credentials.",
+      "Proposal": "Add an `antigravity` harness on the existing ACP host that launches `agy acp --gemini-dir <OVERDECK_HOME>/antigravity` for existing Google model ids (no new provider). The host resolves the credential itself (Gemini API key from env or Overdeck settings, else Agent Platform project+location+ADC), authenticates only with gemini-api-key or agent-platform, sets model and the clamped thought_level on every start including resume, records ACP-standard turn usage for an antigravity cost source priced from the google rows, and surfaces credential failures through acp-launch-error. Pickers, doctor, CLI, config, conversations, docs and a no-loss audit cover the new literal; replay fixtures and a live run verify it. Facts come from live probes of agy 1.5.14 recorded in the PRD.",
+      "NonGoals": "- Any OAuth path: oauth-personal, oauth-business, terminal-login, `agy acp --login`, or reading ~/.gemini/oauth_creds.json.\n- Gemini CLI as a harness.\n- A native terminal-UI agy harness or a companion terminal attaching the agy TUI.\n- Running Antigravity agents on Fly machines.\n- A new model provider or new model ids; changing Google provider defaults or tier models (PAN-5586 owns new Gemini ids).\n- Choosing Agent Platform per agent while an API key is configured.\n- Delivering context through agy's _meta.antigravity.systemPrompt.append instead of the ACP initial-context channel.\n- Distributing Overdeck skills or plugins into the Antigravity gemini dir.\n- Reading agy's private conversation databases or logs, or cleaning up its log directory.\n- Passing --dangerously-skip-permissions, --sandbox, --disable-telemetry or --process-per-session.\n- Modeling Gemini free-tier or Agent Platform contract pricing.\n- Adding antigravity to scripts/lint-harness-branches.sh pattern N, or raising any ratchet baseline or file-size allowlist row.\n- Changing #752."
+    },
+    "autoDecisions": [
+      {
+        "summary": "New harness literal `antigravity` on the ACP host, ACP provider key `antigravity`, executable `agy`.",
+        "rationale": "Matches the Grok Build precedent the issue names; per-harness binary, capabilities, policy and picker entries need their own literal."
+      },
+      {
+        "summary": "No new model provider: the harness runs existing bare Google ids (gemini-4-argon, gemini-3.8-flash, gemini-3.6-flash, gemini-3.1-pro-preview as agy gemini-3.1-pro; Gemini 4 Neon/Carbon/Hydrogen once PAN-5586 registers them).",
+        "rationale": "With gemini-api-key auth agy bills the same Gemini API key the google provider uses, and the issue acceptance names bare ids and asks for Antigravity \"as a harness for Google models\"."
+      },
+      {
+        "summary": "The ACP host main() resolves the credential (literal key from the enabled Google provider, else Agent Platform project+location+ADC) instead of the launcher passing pane env; no env GEMINI_API_KEY source.",
+        "rationale": "The host is Overdeck code and can read config; the key never enters a pane env or launcher script; avoids five launch-site edits, two over the size ceiling; dropping the env source keeps the picker/doctor status and the pane-side launch in agreement, since panes blank GEMINI_API_KEY."
+      },
+      {
+        "summary": "Always launch agy with an isolated --gemini-dir <OVERDECK_HOME>/antigravity.",
+        "rationale": "Keeps agy away from ~/.gemini/oauth_creds.json and the oauth-personal selectedType on this host; a structural guard for the no-OAuth decision; verified live that isolated mode works with an API key."
+      },
+      {
+        "summary": "No --dangerously-skip-permissions flag.",
+        "rationale": "Probed: agy sends session/request_permission with allow_once/reject_once options that the host already auto-answers."
+      },
+      {
+        "summary": "Effort maps to agy thought_level, clamped to the levels the selected model offers; harness levels low..xhigh, default high.",
+        "rationale": "Probed: thought levels vary per model and none offers max; effort-high-default rule."
+      },
+      {
+        "summary": "Cost is estimated from ACP turn usage at Gemini API list prices via a new antigravity reconcile source.",
+        "rationale": "Probed: agy reports per-turn usage but no cost; the issue allows estimates if the PR says so."
+      },
+      {
+        "summary": "Agent Platform is implemented and unit-tested but not live-verified.",
+        "rationale": "The reference host has no gcloud or ADC; recorded as an implementation checkpoint."
+      },
+      {
+        "summary": "Keep the work as one issue with sizeJustification.",
+        "rationale": "Same reasoning as PAN-5078: a harness literal forces coordinated edits and a partial harness delivers zero value."
+      }
+    ],
+    "items": [
+      {
+        "id": "contracts-harness",
+        "title": "Add the antigravity harness literal, ANTIGRAVITY_BEHAVIOR and ANTIGRAVITY_CAPABILITIES to contracts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-21T22:58:40.011Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5587",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "harness-policy",
+            "acp-antigravity-module",
+            "runtime-launcher-fields",
+            "config-validation-messages",
+            "conversation-lists",
+            "launch-context-lists",
+            "server-route-lists",
+            "cli-harness-lists",
+            "picker-catalog-rows"
+          ],
+          "files_scope": [
+            "packages/contracts/src/types.ts",
+            "packages/contracts/src/harness-behavior.ts",
+            "packages/contracts/src/harness-capabilities.ts",
+            "packages/contracts/src/context-layers.ts",
+            "packages/contracts/src/telemetry.ts",
+            "packages/contracts/src/flywheel.ts",
+            "packages/contracts/src/artifacts.ts",
+            "packages/contracts/src/fleet-versions.ts",
+            "packages/contracts/src/index.ts",
+            "packages/contracts/src/harness-behavior.test.ts",
+            "docs/TELEMETRY.md",
+            "src/lib/runtimes/types.ts",
+            "src/lib/harness-policy.ts",
+            "src/lib/harness-policy-decisions.ts",
+            "src/lib/harness-binary.ts",
+            "src/lib/context-layers/harness.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run build:contracts",
+            "npm run typecheck",
+            "npx vitest run packages/contracts/src/harness-behavior.test.ts tests/unit/telemetry-docs.test.ts src/lib/__tests__/harness-policy.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "harness-behavior.test.ts and telemetry-docs.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-12",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Add `antigravity` to Harness/KNOWN_HARNESSES/RuntimeName, define ANTIGRAVITY_BEHAVIOR (displayName \"Antigravity\", executableName \"agy\", processNames [\"acp-host\",\"agy\"], contextLayerKind \"antigravity\", effortLevels low..xhigh) and ANTIGRAVITY_CAPABILITIES (OpenCode capabilities plus the agy install hint, updateArgs [\"update\"], npmPackage null), extend the contracts harness lists and FLEET_BINARY_ORDER (\"agy\"), the TELEMETRY.md harness row, and make the forced Record rows in src/lib compile (temporary deny-all policy clause that harness-policy replaces). Follow PRD .pan/drafts/PAN-5587.md WI-1 exactly (exact lines, before/after snippets and test names are there)."
+        },
+        "items": [
+          {
+            "id": "contracts-harness.ac1",
+            "title": "Given the contracts build, when getHarnessBehavior(\"antigravity\") is called, then it returns displayName \"Antigravity\", executableName \"agy\", launchCommandKind \"acp-host\" and effortLevels [\"low\",\"medium\",\"high\",\"xhigh\"].",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-harness.ac2",
+            "title": "Given KNOWN_HARNESSES, when has(\"antigravity\") is called, then it returns true, and ANTIGRAVITY_CAPABILITIES.overdeckMcp is true and npmPackage is null.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-harness.ac3",
+            "title": "Given the change, when `npm run typecheck` runs, then it exits 0 with antigravity rows in every type-forced Record (POLICY_RUNTIME_NAMES, policy decisions, harness binary map with value \"agy\", context markers).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-harness.ac4",
+            "title": "Given docs/TELEMETRY.md, when tests/unit/telemetry-docs.test.ts runs, then it passes with `antigravity` listed in the harness property-domain row.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "antigravity-models",
+        "title": "Add src/lib/antigravity-models.ts mapping Overdeck Google ids to agy model values",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-21T22:58:40.011Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5587",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/antigravity-models.ts",
+            "tests/unit/lib/antigravity-models.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/antigravity-models.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "antigravity-models.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create the type-only-import leaf module with ANTIGRAVITY_MODEL_IDS (gemini-4-argon, gemini-3.8-flash, gemini-3.6-flash identity; gemini-3.1-pro-preview -> gemini-3.1-pro), isAntigravityModel, antigravityModelIds and translateAntigravityModelId. Apply decision D8: add gemini-4-neon/carbon/hydrogen only if PAN-5586 already registered them in GoogleModel; otherwise post one comment on PAN-5586 asking its implementer to add them. Follow PRD .pan/drafts/PAN-5587.md WI-2 exactly (exact lines, before/after snippets and test names are there)."
+        },
+        "items": [
+          {
+            "id": "antigravity-models.ac1",
+            "title": "Given the map, when translateAntigravityModelId(\"gemini-3.1-pro-preview\") is called, then it returns \"gemini-3.1-pro\", and translateAntigravityModelId(\"gemini-4-argon\") returns \"gemini-4-argon\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "antigravity-models.ac2",
+            "title": "Given an unserved id such as \"gemini-3.5-flash-lite\", when translateAntigravityModelId is called, then it throws a message that lists every antigravity model id.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "antigravity-models.ac3",
+            "title": "Given every ANTIGRAVITY_MODEL_IDS key, when getProviderForModel(key) is called, then it returns provider \"google\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "antigravity-models.ac4",
+            "title": "Given GoogleModel at implementation time, when it contains gemini-4-carbon, then the map contains gemini-4-neon, gemini-4-carbon and gemini-4-hydrogen; otherwise PAN-5586 has a comment naming src/lib/antigravity-models.ts.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "harness-policy",
+        "title": "Allow the antigravity harness only for ANTIGRAVITY_MODEL_IDS in canUseHarness",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-21T22:58:40.011Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5587",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/harness-policy.ts",
+            "src/lib/__tests__/harness-policy.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/harness-policy.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "harness-policy.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Replace the temporary deny-all clause with the D9 clause after the Grok clause and export ANTIGRAVITY_MODEL_BLOCK_REASON built from antigravityModelIds(). Follow PRD .pan/drafts/PAN-5587.md WI-3 exactly (exact lines, before/after snippets and test names are there)."
+        },
+        "items": [
+          {
+            "id": "harness-policy.ac1",
+            "title": "Given harness antigravity, when canUseHarness is called with gemini-4-argon or gemini-3.1-pro-preview, then it returns allowed true.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harness-policy.ac2",
+            "title": "Given harness antigravity, when canUseHarness is called with gemini-3.5-flash-lite or claude-sonnet-5-5, then it returns allowed false with reason exactly ANTIGRAVITY_MODEL_BLOCK_REASON.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harness-policy.ac3",
+            "title": "Given the existing harnesses, when canUseHarness(\"pi\",\"gemini-4-argon\") and canUseHarness(\"acp\",\"gemini-4-argon\") are called, then they return allowed true and allowed false as before.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "antigravity-auth",
+        "title": "Add src/lib/antigravity-auth.ts: the API-key / Agent Platform credential resolver and status reader",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-21T22:58:40.011Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5587",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "acp-antigravity-module",
+            "picker-catalog-rows",
+            "doctor-antigravity"
+          ],
+          "files_scope": [
+            "src/lib/antigravity-auth.ts",
+            "tests/unit/lib/antigravity-auth.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/antigravity-auth.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "antigravity-auth.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-11",
+            "FR-13",
+            "NFR-5",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement ANTIGRAVITY_AUTH_METHODS (gemini-api-key, agent-platform only), ANTIGRAVITY_OAUTH_NOT_OFFERED, ANTIGRAVITY_AUTH_REQUIRED, AntigravityCredentialError, antigravityGeminiDir (<OVERDECK_HOME>/antigravity), resolveAntigravityCredential with the D4 order (config.apiKeys.google as a literal key from the enabled Google provider, refusing unresolved $VAR references and never reading env GEMINI_API_KEY, then project+location+ADC) and readAntigravityAuthStatus, all with fs/promises and no credential values in messages. Follow PRD .pan/drafts/PAN-5587.md WI-4 exactly (exact lines, before/after snippets and test names are there)."
+        },
+        "items": [
+          {
+            "id": "antigravity-auth.ac1",
+            "title": "Given an enabled Google provider with a literal key, when resolveAntigravityCredential runs, then it returns method gemini-api-key with source settings; given only an env GEMINI_API_KEY and no settings key, then it does not return a credential; given the settings value $GEMINI_API_KEY, then it rejects with a message naming $GEMINI_API_KEY and Settings → Google.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "antigravity-auth.ac2",
+            "title": "Given GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION (in env, or gcp.project/gcp.location in <geminiDir>/antigravity-cli/settings.json) and an existing ADC file and no API key, when resolveAntigravityCredential runs, then it returns method agent-platform.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "antigravity-auth.ac3",
+            "title": "Given no API key and a project without an ADC file, when resolveAntigravityCredential runs, then it rejects with AntigravityCredentialError whose message equals ANTIGRAVITY_AUTH_REQUIRED, contains \"clause 6\", and never contains the synthetic key.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "antigravity-auth.ac4",
+            "title": "Given no credential, when readAntigravityAuthStatus runs, then it returns { ready: false, method: null }; given a settings key, then it returns { ready: true, method: \"gemini-api-key\" }.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "antigravity-auth.ac5",
+            "title": "Given the module, when it is searched for an OAuth method id as a selectable value, then ANTIGRAVITY_AUTH_METHODS contains exactly gemini-api-key and agent-platform.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "acp-antigravity-module",
+        "title": "Add src/lib/acp/antigravity.ts and the antigravity ACP provider support entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-21T22:58:40.011Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5587",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "host-antigravity",
+            "antigravity-cost-collector",
+            "antigravity-replay-fixtures"
+          ],
+          "files_scope": [
+            "src/lib/acp/antigravity.ts",
+            "src/lib/acp/providers.ts",
+            "src/lib/acp/transcript.ts",
+            "src/lib/acp/__tests__/antigravity.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/acp/__tests__/antigravity.test.ts src/lib/acp/__tests__/grok.test.ts",
+            "npm run lint:effort"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "antigravity.test.ts and grok.test.ts pass",
+            "lint:effort reports no new offenders"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-7",
+            "NFR-1",
+            "NFR-6",
+            "NFR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement buildAntigravityAcpSpawnInput (agy acp --gemini-dir <dir>, env strips GOOGLE_API_KEY/GEMINI_API_KEY/GOOGLE_CLOUD_* then adds the credential env), resolveAntigravityAuthMethodId (allowlist only), clampAntigravityThoughtLevel (ranked by EFFORT_LEVELS), extractAntigravityTurnUsage(response, model) and makeAntigravityAcpRuntime (requires input.credential, which host main() resolves; dies with ANTIGRAVITY_AUTH_REQUIRED when absent; mkdirs the gemini dir). Register the provider support entry with effortConfigId \"thought_level\", resolveEffortValue, harness \"antigravity\", extractTurnUsage, displayName and resolveCredential; add displayName \"Grok Build\" to grok; add the optional `source` field to AcpTurnUsage. Follow PRD .pan/drafts/PAN-5587.md WI-5 exactly (exact lines, before/after snippets and test names are there)."
+        },
+        "items": [
+          {
+            "id": "acp-antigravity-module.ac1",
+            "title": "Given a geminiDir and a gemini-api-key credential, when buildAntigravityAcpSpawnInput runs with an env holding GOOGLE_API_KEY and another GEMINI_API_KEY, then args equal [\"acp\",\"--gemini-dir\",<dir>] (and makeAntigravityAcpRuntime creates <dir> with mkdir recursive before spawning), GOOGLE_API_KEY is absent and GEMINI_API_KEY equals the credential value; an agent-platform credential leaves GEMINI_API_KEY absent.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-antigravity-module.ac2",
+            "title": "Given an initialize result advertising oauth-personal, oauth-business, gemini-api-key and agent-platform, when resolveAntigravityAuthMethodId runs for gemini-api-key or agent-platform, then it returns that id; given a result advertising only OAuth methods, then it throws a message containing ANTIGRAVITY_AUTH_REQUIRED.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-antigravity-module.ac3",
+            "title": "Given offered thought levels, when clampAntigravityThoughtLevel runs, then (\"medium\",[low,high]) returns \"low\", (\"xhigh\",[low,medium,high]) returns \"high\", (\"low\",[medium,high]) returns \"medium\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-antigravity-module.ac4",
+            "title": "Given the finding-5 prompt result, when extractAntigravityTurnUsage(result,\"gemini-4-argon\") runs, then it returns inputTokens 12101, outputTokens 117, cacheReadTokens 7739, cacheWriteTokens 0, reasoningTokens 0, source \"antigravity\"; a result without usage returns undefined.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-antigravity-module.ac5",
+            "title": "Given the provider table, when resolveAcpModelId(\"antigravity\",\"gemini-3.1-pro-preview\") is called, then it returns \"gemini-3.1-pro\", and the Grok extractor still passes grok.test.ts.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "host-antigravity",
+        "title": "Clamp the ACP effort option generically, pass the launch model to usage, and write pre-start launch errors in the ACP host",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-21T22:58:40.011Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5587",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/acp/host.ts",
+            "src/lib/acp/__tests__/host.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/acp/__tests__/host.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "host.test.ts passes",
+            "lint-file-size passes with host.ts at or under 1000 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-6",
+            "FR-13",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Rework the effortConfigId block (and the live effort-change path) to read the option values and call support.resolveEffortValue, word the missing-effort error with support.displayName, pass this.options.model to extractTurnUsage, add the Antigravity auth-failure message, and in main() await support.resolveCredential() before makeRuntime (passing it as input.credential) and write acp-launch-error for errors thrown before host.start() through an extracted acpLaunchErrorPath helper. Follow PRD .pan/drafts/PAN-5587.md WI-6 exactly (exact lines, before/after snippets and test names are there)."
+        },
+        "items": [
+          {
+            "id": "host-antigravity.ac1",
+            "title": "Given provider antigravity, model gemini-3.1-pro-preview, effort medium and fake thought_level options low/high, when host.start() runs, then the runtime receives setModel(\"gemini-3.1-pro\") followed by setConfigOption(\"thought_level\",\"low\").",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-antigravity.ac2",
+            "title": "Given the same host with resumeSessionId set, when host.start() runs, then setModel and setConfigOption(\"thought_level\", …) are both called again after session/load.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-antigravity.ac3",
+            "title": "Given a completed Antigravity turn with usage, when the host appends turn_completed, then the entry carries usage.model equal to the launch model and usage.source \"antigravity\", and the session-history call receives harness \"antigravity\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-antigravity.ac4",
+            "title": "Given support.resolveCredential rejects with AntigravityCredentialError(ANTIGRAVITY_AUTH_REQUIRED) (tested through main() or the extracted pre-start helper main() calls), when main() handles it, then <OVERDECK_HOME>/agents/<id>/acp-launch-error contains exactly that message and makeRuntime is never called.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-antigravity.ac5",
+            "title": "Given the existing Grok tests, when host.test.ts runs, then \"Grok Build launch requires --effort.\" still matches and every prior test passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "runtime-launcher-fields",
+        "title": "Register the antigravity ACP runtime and pass the resolved harness into getAcpLauncherFields",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-21T22:58:40.011Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5587",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/runtimes/acp.ts",
+            "src/lib/runtimes/index.ts",
+            "src/lib/agents/runtime-command.ts",
+            "src/lib/acp/context.ts",
+            "src/lib/agents/spawn.ts",
+            "src/lib/agents/spawn-prep.ts",
+            "src/lib/planning/spawn-planning-session.ts",
+            "src/lib/overdeck/conversation-runtime.ts",
+            "src/lib/runtimes/__tests__/acp.test.ts",
+            "src/lib/agents/__tests__/runtime-command-effort.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/runtimes/__tests__/acp.test.ts src/lib/agents/__tests__/runtime-command-effort.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "acp.test.ts and runtime-command-effort.test.ts pass",
+            "lint-file-size passes (spawn.ts and conversation-runtime.ts net line delta 0)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Widen the AcpRuntime name unions, default provider and explicit-model guard for antigravity, register createAcpRuntime({ name: \"antigravity\", provider: \"antigravity\" }), add the 7th requestedHarness parameter to getAcpLauncherFields (harness and acpProvider \"antigravity\" when requested), widen acp/context.ts, and pass the resolved harness from the four callers with same-line edits. Follow PRD .pan/drafts/PAN-5587.md WI-7 exactly (exact lines, before/after snippets and test names are there)."
+        },
+        "items": [
+          {
+            "id": "runtime-launcher-fields.ac1",
+            "title": "Given getAcpLauncherFields(id,\"gemini-4-argon\",ws,\"/bin/agy\",\"work\",undefined,\"antigravity\"), when it resolves, then it returns harness \"antigravity\", acpProvider \"antigravity\" and acpEffort \"high\"; with effort \"max\" it returns acpEffort \"high\" for gemini-4-argon (capability levels low..high) and \"xhigh\" for gemini-3.8-flash (no capability levels).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runtime-launcher-fields.ac2",
+            "title": "Given getAcpLauncherFields for \"grok/grok-4.6\" without a 7th argument, when it resolves, then it still returns harness \"grok\" and acpProvider \"grok\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runtime-launcher-fields.ac3",
+            "title": "Given the runtime registry, when getRuntime(\"antigravity\") is called, then it is defined, and spawnAgent without a model rejects with \"Antigravity requires an explicit model\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runtime-launcher-fields.ac4",
+            "title": "Given the four call sites, when the diff is inspected, then spawn.ts, spawn-prep.ts, spawn-planning-session.ts and conversation-runtime.ts each pass the resolved harness on an existing line and lint-file-size passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "config-validation-messages",
+        "title": "Accept antigravity in config, role, provider-harness and tier validation unions and messages",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-21T22:58:40.011Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5587",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/config-yaml/schema.ts",
+            "src/lib/config-yaml/merge.ts",
+            "src/lib/config-yaml/roles.ts",
+            "src/lib/settings-api.ts",
+            "src/lib/agents/tier-table.ts",
+            "tests/lib/config-yaml.test.ts",
+            "tests/lib/settings-api.test.ts",
+            "src/lib/agents/__tests__/tier-table.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/lib/config-yaml.test.ts tests/lib/settings-api.test.ts src/lib/agents/__tests__/tier-table.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the three test files pass",
+            "lint-file-size passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Add antigravity beside grok on the listed union and message lines only; leave every provider list untouched. Follow PRD .pan/drafts/PAN-5587.md WI-8 exactly (exact lines, before/after snippets and test names are there)."
+        },
+        "items": [
+          {
+            "id": "config-validation-messages.ac1",
+            "title": "Given config.yaml with roles.work.harness antigravity, when mergeConfigs/validateRole runs, then it accepts the value without throwing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-validation-messages.ac2",
+            "title": "Given models.providers.google.harness antigravity and a tiered-execution row with harness antigravity, when validated, then both are accepted.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-validation-messages.ac3",
+            "title": "Given an invalid harness value, when validation fails, then the error message lists antigravity among the allowed harnesses.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-lists",
+        "title": "Accept antigravity in conversation normalization, runtime, restart-all and harness-discovery lists",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-21T22:58:40.011Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5587",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversations.ts",
+            "src/lib/overdeck/conversation-runtime.ts",
+            "src/lib/overdeck/conversation-restart-all.ts",
+            "src/lib/conversations/harness-discovery.ts",
+            "src/lib/overdeck/__tests__/conversation-restart-all.test.ts",
+            "src/lib/conversations/__tests__/harness-discovery.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/overdeck/__tests__/conversation-restart-all.test.ts src/lib/conversations/__tests__/harness-discovery.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "both test files pass",
+            "lint-file-size passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-8",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Same-line additions beside grok in conversations.ts line 47, conversation-runtime.ts line 224, conversation-restart-all.ts lines 40/57 and harness-discovery.ts lines 17/157/172. Follow PRD .pan/drafts/PAN-5587.md WI-9 exactly (exact lines, before/after snippets and test names are there)."
+        },
+        "items": [
+          {
+            "id": "conversation-lists.ac1",
+            "title": "Given harness antigravity and model gemini-4-argon, when resolveAllowedHarness runs, then it resolves \"antigravity\", and normalizeHarness(\"antigravity\") returns \"antigravity\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-lists.ac2",
+            "title": "Given a conversation whose harness is antigravity, when restart-all runs, then it restarts that conversation through the ACP host path.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-lists.ac3",
+            "title": "Given an agent dir with acp-session.jsonl and harness antigravity, when harness discovery runs, then the discovered file is labeled antigravity.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "launch-context-lists",
+        "title": "Accept antigravity in launcher, recovery, context-layer, telemetry, artifact and transcript-adapter lists",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-21T22:58:40.011Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5587",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/launcher-generator.ts",
+            "src/lib/agents/recovery.ts",
+            "src/lib/context-layers/launch-sources.ts",
+            "src/lib/telemetry/pipeline.ts",
+            "src/lib/artifacts/lifecycle.ts",
+            "src/lib/conversations/transcript-adapter.ts",
+            "tests/lib/context-layers/harness.test.ts",
+            "src/lib/context-layers/__tests__/launch-sources.test.ts",
+            "src/lib/conversations/__tests__/transcript-adapter.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/lib/context-layers/harness.test.ts src/lib/context-layers/__tests__/launch-sources.test.ts src/lib/conversations/__tests__/transcript-adapter.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the three test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-8",
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Same-line additions beside grok; launch-sources.ts adds contextLayerKind \"antigravity\"; transcript-adapter.ts maps antigravity to acpAdapter. Follow PRD .pan/drafts/PAN-5587.md WI-10 exactly (exact lines, before/after snippets and test names are there)."
+        },
+        "items": [
+          {
+            "id": "launch-context-lists.ac1",
+            "title": "Given a context layer with harness:antigravity and harness:grok blocks, when an Antigravity launch context renders, then it includes the antigravity block and excludes the grok block.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-context-lists.ac2",
+            "title": "Given harness antigravity, when getTranscriptAdapter is called, then it returns the ACP adapter.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-context-lists.ac3",
+            "title": "Given recovery for an antigravity agent, when the recovery harness check runs, then antigravity follows the same host-backed path as grok.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "server-route-lists",
+        "title": "Accept antigravity in the dashboard context-preview and workers route harness lists",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-21T22:58:40.011Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-5587",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/context.ts",
+            "src/dashboard/server/routes/workers.ts",
+            "tests/unit/dashboard/server/routes/context.test.ts",
+            "src/dashboard/server/__tests__/workers-route.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/server/routes/context.test.ts src/dashboard/server/__tests__/workers-route.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "both test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Add antigravity to PREVIEW_HARNESSES and the preview object, and to the workers route HARNESSES list. Follow PRD .pan/drafts/PAN-5587.md WI-11 exactly (exact lines, before/after snippets and test names are there)."
+        },
+        "items": [
+          {
+            "id": "server-route-lists.ac1",
+            "title": "Given the context preview route, when it is requested, then the response contains an antigravity preview key.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-route-lists.ac2",
+            "title": "Given a worker run request with harness antigravity, when the workers route validates it, then it accepts the harness.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-harness-lists",
+        "title": "Accept antigravity in CLI --harness options, validators and help text",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-21T22:58:40.011Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5587",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/index.ts",
+            "src/cli/commands/start-register.ts",
+            "src/cli/commands/start.ts",
+            "src/cli/commands/strike.ts",
+            "src/cli/commands/worker.ts",
+            "src/cli/commands/artifacts.ts",
+            "src/cli/commands/context-layers.ts",
+            "packages/contracts/src/composer-commands.generated.ts",
+            "src/cli/commands/__tests__/start-harness.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/cli/commands/__tests__/start-harness.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "start-harness.test.ts passes",
+            "lint-file-size passes (start.ts net delta 0)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Same-line additions in the help strings and validators; context-layers.ts gains case \"antigravity\"; regenerate composer-commands.generated.ts with the repo generator. Follow PRD .pan/drafts/PAN-5587.md WI-12 exactly (exact lines, before/after snippets and test names are there)."
+        },
+        "items": [
+          {
+            "id": "cli-harness-lists.ac1",
+            "title": "Given `pan start X --harness antigravity`, when the start validator runs, then it accepts the harness; given an invalid value, then the error lists antigravity.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-harness-lists.ac2",
+            "title": "Given src/cli/index.ts and start-register.ts, when every \"Coding-agent harness:\" help string is read, then each contains \"| antigravity\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-harness-lists.ac3",
+            "title": "Given the regenerated composer-commands.generated.ts, when the CLI drift check in `npm run lint` runs, then it reports no drift.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "picker-catalog-rows",
+        "title": "Add \"— Antigravity\" rows to the Google group of the settings model catalog when agy is installed and a credential is ready",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-21T22:58:40.011Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5587",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/settings-model-catalog.ts",
+            "src/lib/__tests__/settings-model-catalog.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/settings-model-catalog.test.ts",
+            "npm run lint:effort"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "settings-model-catalog.test.ts passes",
+            "lint:effort reports no new offenders"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "NFR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement antigravityRows per D13 and append them to result.google in getAvailableModelsWithOpenCodeApi; effort levels come from capability levels filtered by getHarnessBehavior(\"antigravity\").effortLevels with no literal list. Follow PRD .pan/drafts/PAN-5587.md WI-13 exactly (exact lines, before/after snippets and test names are there)."
+        },
+        "items": [
+          {
+            "id": "picker-catalog-rows.ac1",
+            "title": "Given agy resolves and readAntigravityAuthStatus is ready, when the catalog is built, then the google group contains one row per Antigravity model labeled \"<name> — Antigravity\" with harness \"antigravity\" and gemini-4-argon effortLevels low/medium/high, while a row without capability levels (gemini-3.8-flash) gets the harness levels low/medium/high/xhigh, never an empty list.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "picker-catalog-rows.ac2",
+            "title": "Given agy is not installed, or the status is not ready, when the catalog is built, then the google group contains no Antigravity rows.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "picker-catalog-rows.ac3",
+            "title": "Given any case, when the catalog is built, then the plain gemini-4-argon row is present without a harness field.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "doctor-antigravity",
+        "title": "Add the agy prerequisite row and the pan doctor Antigravity check with the OAuth reason",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-21T22:58:40.011Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5587",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/system-prerequisites.ts",
+            "src/cli/commands/doctor-antigravity.ts",
+            "src/cli/commands/doctor.ts",
+            "tests/unit/cli/doctor-antigravity.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/cli/doctor-antigravity.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "doctor-antigravity.test.ts passes",
+            "lint-file-size passes with doctor.ts at or under 1000 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Add the prerequisite row with id \"agy\" (the id is the binary name), checkAntigravity modeled on doctor-grok.ts, and the two-line import/call in doctor.ts. Follow PRD .pan/drafts/PAN-5587.md WI-14 exactly (exact lines, before/after snippets and test names are there)."
+        },
+        "items": [
+          {
+            "id": "doctor-antigravity.ac1",
+            "title": "Given agy is not found, when checkAntigravity runs, then it returns warn \"Not installed (optional ACP harness)\" with the install command and the OAuth sentence in the fix.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-antigravity.ac2",
+            "title": "Given agy is found and no credential is ready, when checkAntigravity runs, then it returns warn \"No API key or Agent Platform credentials\" with fix ANTIGRAVITY_AUTH_REQUIRED.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-antigravity.ac3",
+            "title": "Given agy 1.5.14 and a ready gemini-api-key credential, when checkAntigravity runs, then it returns ok \"1.5.14, auth gemini-api-key.\" followed by ANTIGRAVITY_OAUTH_NOT_OFFERED.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-harness-unions",
+        "title": "Accept antigravity in frontend harness unions, lists, fork guard, context tabs and composer effort",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-21T22:58:40.011Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5587",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/types.ts",
+            "src/dashboard/frontend/src/components/Settings/RolesPanel.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/CrewRow.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx",
+            "src/dashboard/frontend/src/hooks/useSwitchModel.ts",
+            "src/dashboard/frontend/src/components/PlanDialog.tsx",
+            "src/dashboard/frontend/src/types.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationList.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ForkModal.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/useConversationMutations.ts",
+            "src/dashboard/frontend/src/components/sessionFeed/types.ts",
+            "src/dashboard/frontend/src/components/context/ContextPage.tsx",
+            "src/dashboard/frontend/src/components/chat/useComposerEffort.ts",
+            "src/dashboard/frontend/src/components/shared/ModelPicker/ModelPicker.tsx",
+            "src/dashboard/frontend/src/components/shared/branding/index.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/useComposerEffort.test.tsx",
+            "src/dashboard/frontend/src/components/context/__tests__/ContextPage.test.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx tsc --noEmit -p .",
+            "npx vitest run src/dashboard/frontend/src/components/chat/__tests__/useComposerEffort.test.tsx src/dashboard/frontend/src/components/context/__tests__/ContextPage.test.tsx"
+          ],
+          "expected_outputs": [
+            "frontend tsc completes without errors",
+            "useComposerEffort.test.tsx and ContextPage.test.tsx pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-10",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Add antigravity beside grok in every frontend harness union and list (not provider maps), the ForkModal plain-fork guard, the ContextPage tab, the composer effort clamp and harness list, the shared ModelPicker Harness union, and minimal rows for any Record<Harness,…> the frontend tsc reports (branding row with the acp icon, label maps). Follow PRD .pan/drafts/PAN-5587.md WI-15 exactly (exact lines, before/after snippets and test names are there)."
+        },
+        "items": [
+          {
+            "id": "frontend-harness-unions.ac1",
+            "title": "Given harness antigravity and effort max, when useComposerEffort resolves the effort, then it returns xhigh.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-harness-unions.ac2",
+            "title": "Given the context page, when it renders the preview options, then an \"Antigravity\" tab is present.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-harness-unions.ac3",
+            "title": "Given a conversation with harness antigravity, when ForkModal computes sourceSupportsPlainFork, then it returns false like the other ACP harnesses.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-harness-unions.ac4",
+            "title": "Given the change, when the frontend tsc runs, then it exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-picker-options",
+        "title": "Show Antigravity in the harness picker options and the chat ModelPicker rows",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-21T22:58:40.011Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5587",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/shared/ModelPicker/ModelPicker.tsx",
+            "src/dashboard/frontend/src/components/shared/ModelPicker/harnessRows.ts",
+            "src/dashboard/frontend/src/components/chat/ModelPicker.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ModelPicker.test.tsx",
+            "src/dashboard/frontend/src/components/shared/ModelPicker/__tests__/harnessRows.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx tsc --noEmit -p .",
+            "npx vitest run src/dashboard/frontend/src/components/chat/__tests__/ModelPicker.test.tsx src/dashboard/frontend/src/components/shared/ModelPicker/__tests__/harnessRows.test.ts"
+          ],
+          "expected_outputs": [
+            "frontend tsc completes without errors",
+            "ModelPicker.test.tsx and harnessRows.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Add the HARNESS_OPTIONS entry, HARNESS_ROW_LABELS antigravity, the chat picker harness label and isHarness member. Follow PRD .pan/drafts/PAN-5587.md WI-16 exactly (exact lines, before/after snippets and test names are there)."
+        },
+        "items": [
+          {
+            "id": "frontend-picker-options.ac1",
+            "title": "Given a Google group with a plain gemini-4-argon row and a gemini-4-argon row with harness antigravity, when the chat ModelPicker renders, then both rows appear and selecting the second calls onComboChange with harness \"antigravity\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-picker-options.ac2",
+            "title": "Given a row with harness antigravity, when expandHarnessRows runs, then the row passes through unchanged.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-picker-options.ac3",
+            "title": "Given HARNESS_OPTIONS, when it is read, then it contains an entry with id \"antigravity\" and label \"Antigravity\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-branding",
+        "title": "Add the Antigravity harness icon to branding",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-21T22:58:40.011Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "frontend",
+          "issueLabel": "pan-5587",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/shared/branding/index.tsx",
+            "src/dashboard/frontend/src/components/shared/branding/__tests__/branding.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx tsc --noEmit -p .",
+            "npx vitest run src/dashboard/frontend/src/components/shared/branding/__tests__/branding.test.tsx"
+          ],
+          "expected_outputs": [
+            "frontend tsc completes without errors",
+            "branding.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Add an original geometric AntigravityHarnessIcon (aria-label \"Antigravity harness mark\", no copied Google artwork) and point the antigravity harness row at it. Follow PRD .pan/drafts/PAN-5587.md WI-17 exactly (exact lines, before/after snippets and test names are there)."
+        },
+        "items": [
+          {
+            "id": "frontend-branding.ac1",
+            "title": "Given harness antigravity, when the harness branding resolves, then it returns label \"Antigravity\" and renders an element with aria-label \"Antigravity harness mark\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-branding.ac2",
+            "title": "Given the provider branding map, when it is read, then it has no antigravity provider entry.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "acp-usage-collector-extract",
+        "title": "Extract the shared ACP turn-usage cost sweep from grok-collector.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-21T22:58:40.011Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-5587",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/costs/acp-turn-usage-collector.ts",
+            "src/lib/costs/grok-collector.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/overdeck/__tests__/cost-grok-reconcile.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "cost-grok-reconcile.test.ts passes unchanged"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Move the walk/parse/build logic into collectAcpTurnUsageCostEvents(options) and keep collectGrokCostEvents and GrokCollectedCostEvent as a thin wrapper with identical behavior. Follow PRD .pan/drafts/PAN-5587.md WI-18 exactly (exact lines, before/after snippets and test names are there)."
+        },
+        "items": [
+          {
+            "id": "acp-usage-collector-extract.ac1",
+            "title": "Given the unchanged cost-grok-reconcile.test.ts, when it runs after the extraction, then every test passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-usage-collector-extract.ac2",
+            "title": "Given collectAcpTurnUsageCostEvents, when called with a matches predicate, then it emits events only for turn_completed entries whose usage satisfies it and skips entries without sessionId or promptId with reason no-request-id.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "antigravity-cost-collector",
+        "title": "Import Antigravity turn usage into the cost store through an antigravity reconcile source",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-21T22:58:40.011Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5587",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/costs/antigravity-collector.ts",
+            "src/lib/overdeck/cost.ts",
+            "src/lib/cloister/pi-cost-reconciler.ts",
+            "src/dashboard/server/routes/costs.ts",
+            "src/lib/overdeck/__tests__/cost-antigravity-reconcile.test.ts",
+            "src/dashboard/server/routes/__tests__/costs-reconcile-route.test.ts",
+            "src/lib/cloister/__tests__/pi-cost-reconciler.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/overdeck/__tests__/cost-antigravity-reconcile.test.ts src/dashboard/server/routes/__tests__/costs-reconcile-route.test.ts src/lib/cloister/__tests__/pi-cost-reconciler.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the three test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Add collectAntigravityCostEvents (source \"antigravity\" usage, provider google, getPricing(\"google\", model)), the antigravity source in overdeck/cost.ts unions and routing, the Cloister reconciler call, and the route source value. Record the D12 estimate caveat in the collector header. Follow PRD .pan/drafts/PAN-5587.md WI-19 exactly (exact lines, before/after snippets and test names are there)."
+        },
+        "items": [
+          {
+            "id": "antigravity-cost-collector.ac1",
+            "title": "Given a fixture acp-session.jsonl with two Antigravity turn_completed entries on gemini-4-argon, when reconcile source antigravity runs, then it imports 2 events with provider google and cost equal to calculateCost(tokens, getPricing(\"google\",\"gemini-4-argon\")).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "antigravity-cost-collector.ac2",
+            "title": "Given the same fixture, when reconcile runs a second time, then it imports 0 events and reports duplicatesSkipped 2.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "antigravity-cost-collector.ac3",
+            "title": "Given a Grok usage entry and a usage-less Antigravity entry, when reconcile source antigravity runs, then neither produces an event.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "antigravity-cost-collector.ac4",
+            "title": "Given POST /api/costs/reconcile with source antigravity, when the route validates it, then it accepts the source and runs the collector.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "no-loss-audit",
+        "title": "Extend the harness no-loss audit to cover antigravity",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-21T22:58:40.011Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-5587",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/prime-agent-no-loss-audit.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/prime-agent-no-loss-audit.test.ts"
+          ],
+          "expected_outputs": [
+            "prime-agent-no-loss-audit.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Add MODEL_FOR antigravity: gemini-4-argon, ANTIGRAVITY_LITERAL_FILES (GROK_LITERAL_FILES minus system-prerequisites.ts) with an it.each for the literal, an it for \"agy\" in system-prerequisites.ts, and the \"| antigravity\" CLI help check. Follow PRD .pan/drafts/PAN-5587.md WI-20 exactly (exact lines, before/after snippets and test names are there)."
+        },
+        "items": [
+          {
+            "id": "no-loss-audit.ac1",
+            "title": "Given KNOWN_HARNESSES with antigravity, when the audit runs, then the it.each(harnesses) blocks pass for antigravity (behavior, policy, binary, context marker, schemas, normalization, transcript adapter, Cloister runtime).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "no-loss-audit.ac2",
+            "title": "Given ANTIGRAVITY_LITERAL_FILES, when the audit runs, then every listed file contains the literal antigravity and system-prerequisites.ts contains agy.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "no-loss-audit.ac3",
+            "title": "Given src/cli/index.ts, when the audit reads every \"Coding-agent harness:\" string, then each contains \"| antigravity\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "antigravity-replay-fixtures",
+        "title": "Record Antigravity ACP replay fixtures and add host replay tests for turn completion and resume",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-21T22:58:40.011Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-5587",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/protocol-capture/record.ts",
+            "src/lib/protocol-capture/scrub.ts",
+            "src/lib/acp/__tests__/fixtures/replay/antigravity-turn-completion.jsonl",
+            "src/lib/acp/__tests__/fixtures/replay/antigravity-resume.jsonl",
+            "src/lib/acp/__tests__/fixtures/replay-spawner.ts",
+            "src/lib/acp/__tests__/host-replay.test.ts",
+            "src/lib/protocol-capture/__tests__/fixture-hygiene.test.ts",
+            "docs/PROTOCOL-REPLAY-TESTS.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/acp/__tests__/host-replay.test.ts src/lib/protocol-capture/__tests__/fixture-hygiene.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "host-replay.test.ts and fixture-hygiene.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-6",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Add the antigravity harness and its two scenarios to the recorder (binary agy, scratch geminiDir, credential from antigravity-auth), record both fixtures with the real CLI on gemini-4-argon effort low, inject a synthetic credential in the replay spawner, add the replay assertions, extend fixture hygiene, and document scenarios and prerequisites in docs/PROTOCOL-REPLAY-TESTS.md. Follow PRD .pan/drafts/PAN-5587.md WI-21 exactly (exact lines, before/after snippets and test names are there)."
+        },
+        "items": [
+          {
+            "id": "antigravity-replay-fixtures.ac1",
+            "title": "Given the antigravity-turn-completion fixture, when host-replay runs it, then the out frames show authenticate methodId gemini-api-key, then set_config_option model=gemini-4-argon, then thought_level=low, and turn_completed usage.source is \"antigravity\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "antigravity-replay-fixtures.ac2",
+            "title": "Given the antigravity-resume fixture, when host-replay runs it, then the first session frame is session/load with the recorded id and it is followed by set_config_option model=gemini-4-argon.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "antigravity-replay-fixtures.ac3",
+            "title": "Given every committed replay fixture, when fixture-hygiene.test.ts runs, then no fixture contains \"AIza\" or \"GEMINI_API_KEY=\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "antigravity-replay-fixtures.ac4",
+            "title": "Given docs/PROTOCOL-REPLAY-TESTS.md, when it is read, then its scenario table lists antigravity-turn-completion and antigravity-resume with their fixture paths and the API-key prerequisite.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "antigravity-docs",
+        "title": "Document the Antigravity harness in harnesses.mdx, harness-landscape.mdx, ROLES.md, CLAUDE.md, the codebase map and changelog.d",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-21T22:58:40.011Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5587",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/harnesses.mdx",
+            "reference/harness-landscape.mdx",
+            "docs/ROLES.md",
+            "CLAUDE.md",
+            ".overdeck/context/codebase/stack.md",
+            ".overdeck/context/codebase/architecture.md",
+            "changelog.d/pan-5587.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "Write the ### Antigravity CLI section (install, desktop-app note, both auth methods, clause-6 reason, models, choosing it, effort, isolation, resume, permissions, MCP, cost estimates, context blocks, invalid-key behavior), the ToS-rules paragraph, the harness-landscape table/profile/matrix replacements for the Gemini CLI candidate rows (lines 119, 149, 279, 571), the ROLES.md and CLAUDE.md list updates, the codebase-map mentions, and changelog.d/pan-5587.md. Follow PRD .pan/drafts/PAN-5587.md WI-22 exactly (exact lines, before/after snippets and test names are there)."
+        },
+        "items": [
+          {
+            "id": "antigravity-docs.ac1",
+            "title": "Given configuration/harnesses.mdx, when it is read, then a \"### Antigravity CLI\" section states the install command, Settings API key and Agent Platform setup, the clause-6 reason Google sign-in is not offered, the served model ids, isolation in ~/.overdeck/antigravity, and that costs are estimates.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "antigravity-docs.ac2",
+            "title": "Given reference/harness-landscape.mdx, when it is read, then the ACP table row reads \"**Antigravity CLI** (Google) | **Wired now** through `agy acp`\" and no \"Google Gemini CLI: Not supported (candidate)\" heading remains.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "antigravity-docs.ac3",
+            "title": "Given changelog.d/pan-5587.md, when `npm run lint:docs` runs, then it exits 0 and the file has one \"#### New\" bullet linking #5587.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "antigravity-docs.ac4",
+            "title": "Given CLAUDE.md, docs/ROLES.md and .overdeck/context/codebase/stack.md, when they are read, then each lists antigravity beside grok.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "live-verification",
+        "title": "Verify Antigravity end to end with the real agy CLI, a throwaway dashboard and isolated Playwright",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-21T22:58:40.011Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-5587",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/drafts/PAN-5587-live-verification.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "agy --version",
+            "npm run build"
+          ],
+          "expected_outputs": [
+            "agy prints a version",
+            "build completes without errors",
+            ".pan/drafts/PAN-5587-live-verification.md records each check with command output"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-9",
+            "FR-11",
+            "FR-13"
+          ],
+          "acJustification": "The live run has six independent observable checks the issue requires; splitting them into separate items would repeat the throwaway-dashboard setup."
+        },
+        "narrative": {
+          "Action": "On a branch-built throwaway dashboard (separate OVERDECK_HOME and port) with isolated Playwright, run the eight WI-23 checks and record the initialize response, ACP method names and outputs in .pan/drafts/PAN-5587-live-verification.md and the PR. Fallback: if agy acp cannot complete an initialize and prompt round trip, stop and report on the issue. Follow PRD .pan/drafts/PAN-5587.md WI-23 exactly (exact lines, before/after snippets and test names are there)."
+        },
+        "items": [
+          {
+            "id": "live-verification.ac1",
+            "title": "Given a conversation with harness antigravity on gemini-4-carbon (if registered) or gemini-4-argon, when \"Reply with exactly OK.\" is sent, then the conversation view renders the user row and an assistant row reading OK.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-verification.ac2",
+            "title": "Given that conversation, when the throwaway dashboard server restarts and a second message asks for the previous reply, then the conversation keeps the same acp-session-id and answers OK.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-verification.ac3",
+            "title": "Given `pan start <test issue> --harness antigravity --model gemini-4-argon`, when it launches, then ps shows acp-host with an agy child whose argv contains --gemini-dir <throwaway OVERDECK_HOME>/antigravity.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-verification.ac4",
+            "title": "Given completed turns, when POST /api/costs/reconcile with source antigravity runs, then it imports one event per turn with provider google and model gemini-4-argon.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-verification.ac5",
+            "title": "Given `pan doctor`, when it runs, then the Antigravity CLI line is ok with \"auth gemini-api-key\" and the OAuth sentence.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-verification.ac6",
+            "title": "Given the Google key removed from the throwaway config, when a new Antigravity conversation starts, then acp-launch-error contains ANTIGRAVITY_AUTH_REQUIRED and the spawn fails without waiting for the ACP spawn timeout.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "contracts-harness",
+        "to": "harness-policy",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-harness",
+        "to": "acp-antigravity-module",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-harness",
+        "to": "runtime-launcher-fields",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-harness",
+        "to": "config-validation-messages",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-harness",
+        "to": "conversation-lists",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-harness",
+        "to": "launch-context-lists",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-harness",
+        "to": "server-route-lists",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-harness",
+        "to": "cli-harness-lists",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-harness",
+        "to": "picker-catalog-rows",
+        "type": "blocks"
+      },
+      {
+        "from": "antigravity-models",
+        "to": "harness-policy",
+        "type": "blocks"
+      },
+      {
+        "from": "antigravity-models",
+        "to": "acp-antigravity-module",
+        "type": "blocks"
+      },
+      {
+        "from": "antigravity-models",
+        "to": "picker-catalog-rows",
+        "type": "blocks"
+      },
+      {
+        "from": "antigravity-auth",
+        "to": "acp-antigravity-module",
+        "type": "blocks"
+      },
+      {
+        "from": "antigravity-auth",
+        "to": "picker-catalog-rows",
+        "type": "blocks"
+      },
+      {
+        "from": "antigravity-auth",
+        "to": "doctor-antigravity",
+        "type": "blocks"
+      },
+      {
+        "from": "acp-antigravity-module",
+        "to": "host-antigravity",
+        "type": "blocks"
+      },
+      {
+        "from": "acp-antigravity-module",
+        "to": "antigravity-cost-collector",
+        "type": "blocks"
+      },
+      {
+        "from": "acp-antigravity-module",
+        "to": "antigravity-replay-fixtures",
+        "type": "blocks"
+      },
+      {
+        "from": "host-antigravity",
+        "to": "antigravity-replay-fixtures",
+        "type": "blocks"
+      },
+      {
+        "from": "runtime-launcher-fields",
+        "to": "conversation-lists",
+        "type": "blocks"
+      },
+      {
+        "from": "harness-policy",
+        "to": "conversation-lists",
+        "type": "blocks"
+      },
+      {
+        "from": "doctor-antigravity",
+        "to": "no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "acp-usage-collector-extract",
+        "to": "antigravity-cost-collector",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-harness-unions",
+        "to": "frontend-picker-options",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-harness-unions",
+        "to": "frontend-branding",
+        "type": "blocks"
+      },
+      {
+        "from": "harness-policy",
+        "to": "no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "runtime-launcher-fields",
+        "to": "no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "config-validation-messages",
+        "to": "no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-lists",
+        "to": "no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "launch-context-lists",
+        "to": "no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "server-route-lists",
+        "to": "no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-harness-lists",
+        "to": "no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-harness",
+        "to": "live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "antigravity-models",
+        "to": "live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "harness-policy",
+        "to": "live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "antigravity-auth",
+        "to": "live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "acp-antigravity-module",
+        "to": "live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "host-antigravity",
+        "to": "live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "runtime-launcher-fields",
+        "to": "live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "config-validation-messages",
+        "to": "live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-lists",
+        "to": "live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "launch-context-lists",
+        "to": "live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "server-route-lists",
+        "to": "live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-harness-lists",
+        "to": "live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "picker-catalog-rows",
+        "to": "live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "doctor-antigravity",
+        "to": "live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-harness-unions",
+        "to": "live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-picker-options",
+        "to": "live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-branding",
+        "to": "live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "acp-usage-collector-extract",
+        "to": "live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "antigravity-cost-collector",
+        "to": "live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "no-loss-audit",
+        "to": "live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "antigravity-replay-fixtures",
+        "to": "live-verification",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
