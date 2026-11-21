@@ -60,7 +60,6 @@ export function useSubagentSelection(subagents: readonly SubagentSummary[]) {
 }
 
 export function SubagentRail({ conversation, subagents, selectedAgentId, defaultCollapsed, toggleSignal }: SubagentRailProps) {
-  const select = useCallback((agentId: string | null) => updateSelectedSubagent(agentId), []);
   const [storedCollapsed, setStoredCollapsed] = useState(
     // PAN-5295 D2-15: closed by default — only a stored 'false' opens the rail.
     () => defaultCollapsed ?? (typeof window === 'undefined' || localStorage.getItem(AGENTS_RAIL_COLLAPSED_KEY) !== 'false'),
@@ -78,6 +77,13 @@ export function SubagentRail({ conversation, subagents, selectedAgentId, default
   // over it while the pane stays narrow. Never persisted — it's a transient
   // reaction to space, not a preference.
   const [override, setOverride] = useState<boolean | null>(null);
+
+  // On a narrow pane the rail is an overlay (PAN-5585): picking a row closes it,
+  // same as the scrim or the X.
+  const select = useCallback((agentId: string | null) => {
+    updateSelectedSubagent(agentId);
+    if (narrow) setOverride(true);
+  }, [narrow]);
 
   useEffect(() => {
     if (!host) return;
@@ -115,30 +121,24 @@ export function SubagentRail({ conversation, subagents, selectedAgentId, default
 
   if (subagents.length === 0) return null;
 
-  if (collapsed) {
-    return (
-      <button
-        ref={hostRef}
-        type="button"
-        className="flex w-[30px] min-w-[30px] shrink-0 cursor-pointer flex-col items-center gap-2.5 border-l border-border bg-card pt-2.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-        onClick={() => toggleCollapsed(false)}
-        title="Show Agents"
-        aria-label="Show agents rail"
-      >
-        <ChevronLeft size={16} />
-        <span className="text-[10px] font-medium uppercase tracking-[0.08em] [writing-mode:vertical-rl]">
-          Agents
-        </span>
-      </button>
-    );
-  }
-
-  return (
-    <aside
+  const strip = (
+    <button
       ref={hostRef}
-      aria-label="Conversation agents"
-      className="flex min-h-0 w-64 min-w-0 shrink-0 flex-col border-l border-border bg-card"
+      type="button"
+      className="flex w-[30px] min-w-[30px] shrink-0 cursor-pointer flex-col items-center gap-2.5 border-l border-border bg-card pt-2.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+      onClick={() => toggleCollapsed(false)}
+      title="Show Agents"
+      aria-label="Show agents rail"
     >
+      <ChevronLeft size={16} />
+      <span className="text-[10px] font-medium uppercase tracking-[0.08em] [writing-mode:vertical-rl]">
+        Agents
+      </span>
+    </button>
+  );
+
+  const railBody = (
+    <>
       <header className="flex h-11 shrink-0 items-center border-b border-border px-3 text-xs font-medium text-muted-foreground">
         Agents
         <button
@@ -172,6 +172,41 @@ export function SubagentRail({ conversation, subagents, selectedAgentId, default
           />
         ))}
       </div>
+    </>
+  );
+
+  if (collapsed) return strip;
+
+  if (narrow) {
+    return (
+      <>
+        {strip}
+        <button
+          type="button"
+          aria-label="Close agents rail"
+          data-testid="agents-rail-scrim"
+          className="absolute inset-0 z-20 cursor-default bg-background/60"
+          onClick={() => toggleCollapsed(true)}
+        />
+        <aside
+          aria-label="Conversation agents"
+          data-mode="overlay"
+          className="absolute inset-y-0 right-0 z-30 flex min-h-0 w-[min(100%,320px)] flex-col border-l border-border bg-card shadow-lg"
+        >
+          {railBody}
+        </aside>
+      </>
+    );
+  }
+
+  return (
+    <aside
+      ref={hostRef}
+      aria-label="Conversation agents"
+      data-mode="inline"
+      className="flex min-h-0 w-64 min-w-0 shrink-0 flex-col border-l border-border bg-card"
+    >
+      {railBody}
     </aside>
   );
 }

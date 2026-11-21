@@ -334,3 +334,78 @@ describe('SubagentRail toggleSignal (PAN-5291 ⋯ → Subagents)', () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe('SubagentRail narrow overlay (PAN-5585)', () => {
+  beforeEach(() => {
+    window.history.replaceState({}, '', '/conv/42');
+    resizeCallbacks = [];
+    vi.stubGlobal('ResizeObserver', FakeResizeObserver);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('opens as an overlay over the pane and keeps the strip in flow', async () => {
+    const user = userEvent.setup();
+    localStorage.setItem('overdeck.ui.agentsRailCollapsed', 'false');
+    render(<SubagentRail conversation={conversation} subagents={subagents} selectedAgentId={null} />);
+    resize(NARROW_PANE_PX - 1);
+
+    await user.click(screen.getByRole('button', { name: 'Show agents rail' }));
+
+    expect(screen.getByRole('complementary', { name: 'Conversation agents' })).toHaveAttribute('data-mode', 'overlay');
+    expect(screen.getByRole('button', { name: 'Show agents rail' })).toBeInTheDocument();
+    expect(screen.getByTestId('agents-rail-scrim')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Close agents rail' })).toBeInTheDocument();
+  });
+
+  it('closes the overlay when the scrim is tapped', async () => {
+    const user = userEvent.setup();
+    localStorage.setItem('overdeck.ui.agentsRailCollapsed', 'false');
+    render(<SubagentRail conversation={conversation} subagents={subagents} selectedAgentId={null} />);
+    resize(NARROW_PANE_PX - 1);
+    await user.click(screen.getByRole('button', { name: 'Show agents rail' }));
+
+    await user.click(screen.getByTestId('agents-rail-scrim'));
+
+    expect(screen.queryByRole('complementary', { name: 'Conversation agents' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show agents rail' })).toBeInTheDocument();
+  });
+
+  it('selects a subagent and closes the overlay', async () => {
+    const user = userEvent.setup();
+    localStorage.setItem('overdeck.ui.agentsRailCollapsed', 'false');
+    render(<SubagentRail conversation={conversation} subagents={subagents} selectedAgentId={null} />);
+    resize(NARROW_PANE_PX - 1);
+    await user.click(screen.getByRole('button', { name: 'Show agents rail' }));
+
+    await user.click(screen.getByRole('button', { name: /Explore/ }));
+
+    expect(new URLSearchParams(window.location.search).get('subagent')).toBe('alpha');
+    expect(screen.queryByRole('complementary', { name: 'Conversation agents' })).not.toBeInTheDocument();
+  });
+
+  it('selects the main agent and closes the overlay', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState({}, '', '/conv/42?subagent=alpha');
+    localStorage.setItem('overdeck.ui.agentsRailCollapsed', 'false');
+    render(<SubagentRail conversation={conversation} subagents={subagents} selectedAgentId="alpha" />);
+    resize(NARROW_PANE_PX - 1);
+    await user.click(screen.getByRole('button', { name: 'Show agents rail' }));
+
+    await user.click(screen.getByRole('button', { name: /Main agent/ }));
+
+    expect(new URLSearchParams(window.location.search).has('subagent')).toBe(false);
+    expect(screen.queryByRole('complementary', { name: 'Conversation agents' })).not.toBeInTheDocument();
+  });
+
+  it('renders the inline rail with no scrim on a wide pane', () => {
+    localStorage.setItem('overdeck.ui.agentsRailCollapsed', 'false');
+    render(<SubagentRail conversation={conversation} subagents={subagents} selectedAgentId={null} />);
+    resize(1000);
+
+    expect(screen.getByRole('complementary', { name: 'Conversation agents' })).toHaveAttribute('data-mode', 'inline');
+    expect(screen.queryByRole('button', { name: 'Close agents rail' })).not.toBeInTheDocument();
+  });
+});
