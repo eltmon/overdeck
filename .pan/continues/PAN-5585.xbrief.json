@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5585",
   "created": "2026-11-21T22:42:01.524Z",
-  "updated": "2026-11-21T22:42:01.524Z",
+  "updated": "2026-11-21T22:57:12.110Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,30 @@
   "sessionHistory": [],
   "items": {
     "rail-overlay": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5585",
-      "claimedAt": "2026-11-21T22:42:01.524Z"
+      "claimedAt": "2026-11-21T22:42:01.524Z",
+      "doneAt": "2026-11-21T22:57:12.109Z"
+    },
+    "rail-overlay.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-21T22:57:12.109Z"
+    },
+    "rail-overlay.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-21T22:57:12.109Z"
+    },
+    "rail-overlay.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-21T22:57:12.109Z"
+    },
+    "rail-overlay.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-21T22:57:12.109Z"
+    },
+    "rail-overlay.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-21T22:57:12.109Z"
     }
   }
 }
