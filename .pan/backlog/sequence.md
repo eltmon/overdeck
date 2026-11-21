@@ -1,17 +1,19 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-21T22:22:46.134202Z · model: claude-opus-5-5 · open: 942_
+_Last sequenced: 2026-11-21T22:52:58.561762Z · model: claude-opus-5-5 · open: 944_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-5585 | M | medium | ok |  |  | In pipeline. Phone-width conv page: 256px Agents rail squeezes timeline to ~130px, top bar overflows; overlay rail on narrow panes. |
+| 2 | PAN-5586 | M | medium | ok |  |  | In pipeline. Register Gemini 4 Carbon/Neon/Hydrogen, move Google tier map to Gemini 4, fix 2.5 deprecation remaps. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 4 | PAN-5430 | S | medium | ok |  |  | Markdown Preview prints raw HTML (README logo <div>/<picture>) as text; render it via rehype-raw + rehype-sanitize in doc previews. |
 | 5 | PAN-5567 | S | high | ok |  |  | Codex app-server threads hardcode on-request/workspace-write, so Read-only and Full access settings never apply. |
 | 6 | PAN-5489 | S | high | ok |  |  | pan plan from an agent shell fails workspace creation without HUME_API_KEY, leaves a half-built workspace and hides the cause. |
 | 7 | PAN-5566 | M | high | ok |  |  | UI/help text says Auto blocks destructive calls but the hook approves all; repo .pan.yaml can set bypass mode. |
 | 8 | PAN-5385 | S | critical | ok |  |  | Anywhere remote access is down for trickle clients: machine drops ICE candidates sent before session registers; small server fix |
+| 9 | PAN-5587 | L | medium | ok |  |  | In pipeline (planning). Antigravity harness on agy acp, API-key/Agent Platform auth only (OAuth breaches ToS); modeled on Grok ACP. |
 | 10 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 10 | PAN-5523 | S | high | ok |  |  | pan conversations move/heal send raw fetch with no token, so routes refuse with Missing origin; same fix pattern as in-pipeline PAN-5516. |
 | 11 | PAN-4553 | S | critical | ok |  |  | Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges. |
@@ -954,6 +956,10 @@ _Last sequenced: 2026-11-21T22:22:46.134202Z · model: claude-opus-5-5 · open: 
 
 New since the prior run and already in the pipeline with a live workspace, so it is pinned at the free rank-1 slot rather than ranked against the backlog. It is a well-specified mobile layout bug with exact root-cause lines and mechanical acceptance criteria, so condition is ok.
 
+### PAN-5586 (rank 2)
+
+New since the prior run and already in the pipeline, so it is pinned at the free rank-2 slot rather than ranked against the backlog. The issue lists exact registration sites, prices with an implementation checkpoint, and mechanical acceptance criteria, so condition is ok; it informs PAN-4555 (dated Argon price raise) and PAN-5587 (Antigravity harness test model).
+
 ### PAN-5013 (rank 3)
 
 Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.
@@ -977,6 +983,10 @@ New bug: operators choose Auto believing it gates destructive calls, and a proje
 ### PAN-5385 (rank 8)
 
 New issue. Phones (iOS, Android) and the connector cannot reach the machine at all, directly or through the relay, because RtcTransport.accept awaits ICE servers before registering the signalling session and drops trickle candidates that arrive in that window. The root cause and the fix (buffer candidates from offer acceptance) are stated in the body and touch only the dashboard server, so this is a small, well-defined fix for a full outage of a shipped feature. It takes the open rank-8 slot ahead of the remaining pipeline-substrate bugs.
+
+### PAN-5587 (rank 9)
+
+New since the prior run and already in the pipeline (planning), so it is pinned at the free rank-9 slot. Scope is large (runtime, ACP layer, policy, costs, sign-in, UI) but follows the Grok ACP checklist with a clear auth decision; the CLI is not yet verified on this host, which planning must confirm. It informs PAN-752 by closing its OAuth question for Antigravity.
 
 ### PAN-4636 (rank 10)
 
@@ -1262,14 +1272,6 @@ New this pass and the only supply-chain finding in the batch. A stale node_modul
 
 New substrate bug placed in a freed high-tier slot. Under memory pressure the operator has no supported way to stop a deferred start, and the Flywheel had to write the journal directly.
 
-### PAN-4792 (rank 77)
-
-New bug found while planning PAN-4738: the tmux paste guard misses Claude Code's unnumbered select dialogs, so a failed paste's fallback Enter can answer them, including a silent permission-mode change. PAN-4738 removes the one known trigger on Fly, so it ranks with the high-tier delivery bugs rather than the top tier.
-
-### PAN-3557 (rank 78)
-
-New this pass. Post-merge label application has no retry, so a rate-limited 403 leaves a merged issue without its verifying-on-main label — and the verify-on-main phase enumerates by that label, which makes the issue invisible to the phase that owns it. Lifecycle reported 'completed' throughout, so nothing noticed for 45 minutes.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1277,10 +1279,10 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-21T22:22:46.134202Z",
+  "generatedAt": "2026-11-21T22:52:58.561762Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 942,
+  "openCount": 944,
   "nodes": [
     {
       "issue": "PAN-5585",
@@ -1292,6 +1294,19 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
       "dependsOn": [],
       "why": "In pipeline. Phone-width conv page: 256px Agents rail squeezes timeline to ~130px, top bar overflows; overlay rail on narrow panes.",
       "rationale": "New since the prior run and already in the pipeline with a live workspace, so it is pinned at the free rank-1 slot rather than ranked against the backlog. It is a well-specified mobile layout bug with exact root-cause lines and mechanical acceptance criteria, so condition is ok.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5586",
+      "rank": 2,
+      "size": "M",
+      "importance": "medium",
+      "score": 60,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline. Register Gemini 4 Carbon/Neon/Hydrogen, move Google tier map to Gemini 4, fix 2.5 deprecation remaps.",
+      "rationale": "New since the prior run and already in the pipeline, so it is pinned at the free rank-2 slot rather than ranked against the backlog. The issue lists exact registration sites, prices with an implementation checkpoint, and mechanical acceptance criteria, so condition is ok; it informs PAN-4555 (dated Argon price raise) and PAN-5587 (Antigravity harness test model).",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1370,6 +1385,19 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
       "dependsOn": [],
       "why": "Anywhere remote access is down for trickle clients: machine drops ICE candidates sent before session registers; small server fix",
       "rationale": "New issue. Phones (iOS, Android) and the connector cannot reach the machine at all, directly or through the relay, because RtcTransport.accept awaits ICE servers before registering the signalling session and drops trickle candidates that arrive in that window. The root cause and the fix (buffer candidates from offer acceptance) are stated in the body and touch only the dashboard server, so this is a small, well-defined fix for a full outage of a shipped feature. It takes the open rank-8 slot ahead of the remaining pipeline-substrate bugs.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5587",
+      "rank": 9,
+      "size": "L",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline (planning). Antigravity harness on agy acp, API-key/Agent Platform auth only (OAuth breaches ToS); modeled on Grok ACP.",
+      "rationale": "New since the prior run and already in the pipeline (planning), so it is pinned at the free rank-9 slot. Scope is large (runtime, ACP layer, policy, costs, sign-in, UI) but follows the Grok ACP checklist with a clear auth decision; the CLI is not yet verified on this host, which planning must confirm. It informs PAN-752 by closing its OAuth question for Antigravity.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -14341,6 +14369,27 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-5586",
+      "to": "PAN-4555",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-5586",
+      "to": "PAN-5587",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-5587",
+      "to": "PAN-752",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.6
     },
     {
       "from": "PAN-750",
