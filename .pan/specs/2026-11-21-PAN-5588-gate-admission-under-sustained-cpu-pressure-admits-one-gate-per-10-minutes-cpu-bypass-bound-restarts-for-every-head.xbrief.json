@@ -1,0 +1,478 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-21T23:22:36Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5588: Gate admission under sustained CPU pressure admits one gate per 10 minutes: CPU bypass bound restarts for every head",
+    "updated": "2026-11-21T23:33:29.281Z"
+  },
+  "plan": {
+    "id": "pan-5588",
+    "title": "Gate admission under sustained CPU pressure admits one gate per 10 minutes: CPU bypass bound restarts for every head",
+    "status": "proposed",
+    "uid": "701681b3-9ff4-4d06-ac62-3323359bcc59",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-21T23:22:36Z",
+    "updated": "2026-11-21T23:33:29.281Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5588",
+        "label": "PAN-5588",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5588.md",
+        "label": "PRD",
+        "type": "document"
+      }
+    ],
+    "tags": [
+      "cloister",
+      "quality-gate-admission",
+      "cpu-pressure",
+      "bugfix"
+    ],
+    "narratives": {
+      "Problem": "Under sustained CPU pressure the quality-gate admission queue admits one gate per resources.quality_gate_cpu_bypass_minutes (default 10). cpuBlockedSince is per ticket and set only while the ticket is head, so every new head restarts the bound. With N waiters the last waits about N x 10 minutes for runs that take seconds (observed 2026-11-21 with 4 gates behind ffmpeg + OBS load).",
+      "Proposal": "Make the CPU-pressure episode a property of the queue: a marker file cpu-blocked-since.json ({since}) in the admission root, written create-exclusive by the first head that records a CPU block. A head that has sampled pressure itself counts from min(own cpuBlockedSince, marker.since), so after one bypassed gate the next head starts alone as soon as the slots are empty. A head that has not sampled never uses the marker, so a stale marker plus a low sample is a normal admission. Only an unpressured admission of the queue head (position === 0, final return, after settle and memory re-check) deletes the marker, so a waiter that passes a memory-blocked head cannot end the episode; a cpuBypassed admission and every release keep it, so gates that arrive one after another under sustained pressure do not each wait the bound. Alone is kept (taken.size === 0). First extract the admission fs primitives to a leaf module so quality-gate-admission.ts stays under the 1000-line file-size ceiling. Full detail, before/after code and test sketches: .pan/drafts/PAN-5588.md. The CPU-bypass log lines now attribute the wait to the queue.",
+      "NonGoals": "- No change to the memory bypass (PAN-5285) or its 5-minute bound\n- No change to slot counts, the PSI threshold, the bypass default, or config schema keys\n- readQualityGateQueue() and the Flywheel page do not report the marker\n- No marker heartbeat or age-based staleness rule beyond own-sample-first and clear-on-unpressured-admission\n- release() never reads or deletes the marker (no clear when the queue goes idle)\n- Non-head waiters never read or write the marker\n- Never raise scripts/file-size-allowlist.txt\n- Do not rename the '### CPU and memory admission (...)' heading in docs/PIPELINE-GATES.md (its anchor is linked)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "A head uses the queue marker only after it has sampled pressure itself (own cpuBlockedSince set); cpuSince = min(own, marker).",
+        "rationale": "The issue's step 2 taken literally lets a stale marker bypass a head that never sampled, contradicting the issue's own AC that a stale marker plus an unpressured sample admits normally. Cost is one extra 1 s poll per head."
+      },
+      {
+        "summary": "The marker is deleted only by an unpressured admission; release() never touches it, even when the queue goes idle.",
+        "rationale": "Matches issue steps 3 and 5. Clearing on an idle release was considered and rejected: a verification run's gates and an agent's tsc-then-vitest arrive one after another, so each would wait the full bound again. Accepted cost: a marker that outlives its episode lets the next episode's first head start alone after one pressured sample."
+      },
+      {
+        "summary": "Extract the private fs primitives into src/lib/cloister/quality-gate-admission-files.ts before the feature change.",
+        "rationale": "quality-gate-admission.ts is 997 lines against a 1000-line ceiling with no allowlist row; exporting the helpers from the admission module instead would create an import cycle with quality-gate-cpu.ts."
+      },
+      {
+        "summary": "Marker helpers live in quality-gate-cpu.ts.",
+        "rationale": "It is the small CPU-rule module and the leaf files module keeps it free of an import cycle with quality-gate-admission.ts."
+      },
+      {
+        "summary": "Change cpuBypassedMessage() and the validation.ts onLog line to attribute the bypass to the queue; keep the docs ### heading unchanged.",
+        "rationale": "Plan critique: a gate inheriting the episode did not itself wait the bound. The heading anchor is linked from docs/PIPELINE-GATES.md line 119."
+      },
+      {
+        "summary": "Marker stores the injected now() value as {\"since\": <epoch ms>}; unparseable or non-positive values count as absent and are replaced.",
+        "rationale": "Matches the ticket's cpuBlockedSince clock so fake-clock tests are deterministic; mtime would not follow the injected clock."
+      },
+      {
+        "summary": "Only the head's unpressured admission (position === 0) deletes the marker.",
+        "rationale": "Plan critique: a waiter passing a memory-blocked head could otherwise erase the marker while that head still bypasses on its own clock, restarting the bound for the next head. Matches PAN-5520's rule that only the head's admission ends its CPU clock."
+      }
+    ],
+    "items": [
+      {
+        "id": "wi1-extract-admission-files",
+        "title": "Extract admission fs primitives into quality-gate-admission-files.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-21T23:22:36Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-5588",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/quality-gate-admission-files.ts",
+            "src/lib/cloister/quality-gate-admission.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh",
+            "npm run lint:circular",
+            "npx vitest run tests/unit/lib/cloister/quality-gate-admission.test.ts tests/unit/lib/cloister/gate-admission-run.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "file-size guard passed",
+            "no new circular dependency reported",
+            "both test files pass with no test edits"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Move isErrnoException, the module-level tempSequence counter, publishExclusive, replaceFile, readJson, unlinkIfExists and fileAgeMs (bodies unchanged, doc comments kept) from src/lib/cloister/quality-gate-admission.ts into a new leaf module src/lib/cloister/quality-gate-admission-files.ts that imports only node:fs/promises and node:path, and export each. Keep ticketSequence in the admission module. Keep the temp name format `.tmp-${process.pid}-${tempSequence++}-${basename(path)}` exactly (listLiveTickets reaps by that pid). Import them back into quality-gate-admission.ts and trim its now-unused node imports. No behavior change."
+        },
+        "items": [
+          {
+            "id": "wi1-extract-admission-files.ac1",
+            "title": "Given the change, quality-gate-admission-files.ts exports isErrnoException, publishExclusive, replaceFile, readJson, unlinkIfExists and fileAgeMs, and quality-gate-admission.ts no longer defines any of them (grep for 'async function publishExclusive' in quality-gate-admission.ts returns nothing)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-extract-admission-files.ac2",
+            "title": "bash scripts/lint-file-size.sh exits 0 and wc -l reports quality-gate-admission.ts below 945 lines (it was 997)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-extract-admission-files.ac3",
+            "title": "npx vitest run tests/unit/lib/cloister/quality-gate-admission.test.ts tests/unit/lib/cloister/gate-admission-run.test.ts passes with no edits to either test file, and npm run lint:circular reports no new cycle",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi2-queue-cpu-marker-helpers",
+        "title": "Add queue CPU marker helpers to quality-gate-cpu.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-21T23:22:36Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5588",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/quality-gate-cpu.ts",
+            "tests/unit/lib/cloister/quality-gate-cpu.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint:circular",
+            "npx vitest run tests/unit/lib/cloister/quality-gate-cpu.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "no new circular dependency reported",
+            "quality-gate-cpu.test.ts passes all five cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-4",
+            "FR-8",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. In src/lib/cloister/quality-gate-cpu.ts add QUEUE_CPU_MARKER_FILE = 'cpu-blocked-since.json', readQueueCpuBlockedSince(root) (null when absent, unparseable, or since not a finite number > 0; never throws), markQueueCpuBlocked(root, since) (keeps a valid existing marker; replaces an invalid one; publishes {since} create-exclusive via publishExclusive; swallows EEXIST and all errors), and clearQueueCpuBlock(root) (unlink, never throws). Use the exact code in the PRD. Import only node:fs/promises readFile, node:path join, and the helpers from ./quality-gate-admission-files.js. Update the file header and the DEFAULT_QUALITY_GATE_CPU_BYPASS_MS doc comment to say the bound counts per queue episode (PAN-5588). Add tests/unit/lib/cloister/quality-gate-cpu.test.ts with the five cases listed in the PRD, using a mkdtemp directory removed in afterEach."
+        },
+        "items": [
+          {
+            "id": "wi2-queue-cpu-marker-helpers.ac1",
+            "title": "Given no marker, markQueueCpuBlocked(root, 5) creates cpu-blocked-since.json whose JSON is {\"since\":5}; a second markQueueCpuBlocked(root, 9) preserves 5 (readQueueCpuBlockedSince returns 5)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-queue-cpu-marker-helpers.ac2",
+            "title": "Given a marker containing '{not json', {\"since\":\"x\"} or {\"since\":0}, readQueueCpuBlockedSince returns null and markQueueCpuBlocked(root, 7) replaces it so the read returns 7",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-queue-cpu-marker-helpers.ac3",
+            "title": "clearQueueCpuBlock removes the marker, and calling it again or calling readQueueCpuBlockedSince on a missing root resolves without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi3-queue-level-cpu-bound",
+        "title": "Count the CPU bypass bound per queue in the admission loop",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-21T23:22:36Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5588",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/quality-gate-admission.ts",
+            "tests/unit/lib/cloister/quality-gate-admission.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh",
+            "npx vitest run tests/unit/lib/cloister/quality-gate-admission.test.ts tests/unit/lib/cloister/gate-admission-run.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "file-size guard passed",
+            "all admission tests pass, including the rewritten FIFO test and the new PAN-5588 cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-9",
+            "NFR-1",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In quality-gate-admission.ts: (1) markCpuBlocked also calls markQueueCpuBlocked(root, ticket.cpuBlockedSince) after persisting the ticket, so both the pre-settle and settle-time pressured paths write the marker. (2) Replace `const cpuSince = ticket.cpuBlockedSince` with: ownSince = ticket.cpuBlockedSince; queueSince = position === 0 && ownSince != null ? await readQueueCpuBlockedSince(root) : null; cpuSince = ownSince == null ? undefined : Math.min(ownSince, queueSince ?? Infinity). Keep the cpuAlone expression's position === 0 && taken.size === 0 terms. (3) Right after `await unlinkIfExists(ownTicketPath)` at the success return, add `if (!cpuAlone && position === 0) await clearQueueCpuBlock(root)`. (4) Rewrite the PAN-5520 paragraph of the module header per the PRD. Tests in describe('CPU bypass (PAN-5520)'): add a markerSince(rootDir) helper; rewrite 'keeps FIFO behind a CPU-blocked head, and counts the bound only for the head' so the second head resolves cpuBypassed with the clock unchanged after the first releases (it must fail under the old per-ticket code); add the slots-1 next-head, never-two-at-once, unpressured-clears-marker, stale-marker-low-sample cases and the settle-time marker assertion exactly as described in the PRD. Fake timers and injected now/samplePressure only; no skip/only/skipIf. Also add the sequential-arrival test: gate 1 bypassed and released, marker still {since:1}, only then gate 2 enqueues and resolves cpuBypassed at the unchanged clock. Do not add any marker handling to release(). Also add the memory-passer test from the PRD: a CPU-blocked head that becomes memory-blocked is passed by a small gate admitted on low samples, and the marker keeps since 1; the head later bypasses and the next gate inherits the episode."
+        },
+        "items": [
+          {
+            "id": "wi3-queue-level-cpu-bound.ac1",
+            "title": "Given sustained pressure and bound 1000, when the first head is admitted cpuBypassed at clock 2000 and released, then the next gate resolves cpuBypassed with the clock still at 2000 after sampling pressure at least once itself, both with slots 1 and in the rewritten slots-2 FIFO test (which contains no 'clock = 4_000' step and fails under the old per-ticket code)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-queue-level-cpu-bound.ac2",
+            "title": "Given sustained pressure, slots 2 and three gates, while one bypassed gate holds owner.json the others stay unsettled and slot-1.json never exists; each later gate is admitted only after the previous one releases",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-queue-level-cpu-bound.ac3",
+            "title": "Given a marker {\"since\":1} and low samples, a gate is admitted with cpuBypassed false after at least 2 pressure samples and the marker file is deleted; a later gate under pressure from clock 10000 is still unsettled at clock 10900 and resolves cpuBypassed at clock 11100",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-queue-level-cpu-bound.ac4",
+            "title": "When the first head records a CPU block at clock 1 (before or after the settle), cpu-blocked-since.json holds {\"since\":1}; given gate 1 admitted cpuBypassed and released before gate 2 enqueues, the marker preserves since 1 and gate 2 resolves cpuBypassed with the clock unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-queue-level-cpu-bound.ac5",
+            "title": "Given a head that recorded a CPU block at clock 1 and then became memory-blocked, when a smaller later gate passes it and resolves with cpuBypassed false on low samples, then cpu-blocked-since.json still contains {\"since\":1}, and after the head bypasses and releases the next gate resolves cpuBypassed at the unchanged clock",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi4-docs-queue-level-bound",
+        "title": "Describe the queue-level CPU bound in PIPELINE-GATES, CLAUDE.md, memory-governor.mdx and schema-cpu.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-21T23:22:36Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5588",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md",
+            "CLAUDE.md",
+            "configuration/memory-governor.mdx",
+            "src/lib/config-yaml/schema-cpu.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "npm run typecheck",
+            "grep -n PAN-5588 docs/PIPELINE-GATES.md CLAUDE.md configuration/memory-governor.mdx src/lib/config-yaml/schema-cpu.ts"
+          ],
+          "expected_outputs": [
+            "lint:docs passes",
+            "typecheck completes without errors",
+            "grep prints at least one line for each of the four files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 edits 1-6. docs/PIPELINE-GATES.md: the pressure-rule bullet (~line 114-117), the 'Admitted past CPU pressure (PAN-5520)' bullet (~583-599, lead renamed to '(PAN-5520, PAN-5588)', replace 'each head's clock starts only once it is head' with the marker description from the PRD), and the CPU-pressure bullet (~1779-1782). Do not rename the ### heading. CLAUDE.md line 37 PAN-5520 clause per the PRD. configuration/memory-governor.mdx lines 142-144 and the line 165 table cell. src/lib/config-yaml/schema-cpu.ts line 26 doc comment only. Also PRD WI-4 edit 6a: the Logs bullet (~609-611) quotes the new bypass line '[gate-admission] <key> admitted alone: the admission queue has been blocked on CPU past the bypass bound, ...'. The marker description must say only the head's unpressured admission deletes it and a gate passing a memory-blocked head keeps it."
+        },
+        "items": [
+          {
+            "id": "wi4-docs-queue-level-bound.ac1",
+            "title": "docs/PIPELINE-GATES.md contains cpu-blocked-since.json and states that a head that has sampled pressure counts from the earlier of its own cpuBlockedSince and the marker, that only the head's unpressured admission deletes it, and that a cpuBypassed admission, a passing gate and a release keep it; grep for \"each head's clock starts only once it is head\" returns nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-docs-queue-level-bound.ac2",
+            "title": "CLAUDE.md line 37 and configuration/memory-governor.mdx (prose at ~142-144 and the quality_gate_cpu_bypass_minutes table row) contain wording that the bound counts per queue, not per head, and CLAUDE.md contains PAN-5588",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-docs-queue-level-bound.ac3",
+            "title": "The '### CPU and memory admission (PAN-4311, PAN-4546, PAN-5248, PAN-5285, PAN-5520)' heading is unchanged so the anchor link at docs/PIPELINE-GATES.md line ~119 still resolves, and npm run lint:docs passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi5-changelog",
+        "title": "Add changelog.d/pan-5588.md",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-11-21T23:22:36Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5588",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "changelog.d/pan-5588.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs passes"
+          ],
+          "readiness": "ready",
+          "acJustification": "A single new file with a fixed format; one criterion covers format and content.",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 edit 7. Create changelog.d/pan-5588.md with a '#### Fixed' heading and the single bullet given in the PRD, linking https://github.com/eltmon/overdeck/issues/5588. Never edit changelog.mdx."
+        },
+        "items": [
+          {
+            "id": "wi5-changelog.ac1",
+            "title": "changelog.d/pan-5588.md exists with exactly one '#### Fixed' heading and one bullet that links [#5588](https://github.com/eltmon/overdeck/issues/5588), and npm run lint:docs accepts it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi6-bypass-message",
+        "title": "Attribute the CPU-bypass log lines to the admission queue",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-11-21T23:22:36Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-5588",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/gate-admission-run.ts",
+            "src/lib/cloister/validation.ts",
+            "tests/unit/lib/cloister/gate-admission-run.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/gate-admission-run.test.ts",
+            "grep -rn 'after waiting past the CPU bypass bound' src tests"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "gate-admission-run.test.ts passes",
+            "grep prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Change cpuBypassedMessage() in src/lib/cloister/gate-admission-run.ts to return `[gate-admission] ${subject} admitted alone: the admission queue has been blocked on CPU past the bypass bound, so it starts without waiting for CPU pressure to clear and may run slowly` (update its doc comment to PAN-5520/PAN-5588), change the onLog line in src/lib/cloister/validation.ts line ~502 to `${name} admitted alone: the admission queue has been blocked on CPU past the bypass bound`, and update the expected string in the 'announces an admission past the CPU bypass bound (PAN-5520)' test."
+        },
+        "items": [
+          {
+            "id": "wi6-bypass-message.ac1",
+            "title": "Given a handle with cpuBypassed true, runAdmittedCommand prints '[gate-admission] tsc:tsconfig.json admitted alone: the admission queue has been blocked on CPU past the bypass bound, so it starts without waiting for CPU pressure to clear and may run slowly'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-bypass-message.ac2",
+            "title": "grep -rn 'after waiting past the CPU bypass bound' src tests returns no match, and validation.ts logs '<name> admitted alone: the admission queue has been blocked on CPU past the bypass bound' for a cpuBypassed admission",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wi1-extract-admission-files",
+        "to": "wi2-queue-cpu-marker-helpers",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-extract-admission-files",
+        "to": "wi3-queue-level-cpu-bound",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-queue-cpu-marker-helpers",
+        "to": "wi3-queue-level-cpu-bound",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-21-PAN-5588-gate-admission-under-sustained-cpu-pressure-admits-one-gate-per-10-minutes-cpu-bypass-bound-restarts-for-every-head.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
