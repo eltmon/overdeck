@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5585",
   "created": "2026-11-21T22:42:01.524Z",
-  "updated": "2026-11-21T23:16:11.005Z",
+  "updated": "2026-11-21T23:16:25.871Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,6 +52,11 @@
     "topbar-left-compact.ac3": {
       "status": "completed",
       "doneAt": "2026-11-21T23:16:11.005Z"
+    },
+    "topbar-right-compact": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5585",
+      "claimedAt": "2026-11-21T23:16:25.871Z"
     }
   }
 }
