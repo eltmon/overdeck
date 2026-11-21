@@ -1,10 +1,11 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-19T08:43:41.055919Z · model: claude-opus-5-5 · open: 941_
+_Last sequenced: 2026-11-21T22:22:46.134202Z · model: claude-opus-5-5 · open: 942_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
+| 1 | PAN-5585 | M | medium | ok |  |  | In pipeline. Phone-width conv page: 256px Agents rail squeezes timeline to ~130px, top bar overflows; overlay rail on narrow panes. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 4 | PAN-5430 | S | medium | ok |  |  | Markdown Preview prints raw HTML (README logo <div>/<picture>) as text; render it via rehype-raw + rehype-sanitize in doc previews. |
 | 5 | PAN-5567 | S | high | ok |  |  | Codex app-server threads hardcode on-request/workspace-write, so Read-only and Full access settings never apply. |
@@ -949,6 +950,10 @@ _Last sequenced: 2026-11-19T08:43:41.055919Z · model: claude-opus-5-5 · open: 
 
 ## Rationale detail
 
+### PAN-5585 (rank 1)
+
+New since the prior run and already in the pipeline with a live workspace, so it is pinned at the free rank-1 slot rather than ranked against the backlog. It is a well-specified mobile layout bug with exact root-cause lines and mechanical acceptance criteria, so condition is ok.
+
 ### PAN-5013 (rank 3)
 
 Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.
@@ -1265,10 +1270,6 @@ New bug found while planning PAN-4738: the tmux paste guard misses Claude Code's
 
 New this pass. Post-merge label application has no retry, so a rate-limited 403 leaves a merged issue without its verifying-on-main label — and the verify-on-main phase enumerates by that label, which makes the issue invisible to the phase that owns it. Lifecycle reported 'completed' throughout, so nothing noticed for 45 minutes.
 
-### PAN-3543 (rank 79)
-
-New this pass. A completed-handoff agent owed rework after a blocked verdict cannot be started at all: pan start refuses and recommends --fresh, --fresh gives the identical refusal, and reset-session is refused too because the durable plane reconstructs the session pointer. The refusal message names an action the operator cannot take, which is the self-contradictory-deadlock family PAN-3526 opened.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1276,11 +1277,24 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-19T08:43:41.055919Z",
+  "generatedAt": "2026-11-21T22:22:46.134202Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 941,
+  "openCount": 942,
   "nodes": [
+    {
+      "issue": "PAN-5585",
+      "rank": 1,
+      "size": "M",
+      "importance": "medium",
+      "score": 62,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline. Phone-width conv page: 256px Agents rail squeezes timeline to ~130px, top bar overflows; overlay rail on narrow panes.",
+      "rationale": "New since the prior run and already in the pipeline with a live workspace, so it is pinned at the free rank-1 slot rather than ranked against the backlog. It is a well-specified mobile layout bug with exact root-cause lines and mechanical acceptance criteria, so condition is ok.",
+      "gate": "auto",
+      "planning": "auto"
+    },
     {
       "issue": "PAN-5013",
       "rank": 3,
