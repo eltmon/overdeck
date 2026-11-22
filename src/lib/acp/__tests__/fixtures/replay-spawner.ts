@@ -1,10 +1,11 @@
 /**
  * ACP replay harness (PAN-4563): a `ChildProcessSpawner` whose child plays a
  * recorded protocol fixture, so the real effect-acp client, AcpSessionRuntime,
- * provider runtime factory (Kimi, or Grok for fixtures whose header names
- * provider grok), and AcpHost run against recorded provider behavior with no
+ * provider runtime factory (Kimi, or Grok / Antigravity for fixtures whose header
+ * names that provider), and AcpHost run against recorded provider behavior with no
  * child process.
  */
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Writable } from "node:stream";
 import { Writable as WritableStream } from "node:stream";
@@ -21,6 +22,7 @@ import { ChildProcessSpawner } from "effect/unstable/process";
 
 import { loadProtocolFixture, type ProtocolFixture } from "../../../protocol-capture/fixture.js";
 import { createProtocolReplay, type ProtocolReplay } from "../../../protocol-capture/replay.js";
+import { makeAntigravityAcpRuntime } from "../../antigravity.js";
 import { makeGrokAcpRuntime } from "../../grok.js";
 import { AcpHost } from "../../host.js";
 import { makeKimiAcpRuntime } from "../../kimi.js";
@@ -102,7 +104,8 @@ function captureLines(): { stdout: Writable; lines: string[] } {
 
 /**
  * Load a fixture (by name under `fixtures/replay/`, or inline), build the real
- * ACP runtime for the fixture's provider (Kimi unless the header names grok)
+ * ACP runtime for the fixture's provider (Kimi unless the header names grok or
+ * antigravity; Antigravity replays get a synthetic credential, never config)
  * over a replay spawner inside its own scope, and construct the real AcpHost.
  * A recorded `hostOptions.resumeSessionId` starts the host resumed, so the
  * client sends session/load. The caller runs `host.start()` and `host.stop()`;
@@ -123,7 +126,7 @@ export async function startAcpReplay(
   };
   const hostOptions = loaded.header.hostOptions ?? {};
   const resumeSessionId = typeof hostOptions.resumeSessionId === "string" ? hostOptions.resumeSessionId : undefined;
-  const provider = loaded.header.provider === "grok" ? "grok" : "kimi";
+  const provider = loaded.header.provider === "grok" ? "grok" : loaded.header.provider === "antigravity" ? "antigravity" : "kimi";
   const runtimeInput = {
     childProcessSpawner: makeReplaySpawnerFromFixture(replay),
     cwd: REPLAY_WORKSPACE,
@@ -133,7 +136,14 @@ export async function startAcpReplay(
   const runtime = await Effect.runPromise(
     (provider === "grok"
       ? makeGrokAcpRuntime({ ...runtimeInput, binaryPath: "grok" })
-      : makeKimiAcpRuntime({ ...runtimeInput, kimiSettings: { binaryPath: "kimi" } })
+      : provider === "antigravity"
+        ? makeAntigravityAcpRuntime({
+          ...runtimeInput,
+          binaryPath: "agy",
+          geminiDir: join(deps.overdeckHome, "antigravity"),
+          credential: { method: "gemini-api-key", env: { GEMINI_API_KEY: "test-gemini-key" }, source: "settings" },
+        })
+        : makeKimiAcpRuntime({ ...runtimeInput, kimiSettings: { binaryPath: "kimi" } })
     ).pipe(
       Effect.provideService(Scope.Scope, scope),
       Effect.provide(NodeServices.layer),

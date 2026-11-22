@@ -274,3 +274,57 @@ describe("grok acp case: resume (PAN-5078)", () => {
     expect(replay.unmatchedClientLines()).toEqual([]);
   });
 });
+
+describe("antigravity acp case: turn completion (PAN-5587)", () => {
+  it("authenticates with the API key, sets the model before thought_level, and records Antigravity usage", async () => {
+    const { host, replay } = await start("antigravity-turn-completion");
+    const hostOptions = replay.fixture.header.hostOptions ?? {};
+    const authenticate = replay.fixture.frames.find((frame) => frame.dir === "out" && frame.message?.method === "authenticate");
+    expect(record(authenticate?.message?.params).methodId).toBe("gemini-api-key");
+    expect(configFrames(replay.fixture)).toEqual([`model=${String(hostOptions.model)}`, `thought_level=${String(hostOptions.effort)}`]);
+
+    await host.start();
+    expect(await host.handleOp({ op: "message", content: String(hostOptions.prompt) })).toMatchObject({ status: 202 });
+    await host.waitForIdle();
+
+    const records = await readTranscript() as Array<TranscriptRecord & { usage?: { model?: string; source?: string; inputTokens?: number } }>;
+    expect(lifecycle(records)).toEqual(["prompt_queued", "user", "assistant", "turn_completed"]);
+    const completed = records.find((entry) => entry.event === "turn_completed");
+    expect(completed?.usage?.source).toBe("antigravity");
+    expect(completed?.usage?.model).toBe(String(hostOptions.model));
+    expect(Number.isFinite(completed?.usage?.inputTokens)).toBe(true);
+
+    await host.stop();
+    active = undefined;
+    await replay.done;
+    expect(replay.unmatchedClientLines()).toEqual([]);
+  });
+});
+
+describe("antigravity acp case: resume (PAN-5587)", () => {
+  it("loads the recorded session, then sets the model again because agy resets it", async () => {
+    const { host, replay } = await start("antigravity-resume");
+    const hostOptions = replay.fixture.header.hostOptions ?? {};
+    const outMethods = replay.fixture.frames
+      .filter((frame) => frame.dir === "out" && typeof frame.message?.method === "string")
+      .map((frame) => frame.message!.method as string);
+    const firstSession = outMethods.findIndex((method) => method.startsWith("session/"));
+    expect(outMethods[firstSession]).toBe("session/load");
+    expect(outMethods[firstSession + 1]).toBe("session/set_config_option");
+    expect(configFrames(replay.fixture)[0]).toBe(`model=${String(hostOptions.model)}`);
+
+    await host.start();
+    expect(host.status()).toMatchObject({ state: "ready", sessionId: hostOptions.resumeSessionId });
+    expect(await host.handleOp({ op: "message", content: String(hostOptions.prompt) })).toMatchObject({ status: 202 });
+    await host.waitForIdle();
+
+    const records = await readTranscript();
+    expect(records.filter((entry) => entry.event === "turn_completed")).toHaveLength(1);
+    expect(records.some((entry) => entry.event === "prompt_failed")).toBe(false);
+
+    await host.stop();
+    active = undefined;
+    await replay.done;
+    expect(replay.unmatchedClientLines()).toEqual([]);
+  });
+});

@@ -3,11 +3,12 @@
  * production code.
  *
  *   node --import tsx src/lib/protocol-capture/record.ts \
- *     --harness <codex|acp|grok> --scenario <name> --out <path> [--model <id>] [--effort <level>] [--note <text>]
+ *     --harness <codex|acp|grok|antigravity> --scenario <name> --out <path> [--model <id>] [--effort <level>] [--note <text>]
  *
  * It drives the real host classes through one named scenario with capture on,
- * against a live `codex app-server`, `kimi acp` or `grok agent stdio` session
- * (the `grok` harness records the ACP host with provider grok), and writes one
+ * against a live `codex app-server`, `kimi acp`, `grok agent stdio` or `agy acp`
+ * session (the `grok` and `antigravity` harnesses record the ACP host with that
+ * provider), and writes one
  * `overdeck-protocol-capture/1` fixture. After the scenario's terminal event
  * it keeps capturing until no frame has moved in either direction for 2 s, so
  * frames that arrive after the turn boundary stay in the fixture.
@@ -29,6 +30,7 @@ import * as Scope from 'effect/Scope';
 import * as ChildProcessSpawner from 'effect/unstable/process/ChildProcessSpawner';
 
 import { AcpHost } from '../acp/host.js';
+import { resolveAntigravityCredential } from '../antigravity-auth.js';
 import { resolveAcpProviderSupport } from '../acp/providers.js';
 import { CodexAppServerHost } from '../codex/app-server-host.js';
 import { CodexAppServerManager, type AppServerMessage } from '../codex/app-server-manager.js';
@@ -44,7 +46,7 @@ export const QUIET_GAP_MS = 2_000;
 const EXIT_WAIT_MS = 5_000;
 const EXIT_LOG_GRACE_MS = 500;
 
-type Harness = 'codex' | 'acp' | 'grok';
+type Harness = 'codex' | 'acp' | 'grok' | 'antigravity';
 
 interface Scenario {
   harness: Harness;
@@ -94,7 +96,17 @@ export const SCENARIOS: readonly Scenario[] = [
     prompt: 'Reply with exactly OK.',
     actions: 'prime one uncaptured turn, then capture a host resumed with that session id (session/load)',
   },
+  { harness: 'antigravity', name: 'antigravity-turn-completion', prompt: 'Reply with exactly OK.', actions: 'none' },
+  {
+    harness: 'antigravity',
+    name: 'antigravity-resume',
+    prompt: 'Reply with exactly OK.',
+    actions: 'prime one uncaptured turn, then capture a host resumed with that session id (session/load)',
+  },
 ];
+
+/** Scenarios that prime one uncaptured turn and capture a host resumed on its session. */
+const RESUME_SCENARIOS: ReadonlySet<string> = new Set(['grok-resume', 'antigravity-resume']);
 
 const DEFAULTS: Record<Harness, { model: string; effort: string }> = {
   codex: { model: 'gpt-5.6-luna', effort: 'low' },
@@ -102,18 +114,22 @@ const DEFAULTS: Record<Harness, { model: string; effort: string }> = {
   acp: { model: 'k3', effort: 'low' },
   // Grok Build requires an explicit model and effort (PAN-5078 D4, D6).
   grok: { model: 'grok/grok-4.6', effort: 'low' },
+  // Antigravity requires an explicit model (PAN-5587 D10). agy starts a session at
+  // thought_level low and the runtime skips a set that matches, so high (Overdeck's
+  // default) is what puts a thought_level frame in the fixture.
+  antigravity: { model: 'gemini-4-argon', effort: 'high' },
 };
 
 export function scenarioTable(): string {
-  const rows = SCENARIOS.map(scenario => `  ${scenario.harness.padEnd(6)} ${scenario.name.padEnd(16)} ${scenario.actions}`);
+  const rows = SCENARIOS.map(scenario => `  ${scenario.harness.padEnd(11)} ${scenario.name.padEnd(27)} ${scenario.actions}`);
   return [
-    'Usage: node --import tsx src/lib/protocol-capture/record.ts --harness <codex|acp|grok> --scenario <name> --out <path> [--model <id>] [--effort <level>] [--note <text>]',
+    'Usage: node --import tsx src/lib/protocol-capture/record.ts --harness <codex|acp|grok|antigravity> --scenario <name> --out <path> [--model <id>] [--effort <level>] [--note <text>]',
     '',
     'Scenarios:',
-    `  ${'HARNESS'.padEnd(6)} ${'SCENARIO'.padEnd(16)} SCRIPTED ACTIONS`,
+    `  ${'HARNESS'.padEnd(11)} ${'SCENARIO'.padEnd(27)} SCRIPTED ACTIONS`,
     ...rows,
     '',
-    `Defaults: codex ${DEFAULTS.codex.model} effort ${DEFAULTS.codex.effort}; acp (kimi) ${DEFAULTS.acp.model} effort ${DEFAULTS.acp.effort}; grok ${DEFAULTS.grok.model} effort ${DEFAULTS.grok.effort}.`,
+    `Defaults: codex ${DEFAULTS.codex.model} effort ${DEFAULTS.codex.effort}; acp (kimi) ${DEFAULTS.acp.model} effort ${DEFAULTS.acp.effort}; grok ${DEFAULTS.grok.model} effort ${DEFAULTS.grok.effort}; antigravity ${DEFAULTS.antigravity.model} effort ${DEFAULTS.antigravity.effort}.`,
   ].join('\n');
 }
 
@@ -263,19 +279,25 @@ async function recordCodex(input: RecordInput, tempDirs: string[]): Promise<void
   }
 }
 
-async function cliVersion(binary: 'kimi' | 'grok'): Promise<string | null> {
+async function cliVersion(binary: 'kimi' | 'grok' | 'agy'): Promise<string | null> {
   const { stdout } = await execFileAsync(binary, ['--version'], { timeout: 10_000 });
   return stdout.match(/\d+\.\d+\.\d+\S*/)?.[0] ?? (stdout.trim() || null);
 }
 
-type AcpRecordProvider = 'kimi' | 'grok';
+type AcpRecordProvider = 'kimi' | 'grok' | 'antigravity';
+
+/** The ACP agent binary each recorded provider runs. */
+const ACP_RECORD_BINARY: Record<AcpRecordProvider, 'kimi' | 'grok' | 'agy'> = { kimi: 'kimi', grok: 'grok', antigravity: 'agy' };
 
 async function makeAcpCaptureRuntime(
   provider: AcpRecordProvider,
   cwd: string,
   scope: Scope.Scope,
-  options: { resumeSessionId?: string; protocolLogging?: ReturnType<typeof acpCaptureProtocolLogging> },
+  options: { resumeSessionId?: string; protocolLogging?: ReturnType<typeof acpCaptureProtocolLogging>; geminiDir?: string },
 ) {
+  // Antigravity: a real API key or Agent Platform credential from the recorder's
+  // OVERDECK_HOME config, and always a scratch --gemini-dir, never ~/.gemini (PAN-5587 HZ-1).
+  const credential = provider === 'antigravity' ? await resolveAntigravityCredential() : undefined;
   return Effect.runPromise(
     Effect.gen(function* () {
       const childProcessSpawner = yield* ChildProcessSpawner.ChildProcessSpawner;
@@ -283,7 +305,9 @@ async function makeAcpCaptureRuntime(
         childProcessSpawner,
         cwd,
         kimiSettings: { binaryPath: provider },
-        binaryPath: provider,
+        binaryPath: ACP_RECORD_BINARY[provider],
+        ...(credential ? { credential } : {}),
+        ...(options.geminiDir ? { geminiDir: options.geminiDir } : {}),
         clientInfo: { name: 'overdeck', version: 'capture' },
         environment: process.env,
         ...(options.resumeSessionId ? { resumeSessionId: options.resumeSessionId } : {}),
@@ -295,7 +319,8 @@ async function makeAcpCaptureRuntime(
 
 /**
  * Run one uncaptured turn and return its session id. Grok keeps sessions per
- * working directory, so the resumed capture must run in the same cwd.
+ * working directory, so the resumed capture must run in the same cwd; agy keeps
+ * them in its gemini dir, so both runs share the scratch one.
  */
 async function primeAcpSession(input: RecordInput, provider: AcpRecordProvider): Promise<string> {
   const scope = await Effect.runPromise(Scope.make());
@@ -307,7 +332,7 @@ async function primeAcpSession(input: RecordInput, provider: AcpRecordProvider):
   };
   let host: AcpHost | undefined;
   try {
-    const runtime = await makeAcpCaptureRuntime(provider, input.cwd, scope, {});
+    const runtime = await makeAcpCaptureRuntime(provider, input.cwd, scope, { geminiDir: recordGeminiDir(input) });
     host = new AcpHost({
       agentId: 'agent-capture-prime',
       provider,
@@ -332,9 +357,14 @@ async function primeAcpSession(input: RecordInput, provider: AcpRecordProvider):
   }
 }
 
+/** The scratch agy gemini dir inside the recorder's temp Overdeck home (removed afterwards). */
+function recordGeminiDir(input: RecordInput): string {
+  return join(input.overdeckHome, 'antigravity');
+}
+
 async function recordAcp(input: RecordInput, provider: AcpRecordProvider): Promise<void> {
   const { scenario, model, effort, cwd, overdeckHome } = input;
-  const resumeSessionId = scenario.name === 'grok-resume' ? await primeAcpSession(input, provider) : undefined;
+  const resumeSessionId = RESUME_SCENARIOS.has(scenario.name) ? await primeAcpSession(input, provider) : undefined;
   const tracked = trackActivity(createProtocolCaptureSink({
     path: input.out,
     harness: 'acp',
@@ -342,7 +372,7 @@ async function recordAcp(input: RecordInput, provider: AcpRecordProvider): Promi
   }));
   tracked.sink.setHeader({
     provider,
-    cliVersion: await cliVersion(provider),
+    cliVersion: await cliVersion(ACP_RECORD_BINARY[provider]),
     scenario: scenario.name,
     hostOptions: { model, effort, prompt: scenario.prompt, ...(resumeSessionId ? { resumeSessionId } : {}) },
     ...(input.note ? { note: input.note } : {}),
@@ -360,6 +390,7 @@ async function recordAcp(input: RecordInput, provider: AcpRecordProvider): Promi
     const runtime = await makeAcpCaptureRuntime(provider, cwd, scope, {
       resumeSessionId,
       protocolLogging: acpCaptureProtocolLogging(tracked.sink),
+      geminiDir: recordGeminiDir(input),
     });
 
     let interrupted = false;
@@ -459,6 +490,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
       codex: () => recordCodex(input, tempDirs),
       acp: () => recordAcp(input, 'kimi'),
       grok: () => recordAcp(input, 'grok'),
+      antigravity: () => recordAcp(input, 'antigravity'),
     };
     await recorders[harness]();
     process.stderr.write(`[record] wrote ${input.out}\n`);

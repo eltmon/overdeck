@@ -26,7 +26,7 @@ const FIXTURE_DIRS = {
 };
 const EXPECTED_FIXTURES = {
   codex: ['approval.jsonl', 'interrupt.jsonl', 'subagent.jsonl', 'turn-idle.jsonl', 'user-input.jsonl'],
-  acp: ['grok-resume.jsonl', 'grok-turn-completion.jsonl', 'kimi-interrupt.jsonl', 'kimi-turn-completion.jsonl'],
+  acp: ['antigravity-resume.jsonl', 'antigravity-turn-completion.jsonl', 'grok-resume.jsonl', 'grok-turn-completion.jsonl', 'kimi-interrupt.jsonl', 'kimi-turn-completion.jsonl'],
 };
 
 function oversizedString(value: unknown): boolean {
@@ -98,5 +98,15 @@ describe('committed protocol fixtures', () => {
     expect(() => parseProtocolFixture(text)).not.toThrow();
     expect((await stat(path)).size).toBeLessThanOrEqual(MAX_FIXTURE_BYTES);
     expect(hygieneProblems(name, text)).toEqual([]);
+  });
+
+  // PAN-5587: agy authenticates with a Gemini API key passed in its env; no fixture may carry one.
+  // Built at runtime so the test source holds no key-shaped literal.
+  const GOOGLE_KEY_PREFIX = ['AI', 'za'].join('');
+  const KEY_ASSIGNMENT = ['GEMINI', 'API', 'KEY='].join('_');
+  it.each(all)('$harness/$name holds no Google API key or GEMINI_API_KEY assignment', async ({ harness, name }) => {
+    const text = await readFile(`${FIXTURE_DIRS[harness]}${name}`, 'utf8');
+    expect(text.includes(GOOGLE_KEY_PREFIX)).toBe(false);
+    expect(text.includes(KEY_ASSIGNMENT)).toBe(false);
   });
 });
