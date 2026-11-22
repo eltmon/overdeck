@@ -4,17 +4,17 @@
     "created": "2026-11-21T23:22:36Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5588: Gate admission under sustained CPU pressure admits one gate per 10 minutes: CPU bypass bound restarts for every head",
-    "updated": "2026-11-21T23:33:29.281Z"
+    "updated": "2026-11-21T23:33:59.722Z"
   },
   "plan": {
     "id": "pan-5588",
     "title": "Gate admission under sustained CPU pressure admits one gate per 10 minutes: CPU bypass bound restarts for every head",
-    "status": "proposed",
+    "status": "running",
     "uid": "701681b3-9ff4-4d06-ac62-3323359bcc59",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-21T23:22:36Z",
-    "updated": "2026-11-21T23:33:29.281Z",
+    "updated": "2026-11-21T23:33:59.722Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5588",
@@ -474,5 +474,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
