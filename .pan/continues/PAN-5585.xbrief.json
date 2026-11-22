@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-5585",
   "created": "2026-11-21T22:42:01.524Z",
-  "updated": "2026-11-22T01:17:21.886Z",
+  "updated": "2026-11-22T01:27:19.900Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-22T01:27Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-22T01:27:19.900Z"
+    }
+  ],
   "items": {
     "rail-overlay": {
       "status": "completed",
@@ -175,5 +181,14 @@
       "status": "completed",
       "doneAt": "2026-11-22T01:17:21.885Z"
     }
-  }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-22T01:27:19Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5585\n\nPull request: https://github.com/eltmon/overdeck/pull/5591 (head `f256ecd3`)\n\nSource: check_run:test-e2e\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-e2e\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/137050111807/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/44970863357/job/137050111807  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/__tests__/reactCompilerCoverage.test.ts\u001b[2m > \u001b[22mReact Compiler skip coverage\u001b[2m > \u001b[22mthe frontend tree matches scripts/react-compiler-skip-baseline.txt\n\u001b[31m\u001b[1mAssertionError\u001b[22m: React Compiler skip baseline mismatch:\n  src/dashboard/frontend/src/App.tsx: 48 skip(s), baseline 47 (Hooks must always be called in a consistent order and may not be called conditionally)\nA new skip: fix the component (docs/DASHBOARD-ARCHITECTURE.md, React Compiler). A stale row: run npx tsx src/dashboard/frontend/scripts/reactCompilerCoverage.ts --update.: expected { added: [], …(2) } to deeply equal { added: [], raised: [], stale: [] }\u001b[39m\n\n\u001b[32m- Expected\u001b[39m\n\u001b[31m+ Received\u001b[39m\n\n\u001b[2m  {\u001b[22m\n\u001b[2m    \"added\": [],\u001b[22m\n\u001b[32m-   \"raised\": [],\u001b[39m\n\u001b[31m+   \"raised\": [\u001b[39m\n\u001b[31m+     \"src/dashboard/frontend/src/App.tsx\",\u001b[39m\n\u001b[31m+   ],\u001b[39m\n\u001b[2m    \"stale\": [],\u001b[22m\n\u001b[2m  }\u001b[22m\n\n\u001b[36m \u001b[2m❯\u001b[22m src/__tests__/reactCompilerCoverage.test.ts:\u001b[2m83:29\u001b[22m\u001b[39m\n    \u001b[90m 81|\u001b[39m       'A new skip: fix the component (docs/DASHBOARD-ARCHITECTURE.md, …\n    \u001b[90m 82|\u001b[39m     ]\u001b[33m.\u001b[39m\u001b[34mjoin\u001b[39m(\u001b[32m'\\n'\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m 83|\u001b[39m     expect(result, message).toEqual({ added: [], raised: [], stale: []…\n    \u001b[90m   |\u001b[39m                             \u001b[31m^\u001b[39m\n    \u001b[90m 84|\u001b[39m   })\u001b[33m;\u001b[39m\n    \u001b[90m 85|\u001b[39m })\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\u001b[22m\u001b[39m\n\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m568 passed\u001b[39m\u001b[22m\u001b[90m (569)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ]
 }

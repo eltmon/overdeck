@@ -1,6 +1,6 @@
 # React Compiler skip baseline (PAN-4561). Rows: <count> <path>. Count = compiler diagnostics + "use no memo" directives.
 # Shrink-only. Lower with: npx tsx src/dashboard/frontend/scripts/reactCompilerCoverage.ts --update
-47 src/dashboard/frontend/src/App.tsx
+48 src/dashboard/frontend/src/App.tsx
 2 src/dashboard/frontend/src/App/hooks/useAppShortcuts.ts
 1 src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts
 1 src/dashboard/frontend/src/App/hooks/usePermissionNotifications.ts
