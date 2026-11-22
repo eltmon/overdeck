@@ -1,0 +1,85 @@
+{
+  "version": "1",
+  "issueId": "PAN-5589",
+  "created": "2026-11-22T01:01:54.134Z",
+  "updated": "2026-11-22T01:11:41.366Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "extract-cpu-rule": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5589",
+      "claimedAt": "2026-11-22T01:01:54.133Z",
+      "doneAt": "2026-11-22T01:04:47.676Z"
+    },
+    "extract-cpu-rule.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:04:47.676Z"
+    },
+    "extract-cpu-rule.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:04:47.676Z"
+    },
+    "extract-cpu-rule.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:04:47.676Z"
+    },
+    "utilization-floor": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5589",
+      "claimedAt": "2026-11-22T01:05:16.764Z",
+      "doneAt": "2026-11-22T01:08:08.506Z"
+    },
+    "utilization-floor.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:08:08.506Z"
+    },
+    "utilization-floor.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:08:08.506Z"
+    },
+    "utilization-floor.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:08:08.506Z"
+    },
+    "utilization-floor.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:08:08.506Z"
+    },
+    "cpu-rule-boundary-tests": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5589",
+      "claimedAt": "2026-11-22T01:08:16.916Z",
+      "doneAt": "2026-11-22T01:09:22.896Z"
+    },
+    "cpu-rule-boundary-tests.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:09:22.896Z"
+    },
+    "cpu-rule-boundary-tests.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:09:22.896Z"
+    },
+    "docs-and-changelog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5589",
+      "claimedAt": "2026-11-22T01:09:27.678Z",
+      "doneAt": "2026-11-22T01:11:41.365Z"
+    },
+    "docs-and-changelog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:11:41.365Z"
+    },
+    "docs-and-changelog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:11:41.365Z"
+    },
+    "docs-and-changelog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:11:41.365Z"
+    }
+  }
+}

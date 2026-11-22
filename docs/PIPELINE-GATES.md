@@ -107,9 +107,11 @@ target-branch sync, skipped when CI is already green on the exact tip commit
   gates each wait behind roughly 21 admissions.
 - **The pressure rule.** Before granting the slot, the admission queue samples
   the host: it is pressured when CPU utilization is at or above `0.75`, or
-  when PSI `some avg10` is at or above
-  `resources.quality_gate_psi_start_avg10` (default `25`), or — only when PSI is
-  unavailable — when 1-minute load per core is at or above `1`. If not
+  when utilization is at or above `0.5` and PSI `some avg10` is at or above
+  `resources.quality_gate_psi_start_avg10` (default `25`) — or, only when PSI
+  is unavailable, when 1-minute load per core is at or above `1`. Below 50 %
+  utilization PSI and load are ignored, because a workload pinned to a few
+  cores raises them while the other cores sit idle (PAN-5589). If not
   pressured, it writes the holder record, waits 1.5 seconds, and samples
   again; if the host is pressured on that second look, it gives the slot back
   and keeps waiting. The CPU wait is bounded: a queue head starts alone once
@@ -501,7 +503,7 @@ every `tsc` lane run through `scripts/tsc-admitted.mjs` join the same queue. Up 
 once (default 2; set it in the global `~/.overdeck/config.yaml`, because a
 project `.pan.yaml` value is ignored). A gate is admitted only when its CPU
 sample is unpressured both before and 1.5 s after it takes its slot:
-utilization below 75 %, and CPU PSI `some avg10` below
+utilization below 75 %, and, from 50 % utilization, CPU PSI `some avg10` below
 `resources.quality_gate_psi_start_avg10` (default 25), or load per core below 1
 where PSI is unavailable. Under pressure, new gates wait while running gates
 keep their slots; nothing is preempted, and the head's CPU wait is bounded (see
@@ -610,6 +612,16 @@ already queued, without killing them:
   the full bound. Both CPU settings are read from the global config on every
   poll, so raising `resources.quality_gate_psi_start_avg10` or lowering the
   bound reaches gates that are already queued.
+- **Pinned workloads are not pressure (PAN-5589).** PSI `some avg10` and load
+  average are system-wide: they count every task waiting for a CPU, including
+  tasks whose affinity mask (`taskset`) or cgroup quota confines them to a few
+  cores. A new gate is not confined by that mask, so that stall does not apply
+  to it. Admission therefore counts PSI (or load per core without PSI) as
+  contention only while whole-machine utilization is at least 50 %
+  (`QUALITY_GATE_CONTENDED_UTILIZATION_FLOOR` in
+  `src/lib/cloister/quality-gate-cpu.ts`); 75 % utilization is pressure on its
+  own. Seven encodes pinned to 4 of 24 cores read PSI 35 at 44 % utilization,
+  which no longer holds gates.
 - **Logs.** A waiting gate says why. The wrapper and a local Vitest run print
   `[gate-admission] <key> waiting for memory: available X GiB, reserved Y GiB,
   needs Z GiB, soft reserve W GiB`, `… waiting in the admission queue at
@@ -1790,10 +1802,10 @@ Auto-resume is intentionally suppressible:
   to `~/.overdeck/logs/deacon.log` every 5 minutes. Quality-gate admission
   (`quality-gate-admission.ts`) treats the host as contended at PSI `some
   avg10 >= resources.quality_gate_psi_start_avg10` (default 25), with load per
-  core `>= 1` as the fallback; a head starts alone once the slots are empty
-  after the queue has been CPU-blocked longer than
-  `resources.quality_gate_cpu_bypass_minutes` (default 10; per queue episode,
-  PAN-5520, PAN-5588). Admission has
+  core `>= 1` as the fallback, but only from 50 % utilization (PAN-5589); a
+  head starts alone once the slots are empty after the queue has been
+  CPU-blocked longer than `resources.quality_gate_cpu_bypass_minutes`
+  (default 10; per queue episode, PAN-5520, PAN-5588). Admission has
   `resources.quality_gate_slots` slots (default 2, read from the global
   config only): slot 0 is `owner.json` and slot *i* is `slot-<i>.json`.
   Waiters stay FIFO, and the head takes the lowest free slot only while fewer

@@ -21,7 +21,7 @@ export interface CpuResourcesYamlConfig {
   governor_cpu_hold_dispatch?: boolean;
   /** concurrent quality-gate admission slots (1-16); extra slots open only while CPU is unpressured */
   quality_gate_slots?: number;
-  /** new quality gates wait while CPU PSI `some avg10` is at or above this percentage (PAN-5520) */
+  /** new quality gates wait while CPU PSI `some avg10` is at or above this percentage and utilization is at least 50% (PAN-5520, PAN-5589) */
   quality_gate_psi_start_avg10?: number;
   /** minutes the admission queue may stay blocked on CPU pressure before its head starts alone once the slots are empty; counted per queue episode; under 30 (PAN-5520, PAN-5588) */
   quality_gate_cpu_bypass_minutes?: number;

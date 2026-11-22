@@ -1524,6 +1524,14 @@ describe('sampleQualityGatePressure (PAN-4311)', () => {
   }))
   const noWait = async () => undefined
 
+  // PAN-5589: the before and after counters give `busy` utilization over the sample window.
+  function cpusAt(busy: number) {
+    const at = (user: number, idle: number) => Array.from({ length: 4 }, () => ({
+      model: 'cpu', speed: 1, times: { user, nice: 0, sys: 0, idle, irq: 0 },
+    }))
+    osMocks.cpus.mockReturnValueOnce(at(0, 0)).mockReturnValueOnce(at(busy * 100, 100 - busy * 100))
+  }
+
   beforeEach(() => {
     osMocks.cpus.mockReturnValue(idleCpus)
   })
@@ -1534,18 +1542,22 @@ describe('sampleQualityGatePressure (PAN-4311)', () => {
     osMocks.loadavg.mockImplementation(actual.loadavg)
   })
 
-  it('is pressured when PSI some avg10 reaches 25, even at low utilization and load', async () => {
+  it('is pressured when PSI some avg10 reaches 25 at 60 % utilization', async () => {
+    cpusAt(0.6)
     osMocks.loadavg.mockReturnValue([0.4, 0, 0])
     const sample = await sampleQualityGatePressure(noWait, async () => ({ someAvg10: 30, someAvg60: 10 }))
 
-    expect(sample).toEqual({ cpuUtilization: 0, loadPerCore: 0.1, psiSomeAvg10: 30, pressured: true })
+    expect(sample).toMatchObject({ loadPerCore: 0.1, psiSomeAvg10: 30, pressured: true })
+    expect(sample.cpuUtilization).toBeCloseTo(0.6)
   })
 
   it('honors a configured PSI start threshold (PAN-5520)', async () => {
     osMocks.loadavg.mockReturnValue([0.4, 0, 0])
     const psi = async () => ({ someAvg10: 30, someAvg60: 10 })
 
+    cpusAt(0.6)
     expect(await sampleQualityGatePressure(noWait, psi, 35)).toMatchObject({ psiSomeAvg10: 30, pressured: false })
+    cpusAt(0.6)
     expect(await sampleQualityGatePressure(noWait, psi, 30)).toMatchObject({ psiSomeAvg10: 30, pressured: true })
   })
 
@@ -1556,10 +1568,43 @@ describe('sampleQualityGatePressure (PAN-4311)', () => {
     expect(sample).toMatchObject({ loadPerCore: 3, psiSomeAvg10: 10, pressured: false })
   })
 
-  it('falls back to load per core when PSI is unavailable', async () => {
+  it('falls back to load per core when PSI is unavailable, at 60 % utilization', async () => {
+    cpusAt(0.6)
     osMocks.loadavg.mockReturnValue([4.8, 0, 0])
     const sample = await sampleQualityGatePressure(noWait, async () => ({ someAvg10: null, someAvg60: null }))
 
     expect(sample).toMatchObject({ loadPerCore: 1.2, psiSomeAvg10: null, pressured: true })
+  })
+
+  it('ignores PSI from pinned workloads while utilization is below 50 % (PAN-5589)', async () => {
+    cpusAt(0.44)
+    osMocks.loadavg.mockReturnValue([0.4, 0, 0])
+    const sample = await sampleQualityGatePressure(noWait, async () => ({ someAvg10: 35, someAvg60: 30 }))
+
+    expect(sample).toMatchObject({ pressured: false })
+  })
+
+  it('counts PSI as contention from 50 % utilization (PAN-5589)', async () => {
+    cpusAt(0.6)
+    osMocks.loadavg.mockReturnValue([0.4, 0, 0])
+    const sample = await sampleQualityGatePressure(noWait, async () => ({ someAvg10: 35, someAvg60: 30 }))
+
+    expect(sample).toMatchObject({ pressured: true })
+  })
+
+  it('is pressured at 80 % utilization whatever PSI says (PAN-5589)', async () => {
+    cpusAt(0.8)
+    osMocks.loadavg.mockReturnValue([0.4, 0, 0])
+    const sample = await sampleQualityGatePressure(noWait, async () => ({ someAvg10: 5, someAvg60: 5 }))
+
+    expect(sample).toMatchObject({ pressured: true })
+  })
+
+  it('ignores high load per core below 50 % utilization without PSI (PAN-5589)', async () => {
+    cpusAt(0.44)
+    osMocks.loadavg.mockReturnValue([4.8, 0, 0])
+    const sample = await sampleQualityGatePressure(noWait, async () => ({ someAvg10: null, someAvg60: null }))
+
+    expect(sample).toMatchObject({ pressured: false })
   })
 })

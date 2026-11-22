@@ -1,12 +1,13 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-21T23:23:02.370115Z · model: claude-opus-5-5 · open: 945_
+_Last sequenced: 2026-11-22T00:54:23.087429Z · model: claude-opus-5-5 · open: 946_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-5585 | M | medium | ok |  |  | In pipeline. Phone-width conv page: 256px Agents rail squeezes timeline to ~130px, top bar overflows; overlay rail on narrow panes. |
 | 1 | PAN-5588 | S | critical | ok |  |  | In pipeline. Gate admission CPU bypass bound restarts per head: 1 gate/10 min under sustained CPU; make the bound queue-level. |
+| 1 | PAN-5589 | S | critical | ok |  |  | In pipeline. Gate admission reads system-wide PSI from CPU-pinned jobs as pressure while 20 of 24 cores idle; add utilization floor. |
 | 2 | PAN-5586 | M | medium | ok |  |  | In pipeline. Register Gemini 4 Carbon/Neon/Hydrogen, move Google tier map to Gemini 4, fix 2.5 deprecation remaps. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 4 | PAN-5430 | S | medium | ok |  |  | Markdown Preview prints raw HTML (README logo <div>/<picture>) as text; render it via rehype-raw + rehype-sanitize in doc previews. |
@@ -961,6 +962,10 @@ New since the prior run and already in the pipeline with a live workspace, so it
 
 New since the prior run and already in the pipeline (planning), so it is pinned at rank 1 rather than ranked against the backlog. It is a substrate-improvement bug in the quality-gate admission queue that stalls every work agent for up to N x 10 minutes under sustained CPU pressure, which makes it critical pipeline throughput work; the body gives the exact root-cause lines, a five-step fix and fake-timer acceptance criteria, so condition is ok. It touches the same head-admission logic as PAN-5312, so the two should land in sequence.
 
+### PAN-5589 (rank 1)
+
+New since the prior run and already in the pipeline, so it is pinned at rank 1 beside its sibling PAN-5588 rather than ranked against the backlog. It is substrate work on the quality-gate admission queue that stalled four work agents for over an hour, with an exact root cause, a small fix and mechanical unit-test acceptance criteria, so importance is critical and condition is ok.
+
 ### PAN-5586 (rank 2)
 
 New since the prior run and already in the pipeline, so it is pinned at the free rank-2 slot rather than ranked against the backlog. The issue lists exact registration sites, prices with an implementation checkpoint, and mechanical acceptance criteria, so condition is ok; it informs PAN-4555 (dated Argon price raise) and PAN-5587 (Antigravity harness test model).
@@ -1269,10 +1274,6 @@ Three red-mains in one day from direct-push series bypassing PR CI — conversat
 
 New this pass. pan strike dies at git worktree list --porcelain on a polyrepo wrapper root, which is not a git repository, so the urgent-strike escape hatch is simply unavailable for MYN-class projects. pan swarm already understands nested repos; strike must use the same project repository inventory. Duplicate of PAN-3040 — close one when this lands.
 
-### PAN-3605 (rank 75)
-
-New this pass and the only supply-chain finding in the batch. A stale node_modules made npx fall back to the registry, where the unscoped effect-language-service name is claimed by a third party, and npm installed and executed it non-interactively. The payload was benign this time; the name stays third-party-controlled, so a malicious patch release would run on any machine in the same state. The fix is small and the downside is unbounded.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1280,10 +1281,10 @@ New this pass and the only supply-chain finding in the batch. A stale node_modul
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-21T23:23:02.370115Z",
+  "generatedAt": "2026-11-22T00:54:23.087429Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 945,
+  "openCount": 946,
   "nodes": [
     {
       "issue": "PAN-5585",
@@ -1308,6 +1309,19 @@ New this pass and the only supply-chain finding in the batch. A stale node_modul
       "dependsOn": [],
       "why": "In pipeline. Gate admission CPU bypass bound restarts per head: 1 gate/10 min under sustained CPU; make the bound queue-level.",
       "rationale": "New since the prior run and already in the pipeline (planning), so it is pinned at rank 1 rather than ranked against the backlog. It is a substrate-improvement bug in the quality-gate admission queue that stalls every work agent for up to N x 10 minutes under sustained CPU pressure, which makes it critical pipeline throughput work; the body gives the exact root-cause lines, a five-step fix and fake-timer acceptance criteria, so condition is ok. It touches the same head-admission logic as PAN-5312, so the two should land in sequence.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5589",
+      "rank": 1,
+      "size": "S",
+      "importance": "critical",
+      "score": 74,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline. Gate admission reads system-wide PSI from CPU-pinned jobs as pressure while 20 of 24 cores idle; add utilization floor.",
+      "rationale": "New since the prior run and already in the pipeline, so it is pinned at rank 1 beside its sibling PAN-5588 rather than ranked against the backlog. It is substrate work on the quality-gate admission queue that stalled four work agents for over an hour, with an exact root cause, a small fix and mechanical unit-test acceptance criteria, so importance is critical and condition is ok.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -14411,6 +14425,13 @@ New this pass and the only supply-chain finding in the batch. A stale node_modul
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-5589",
+      "to": "PAN-5588",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
     },
     {
       "from": "PAN-750",
