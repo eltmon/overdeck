@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-22T04:24:59Z · model: claude-opus-5-5 · open: 942_
+_Last sequenced: 2026-11-22T05:32:06Z · model: claude-opus-5-5 · open: 942_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -11,7 +11,6 @@ _Last sequenced: 2026-11-22T04:24:59Z · model: claude-opus-5-5 · open: 942_
 | 6 | PAN-5489 | S | high | ok |  |  | pan plan from an agent shell fails workspace creation without HUME_API_KEY, leaves a half-built workspace and hides the cause. |
 | 7 | PAN-5566 | M | high | ok |  |  | UI/help text says Auto blocks destructive calls but the hook approves all; repo .pan.yaml can set bypass mode. |
 | 8 | PAN-5385 | S | critical | ok |  |  | Anywhere remote access is down for trickle clients: machine drops ICE candidates sent before session registers; small server fix |
-| 9 | PAN-5595 | S | high | ok |  |  | In pipeline. Release passes while npm holds core as staged (uninstallable); rerun hits E409. Poll visibility, handle staged. |
 | 10 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 10 | PAN-5523 | S | high | ok |  |  | pan conversations move/heal send raw fetch with no token, so routes refuse with Missing origin; same fix pattern as in-pipeline PAN-5516. |
 | 11 | PAN-4553 | S | critical | ok |  |  | Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges. |
@@ -947,6 +946,7 @@ _Last sequenced: 2026-11-22T04:24:59Z · model: claude-opus-5-5 · open: 942_
 | 902 | PAN-5305 | XS | low | ok |  |  | Main build break already fixed: needsYou.ts imports from needsYouRows and main CI is green. Verify and close. |
 | 903 | PAN-5444 | XS | low | ok |  |  | Two Minor CodeRabbit findings left on merged PR #5443: semgrep repo rules resolve from event cwd; hook tests not isolated from Docker. |
 | 904 | PAN-5405 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5403: changes-query refetch after turns, Send menu keyboard/scheduling guard, tab-menu focus. |
+| 905 | PAN-5595 | S | low | ok |  |  | Fix merged in PR #5596; verifying on main. Close once main verification passes; nothing left to pick up. |
 
 ## Rationale detail
 
@@ -973,10 +973,6 @@ New bug: operators choose Auto believing it gates destructive calls, and a proje
 ### PAN-5385 (rank 8)
 
 New issue. Phones (iOS, Android) and the connector cannot reach the machine at all, directly or through the relay, because RtcTransport.accept awaits ICE servers before registering the signalling session and drops trickle candidates that arrive in that window. The root cause and the fix (buffer candidates from offer acceptance) are stated in the body and touch only the dashboard server, so this is a small, well-defined fix for a full outage of a shipped feature. It takes the open rank-8 slot ahead of the remaining pipeline-substrate bugs.
-
-### PAN-5595 (rank 9)
-
-New since the prior run and already in the pipeline, so it takes the rank-9 slot freed when PAN-5587 merged. It is substrate work on the release path: the 0.90.0 run reported success while @overdeck/core was not installable, so every release can silently ship nothing. The fix is small and fully specified (extract a tested publish script, poll visibility, treat staged E409 as published, document the approval commands).
 
 ### PAN-4636 (rank 10)
 
@@ -1270,6 +1266,10 @@ New bug found while planning PAN-4738: the tmux paste guard misses Claude Code's
 
 New this pass. Post-merge label application has no retry, so a rate-limited 403 leaves a merged issue without its verifying-on-main label — and the verify-on-main phase enumerates by that label, which makes the issue invisible to the phase that owns it. Lifecycle reported 'completed' throughout, so nothing noticed for 45 minutes.
 
+### PAN-3543 (rank 79)
+
+New this pass. A completed-handoff agent owed rework after a blocked verdict cannot be started at all: pan start refuses and recommends --fresh, --fresh gives the identical refusal, and reset-session is refused too because the durable plane reconstructs the session pointer. The refusal message names an action the operator cannot take, which is the self-contradictory-deadlock family PAN-3526 opened.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1277,7 +1277,7 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-22T04:24:59Z",
+  "generatedAt": "2026-11-22T05:32:06Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 942,
@@ -1357,19 +1357,6 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
       "dependsOn": [],
       "why": "Anywhere remote access is down for trickle clients: machine drops ICE candidates sent before session registers; small server fix",
       "rationale": "New issue. Phones (iOS, Android) and the connector cannot reach the machine at all, directly or through the relay, because RtcTransport.accept awaits ICE servers before registering the signalling session and drops trickle candidates that arrive in that window. The root cause and the fix (buffer candidates from offer acceptance) are stated in the body and touch only the dashboard server, so this is a small, well-defined fix for a full outage of a shipped feature. It takes the open rank-8 slot ahead of the remaining pipeline-substrate bugs.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5595",
-      "rank": 9,
-      "size": "S",
-      "importance": "high",
-      "score": 74,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline. Release passes while npm holds core as staged (uninstallable); rerun hits E409. Poll visibility, handle staged.",
-      "rationale": "New since the prior run and already in the pipeline, so it takes the rank-9 slot freed when PAN-5587 merged. It is substrate work on the release path: the 0.90.0 run reported success while @overdeck/core was not installable, so every release can silently ship nothing. The fix is small and fully specified (extract a tested publish script, poll visibility, treat staged E409 as published, document the approval commands).",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13042,6 +13029,19 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
       "dependsOn": [],
       "why": "CodeRabbit follow-up on PR #5403: changes-query refetch after turns, Send menu keyboard/scheduling guard, tab-menu focus.",
       "rationale": "New CodeRabbit follow-up from the merged PAN-5295 PR; one Major and four Minor frontend findings, ranked with comparable follow-ups.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5595",
+      "rank": 905,
+      "size": "S",
+      "importance": "low",
+      "score": 10,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Fix merged in PR #5596; verifying on main. Close once main verification passes; nothing left to pick up.",
+      "rationale": "Demoted from rank 9 because PR #5596 merged at 2026-11-22T05:13Z and the issue now only awaits post-merge verification, so a pickup would waste an agent.",
       "gate": "auto",
       "planning": "auto"
     }
