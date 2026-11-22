@@ -6,7 +6,14 @@ import { getOverdeckHome } from '../paths.js'
 import { readCpuPsi, type CpuPsi } from '../system-health/cpu-psi.js'
 import { readProcessTreeRssBytes } from '../system-health/process-tree-rss.js'
 import { fileAgeMs, isErrnoException, publishExclusive, readJson, replaceFile, unlinkIfExists } from './quality-gate-admission-files.js'
-import { DEFAULT_QUALITY_GATE_PSI_START_AVG10, resolveQualityGateCpuSettings, type QualityGateCpuSettings } from './quality-gate-cpu.js'
+import {
+  clearQueueCpuBlock,
+  DEFAULT_QUALITY_GATE_PSI_START_AVG10,
+  markQueueCpuBlocked,
+  readQueueCpuBlockedSince,
+  resolveQualityGateCpuSettings,
+  type QualityGateCpuSettings,
+} from './quality-gate-cpu.js'
 import {
   evaluateMemoryHeadroom,
   ownerReservationBytes,
@@ -39,9 +46,13 @@ import {
  * PAN-5520: CPU waits are bounded too. The head records its first CPU block
  * (`cpuBlockedSince`, cleared only by admission so a flapping sample cannot
  * restart it); past `resources.quality_gate_cpu_bypass_minutes` it starts
- * alone once the slots are empty, skipping both CPU samples. Under sustained
- * pressure the queue drains one gate at a time. The PSI start threshold is
- * `resources.quality_gate_psi_start_avg10`.
+ * alone once the slots are empty, skipping both CPU samples. PAN-5588: the
+ * bound is per queue, not per head. The first head to block writes
+ * `cpu-blocked-since.json`; a head that has sampled pressure itself counts from
+ * the earlier of its own clock and that marker, so under sustained pressure the
+ * queue runs one gate at a time back to back. Only an unpressured admission
+ * of the head deletes the marker. The PSI start
+ * threshold is `resources.quality_gate_psi_start_avg10`.
  * Admitted parents set OVERDECK_GATE_ADMITTED=1 for child-process reentrancy.
  */
 
@@ -626,13 +637,14 @@ export async function acquireQualityGateAdmission(
     const resolved = await resolveQualityGateCpuSettings()
     return { psiStartAvg10: deps.psiStartAvg10 ?? resolved.psiStartAvg10, bypassMs: deps.cpuBypassMs ?? resolved.bypassMs }
   }
-  /** PAN-5520: start our CPU-block clock as head; it keeps running until admission. */
+  /** PAN-5520: start our CPU-block clock as head; PAN-5588: and the queue's, if it has none. */
   const markCpuBlocked = async (): Promise<void> => {
     if (ticket.cpuBlockedSince == null) {
       ticket.cpuBlockedSince = now()
       ticketDirty = true
     }
     if (ticketDirty) await persistTicket()
+    await markQueueCpuBlocked(root, ticket.cpuBlockedSince)
   }
   /** Older-version peers first seen "fitting" with a slot free, by ticket id (PAN-5285). */
   const legacyFitSince = new Map<string, number>()
@@ -822,8 +834,12 @@ export async function acquireQualityGateAdmission(
 
       // PAN-5520: a head blocked on CPU for longer than the bound starts alone once the slots
       // are empty, without sampling again, so a flapping sample cannot hold it either.
+      // PAN-5588: the block belongs to the queue. A head that has sampled pressure itself
+      // counts from the queue's marker, so the next head does not wait the bound again.
       const cpu = await resolveCpu()
-      const cpuSince = ticket.cpuBlockedSince
+      const ownSince = ticket.cpuBlockedSince
+      const queueSince = position === 0 && ownSince != null ? await readQueueCpuBlockedSince(root) : null
+      const cpuSince = ownSince == null ? undefined : Math.min(ownSince, queueSince ?? Infinity)
       const cpuAlone = position === 0 && taken.size === 0 && cpuSince != null && now() - cpuSince > cpu.bypassMs
       const pressure = cpuAlone ? null : await samplePressure(cpu.psiStartAvg10)
       if (pressure?.pressured) {
@@ -898,6 +914,9 @@ export async function acquireQualityGateAdmission(
       }
 
       await unlinkIfExists(ownTicketPath)
+      // PAN-5588: the head's two CPU samples were low, so the pressure cleared and the queue's block ends.
+      // A waiter that passed a memory-blocked head leaves it: that head may still bypass on its own clock.
+      if (!cpuAlone && position === 0) await clearQueueCpuBlock(root)
       let released = false
       return {
         admittedAt: new Date(owner.acquiredAt).toISOString(),
