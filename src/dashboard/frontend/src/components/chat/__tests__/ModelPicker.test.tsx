@@ -12,7 +12,7 @@ vi.mock('sonner', () => ({
 
 type HarnessPolicyDecisionsMap = Record<string, Record<string, { allowed: boolean; reason?: string }>>;
 
-function installFetchMock(options: { grokModels?: boolean; showHarnessModelPermutations?: boolean; missingCatalogMetadata?: boolean; harnessPolicyDecisions?: HarnessPolicyDecisionsMap; defaultConversationModel?: string; availableModelsGate?: Promise<void> } = {}) {
+function installFetchMock(options: { grokModels?: boolean; antigravityModels?: boolean; showHarnessModelPermutations?: boolean; missingCatalogMetadata?: boolean; harnessPolicyDecisions?: HarnessPolicyDecisionsMap; defaultConversationModel?: string; availableModelsGate?: Promise<void> } = {}) {
   vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
     const url = input.toString();
     if (url === '/api/settings/available-models') {
@@ -26,6 +26,10 @@ function installFetchMock(options: { grokModels?: boolean; showHarnessModelPermu
         ],
         google: [
           { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash', costPer1MTokens: 0.4 },
+          ...(options.antigravityModels ? [
+            { id: 'gemini-4-argon', name: 'Gemini 4 Argon (1M context)', costPer1MTokens: 10, effortLevels: ['low', 'medium', 'high'] },
+            { id: 'gemini-4-argon', name: 'Gemini 4 Argon (1M context) — Antigravity', baseName: 'Gemini 4 Argon (1M context)', costPer1MTokens: 10, harness: 'antigravity', effortLevels: ['low', 'medium', 'high'] },
+          ] : []),
         ],
         minimax: [
           { id: 'minimax-m3', name: 'MiniMax M3', costPer1MTokens: 1 },
@@ -315,6 +319,37 @@ describe('chat ModelPicker live harness labels', () => {
       expect(vi.mocked(fetch)).toHaveBeenCalledWith(expect.stringContaining('/api/settings/harness-policy'));
     });
     expect(onChange).not.toHaveBeenCalled();
+  });
+});
+
+describe('chat ModelPicker Antigravity rows (PAN-5587)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    installFetchMock({ antigravityModels: true, showHarnessModelPermutations: false });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('renders the plain and the Antigravity Gemini 4 Argon rows and launches the second on antigravity', async () => {
+    const user = userEvent.setup();
+    const onComboChange = vi.fn();
+    render(<ModelPicker value="claude-sonnet-4-6" onChange={vi.fn()} harness="claude-code" onHarnessChange={vi.fn()} onComboChange={onComboChange} />);
+
+    await user.click(screen.getByRole('button', { name: /Claude Sonnet 4\.6/i }));
+
+    const argonRows = await screen.findAllByRole('button', { name: /Gemini 4 Argon/i });
+    expect(argonRows).toHaveLength(2);
+    const antigravityRow = argonRows.find((row) => /— Antigravity/.test(row.textContent ?? ''));
+    expect(antigravityRow).toBeDefined();
+    await user.click(antigravityRow!);
+
+    expect(onComboChange).toHaveBeenCalledWith('gemini-4-argon', ['low', 'medium', 'high'], 'antigravity');
+  });
+
+  it('offers Antigravity as a harness option', () => {
+    expect(HARNESS_OPTIONS).toContainEqual({ id: 'antigravity', label: 'Antigravity', description: 'Google Antigravity CLI over ACP (Gemini models)' });
   });
 });
 

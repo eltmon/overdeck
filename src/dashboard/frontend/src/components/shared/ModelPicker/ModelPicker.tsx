@@ -22,6 +22,7 @@ export const HARNESS_OPTIONS: Array<{ id: Harness; label: string; description: s
   { id: 'codex', label: 'Codex', description: 'OpenAI Codex CLI harness' },
   { id: 'opencode', label: 'OpenCode', description: 'OpenCode with Go and Zen providers' },
   { id: 'grok', label: 'Grok Build', description: 'xAI Grok Build CLI over ACP' },
+  { id: 'antigravity', label: 'Antigravity', description: 'Google Antigravity CLI over ACP (Gemini models)' },
   { id: 'acp', label: 'ACP', description: 'Agent Client Protocol harness' },
   { id: 'muse', label: 'Muse Code', description: 'Meta Muse Code with Wonder, Spark, Ember and Wonder Full models' },
   { id: 'kimi-code', label: 'Kimi Code', description: 'Moonshot Kimi Code CLI (native, Kimi models only)' },
