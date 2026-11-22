@@ -95,6 +95,17 @@ describe('useComposerEffort', () => {
     expect(result.current.effort).toBe('xhigh');
   });
 
+  it('shows a stored max as xhigh for Antigravity and changes it live (PAN-5587)', async () => {
+    vi.mocked(fetch).mockResolvedValue(jsonResponse({ ok: true, effort: 'high' }));
+    const antigravity = { ...conversation, name: 'agy-conv', harness: 'antigravity', model: 'gemini-4-argon', effort: 'max' } as unknown as Conversation;
+    const { result } = renderHook(() => useComposerEffort(input({ conversation: antigravity, harness: 'antigravity', model: 'gemini-4-argon' })));
+    expect(result.current.effort).toBe('xhigh');
+    expect(result.current.liveChangeEnabled).toBe(true);
+    act(() => result.current.onChange('high'));
+    await waitFor(() => expect(result.current.pending).toBe(false));
+    expect(fetch).toHaveBeenCalledWith('/api/conversations/agy-conv/thinking-level', expect.objectContaining({ body: JSON.stringify({ level: 'high' }) }));
+  });
+
   it('marks the change observed once the transcript reports it', async () => {
     vi.mocked(fetch).mockResolvedValue(jsonResponse({ ok: true, effort: 'low', source: 'explicit' }));
     const { result, rerender } = renderHook((props: UseComposerEffortInput) => useComposerEffort(props), { initialProps: input() });

@@ -65,6 +65,21 @@ describe('ForkModal Prime Agent source capabilities (PAN-3668)', () => {
     expect(screen.queryByText('Exact copy')).not.toBeInTheDocument();
     expect(screen.getByRole('radio', { name: /Fresh summary/ })).toBeChecked();
   });
+
+  it('hides Exact copy for an antigravity source and falls back to a summary (PAN-5587)', () => {
+    render(
+      <ForkModal
+        conversation={{ ...ACP_CONVERSATION, name: 'Antigravity source', tmuxSession: 'conv-agy-source', model: 'gemini-4-argon', harness: 'antigravity' }}
+        initialMode="plain"
+        onConfirm={vi.fn()}
+        onClose={vi.fn()}
+        isPending={false}
+      />,
+    );
+
+    expect(screen.queryByText('Exact copy')).not.toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /Fresh summary/ })).toBeChecked();
+  });
 });
 
 describe('ForkModal ACP source capabilities', () => {

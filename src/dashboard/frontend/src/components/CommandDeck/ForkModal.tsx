@@ -147,7 +147,7 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
   // ("fast-summary") is an advanced toggle under the summary intent.
   // ACP (including OpenCode and Grok Build) and Prime Agent transcripts are portable only through summary/handoff
   // adapters; the server rejects an exact-copy fork from those sources.
-  const sourceSupportsPlainFork = conversation.harness !== 'acp' && conversation.harness !== 'opencode' && conversation.harness !== 'grok' && conversation.harness !== 'prime-agent';
+  const sourceSupportsPlainFork = conversation.harness !== 'acp' && conversation.harness !== 'opencode' && conversation.harness !== 'grok' && conversation.harness !== 'antigravity' && conversation.harness !== 'prime-agent';
   const initialIntent: ForkIntent =
     initialMode === 'plain' && sourceSupportsPlainFork
       ? 'plain'
