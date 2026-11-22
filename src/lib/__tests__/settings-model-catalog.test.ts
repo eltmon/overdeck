@@ -260,7 +260,7 @@ describe('Antigravity picker rows (PAN-5587 D13)', () => {
     availability.readAntigravityAuthStatus.mockResolvedValue({ ready: true, method: 'gemini-api-key' });
     const { google } = await getAvailableModelsWithOpenCodeApi();
     const rows = antigravityRowsOf(google);
-    expect(rows.map((row) => row.id).sort()).toEqual(['gemini-3.1-pro-preview', 'gemini-3.6-flash', 'gemini-3.8-flash', 'gemini-4-argon']);
+    expect(rows.map((row) => row.id).sort()).toEqual(['gemini-3.1-pro-preview', 'gemini-3.6-flash', 'gemini-3.8-flash', 'gemini-4-argon', 'gemini-4-carbon', 'gemini-4-hydrogen', 'gemini-4-neon']);
     expect(rows.every((row) => row.name.endsWith(' — Antigravity'))).toBe(true);
     expect(rows.find((row) => row.id === 'gemini-4-argon')).toMatchObject({ harness: 'antigravity', effortLevels: ['low', 'medium', 'high'] });
     const plainArgon = google.find((row) => row.id === 'gemini-4-argon' && row.harness === undefined);

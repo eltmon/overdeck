@@ -25,6 +25,13 @@ describe('antigravity-models (PAN-5587 D8)', () => {
     }
   });
 
+  it('serves the Gemini 4 tier models PAN-5586 registered under the same names', () => {
+    for (const id of ['gemini-4-neon', 'gemini-4-carbon', 'gemini-4-hydrogen']) {
+      expect(isAntigravityModel(id)).toBe(true);
+      expect(translateAntigravityModelId(id)).toBe(id);
+    }
+  });
+
   it('does not treat a non-Google model as an Antigravity model', () => {
     expect(isAntigravityModel('claude-sonnet-5-5')).toBe(false);
     expect(isAntigravityModel('gemini-4-argon')).toBe(true);

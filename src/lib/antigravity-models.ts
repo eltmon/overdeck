@@ -3,6 +3,9 @@ import type { GoogleModel } from './settings.js';
 
 export const ANTIGRAVITY_MODEL_IDS: Readonly<Partial<Record<GoogleModel, string>>> = {
   'gemini-4-argon': 'gemini-4-argon',
+  'gemini-4-neon': 'gemini-4-neon',
+  'gemini-4-carbon': 'gemini-4-carbon',
+  'gemini-4-hydrogen': 'gemini-4-hydrogen',
   'gemini-3.8-flash': 'gemini-3.8-flash',
   'gemini-3.6-flash': 'gemini-3.6-flash',
   'gemini-3.1-pro-preview': 'gemini-3.1-pro',

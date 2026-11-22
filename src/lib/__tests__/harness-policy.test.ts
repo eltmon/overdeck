@@ -334,6 +334,9 @@ describe('Antigravity harness pin (PAN-5587 D9)', () => {
   it('allows the Google models agy serves on the antigravity harness', () => {
     expect(canUseHarness('antigravity', 'gemini-4-argon', undefined)).toEqual({ allowed: true })
     expect(canUseHarness('antigravity', 'gemini-3.1-pro-preview', 'api-key')).toEqual({ allowed: true })
+    expect(canUseHarness('antigravity', 'gemini-4-carbon', 'api-key')).toEqual({ allowed: true })
+    expect(canUseHarness('antigravity', 'gemini-4-neon', undefined)).toEqual({ allowed: true })
+    expect(canUseHarness('antigravity', 'gemini-4-hydrogen', undefined)).toEqual({ allowed: true })
   })
 
   it('denies every other model on the antigravity harness with the block reason', () => {
