@@ -1,0 +1,104 @@
+{
+  "version": "1",
+  "issueId": "PAN-5595",
+  "created": "2026-11-22T04:25:34.764Z",
+  "updated": "2026-11-22T04:48:38.528Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-22T04:48Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-22T04:48:38.528Z"
+    }
+  ],
+  "items": {
+    "publish-script": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5595",
+      "claimedAt": "2026-11-22T04:25:34.764Z",
+      "doneAt": "2026-11-22T04:32:33.363Z"
+    },
+    "publish-script.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T04:32:33.363Z"
+    },
+    "publish-script.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T04:32:33.363Z"
+    },
+    "publish-script.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T04:32:33.363Z"
+    },
+    "publish-script.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-22T04:32:33.363Z"
+    },
+    "publish-script.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-22T04:32:33.363Z"
+    },
+    "workflow-wiring": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5595",
+      "claimedAt": "2026-11-22T04:32:39.771Z",
+      "doneAt": "2026-11-22T04:37:43.340Z"
+    },
+    "workflow-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T04:37:43.340Z"
+    },
+    "workflow-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T04:37:43.340Z"
+    },
+    "workflow-wiring.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T04:37:43.340Z"
+    },
+    "docs-releasing": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5595",
+      "claimedAt": "2026-11-22T04:37:46.498Z",
+      "doneAt": "2026-11-22T04:38:50.437Z"
+    },
+    "docs-releasing.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T04:38:50.437Z"
+    },
+    "docs-releasing.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T04:38:50.437Z"
+    },
+    "docs-releasing.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T04:38:50.437Z"
+    },
+    "docs-skill": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5595",
+      "claimedAt": "2026-11-22T04:38:53.654Z",
+      "doneAt": "2026-11-22T04:40:54.642Z"
+    },
+    "docs-skill.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T04:40:54.642Z"
+    },
+    "docs-skill.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T04:40:54.642Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-22T04:48:38Z",
+      "markdownBody": "# CodeRabbit findings for PAN-5595 (PR #5596)\n\nCodeRabbit posted 1 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4656722846 · scripts/npm-publish-retry-safe.sh:62 [Minor]: Fail when package metadata cannot be read.\n  https://github.com/eltmon/overdeck/pull/5596#discussion_r4656722846\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5596/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-5595 -m \"CodeRabbit <thread ids>: <what you changed>\"`.\n   If you only replied, you are done.\n5. If PR #5596 has already merged when you read this, stop: after the merge Overdeck files a follow-up issue\n   for every thread with no reply, no later commit to its file, and no re-review request naming its thread id."
+    }
+  ]
+}

@@ -369,51 +369,25 @@ jobs:
       # this repo + workflow filename as the only allowed publisher.
       # PAN-5176: publish the tarball the pack job built, tested and smoked, not a
       # fresh pack of this checkout.
+      # PAN-5595: scripts/npm-publish-retry-safe.sh handles the retry-safe
+      # visibility check, staged-version (E409) detection, and the post-publish
+      # visibility poll — see docs/RELEASING.md for the staged-version recovery.
       - name: Publish CLI to npm
+        env:
+          NPM_TAG: ${{ needs.classify.outputs.npm_tag }}
         run: |
           TGZ=$(ls "$RUNNER_TEMP"/release/*.tgz)
-          read -r PKG_NAME PKG_VERSION <<EOF
-          $(tar -xOzf "$TGZ" package/package.json | node -e 'const p=JSON.parse(require("fs").readFileSync(0));console.log(p.name+" "+p.version)')
-          EOF
-          if npm view "${PKG_NAME}@${PKG_VERSION}" version >/dev/null 2>&1; then
-            echo "${PKG_NAME}@${PKG_VERSION} already on npm — skipping (retry-safe)."
-            exit 0
-          fi
-          if [ "${{ needs.classify.outputs.npm_tag }}" = "latest" ]; then
-            npm publish "$TGZ" --ignore-scripts --provenance --access public
-          else
-            npm publish "$TGZ" --ignore-scripts --provenance --access public --tag "${{ needs.classify.outputs.npm_tag }}"
-          fi
+          bash scripts/npm-publish-retry-safe.sh --tag "$NPM_TAG" "$TGZ"
 
       - name: Publish contracts to npm
-        run: |
-          cd packages/contracts
-          PKG_NAME=$(node -p "require('./package.json').name")
-          PKG_VERSION=$(node -p "require('./package.json').version")
-          if npm view "${PKG_NAME}@${PKG_VERSION}" version >/dev/null 2>&1; then
-            echo "${PKG_NAME}@${PKG_VERSION} already on npm — skipping (retry-safe)."
-            exit 0
-          fi
-          if [ "${{ needs.classify.outputs.npm_tag }}" = "latest" ]; then
-            npm publish --ignore-scripts --provenance --access public
-          else
-            npm publish --ignore-scripts --provenance --access public --tag "${{ needs.classify.outputs.npm_tag }}"
-          fi
+        env:
+          NPM_TAG: ${{ needs.classify.outputs.npm_tag }}
+        run: bash scripts/npm-publish-retry-safe.sh --tag "$NPM_TAG" packages/contracts
 
       - name: Publish desktop to npm
-        run: |
-          cd apps/desktop
-          PKG_NAME=$(node -p "require('./package.json').name")
-          PKG_VERSION=$(node -p "require('./package.json').version")
-          if npm view "${PKG_NAME}@${PKG_VERSION}" version >/dev/null 2>&1; then
-            echo "${PKG_NAME}@${PKG_VERSION} already on npm — skipping (retry-safe)."
-            exit 0
-          fi
-          if [ "${{ needs.classify.outputs.npm_tag }}" = "latest" ]; then
-            npm publish --ignore-scripts --provenance --access public
-          else
-            npm publish --ignore-scripts --provenance --access public --tag "${{ needs.classify.outputs.npm_tag }}"
-          fi
+        env:
+          NPM_TAG: ${{ needs.classify.outputs.npm_tag }}
+        run: bash scripts/npm-publish-retry-safe.sh --tag "$NPM_TAG" apps/desktop
 
       # The deprecate step is dropped intentionally: it required a long-lived
       # NPM_TOKEN and OIDC trusted publishing only covers publish, not metadata
