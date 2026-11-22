@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5585",
   "created": "2026-11-21T22:42:01.524Z",
-  "updated": "2026-11-22T01:01:25.680Z",
+  "updated": "2026-11-22T01:01:38.626Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -134,6 +134,11 @@
     "phone-shells.ac2": {
       "status": "completed",
       "doneAt": "2026-11-22T01:01:25.679Z"
+    },
+    "docs-changelog": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5585",
+      "claimedAt": "2026-11-22T01:01:38.625Z"
     }
   }
 }
