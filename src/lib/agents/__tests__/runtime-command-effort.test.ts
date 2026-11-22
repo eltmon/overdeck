@@ -45,9 +45,11 @@ vi.mock('../../runtimes/ohmypi-fifo.js', async (importOriginal) => ({
   createOhmypiFifo: vi.fn(() => Effect.succeed('/tmp/fake-agent-dir/rpc.in')),
 }));
 
+const rmMock = vi.hoisted(() => vi.fn(async () => undefined));
 vi.mock('fs/promises', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   mkdir: vi.fn(async () => undefined),
+  rm: rmMock,
 }));
 
 const initCodexHomeMock = vi.hoisted(() => vi.fn());
@@ -217,6 +219,12 @@ describe('getAcpLauncherFields --effort (PAN-4260)', () => {
     expect(fields.harness).toBe('antigravity');
     expect(fields.acpProvider).toBe('antigravity');
     expect(fields.acpEffort).toBe('high');
+  });
+
+  it('clears a stale acp-launch-error before the host launches (PAN-5587 review)', async () => {
+    rmMock.mockClear();
+    await getAcpLauncherFields('agent-stale', 'gemini-4-argon', '/tmp/ws', '/bin/agy', 'work', undefined, 'antigravity');
+    expect(rmMock).toHaveBeenCalledWith(expect.stringMatching(/agent-stale[\\/]acp-launch-error$/), { force: true });
   });
 
   it('clamps max to the model and Antigravity effort levels (PAN-5587)', async () => {

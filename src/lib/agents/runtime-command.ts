@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, statfsSync, statSync, writeFileSync } from 'fs';
-import { mkdir, rename as renameAsync, stat as statAsync, writeFile } from 'fs/promises';
+import { mkdir, rename as renameAsync, rm, stat as statAsync, writeFile } from 'fs/promises';
 import { exec } from 'child_process';
 import { request as httpRequest } from 'node:http';
 import { randomUUID } from 'crypto';
@@ -149,6 +149,8 @@ export async function getAcpLauncherFields(
   unsetProviderEnv: true;
 }> {
   // Antigravity runs bare Google ids, so its harness comes from the caller (PAN-5587 D2).
+  // A previous launch's error (e.g. a missing Antigravity credential) must not fail this launch's readiness poll.
+  await rm(join(getAgentDir(agentId), hostLaunchErrorFile('acp')), { force: true });
   const harness = requestedHarness === 'antigravity' ? 'antigravity' : model.startsWith('grok/') ? 'grok' : model.startsWith('opencode/') || model.startsWith('opencode-go/') ? 'opencode' : 'acp';
   return {
     harness,
