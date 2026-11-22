@@ -1,13 +1,10 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-22T02:35:23Z · model: claude-opus-5-5 · open: 946_
+_Last sequenced: 2026-11-22T03:04:49Z · model: claude-opus-5-5 · open: 942_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
-| 1 | PAN-5588 | S | critical | ok |  |  | In pipeline. Gate admission CPU bypass bound restarts per head: 1 gate/10 min under sustained CPU; make the bound queue-level. |
-| 1 | PAN-5589 | S | critical | ok |  |  | In pipeline. Gate admission reads system-wide PSI from CPU-pinned jobs as pressure while 20 of 24 cores idle; add utilization floor. |
-| 2 | PAN-5586 | M | medium | ok |  |  | In pipeline. Register Gemini 4 Carbon/Neon/Hydrogen, move Google tier map to Gemini 4, fix 2.5 deprecation remaps. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 4 | PAN-5430 | S | medium | ok |  |  | Markdown Preview prints raw HTML (README logo <div>/<picture>) as text; render it via rehype-raw + rehype-sanitize in doc previews. |
 | 5 | PAN-5567 | S | high | ok |  |  | Codex app-server threads hardcode on-request/workspace-write, so Read-only and Full access settings never apply. |
@@ -950,21 +947,8 @@ _Last sequenced: 2026-11-22T02:35:23Z · model: claude-opus-5-5 · open: 946_
 | 902 | PAN-5305 | XS | low | ok |  |  | Main build break already fixed: needsYou.ts imports from needsYouRows and main CI is green. Verify and close. |
 | 903 | PAN-5444 | XS | low | ok |  |  | Two Minor CodeRabbit findings left on merged PR #5443: semgrep repo rules resolve from event cwd; hook tests not isolated from Docker. |
 | 904 | PAN-5405 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5403: changes-query refetch after turns, Send menu keyboard/scheduling guard, tab-menu focus. |
-| 905 | PAN-5585 | M | medium | ok |  |  | Merged and closed out: phone-width Agents rail fix shipped. Nothing left to pick up; drops off with the next manifest. |
 
 ## Rationale detail
-
-### PAN-5588 (rank 1)
-
-New since the prior run and already in the pipeline (planning), so it is pinned at rank 1 rather than ranked against the backlog. It is a substrate-improvement bug in the quality-gate admission queue that stalls every work agent for up to N x 10 minutes under sustained CPU pressure, which makes it critical pipeline throughput work; the body gives the exact root-cause lines, a five-step fix and fake-timer acceptance criteria, so condition is ok. It touches the same head-admission logic as PAN-5312, so the two should land in sequence.
-
-### PAN-5589 (rank 1)
-
-New since the prior run and already in the pipeline, so it is pinned at rank 1 beside its sibling PAN-5588 rather than ranked against the backlog. It is substrate work on the quality-gate admission queue that stalled four work agents for over an hour, with an exact root cause, a small fix and mechanical unit-test acceptance criteria, so importance is critical and condition is ok.
-
-### PAN-5586 (rank 2)
-
-New since the prior run and already in the pipeline, so it is pinned at the free rank-2 slot rather than ranked against the backlog. The issue lists exact registration sites, prices with an implementation checkpoint, and mechanical acceptance criteria, so condition is ok; it informs PAN-4555 (dated Argon price raise) and PAN-5587 (Antigravity harness test model).
 
 ### PAN-5013 (rank 3)
 
@@ -1274,6 +1258,18 @@ New this pass. pan strike dies at git worktree list --porcelain on a polyrepo wr
 
 New this pass and the only supply-chain finding in the batch. A stale node_modules made npx fall back to the registry, where the unscoped effect-language-service name is claimed by a third party, and npm installed and executed it non-interactively. The payload was benign this time; the name stays third-party-controlled, so a malicious patch release would run on any machine in the same state. The fix is small and the downside is unbounded.
 
+### PAN-5133 (rank 76)
+
+New substrate bug placed in a freed high-tier slot. Under memory pressure the operator has no supported way to stop a deferred start, and the Flywheel had to write the journal directly.
+
+### PAN-4792 (rank 77)
+
+New bug found while planning PAN-4738: the tmux paste guard misses Claude Code's unnumbered select dialogs, so a failed paste's fallback Enter can answer them, including a silent permission-mode change. PAN-4738 removes the one known trigger on Fly, so it ranks with the high-tier delivery bugs rather than the top tier.
+
+### PAN-3557 (rank 78)
+
+New this pass. Post-merge label application has no retry, so a rate-limited 403 leaves a merged issue without its verifying-on-main label — and the verify-on-main phase enumerates by that label, which makes the issue invisible to the phase that owns it. Lifecycle reported 'completed' throughout, so nothing noticed for 45 minutes.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1281,50 +1277,11 @@ New this pass and the only supply-chain finding in the batch. A stale node_modul
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-22T02:35:23Z",
+  "generatedAt": "2026-11-22T03:04:49Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 946,
+  "openCount": 942,
   "nodes": [
-    {
-      "issue": "PAN-5588",
-      "rank": 1,
-      "size": "S",
-      "importance": "critical",
-      "score": 74,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline. Gate admission CPU bypass bound restarts per head: 1 gate/10 min under sustained CPU; make the bound queue-level.",
-      "rationale": "New since the prior run and already in the pipeline (planning), so it is pinned at rank 1 rather than ranked against the backlog. It is a substrate-improvement bug in the quality-gate admission queue that stalls every work agent for up to N x 10 minutes under sustained CPU pressure, which makes it critical pipeline throughput work; the body gives the exact root-cause lines, a five-step fix and fake-timer acceptance criteria, so condition is ok. It touches the same head-admission logic as PAN-5312, so the two should land in sequence.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5589",
-      "rank": 1,
-      "size": "S",
-      "importance": "critical",
-      "score": 74,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline. Gate admission reads system-wide PSI from CPU-pinned jobs as pressure while 20 of 24 cores idle; add utilization floor.",
-      "rationale": "New since the prior run and already in the pipeline, so it is pinned at rank 1 beside its sibling PAN-5588 rather than ranked against the backlog. It is substrate work on the quality-gate admission queue that stalled four work agents for over an hour, with an exact root cause, a small fix and mechanical unit-test acceptance criteria, so importance is critical and condition is ok.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5586",
-      "rank": 2,
-      "size": "M",
-      "importance": "medium",
-      "score": 60,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline. Register Gemini 4 Carbon/Neon/Hydrogen, move Google tier map to Gemini 4, fix 2.5 deprecation remaps.",
-      "rationale": "New since the prior run and already in the pipeline, so it is pinned at the free rank-2 slot rather than ranked against the backlog. The issue lists exact registration sites, prices with an implementation checkpoint, and mechanical acceptance criteria, so condition is ok; it informs PAN-4555 (dated Argon price raise) and PAN-5587 (Antigravity harness test model).",
-      "gate": "auto",
-      "planning": "auto"
-    },
     {
       "issue": "PAN-5013",
       "rank": 3,
@@ -13087,19 +13044,6 @@ New this pass and the only supply-chain finding in the batch. A stale node_modul
       "rationale": "New CodeRabbit follow-up from the merged PAN-5295 PR; one Major and four Minor frontend findings, ranked with comparable follow-ups.",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-5585",
-      "rank": 905,
-      "size": "M",
-      "importance": "medium",
-      "score": 62,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Merged and closed out: phone-width Agents rail fix shipped. Nothing left to pick up; drops off with the next manifest.",
-      "rationale": "It left the pipeline because its PR merged and the issue closed out, so it moves to the bottom instead of holding an unpinned rank-1 slot.",
-      "gate": "auto",
-      "planning": "auto"
     }
   ],
   "edges": [
@@ -14399,38 +14343,10 @@ New this pass and the only supply-chain finding in the batch. A stale node_modul
       "confidence": 0.5
     },
     {
-      "from": "PAN-5586",
-      "to": "PAN-4555",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-5586",
-      "to": "PAN-5587",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.6
-    },
-    {
       "from": "PAN-5587",
       "to": "PAN-752",
       "type": "informs",
       "source": "github-ref",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-5588",
-      "to": "PAN-5312",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
-      "from": "PAN-5589",
-      "to": "PAN-5588",
-      "type": "informs",
-      "source": "ai-inferred",
       "confidence": 0.6
     },
     {
