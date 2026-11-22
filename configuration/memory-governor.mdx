@@ -138,7 +138,9 @@ them; Overdeck never kills them itself.
 Quality gates, local Vitest runs and typecheck lanes (`scripts/tsc-admitted.mjs`)
 share an admission queue with `resources.quality_gate_slots` slots (default 2),
 set in `~/.overdeck/config.yaml` only. A gate starts only while CPU is
-unpressured; under pressure new gates wait and running gates keep their slots.
+unpressured; PSI counts only while CPU utilization is at least 50 %, so a
+workload pinned to a few cores does not hold gates while other cores are
+idle; under pressure new gates wait and running gates keep their slots.
 The CPU wait is bounded: the gate at the head of the queue starts alone once it
 has waited on CPU for `resources.quality_gate_cpu_bypass_minutes` and no other
 gate holds a slot, because CPU contention only slows a gate down.
@@ -160,8 +162,8 @@ as available memory minus its footprint stays at or above the hard reserve
 | `resources.governor_cpu_psi_hold_avg60` | `50` | CPU PSI `some avg60` percentage at which the governor holds and the doors above react. |
 | `resources.governor_cpu_psi_recovery_avg60` | `25` | The governor stays held until CPU PSI falls below this. Must be lower than the hold threshold, or both fall back to the defaults with a warning. |
 | `resources.governor_cpu_hold_dispatch` | `false` | Hold Flywheel-started work agents while CPU is saturated. Off until calibration data exists. |
-| `resources.quality_gate_slots` | `2` | Quality gates, local Vitest runs and typecheck lanes that may hold admission at once (1-16). Set it in `~/.overdeck/config.yaml`; a project `.pan.yaml` value is ignored. A gate starts only while CPU is unpressured: utilization below 75 %, and PSI some avg10 below `resources.quality_gate_psi_start_avg10` (load per core below 1 without PSI). It also waits while starting it would push MemAvailable below `resources.governor_soft_reserve_gb`. Under pressure new gates wait; running gates keep their slots. |
-| `resources.quality_gate_psi_start_avg10` | `25` | New quality gates wait while CPU PSI `some avg10` is at or above this percentage (above 0, at most 100). Global config only. |
+| `resources.quality_gate_slots` | `2` | Quality gates, local Vitest runs and typecheck lanes that may hold admission at once (1-16). Set it in `~/.overdeck/config.yaml`; a project `.pan.yaml` value is ignored. A gate starts only while CPU is unpressured: utilization below 75 %, and, from 50 % utilization, PSI some avg10 below `resources.quality_gate_psi_start_avg10` (load per core below 1 without PSI). It also waits while starting it would push MemAvailable below `resources.governor_soft_reserve_gb`. Under pressure new gates wait; running gates keep their slots. |
+| `resources.quality_gate_psi_start_avg10` | `25` | New quality gates wait while CPU PSI `some avg10` is at or above this percentage and CPU utilization is at least 50 % (above 0, at most 100). Below 50 % utilization PSI is ignored, because workloads pinned to a few cores raise it while other cores sit idle. Global config only. |
 | `resources.quality_gate_cpu_bypass_minutes` | `10` | Minutes the gate at the head of the admission queue waits on CPU pressure before it starts alone, once no other gate holds a slot. Must be above 0 and under 30, the gate wrappers' admission wait. Global config only; queued gates pick up a change on their next poll. |
 
 The deacon log (`~/.overdeck/logs/deacon.log`) gets one `cpu-pressure sample`
