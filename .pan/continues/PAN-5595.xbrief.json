@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5595",
   "created": "2026-11-22T04:25:34.764Z",
-  "updated": "2026-11-22T04:37:43.341Z",
+  "updated": "2026-11-22T04:37:46.498Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,6 +52,11 @@
     "workflow-wiring.ac3": {
       "status": "completed",
       "doneAt": "2026-11-22T04:37:43.340Z"
+    },
+    "docs-releasing": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5595",
+      "claimedAt": "2026-11-22T04:37:46.498Z"
     }
   }
 }
