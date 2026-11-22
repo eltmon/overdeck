@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5587",
   "created": "2026-11-21T22:59:41.238Z",
-  "updated": "2026-11-22T01:12:04.369Z",
+  "updated": "2026-11-22T01:12:10.164Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -122,6 +122,11 @@
     "acp-antigravity-module.ac5": {
       "status": "completed",
       "doneAt": "2026-11-22T01:12:04.368Z"
+    },
+    "host-antigravity": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5587",
+      "claimedAt": "2026-11-22T01:12:10.164Z"
     }
   }
 }
