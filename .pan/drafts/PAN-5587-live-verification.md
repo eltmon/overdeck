@@ -37,7 +37,7 @@ $ pan doctor | grep -i antigravity
 
 ## Check 1 — Antigravity conversation renders
 
-`gemini-4-carbon` is not registered (PAN-5586 open), so the run used `gemini-4-argon`.
+The first run used `gemini-4-argon`, because the model map did not yet carry `gemini-4-carbon`; the carbon re-run after the review fix is under "Review cycle 1" below.
 
 ```
 POST /api/conversations
@@ -184,3 +184,19 @@ Four conversation turns on `gemini-4-argon` (about $0.09 at list prices per the 
 ## Cleanup
 
 The peer server, the conversation hosts and the private tmux server were stopped; no `acp-host` or `agy` process with the throwaway gemini dir remained. Both scratch config files that held the key were deleted, and the throwaway home and its `/tmp` symlinks were removed.
+
+## Review cycle 1 — `gemini-4-carbon` re-run
+
+The review found that PAN-5586 (gemini-4-neon, gemini-4-carbon, gemini-4-hydrogen) had landed on this branch while `ANTIGRAVITY_MODEL_IDS` still lacked the three ids. After the fix (`338cdd372f1`), checks 1 and 2 were re-run on `gemini-4-carbon` with a fresh build at `52c658d97f5` and the same throwaway setup (the server's `HOME` set to the real scratchpad path so cwd containment resolved; `OVERDECK_HOME` stayed on the short `/tmp/p5587/.overdeck`).
+
+1. **No key, then a retry of the same conversation (stale launch error).** With `models.providers.google: { enabled: true }` and no key, a new conversation on `gemini-4-carbon` with harness `antigravity` passed the policy and failed fast with `ANTIGRAVITY_AUTH_REQUIRED` in `acp-launch-error`. The key was then written to the throwaway config (by script) and the same conversation was resumed (`POST /api/conversations/20261122-6975/resume`): the host came up with session `119a2868-26b4-4b14-8cae-d17d00f93936` and no `acp-launch-error` remained, which is the review's stale-error case, now cleared by `getAcpLauncherFields`.
+2. **Check 1 (carbon).** Host argv `--model gemini-4-carbon --effort high`; child `agy acp --gemini-dir /tmp/p5587/.overdeck/antigravity`. "Reply with exactly OK." → `OK`; `turn_completed` usage `{model: gemini-4-carbon, source: antigravity, inputTokens: 2383, outputTokens: 74, cacheReadTokens: 36931, reasoningTokens: 69}`. (The resume prompt Overdeck sends after a restore ran first, as one extra turn with tool calls.)
+3. **Check 2 (carbon).** `POST /api/conversations/restart-all` → `{"restarted":1,"results":[{"name":"20261122-6975","model":"gemini-4-carbon","status":"restarted"}]}`; `acp-session-id` unchanged (`119a2868-…`); "What did you reply to \"Reply with exactly OK.\"? One word." → `OK` on the same session id.
+4. **Picker.** `GET /api/settings/available-models` listed seven "— Antigravity" Google rows: Gemini 4 Argon, Gemini 4 Neon, Gemini 4 Carbon, Gemini 4 Hydrogen, Gemini 3.8 Flash, Gemini 3.6 Flash, Gemini 3.1 Pro.
+
+Screenshot: `scratchpad/live/shots/check1-carbon.png` — the carbon conversation with both `OK` replies and the composer showing "Gemini 4 Carbon (1M context) — Antigravity" with the Antigravity chip.
+
+`~/.gemini` gained no files during the re-run. The peer server, hosts and private tmux server were stopped (the restart-all orphan of #5116 was stopped by pid), and the throwaway home with the key was deleted.
+
+**Result: pass.**
+
