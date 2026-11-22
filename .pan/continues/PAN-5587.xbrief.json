@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5587",
   "created": "2026-11-21T22:59:41.238Z",
-  "updated": "2026-11-22T01:46:23.079Z",
+  "updated": "2026-11-22T01:46:24.763Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -310,6 +310,11 @@
     "no-loss-audit.ac3": {
       "status": "completed",
       "doneAt": "2026-11-22T01:46:23.078Z"
+    },
+    "frontend-harness-unions": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5587",
+      "claimedAt": "2026-11-22T01:46:24.762Z"
     }
   }
 }
