@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5588",
   "created": "2026-11-21T23:34:16.196Z",
-  "updated": "2026-11-22T01:03:55.913Z",
+  "updated": "2026-11-22T01:04:15.672Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,11 @@
     "wi2-queue-cpu-marker-helpers.ac3": {
       "status": "completed",
       "doneAt": "2026-11-22T01:03:55.913Z"
+    },
+    "wi3-queue-level-cpu-bound": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5588",
+      "claimedAt": "2026-11-22T01:04:15.672Z"
     }
   }
 }
