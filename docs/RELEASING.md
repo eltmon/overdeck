@@ -167,7 +167,7 @@ For tags like `v0.7.1` the workflow will:
 - run the full test suite and smoke-test the CLI
 - pack `@overdeck/core` into one tarball (job `pack`)
 - install that exact tarball on a bare macOS host and run the bare-host smoke (job `bare-host-macos`)
-- build `@overdeck/desktop` and check it (no `onnxruntime`/`transformers` in `server/node_modules`, tarball at most 300 MB), then publish that tarball to npm `latest`, followed by `@overdeck/contracts` and `@overdeck/desktop` (job `npm`, PAN-5424)
+- build `@overdeck/desktop` and check it (no `onnxruntime`/`transformers` in `server/node_modules`, tarball at most 300 MB), then publish that tarball to npm `latest`, followed by `@overdeck/contracts` and `@overdeck/desktop` (job `npm`, PAN-5424); each publish waits for its version to become visible on npm before the step succeeds (PAN-5595)
 - build the Linux desktop app
 - generate a structured release body from git history
 - create a normal GitHub Release
@@ -218,7 +218,7 @@ The end-user launch command is **`npx @overdeck/core`** (or `npm i -g @overdeck/
 
 ### How CI authenticates (steady state)
 
-`.github/workflows/release.yml` publishes with **npm Trusted Publishing (OIDC)** — `npm publish --provenance --access public`, with **no `NODE_AUTH_TOKEN`**. The workflow's `id-token: write` permission lets npm verify the publisher against each package's trusted-publisher config (this repo + `release.yml`). Each publish step is retry-safe: if `name@version` already exists on npm, it skips that package.
+`.github/workflows/release.yml` publishes with **npm Trusted Publishing (OIDC)** — `npm publish --provenance --access public`, with **no `NODE_AUTH_TOKEN`**. The workflow's `id-token: write` permission lets npm verify the publisher against each package's trusted-publisher config (this repo + `release.yml`). Each publish step runs `scripts/npm-publish-retry-safe.sh` (PAN-5595): it skips a version that is already visible on npm, and after a successful `npm publish` it polls npm view for up to 20 minutes (40 checks, 30 s apart) waiting for the version to become visible. It treats a `npm publish` failure containing `previously staged version` (E409) as the version already being staged, not as an error, and goes straight into that same visibility poll instead of publishing a second time.
 
 So once Trusted Publishing is configured per package, publishing is hands-off: `pan release stable` → push tag → CI publishes. No tokens, no OTP.
 
@@ -287,6 +287,29 @@ Choose the next version. Tags are immutable release identifiers.
 ### npm publish or GitHub Release fails after tag push
 
 Inspect the run in GitHub Actions for `.github/workflows/release.yml`. The release tag remains the source of truth, so fix the workflow or package issue and then decide whether to publish a new tag.
+
+### The npm job failed: "<pkg>@<version> is not visible on npm"
+
+The version is most likely **staged**: npm accepted it but holds it back until a maintainer approves it. A staged version is invisible to `npm view`, its tarball URL returns 404, and a second publish fails with `E409 … Cannot publish over previously staged version`. Example: `@overdeck/core@0.90.0`, run 44976899182 (PAN-5595). The job is certain only when its log shows that E409. After a clean publish, a registry delay produces the same timeout, so confirm staging before you approve anything.
+
+CI cannot check or approve staging, because OIDC trust tokens cannot run `npm stage` subcommands.
+
+As an `@overdeck` maintainer (2FA, npm 11.15 or later), confirm and approve:
+
+```bash
+npm login
+npx --yes npm@11 stage list @overdeck/core      # package name only; a version spec is a usage error
+npx --yes npm@11 stage view <stage-id>          # required: check the package name and exact version
+npx --yes npm@11 stage approve <stage-id>       # prompts for 2FA
+```
+
+A package can have several staged versions. Approve only the stage id whose `stage view` output shows the package and exact version the job named. You can also approve under Staged Packages in your npmjs.com account settings.
+
+If `stage list` shows no staged entry for that version, it is not staged. Check registry visibility (`npm view <name>@<version> version`, npm's status page) instead of approving anything, and re-run the job once the version is visible.
+
+If you approve while the job is still polling, the job continues on its own. Otherwise re-run the failed `npm` job: the script sees the version, skips it, and publishes any packages that come after it.
+
+Never publish the same version again, and never cut a new tag just to get around a staged version.
 
 ### Manual `npm publish` returns `404 Not Found` on the `PUT`
 
