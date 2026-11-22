@@ -80,6 +80,9 @@ export function getFriendlyModelName(fullModel: string | undefined | null): stri
 
   // Google models
   if (backingModel.includes('gemini-4-argon')) return 'Gemini 4 Argon';
+  if (backingModel.includes('gemini-4-neon')) return 'Gemini 4 Neon';
+  if (backingModel.includes('gemini-4-carbon')) return 'Gemini 4 Carbon';
+  if (backingModel.includes('gemini-4-hydrogen')) return 'Gemini 4 Hydrogen';
   if (backingModel.includes('gemini-4')) return 'Gemini 4';
   if (backingModel.includes('gemini-3.1-pro-preview') || backingModel.includes('gemini-3.1-pro')) return 'Gemini 3.1 Pro';
   if (backingModel.includes('gemini-3-flash')) return 'Gemini 3 Flash';
