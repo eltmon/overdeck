@@ -1,11 +1,10 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-22T01:55:41.074453Z · model: claude-opus-5-5 · open: 946_
+_Last sequenced: 2026-11-22T02:35:23Z · model: claude-opus-5-5 · open: 946_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
-| 1 | PAN-5585 | M | medium | ok |  |  | In pipeline. Phone-width conv page: 256px Agents rail squeezes timeline to ~130px, top bar overflows; overlay rail on narrow panes. |
 | 1 | PAN-5588 | S | critical | ok |  |  | In pipeline. Gate admission CPU bypass bound restarts per head: 1 gate/10 min under sustained CPU; make the bound queue-level. |
 | 1 | PAN-5589 | S | critical | ok |  |  | In pipeline. Gate admission reads system-wide PSI from CPU-pinned jobs as pressure while 20 of 24 cores idle; add utilization floor. |
 | 2 | PAN-5586 | M | medium | ok |  |  | In pipeline. Register Gemini 4 Carbon/Neon/Hydrogen, move Google tier map to Gemini 4, fix 2.5 deprecation remaps. |
@@ -951,12 +950,9 @@ _Last sequenced: 2026-11-22T01:55:41.074453Z · model: claude-opus-5-5 · open: 
 | 902 | PAN-5305 | XS | low | ok |  |  | Main build break already fixed: needsYou.ts imports from needsYouRows and main CI is green. Verify and close. |
 | 903 | PAN-5444 | XS | low | ok |  |  | Two Minor CodeRabbit findings left on merged PR #5443: semgrep repo rules resolve from event cwd; hook tests not isolated from Docker. |
 | 904 | PAN-5405 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5403: changes-query refetch after turns, Send menu keyboard/scheduling guard, tab-menu focus. |
+| 905 | PAN-5585 | M | medium | ok |  |  | Merged and closed out: phone-width Agents rail fix shipped. Nothing left to pick up; drops off with the next manifest. |
 
 ## Rationale detail
-
-### PAN-5585 (rank 1)
-
-New since the prior run and already in the pipeline with a live workspace, so it is pinned at the free rank-1 slot rather than ranked against the backlog. It is a well-specified mobile layout bug with exact root-cause lines and mechanical acceptance criteria, so condition is ok.
 
 ### PAN-5588 (rank 1)
 
@@ -1274,6 +1270,10 @@ Three red-mains in one day from direct-push series bypassing PR CI — conversat
 
 New this pass. pan strike dies at git worktree list --porcelain on a polyrepo wrapper root, which is not a git repository, so the urgent-strike escape hatch is simply unavailable for MYN-class projects. pan swarm already understands nested repos; strike must use the same project repository inventory. Duplicate of PAN-3040 — close one when this lands.
 
+### PAN-3605 (rank 75)
+
+New this pass and the only supply-chain finding in the batch. A stale node_modules made npx fall back to the registry, where the unscoped effect-language-service name is claimed by a third party, and npm installed and executed it non-interactively. The payload was benign this time; the name stays third-party-controlled, so a malicious patch release would run on any machine in the same state. The fix is small and the downside is unbounded.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1281,24 +1281,11 @@ New this pass. pan strike dies at git worktree list --porcelain on a polyrepo wr
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-22T01:55:41.074453Z",
+  "generatedAt": "2026-11-22T02:35:23Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 946,
   "nodes": [
-    {
-      "issue": "PAN-5585",
-      "rank": 1,
-      "size": "M",
-      "importance": "medium",
-      "score": 62,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline. Phone-width conv page: 256px Agents rail squeezes timeline to ~130px, top bar overflows; overlay rail on narrow panes.",
-      "rationale": "New since the prior run and already in the pipeline with a live workspace, so it is pinned at the free rank-1 slot rather than ranked against the backlog. It is a well-specified mobile layout bug with exact root-cause lines and mechanical acceptance criteria, so condition is ok.",
-      "gate": "auto",
-      "planning": "auto"
-    },
     {
       "issue": "PAN-5588",
       "rank": 1,
@@ -13098,6 +13085,19 @@ New this pass. pan strike dies at git worktree list --porcelain on a polyrepo wr
       "dependsOn": [],
       "why": "CodeRabbit follow-up on PR #5403: changes-query refetch after turns, Send menu keyboard/scheduling guard, tab-menu focus.",
       "rationale": "New CodeRabbit follow-up from the merged PAN-5295 PR; one Major and four Minor frontend findings, ranked with comparable follow-ups.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5585",
+      "rank": 905,
+      "size": "M",
+      "importance": "medium",
+      "score": 62,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Merged and closed out: phone-width Agents rail fix shipped. Nothing left to pick up; drops off with the next manifest.",
+      "rationale": "It left the pipeline because its PR merged and the issue closed out, so it moves to the bottom instead of holding an unpinned rank-1 slot.",
       "gate": "auto",
       "planning": "auto"
     }
