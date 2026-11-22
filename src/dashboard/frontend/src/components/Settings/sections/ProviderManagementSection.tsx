@@ -71,6 +71,7 @@ const HARNESS_LABELS: Record<Harness, string> = {
   muse: 'Muse Code',
   'prime-agent': 'Prime Agent',
   grok: 'Grok Build',
+  antigravity: 'Antigravity',
 };
 
 const PROVIDERS: { id: Provider; name: string; placeholder: string }[] = [

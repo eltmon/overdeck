@@ -12,7 +12,7 @@ import styles from './ModelPicker.module.css';
 export const FALLBACK_COMPACTION_MODEL = 'claude-haiku-5-5';
 
 
-export type Harness = 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent' | 'grok';
+export type Harness = 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent' | 'grok' | 'antigravity';
 export type AuthMode = 'api-key' | 'subscription';
 
 export const HARNESS_OPTIONS: Array<{ id: Harness; label: string; description: string }> = [

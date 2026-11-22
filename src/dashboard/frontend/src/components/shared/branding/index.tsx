@@ -142,6 +142,7 @@ export const HARNESS_BRANDS: Record<Harness, BrandDef> = {
   'kimi-code': { id: 'kimi-code', label: 'Kimi Code', color: PROVIDER_BRANDS.kimi.color, Icon: KimiIcon },
   'prime-agent': { id: 'prime-agent', label: 'Prime Agent', color: '#475569', Icon: Cpu },
   grok: { id: 'grok', label: 'Grok Build', color: '#475569', Icon: GrokHarnessIcon },
+  antigravity: { id: 'antigravity', label: 'Antigravity', color: '#4b5563', Icon: AcpHarnessIcon },
 };
 
 export const PROVIDER_COLORS: Record<Provider, string> = Object.fromEntries(

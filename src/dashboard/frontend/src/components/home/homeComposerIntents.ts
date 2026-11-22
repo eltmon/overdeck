@@ -20,6 +20,7 @@ export const HOME_AGENT_LABELS: Record<Harness, string> = {
   muse: 'Muse Code',
   'prime-agent': 'Prime Agent',
   grok: 'Grok Build',
+  antigravity: 'Antigravity',
 };
 
 export function buildHomeIntents(opts: {
