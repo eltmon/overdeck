@@ -74,6 +74,7 @@ export const POLICY_RUNTIME_NAMES = Object.keys({
   muse: true,
   'prime-agent': true,
   grok: true,
+  antigravity: true,
 } satisfies Record<RuntimeName, true>) as RuntimeName[]
 
 const OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK: HarnessPolicyDecision = {
@@ -180,6 +181,7 @@ export function canUseHarness(
       ? ALLOWED
       : { allowed: false, reason: 'OpenCode Go and Zen model IDs require the OpenCode harness. Select an opencode/* or opencode-go/* model.' };
   }
+  if (harness === 'antigravity') return { allowed: false, reason: 'Antigravity models are not registered yet.' };
   const isGrokProvider = providerName === 'grok';
   if (harness === 'grok' || isGrokProvider) {
     return harness === 'grok' && isGrokProvider

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 
 import {
+  ANTIGRAVITY_BEHAVIOR,
   CLAUDE_CODE_BEHAVIOR,
   GROK_BEHAVIOR,
   PRIME_AGENT_BEHAVIOR,
@@ -9,7 +10,7 @@ import {
   normalizeHarnessName,
   type RuntimeName,
 } from "./harness-behavior"
-import { GROK_CAPABILITIES, HARNESS_CAPABILITY_KEYS } from "./harness-capabilities"
+import { ANTIGRAVITY_CAPABILITIES, GROK_CAPABILITIES, HARNESS_CAPABILITY_KEYS } from "./harness-capabilities"
 import { KNOWN_HARNESSES } from "./types"
 
 describe("PRIME_AGENT_BEHAVIOR", () => {
@@ -65,6 +66,34 @@ describe("GROK_BEHAVIOR (PAN-5078)", () => {
     expect(capabilities.updateArgs).toEqual(["update"])
     expect(capabilities.overdeckMcp).toBe(true)
     expect(capabilities.binaryLabel).toBe("Grok Build")
+  })
+})
+
+describe("ANTIGRAVITY_BEHAVIOR (PAN-5587)", () => {
+  it("getHarnessBehavior('antigravity') returns the Antigravity ACP-host behavior with four effort levels", () => {
+    const behavior = getHarnessBehavior("antigravity")
+    expect(behavior).toBe(ANTIGRAVITY_BEHAVIOR)
+    expect(behavior.displayName).toBe("Antigravity")
+    expect(behavior.executableName).toBe("agy")
+    expect(behavior.launchCommandKind).toBe("acp-host")
+    expect(behavior.effortLevels).toEqual(["low", "medium", "high", "xhigh"])
+    expect(behavior.contextLayerKind).toBe("antigravity")
+    expect(behavior.processNames).toEqual(["acp-host", "agy"])
+  })
+
+  it("is a known harness name", () => {
+    expect(KNOWN_HARNESSES.has("antigravity")).toBe(true)
+    expect(normalizeHarnessName("antigravity")).toBe("antigravity")
+  })
+
+  it("declares Antigravity capabilities with the overdeck MCP server and no npm package", () => {
+    const capabilities = getHarnessBehavior("antigravity").capabilities
+    expect(capabilities).toBe(ANTIGRAVITY_CAPABILITIES)
+    expect(capabilities.overdeckMcp).toBe(true)
+    expect(capabilities.npmPackage).toBeNull()
+    expect(capabilities.updateArgs).toEqual(["update"])
+    expect(capabilities.binaryLabel).toBe("Antigravity CLI")
+    expect(capabilities.installHint).toBe("curl -fsSL https://antigravity.google/cli/install.sh | bash")
   })
 })
 

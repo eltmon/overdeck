@@ -73,6 +73,7 @@ const HARNESS_BINARY_BY_RUNTIME: Record<RuntimeName, string> = {
   muse: 'muse',
   'prime-agent': 'prime-agent',
   grok: 'grok',
+  antigravity: 'agy',
 };
 
 export type ExecutableCommandRunner = (command: string, args: string[]) => Promise<string>;
