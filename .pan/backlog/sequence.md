@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-22T05:32:06Z · model: claude-opus-5-5 · open: 942_
+_Last sequenced: 2026-11-22T06:01:38Z · model: claude-opus-5-5 · open: 941_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -946,7 +946,6 @@ _Last sequenced: 2026-11-22T05:32:06Z · model: claude-opus-5-5 · open: 942_
 | 902 | PAN-5305 | XS | low | ok |  |  | Main build break already fixed: needsYou.ts imports from needsYouRows and main CI is green. Verify and close. |
 | 903 | PAN-5444 | XS | low | ok |  |  | Two Minor CodeRabbit findings left on merged PR #5443: semgrep repo rules resolve from event cwd; hook tests not isolated from Docker. |
 | 904 | PAN-5405 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5403: changes-query refetch after turns, Send menu keyboard/scheduling guard, tab-menu focus. |
-| 905 | PAN-5595 | S | low | ok |  |  | Fix merged in PR #5596; verifying on main. Close once main verification passes; nothing left to pick up. |
 
 ## Rationale detail
 
@@ -1277,10 +1276,10 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-22T05:32:06Z",
+  "generatedAt": "2026-11-22T06:01:38Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 942,
+  "openCount": 941,
   "nodes": [
     {
       "issue": "PAN-5013",
@@ -13029,19 +13028,6 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "dependsOn": [],
       "why": "CodeRabbit follow-up on PR #5403: changes-query refetch after turns, Send menu keyboard/scheduling guard, tab-menu focus.",
       "rationale": "New CodeRabbit follow-up from the merged PAN-5295 PR; one Major and four Minor frontend findings, ranked with comparable follow-ups.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5595",
-      "rank": 905,
-      "size": "S",
-      "importance": "low",
-      "score": 10,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Fix merged in PR #5596; verifying on main. Close once main verification passes; nothing left to pick up.",
-      "rationale": "Demoted from rank 9 because PR #5596 merged at 2026-11-22T05:13Z and the issue now only awaits post-merge verification, so a pickup would waste an agent.",
       "gate": "auto",
       "planning": "auto"
     }
