@@ -61,7 +61,8 @@ export interface AntigravityAuthDeps {
   readonly home?: string;
 }
 
-const UNRESOLVED_ENV_REFERENCE = /\$\{?[A-Z_][A-Z0-9_]*\}?/;
+/** The whole value is an unresolved `$NAME` / `${NAME}` reference (resolveEnvVar keeps it when the variable is unset). */
+const UNRESOLVED_ENV_REFERENCE = /^\$\{?[A-Z_][A-Z0-9_]*\}?$/;
 
 /** `<OVERDECK_HOME>/antigravity`: the isolated --gemini-dir (D6). */
 export function antigravityGeminiDir(overdeckHome = getOverdeckHome()): string {

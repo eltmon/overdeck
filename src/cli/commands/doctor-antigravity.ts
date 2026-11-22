@@ -40,7 +40,18 @@ export async function checkAntigravity(
     }];
   }
 
-  const status = await readStatus();
+  let status: { ready: boolean; method: AntigravityAuthMethod | null };
+  try {
+    status = await readStatus();
+  } catch (error) {
+    // A config read or parse failure is a doctor finding, not a crash of the whole report.
+    return [{
+      name: agy.name,
+      status: 'warn',
+      message: `Could not check credentials: ${error instanceof Error ? error.message : String(error)}`,
+      fix: ANTIGRAVITY_AUTH_REQUIRED,
+    }];
+  }
   if (!status.ready) {
     return [{
       name: agy.name,

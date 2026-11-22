@@ -36,6 +36,16 @@ describe('checkAntigravity (PAN-5587)', () => {
     expect(results[0]?.fix).toContain('clause 6');
   });
 
+  it('reports a config read failure as a warn row instead of throwing', async () => {
+    const results = await checkAntigravity(probe, installed, async () => { throw new Error('config.yaml: bad indentation'); });
+    expect(results).toEqual([{
+      name: 'Antigravity CLI',
+      status: 'warn',
+      message: 'Could not check credentials: config.yaml: bad indentation',
+      fix: ANTIGRAVITY_AUTH_REQUIRED,
+    }]);
+  });
+
   it('is ok with the version and auth method when a credential is ready', async () => {
     const results = await checkAntigravity(probe, installed, async () => ({ ready: true, method: 'gemini-api-key' }));
     expect(results).toEqual([{
