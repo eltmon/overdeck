@@ -112,6 +112,9 @@ describe('dashboard context routes helpers', () => {
       '{{#harness:grok}}',
       'Grok guidance.',
       '{{/harness:grok}}',
+      '{{#harness:antigravity}}',
+      'Antigravity guidance.',
+      '{{/harness:antigravity}}',
     ].join('\n');
 
     const response = await previewContextLayers(projects, { kind: 'global' }, [{
@@ -133,6 +136,10 @@ describe('dashboard context routes helpers', () => {
     expect(response.previews.grok).toContain('Grok guidance.');
     expect(response.previews.grok).not.toContain('Ohmypi guidance.');
     expect(response.previews['claude-code']).not.toContain('Grok guidance.');
+    expect(response.previews.antigravity).toContain('Shared guidance.');
+    expect(response.previews.antigravity).toContain('Antigravity guidance.');
+    expect(response.previews.antigravity).not.toContain('Grok guidance.');
+    expect(response.previews.grok).not.toContain('Antigravity guidance.');
     expect(syncRunner).not.toHaveBeenCalled();
     await expect(exists(globalFile)).resolves.toBe(false);
   });
