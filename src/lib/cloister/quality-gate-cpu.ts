@@ -13,11 +13,31 @@ export const DEFAULT_QUALITY_GATE_PSI_START_AVG10 = 25
  */
 export const DEFAULT_QUALITY_GATE_CPU_BYPASS_MS = 10 * 60 * 1_000
 
+export const QUALITY_GATE_CPU_START_THRESHOLD = 0.75
+// PAN-4311 D10: with CPU PSI available, start heavy runs only once `some avg10` is below the
+// configured start threshold. Load per core counts IO wait, so it is the fallback only without PSI.
+export const QUALITY_GATE_LOAD_PER_CORE_START_THRESHOLD = 1
+
 export interface QualityGateCpuSettings {
   /** `resources.quality_gate_psi_start_avg10`. */
   psiStartAvg10: number
   /** `resources.quality_gate_cpu_bypass_minutes`, in milliseconds. */
   bypassMs: number
+}
+
+export interface QualityGateCpuReading {
+  cpuUtilization: number
+  loadPerCore: number
+  /** CPU PSI `some avg10`, percent; null when unavailable (PAN-4311). */
+  psiSomeAvg10: number | null
+}
+
+/** The quality-gate CPU pressure decision, unchanged from `sampleQualityGatePressure` (PAN-5589 WI-1). */
+export function isQualityGateCpuPressured(reading: QualityGateCpuReading, psiStartAvg10: number): boolean {
+  const contended = reading.psiSomeAvg10 != null
+    ? reading.psiSomeAvg10 >= psiStartAvg10
+    : reading.loadPerCore >= QUALITY_GATE_LOAD_PER_CORE_START_THRESHOLD
+  return reading.cpuUtilization >= QUALITY_GATE_CPU_START_THRESHOLD || contended
 }
 
 /** Never throws: a config read failure falls back to the defaults. */
