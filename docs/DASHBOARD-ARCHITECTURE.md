@@ -2181,6 +2181,16 @@ opens Home (`/`). After the brand, left to right, the bar holds:
    exist) and System controls (`CloisterStatusBar`).
 7. **Theme toggle.**
 
+**Phone width (PAN-5585).** Below 640 px (`max-sm:`) the wordmark, the crumb,
+the search box's placeholder text and keycap, and the four exception chips
+are hidden. The Agents and Needs-you triggers keep their accessible
+name/text content (the Agents trigger's accessible name stays
+`"N agents working"`) but show only a dot and a number. The three menus
+(Agents, Needs you, System health) anchor to the bar instead of overflowing
+the viewport: their wrappers go `max-sm:static` so the popovers' `absolute`
+positioning resolves to the bar, with `left-2 right-2` insets replacing a
+fixed width.
+
 The Home page's "Needs you" and "Agents working" cards read the same two
 selectors, so the top bar and Home always show the same numbers
 (`App/__tests__/countAgreement.test.tsx` pins it). `AppChrome` itself calls no
@@ -2240,7 +2250,11 @@ every desktop route, not only on the Command Deck.
 `App.tsx` renders the top bar (`AppChrome`) across the full window width. Below
 it, one row holds the left column and then the routed page. `CommandDeck`
 renders only its content area, full width: it has no column of its own and no
-feed column.
+feed column. The app root, `#root` and the phone shells (`.app-viewport-shell`,
+`MobileApp`, `ShellApp`) size to `--app-height`/`--app-offset-top`, written from
+`window.visualViewport` by `useVisualViewportVars()` (`lib/visualViewport.ts`,
+PAN-5585), so the iOS keyboard does not push the header off-screen; the app
+root pads `env(safe-area-inset-top)`.
 
 - **Width.** 264 px by default. Dragging the right edge resizes it between 240
   and 640 px. The width persists in `localStorage` key
