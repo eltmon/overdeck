@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5587",
   "created": "2026-11-21T22:59:41.238Z",
-  "updated": "2026-11-22T01:29:13.098Z",
+  "updated": "2026-11-22T01:29:14.565Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -238,6 +238,11 @@
     "server-route-lists.ac2": {
       "status": "completed",
       "doneAt": "2026-11-22T01:29:13.098Z"
+    },
+    "cli-harness-lists": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5587",
+      "claimedAt": "2026-11-22T01:29:14.564Z"
     }
   }
 }
