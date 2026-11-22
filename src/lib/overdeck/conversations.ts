@@ -44,7 +44,7 @@ const ConversationName = Schema.String.pipe(Schema.brand('ConversationName'));
 export type  ConversationName = typeof ConversationName.Type;
 
 // 'pi' is a live harness again (PAN-5212); its pre-PAN-1989 rows really ran on pi.
-export const Harness     = Schema.Literals(['claude-code', 'pi', 'ohmypi', 'codex', 'acp', 'kimi-code', 'opencode', 'muse', 'prime-agent', 'grok']);
+export const Harness     = Schema.Literals(['claude-code', 'pi', 'ohmypi', 'codex', 'acp', 'kimi-code', 'opencode', 'muse', 'prime-agent', 'grok', 'antigravity']);
 export type  Harness     = typeof Harness.Type;
 
 export const TitleSource = Schema.Literals(['manual', 'auto', 'ai', 'ai-refined', 'ai-explicit', 'default']);

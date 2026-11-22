@@ -14,7 +14,7 @@ import { codexAgentSessionsDir, codexDefaultHome, codexSessionsRoot } from '../r
 import { piSessionsRoot, piUserAgentDir } from '../runtimes/storage/pi.js';
 import { ACP_TRANSCRIPT_FILE } from '../runtimes/storage/acp.js';
 
-export type DiscoveredHarness = 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent' | 'grok';
+export type DiscoveredHarness = 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent' | 'grok' | 'antigravity';
 
 export interface DiscoveredFile {
   jsonlPath: string;
@@ -154,7 +154,7 @@ async function collectAgentDirFiles(root: string, warnings: string[] = []): Prom
     const piHarness = agentHarness === 'pi' || agentHarness === 'ohmypi' ? agentHarness : 'ohmypi';
 
     result.push(...await collectPiFamilyRoot(piSessionsRoot(agentDir), piHarness, warnings));
-    await collectAgentRootFiles(agentDir, piHarness, warnings, result, agentHarness === 'opencode' ? 'opencode' : agentHarness === 'grok' ? 'grok' : 'acp');
+    await collectAgentRootFiles(agentDir, piHarness, warnings, result, agentHarness === 'opencode' ? 'opencode' : agentHarness === 'grok' ? 'grok' : agentHarness === 'antigravity' ? 'antigravity' : 'acp');
     await collectJsonlFiles(codexAgentSessionsDir(agentDir), codexAgentSessionsDir(agentDir), 'codex', warnings, result);
     for (const jsonlPath of await listMuseSessionPaths(entry.name, root)) {
       result.push({ projectDir: agentDir, jsonlPath, harness: 'muse' });
@@ -169,7 +169,7 @@ async function collectAgentRootFiles(
   piHarness: 'pi' | 'ohmypi',
   warnings: string[],
   result: DiscoveredFile[],
-  acpHarness: 'acp' | 'opencode' | 'grok',
+  acpHarness: 'acp' | 'opencode' | 'grok' | 'antigravity',
 ): Promise<void> {
   let entries: import('fs').Dirent[];
   try {

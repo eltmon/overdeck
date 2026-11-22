@@ -27,6 +27,10 @@ describe('normalizeHarness', () => {
     expect(normalizeHarness('kimi-code')).toBe('kimi-code');
   });
 
+  it("accepts 'antigravity' and returns it unchanged (PAN-5587)", () => {
+    expect(normalizeHarness('antigravity')).toBe('antigravity');
+  });
+
   it('returns null for unknown harness values', () => {
     expect(normalizeHarness('unknown')).toBeNull();
     expect(normalizeHarness('')).toBeNull();
