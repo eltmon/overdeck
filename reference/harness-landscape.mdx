@@ -11,9 +11,9 @@ extensibility mechanism each one exposes, and what that means for future
 features.
 
 <Note>
-**This is a planning survey, not a support matrix.** Overdeck drives ten
+**This is a planning survey, not a support matrix.** Overdeck drives eleven
 harnesses today: `claude-code` (the default), `pi`, `ohmypi`, `codex`, `acp`,
-`kimi-code`, `opencode`, `grok`, `muse` and `prime-agent` (see
+`kimi-code`, `opencode`, `grok`, `antigravity`, `muse` and `prime-agent` (see
 [Harnesses](/configuration/harnesses) for the operational guide). Kimi Code
 CLI is wired two ways: through the `acp` protocol harness, and natively
 through `kimi-code`, which drives Kimi's own terminal UI directly with no ACP
@@ -90,6 +90,7 @@ them.
 | `kimi-code` | **Supported** (native, Kimi only; default for Kimi models) | `src/lib/runtimes/kimi-code.ts` |
 | `opencode` | **Supported** (Go and Zen) | `src/lib/acp/opencode.ts` + shared ACP runtime |
 | `grok` | **Supported** (Grok Build sign-in) | `src/lib/acp/grok.ts` + shared ACP runtime |
+| `antigravity` | **Supported** (Gemini API key or Agent Platform; never Google sign-in) | `src/lib/acp/antigravity.ts` + shared ACP runtime |
 | `muse` | **Supported** (Meta Muse models only) | `src/lib/runtimes/muse.ts` |
 | `prime-agent` | **Supported** (alternative; Anthropic models need API-key auth) | `src/lib/runtimes/prime-agent.ts` |
 
@@ -116,7 +117,7 @@ compatibility as automatic support.
 | **OpenCode** | **Wired now** through `opencode acp` | Go and Zen; sign in with `opencode auth login`. |
 | **Cursor CLI** | ACP-reachable next | Register its executable, launch arguments, and authentication mapping. |
 | **Grok Build CLI** | **Wired now** through `grok agent stdio` | Four `grok/*` models; sign in with `grok login`. |
-| **Google Gemini CLI** | ACP-reachable next | Register its executable, launch arguments, and authentication mapping. |
+| **Antigravity CLI** (Google) | **Wired now** through `agy acp` | Gemini models; Gemini API key or Agent Platform only (no Google sign-in). |
 
 Kimi K3 and K3.1 Pro (`k3.1-pro`, `k3.1-pro-highspeed`) support Low, High, and
 Max effort through both native CLI and ACP. Overdeck initializes managed K3
@@ -145,10 +146,10 @@ windows of 1,048,576 and 262,144 tokens, respectively. K2.8 Preview has
 entitlement. See the [official Kimi model reference](https://www.kimi.com/code/docs/en/kimi-code/models.html).
 
 Kimi is therefore a supported agent through the `acp` harness, and OpenCode
-and Grok Build run on the same ACP transport under their own harness names.
-Cursor and Gemini remain candidates: their ACP support reduces the adapter to
-provider-specific startup and auth, but they aren't selectable until those
-adapters and probes land.
+and Grok Build run on the same ACP transport under their own harness names, as
+does Google's Antigravity CLI. Cursor remains a candidate: its ACP support
+reduces the adapter to provider-specific startup and auth, but it isn't
+selectable until that adapter and its probes land.
 
 ## Harness profiles
 
@@ -276,28 +277,37 @@ and should be re-checked before any decision.
   `src/lib/cost-parsers/codex-parser.ts` (per-agent thread-id pinning at
   `~/.overdeck/agents/<id>/codex-thread-id` for session introspection).
 
-### Google Gemini CLI: Not supported (candidate)
+### Google Antigravity CLI: Supported through ACP
 
-- **Vendor / model:** Google. Gemini 3 models, 1M-token context. Google-locked.
-- **OSS / license:** Open source, **Apache-2.0**. TypeScript. v0.43.0
-  (2026-05-22).
-- **Auth:** Google OAuth (free tier) / Gemini API key / Vertex AI (enterprise).
-- **Extensibility:**
-  - **Skills: yes**, `SKILL.md`, four discovery tiers (built-in →
-    extension-bundled → user `~/.gemini/skills/` or `~/.agents/skills/` →
-    workspace). Activated via an `activate_skill` tool with a confirmation
-    prompt.
-  - **⭐ Per-session skill toggling**: `/skills enable <name>` /
-    `/skills disable <name>` turn skills on/off **for the current session**.
-    This is a *native* primitive close to what template conversations want.
-  - **GEMINI.md** context file; **AGENTS.md** opt-in via `contextFileName`.
-  - **Extensions** bundle MCP servers + context file + custom TOML commands.
-  - **MCP: yes**.
-- **Headless / RPC:** `-p`/`--prompt`; `--output-format json` or
-  `stream-json` (typed JSONL events); documented exit codes.
-- **Why a candidate:** the `/skills enable/disable` primitive is a working
-  reference for per-session skill curation; generous free tier; clean headless
-  JSONL stream.
+Overdeck supports Google's Antigravity CLI (`agy`) as the `antigravity`
+harness, with persistent ACP sessions through `agy acp`. Verified version:
+`agy 1.5.14`. Gemini CLI handed its consumer users to Antigravity on 2026-06-18
+([announcement](https://github.com/google-gemini/gemini-cli/discussions/27274)),
+so Antigravity, not Gemini CLI, is the Google agent CLI Overdeck runs. See
+[Antigravity CLI setup](/configuration/harnesses#antigravity-cli) for
+credentials, models, effort, cost and known behavior.
+
+- **Vendor / model:** Google. Gemini models only; Overdeck runs the existing
+  Google model IDs `agy` serves (`gemini-4-argon`, `gemini-3.8-flash`,
+  `gemini-3.6-flash`, `gemini-3.1-pro-preview`).
+- **OSS / license:** Closed source (a native binary).
+- **Distribution:** `curl -fsSL https://antigravity.google/cli/install.sh | bash`
+  installs `~/.local/bin/agy`; `agy update` updates it, and it also updates
+  itself in the background.
+- **Auth:** a Gemini API key or Agent Platform (formerly Vertex AI) with
+  Application Default Credentials. Overdeck never uses Antigravity's Google
+  sign-in (OAuth): clause 6 of Antigravity's
+  [terms](https://antigravity.google/terms/) calls accessing the service with
+  it through third-party software a breach, and users report account bans.
+- **ACP capabilities** (from `initialize`): `loadSession`; session resume,
+  close, load, list and additional directories; image and embedded-context
+  prompts; stdio MCP servers passed over ACP; config options `model`,
+  `thought_level` (per-model values) and `mode`.
+- **Isolation:** Overdeck passes `--gemini-dir ~/.overdeck/antigravity`, so
+  `agy` never reads `~/.gemini` (Gemini CLI OAuth credentials, the operator's
+  `agy` MCP servers, hooks and skills).
+- **Cost:** each prompt result reports token usage but no cost; Overdeck
+  estimates one cost event per turn at Gemini API list prices.
 
 ### GitHub Copilot CLI: Not supported (candidate)
 
@@ -569,6 +579,7 @@ models, effort, cost and known behavior.
 | **Pi** | MIT | TS | ✅ | ✅ | ✅ | ❌ (by design) | ✅ (RPC) | `--skill` flag | **Supported** |
 | **Codex CLI** | Apache-2.0 | Rust | ✅ | ✅ | ✅ native | ✅ (+is a server) | ✅ | Profiles | **Supported** |
 | **Gemini CLI** | Apache-2.0 | TS | ✅ | ✅ | Opt-in | ✅ | ✅ | ⭐ `/skills enable` | Candidate |
+| **Antigravity CLI** | Closed | n/a | not stated | not stated | not stated | ✅ (stdio, via ACP) | ✅ (ACP) | not stated | **Supported** via ACP |
 | **Copilot CLI** | Proprietary | n/a | ✅ | ❌ (`~/.agents`) | ✅ native | ✅ | ❌ ⚠ | `.agent.md` | Candidate |
 | **Cursor CLI** | Proprietary | n/a | ✅ | ✅ | ✅ | ✅ | ✅ | Rule scopes | No |
 | **Warp / Oz** | ⚠ AGPL-3.0? | Rust | ✅ | ✅ (+all dirs) | ✅ | ✅ (imports) | ✅ | Oz `--profile` | No |

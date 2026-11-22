@@ -14,7 +14,7 @@ that runs in a terminal-backend pane (Herdr by default; see
 independently per spawn.
 
 <Info>
-**Supported today:** `claude-code` (default), `pi`, `ohmypi`, `codex`, `acp`, `kimi-code`, `opencode`, `muse`, `prime-agent`, and `grok`. For the wider
+**Supported today:** `claude-code` (default), `pi`, `ohmypi`, `codex`, `acp`, `kimi-code`, `opencode`, `muse`, `prime-agent`, `grok`, and `antigravity`. For the wider
 field of coding-agent harnesses Overdeck could adopt next, and how each one handles
 skills, MCP, and AGENTS.md, see the [Harness Landscape](/reference/harness-landscape).
 </Info>
@@ -31,10 +31,11 @@ skills, MCP, and AGENTS.md, see the [Harness Landscape](/reference/harness-lands
 | `muse` | Muse Code (`muse`) | Meta Muse models (Wonder, Spark, Ember) | Persistent native terminal sessions with separate Standard and Contributor model choices. |
 | `prime-agent` | [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent) (`prime-agent`) | Opt-in multi-provider work | RPC mode behind an Overdeck host, with one private Prime daemon per agent; supports 0.8.x. |
 | `grok` | [Grok Build](https://x.ai/cli) (`grok`) | Grok Build sign-in (SuperGrok) | Persistent ACP sessions, sign-in reuse, reported cost; verified with 1.0.77. |
+| `antigravity` | [Antigravity CLI](https://antigravity.google/cli) (`agy`) | Gemini API key or Agent Platform (ADC); never Google sign-in | Persistent ACP sessions, estimated cost from turn usage; verified with agy 1.5.14. |
 
 ## Composer commands across harnesses
 
-The dashboard reserves `/pan <verb> [args]` for Overdeck operator commands. The dashboard parses and executes this namespace before a message reaches the coding harness, so `/pan` has the same syntax, validation, canonical arguments, confirmations, and result shape under every harness (`claude-code`, `pi`, `ohmypi`, `codex`, `acp`, `kimi-code`, `opencode`, `muse`, `prime-agent` and `grok`). Unprefixed `pan ...` text is still delivered as an ordinary prompt.
+The dashboard reserves `/pan <verb> [args]` for Overdeck operator commands. The dashboard parses and executes this namespace before a message reaches the coding harness, so `/pan` has the same syntax, validation, canonical arguments, confirmations, and result shape under every harness (`claude-code`, `pi`, `ohmypi`, `codex`, `acp`, `kimi-code`, `opencode`, `muse`, `prime-agent`, `grok` and `antigravity`). Unprefixed `pan ...` text is still delivered as an ordinary prompt.
 
 Harness-native slash commands are a separate lane and are not uniform. The composer menu reads the active harness's verified capability list: for example, Claude Code exposes native commands such as `/model`, while a harness with no verified inventory shows no native entries. Overdeck commands appear in their own **Overdeck** group, so choosing a harness never changes the `/pan` control-plane surface. Type `/pan` alone and send it to list the Overdeck commands; the ones that run in the composer come first.
 
@@ -51,7 +52,7 @@ Pressing **Enter** in the dashboard composer queues your message while the agent
 | Claude Code | normally, interrupt now | Interrupts the running turn and sends the message at once, like the TUI's Ctrl+Enter. Under the hood Overdeck types the message and presses Claude Code's send-now chord, Ctrl+X Ctrl+S. An idle agent just receives the message. |
 | Pi (`pi`), oh-my-pi (`ohmypi`) | normally, interrupt now, after this turn | Steers over the Pi control channel. Conversations only. |
 | Codex | normally (no Send menu) | Not yet; see [PAN-4303](https://github.com/eltmon/overdeck/issues/4303). |
-| ACP, OpenCode, Grok Build, Kimi Code, Muse Code, Prime Agent | normally (no Send menu) | None. |
+| ACP, OpenCode, Grok Build, Antigravity, Kimi Code, Muse Code, Prime Agent | normally (no Send menu) | None. |
 
 A steer never falls back silently to a queued message. A harness without steer answers `steer-unsupported` and delivers nothing. A Claude Code agent launched before steer support has a PTY supervisor that presses Enter instead, and the delivery reports that it went out as a normal submit.
 
@@ -832,6 +833,113 @@ the outside-client plugin; the harness agent already gets its own per-agent
 `overdeck` server. In the live check (bot plugin enabled), the agent's
 `overdeck__list_conversations` call was answered by the per-agent server. Plain transcript forks are unavailable; use a summary fork.
 
+### Antigravity CLI
+
+Overdeck runs Google's Antigravity CLI as the `antigravity` harness, so Gemini
+models can run inside Google's own agent loop. The integration was verified
+against `agy 1.5.14`. Install the CLI with
+`curl -fsSL https://antigravity.google/cli/install.sh | bash`. The installer
+puts the binary at `~/.local/bin/agy` (which Overdeck searches) and appends a
+`PATH` line to `~/.bashrc`. Update it with `agy update`; it also updates itself
+in the background. `/usr/bin/antigravity` is the separate Antigravity desktop
+app, and Overdeck never runs it. `pan doctor` reports the CLI as not installed,
+missing a credential, or `<version>, auth <method>`.
+
+**Credentials.** Overdeck runs `agy` with one of two credentials, checked in
+this order:
+
+1. **Gemini API key.** Enable the Google provider and enter a literal API key in
+   **Settings → Google** (`models.providers.google: { enabled: true, api_key: … }`).
+   A `$VAR` reference is refused by name, because agent panes do not receive
+   provider environment variables. An exported `GEMINI_API_KEY` in your shell is
+   not used, for the same reason.
+2. **Agent Platform** (formerly Vertex AI). Set `GOOGLE_CLOUD_PROJECT` and
+   `GOOGLE_CLOUD_LOCATION` in the terminal backend's environment, or set
+   `gcp.project` and `gcp.location` in
+   `~/.overdeck/antigravity/antigravity-cli/settings.json`, and create
+   Application Default Credentials with `gcloud auth application-default login`
+   (or point `GOOGLE_APPLICATION_CREDENTIALS` at a credentials file).
+
+The API key wins when both exist. Without either, the launch fails at once with
+a message that names both setups. Agent Platform is implemented and unit-tested
+but **not verified live**; whether `agy` reads `gcp.*` from the isolated
+settings file is also unverified.
+
+**Why Google sign-in is not offered.** Antigravity's terms, clause 6
+([antigravity.google/terms](https://antigravity.google/terms/)), say that
+"Using third party software, tools, or services to access the Service" with
+Antigravity OAuth "is a breach of this Agreement", and that it may lead to
+suspension of Antigravity and Gemini CLI accounts. Users report bans. So
+Overdeck never selects the `oauth-personal`, `oauth-business` or
+`terminal-login` methods, never runs `agy acp --login`, and never reads
+`~/.gemini/oauth_creds.json`.
+
+**Models.** Antigravity adds no model provider: it is a second harness for some
+existing Google model IDs. It serves `gemini-4-argon`, `gemini-3.8-flash`,
+`gemini-3.6-flash` and `gemini-3.1-pro-preview` (which runs as `agy`'s
+`gemini-3.1-pro`). Other Google IDs are not served, and the `antigravity`
+harness refuses them before launch. Every launch needs an explicit model; there
+is no fallback.
+
+**Choosing it.** Once `agy` is installed and a credential is ready, the model
+pickers add a "— Antigravity" row beside each Google model it serves; the plain
+Google rows stay on their usual harness. From the CLI, pass
+`--harness antigravity` (for example
+`pan start PAN-123 --harness antigravity --model gemini-4-argon`). To make it
+the default for Google models, set:
+
+```yaml
+models:
+  providers:
+    google:
+      enabled: true
+      harness: antigravity
+```
+
+With that default, Google IDs that Antigravity does not serve fail the harness
+policy; pick another harness for them.
+
+**Effort.** `agy` exposes reasoning effort as the ACP `thought_level` option,
+and its values depend on the model (for example `gemini-3.1-pro` offers only
+`low` and `high`; no model offers `max`). Overdeck sets the model first, then
+`thought_level` to the requested effort, or to the highest offered level below
+it, or to the lowest offered level. The default is `high`, and `max` is shown
+as `xhigh`. A dashboard effort change on a live conversation applies to
+subsequent turns.
+
+**Isolation.** Every launch passes `--gemini-dir ~/.overdeck/antigravity`
+(under `OVERDECK_HOME`). `agy` then keeps its sessions there and never reads
+`~/.gemini`, so your own `agy` settings, MCP servers, hooks and skills do not
+apply to Overdeck agents.
+
+**Launch and resume.** Overdeck runs one persistent `agy acp` process per agent
+behind its ACP host; the host resolves the credential and passes it only to the
+`agy` process. Restart and resume pass the recorded `acp-session-id`, and the
+host reopens it with `session/load`. `agy` resets the model after a load, so
+Overdeck sets the model and effort again on every start.
+
+**Permissions.** `agy` asks for each tool call over ACP, and the host answers
+`allow` for it. No skip-permissions flag is passed.
+
+**Context and tools.** Antigravity receives Overdeck's rendered context at
+session start; use `harness:antigravity` blocks for Antigravity-specific
+instructions. The managed per-agent `overdeck` MCP server reaches it through the
+ACP `session/new` and `session/load` requests.
+
+**Cost.** `agy` reports token usage with each prompt result, but no cost. The
+ACP host records the usage on the transcript's `turn_completed` entry, and the
+`antigravity` cost reconcile source imports one cost event per turn (provider
+`google`, model = the Overdeck Google ID). The cost is an **estimate** at Gemini
+API list prices: free-tier usage and Agent Platform contract pricing are not
+modeled. The Cloister tick imports a running Antigravity work agent's turns.
+Antigravity conversations write no agent state, so their turns are imported when
+`POST /api/costs/reconcile` runs.
+
+**Known behavior.** `agy` does not validate the API key when it authenticates.
+An invalid key surfaces as an assistant message such as
+`agent executor error … API key not valid`, and that turn records no cost.
+Plain transcript forks are unavailable; use a summary fork.
+
 ### Prime Agent
 
 [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent) is Prime
@@ -982,7 +1090,7 @@ three keys default to off, and Docker workspaces and Windows get neither:
 | --- | --- | --- |
 | Claude Code | Yes | Yes |
 | Codex | Yes | No ([#5434](https://github.com/eltmon/overdeck/issues/5434)) |
-| ACP host (Kimi over ACP, OpenCode, Grok Build) | Yes | No |
+| ACP host (Kimi over ACP, OpenCode, Grok Build, Antigravity) | Yes | No |
 | pi, oh-my-pi, Kimi Code native, Muse, Prime Agent | No (one launch warning) | No |
 
 See [Semgrep: harness support](/configuration/semgrep#harness-support) for what each column
@@ -1094,7 +1202,7 @@ agents the same. See [Workers](/reference/workers) for the commands.
 | Transcript | On the agent transcript route, like any agent | Codex-plugin jobs: the Codex rollout, read-only on the agent transcript route |
 | Cost | Attributed to the issue | Not attributed |
 | Control | `pan tell`, `pan kill`, restart | None from Overdeck |
-| Harness and model | The model from `roles.worker.model` (harness routed from its provider), or `--model` / `--harness` (claude-code, codex, acp, kimi-code, opencode, muse, prime-agent, grok) | The plugin's own |
+| Harness and model | The model from `roles.worker.model` (harness routed from its provider), or `--model` / `--harness` (claude-code, codex, acp, kimi-code, opencode, muse, prime-agent, grok, antigravity) | The plugin's own |
 | Result | The report comes back to the caller on stdout | The plugin returns its result as a tool result |
 | Sandbox | None. `--read-only` adds a PATH shim against accidental git writes to the issue's repository; it restricts no file or network writes | The plugin's file-system and network sandbox |
 | Setup | Needs the issue's workspace (`pan start` first) | None |
@@ -1161,6 +1269,11 @@ it pins OpenCode Go and Zen models to `opencode`, Muse models to `muse`, and
 Kimi models to the harnesses that can run them, and keeps Ollama models on
 `claude-code`. Subscription-only OpenAI models are refused under API-key auth
 on every harness.
+
+Antigravity has no ToS gate for Gemini API-key or Agent Platform auth. The gate
+pins the `antigravity` harness to the Google models `agy` serves. Overdeck
+never selects Antigravity's OAuth methods, because clause 6 of Antigravity's
+terms forbids third-party software from using Antigravity OAuth.
 
 The same gate enforces Kimi id-space correctness: a `kimi-code/*`
 native-catalog id is blocked on every harness except `kimi-code` and `acp`, so
