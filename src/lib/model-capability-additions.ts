@@ -179,7 +179,7 @@ export const AUDITED_MODEL_ADDITIONS = {
     model: 'gemini-4-neon',
     provider: 'google',
     displayName: 'Gemini 4 Neon',
-    costPer1MTokens: 9,
+    costPer1MTokens: 9, // $3 in / $15 out
     contextWindow: 1048576,
     maxOutputTokens: 65536,
     supportsImages: true,
@@ -198,14 +198,14 @@ export const AUDITED_MODEL_ADDITIONS = {
     },
     effortLevels: ['low', 'medium', 'high', 'xhigh'],
     supportsSamplingParams: false,
-    notes: 'Released November 2026. Skill scores inherit the Gemini 4 Argon baseline until benchmarked.',
+    notes: 'Stable, released 2026-11-18. 1,048,576-token window shared by input, thinking and output. Output cap 65,536 per request (streaming and non-streaming); long decode reaches 1,048,576. Thinking levels low/medium/high (default)/xhigh. Sampling parameters are ignored (out-of-range values return 400) and explicit context caching is not supported; implicit caching applies from 4,096 prompt tokens. $3/M input, $15/M output, $0.15/M cached input. Skill scores inherit Gemini 4 Argon until benchmarked.',
   },
 
   'gemini-4-carbon': {
     model: 'gemini-4-carbon',
     provider: 'google',
     displayName: 'Gemini 4 Carbon',
-    costPer1MTokens: 6,
+    costPer1MTokens: 6, // $2 in / $10 out (introductory through 2026-11-30)
     contextWindow: 1048576,
     maxOutputTokens: 65536,
     supportsImages: true,
@@ -224,14 +224,14 @@ export const AUDITED_MODEL_ADDITIONS = {
     },
     effortLevels: ['low', 'medium', 'high'],
     supportsSamplingParams: false,
-    notes: 'Released November 2026. Skill scores inherit the Gemini 4 Argon baseline until benchmarked.',
+    notes: 'Stable, released 2026-11-10. 1,048,576-token window shared by input, thinking and output. Output cap 65,536 per stream and 32,768 per non-streaming request; long decode reaches 1,048,576. Thinking levels low/medium (default)/high. Sampling parameters are ignored and explicit context caching is not supported; implicit caching applies from 4,096 prompt tokens. Introductory pricing through 2026-11-30: $2/M input, $10/M output, $0.10/M cached input; from 2026-12-01 $4/M, $20/M and $0.20/M. Skill scores inherit Gemini 4 Argon until benchmarked.',
   },
 
   'gemini-4-hydrogen': {
     model: 'gemini-4-hydrogen',
     provider: 'google',
     displayName: 'Gemini 4 Hydrogen',
-    costPer1MTokens: 4.5,
+    costPer1MTokens: 4.5, // $1.50 in / $7.50 out
     contextWindow: 1048576,
     maxOutputTokens: 65536,
     supportsImages: true,
@@ -250,7 +250,7 @@ export const AUDITED_MODEL_ADDITIONS = {
     },
     effortLevels: ['low', 'medium', 'high', 'xhigh'],
     supportsSamplingParams: false,
-    notes: 'Released November 2026. Skill scores inherit the Gemini 3.8 Flash baseline until benchmarked.',
+    notes: 'Stable, released 2026-11-12. 1,048,576-token window shared by input, thinking and output. Output cap 65,536 per request (streaming and non-streaming); long decode reaches 1,048,576. Thinking levels low/medium/high (default)/xhigh. Sampling parameters are ignored (out-of-range values return 400) and explicit context caching is not supported; implicit caching applies from 4,096 prompt tokens. $1.50/M input, $7.50/M output, $0.075/M cached input; a free tier exists. Skill scores inherit Gemini 3.8 Flash until benchmarked.',
   },
 
   'gemini-3.8-flash': {
