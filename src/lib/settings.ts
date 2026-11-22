@@ -227,7 +227,7 @@ export function getAvailableModels(settings: SettingsConfig): {
     : [];
 
   const googleModels: GoogleModel[] = settings.api_keys.google
-    ? ['gemini-4-argon', 'gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-pro-preview', 'gemini-3-flash-preview', 'gemini-3.1-flash-lite']
+    ? ['gemini-4-argon', 'gemini-4-neon', 'gemini-4-carbon', 'gemini-4-hydrogen', 'gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-pro-preview', 'gemini-3-flash-preview', 'gemini-3.1-flash-lite']
     : [];
 
   const kimiModels: KimiModel[] = settings.api_keys.kimi

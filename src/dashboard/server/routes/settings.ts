@@ -586,7 +586,7 @@ const postValidateApiKeyRoute = HttpRouter.add(
             });
             if (resp.ok || resp.status === 400) {
               valid = true;
-              models = ['gemini-4-argon', 'gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-pro-preview', 'gemini-3-flash-preview', 'gemini-3.1-flash-lite'];
+              models = ['gemini-4-argon', 'gemini-4-neon', 'gemini-4-carbon', 'gemini-4-hydrogen', 'gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-pro-preview', 'gemini-3-flash-preview', 'gemini-3.1-flash-lite'];
             } else if (resp.status === 401 || resp.status === 403) {
               error = 'Invalid API key';
             } else if (resp.status === 429) {
