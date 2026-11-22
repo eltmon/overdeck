@@ -4,17 +4,17 @@
     "created": "2026-11-22T04:17:12Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5595: Release workflow: npm staged versions look unpublished; the run passes while core is not installable, and a rerun fails E409",
-    "updated": "2026-11-22T04:24:34.967Z"
+    "updated": "2026-11-22T04:25:10.134Z"
   },
   "plan": {
     "id": "pan-5595",
     "title": "Release workflow: npm staged versions look unpublished; the run passes while core is not installable, and a rerun fails E409",
-    "status": "proposed",
+    "status": "running",
     "uid": "7827bd0a-59ba-4eab-a7f8-6912ef9e947e",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-22T04:17:12Z",
-    "updated": "2026-11-22T04:24:34.967Z",
+    "updated": "2026-11-22T04:25:10.134Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5595",
@@ -338,5 +338,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
