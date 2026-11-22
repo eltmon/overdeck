@@ -103,7 +103,8 @@ const PRIME_AGENT_PROVIDERS: ReadonlySet<Provider | 'openrouter'> = new Set(['an
 /**
  * Harness choices offered for a provider. `acp` and `kimi-code` are Kimi-only
  * at the policy gate (src/lib/harness-policy.ts), so offering them on another
- * provider would write a config that fails at every spawn. `prime-agent` is
+ * provider would write a config that fails at every spawn; `antigravity` is
+ * likewise Google-only. `prime-agent` is
  * offered only for providers Prime Agent has a credential mapping for.
  */
 function harnessOptionsFor(provider: Provider | 'openrouter'): Harness[] {
@@ -111,7 +112,8 @@ function harnessOptionsFor(provider: Provider | 'openrouter'): Harness[] {
   if (provider === 'grok') return ['grok'];
   if (provider === 'meta') return ['muse'];
   const shared: Harness[] = ['claude-code', 'pi', 'ohmypi', 'codex'];
-  const options: Harness[] = provider === 'kimi' ? [...shared, 'acp', 'kimi-code'] : shared;
+  // Antigravity (PAN-5587) runs Google models only; the policy gate limits it to the ids agy serves.
+  const options: Harness[] = provider === 'kimi' ? [...shared, 'acp', 'kimi-code'] : provider === 'google' ? [...shared, 'antigravity'] : shared;
   return PRIME_AGENT_PROVIDERS.has(provider) ? [...options, 'prime-agent'] : options;
 }
 
