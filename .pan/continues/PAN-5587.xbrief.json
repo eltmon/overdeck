@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5587",
   "created": "2026-11-21T22:59:41.238Z",
-  "updated": "2026-11-22T01:12:10.164Z",
+  "updated": "2026-11-22T01:15:20.984Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -124,9 +124,30 @@
       "doneAt": "2026-11-22T01:12:04.368Z"
     },
     "host-antigravity": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5587",
-      "claimedAt": "2026-11-22T01:12:10.164Z"
+      "claimedAt": "2026-11-22T01:12:10.164Z",
+      "doneAt": "2026-11-22T01:15:20.984Z"
+    },
+    "host-antigravity.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:15:20.984Z"
+    },
+    "host-antigravity.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:15:20.984Z"
+    },
+    "host-antigravity.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:15:20.984Z"
+    },
+    "host-antigravity.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:15:20.984Z"
+    },
+    "host-antigravity.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:15:20.984Z"
     }
   }
 }
