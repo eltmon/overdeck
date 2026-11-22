@@ -1,18 +1,15 @@
-# Flywheel report (2026-11-19)
+# Flywheel report (2026-11-22)
 
 ## Shipped this run (merged, deployed, closed)
 
-- Docs overhaul order book 2026-11-17-docs-overhaul-pan-5467: all 23 items merged and closed (Lane A: PAN-5483, 5505, 5472, 5468, 5470, 5473, 5475, 5477, 5479, 5481, 5500, 5502, 5504; Lane B: PAN-5469, 5471, 5474, 5476, 5478, 5480, 5482, 5503, 5501, 5499). Epic PAN-5467 stays open for the operator.
-- PAN-5522: GPT-6.2 Astra and GPT-6.2 Sol models.
-- PAN-5498, 5516, 5519, 5520, 5526: auto-start after planning, `pan conversations resume`, stale review runs, CPU-pressure gate bypass, finalize auto-start consent.
-- PAN-5540: known skill packs (video group) discoverable from the Skills page, `pan skills pack list` and a shipped pan-skills agent skill.
-- PAN-5541: a secret request opens its masked input from Needs-you and from the waiting conversation.
-- PAN-5564: flaky changes-view test fixed (mock onMount race).
-- Release 0.89.1 published to npm (GPT-6.2 and the fixes above it); verified with a clean npx install.
-
-## Not yet released
-
-PAN-5540, 5541, 5564 and the docs work are on main and deployed here but not in an npm release. The operator's Mac needs a 0.89.2 release to get the pack and secret fixes.
+- PAN-5585: mobile conversation layout (subagent rail is an overlay on narrow panes; top bar no longer overflows).
+- PAN-5586: Gemini 4 models (`gemini-4-carbon`, `gemini-4-neon`, `gemini-4-hydrogen`), new Google tier mapping and deprecation remaps.
+- PAN-5587: Antigravity harness (`agy acp`, API key and Agent Platform auth only, because the Antigravity terms forbid third-party OAuth use).
+- PAN-5588: the quality-gate CPU bypass bound is counted per queue, not per head, so sustained outside CPU load no longer drains one gate every 10 minutes.
+- PAN-5589: CPU pressure (PSI) alone no longer blocks gates while most cores are idle; contention needs at least 50% utilization.
+- PAN-5595: the release workflow waits for npm to show each published version, explains a staged hold, and treats a "previously staged" 409 on rerun as already published.
+- Releases 0.90.0 and 0.90.1 published to npm (`latest` = 0.90.1); both verified with a clean npx install.
+- Outside Overdeck, at the operator's request: dfai recorders now run one video encode at a time on the medium preset (dfai commit 4388932e).
 
 ## In flight
 
@@ -20,8 +17,8 @@ None.
 
 ## Parked / waiting on the operator
 
-PAN-4593 (Semgrep tier decisions), PAN-4294 Worker deploy, PAN-5342 live checks, PAN-5241 spillover settings, GitHub App Issues permission, author-gate bot decision, AAB upload, overdeck-landing#7, Grok retest.
+PAN-4593 (Semgrep tier decisions, the only released issue), PAN-4294 Worker deploy, PAN-5342 live checks, PAN-5241 spillover settings, GitHub App Issues permission, author-gate bot decision, AAB upload, overdeck-landing#7, Grok retest. Open PRs #5387 (PAN-5385, Anywhere trickle ICE) and #5206 (PAN-5204, voice sample rate) wait on review; PAN-5385 is not released.
 
 ## Substrate fixes this run
 
-PAN-5516, 5519, 5520, 5526, 5540, 5541, 5564 (see .pan/flywheel/state.md for learnings).
+PAN-5588, 5589, 5595.
