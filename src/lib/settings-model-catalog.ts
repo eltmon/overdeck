@@ -1,10 +1,16 @@
-/** Model picker catalog, including installed OpenCode Go and Zen models and signed-in Grok Build models. */
+/**
+ * Model picker catalog, including installed OpenCode Go and Zen models, signed-in Grok Build
+ * models, and "— Antigravity" rows for Google models when agy is installed with a credential.
+ */
+import { getHarnessBehavior } from '@overdeck/contracts';
 import { GROK_BUILD_MODELS, type ModelId } from './settings.js';
 import type { RuntimeName } from './runtimes/types.js';
 import { MODEL_CAPABILITIES, MODEL_DEPRECATIONS } from './model-capabilities.js';
 import { discoverOpenCodeModels } from './opencode-models.js';
 import { resolveHarnessBinary } from './harness-binary.js';
 import { readGrokSignIn } from './grok-sign-in.js';
+import { readAntigravityAuthStatus } from './antigravity-auth.js';
+import { isAntigravityModel } from './antigravity-models.js';
 
 type AvailableModel = {
   id: ModelId;
@@ -142,6 +148,29 @@ async function availableGrokModels(): Promise<AvailableModel[]> {
   });
 }
 
+/**
+ * One "— Antigravity" row per Google row agy serves, only when the agy CLI is installed and a
+ * Gemini API key or Agent Platform credential is ready (PAN-5587 D13). Plain Google rows stay.
+ */
+async function antigravityRows(google: readonly AvailableModel[]): Promise<AvailableModel[]> {
+  try {
+    if (!await resolveHarnessBinary('antigravity')) return [];
+    if (!(await readAntigravityAuthStatus()).ready) return [];
+  } catch (error) {
+    console.warn('[settings] Antigravity availability check failed:', error instanceof Error ? error.message : String(error));
+    return [];
+  }
+  const antigravityLevels: readonly string[] = getHarnessBehavior('antigravity').effortLevels ?? [];
+  return google.filter((row) => isAntigravityModel(row.id)).map((row) => ({
+    ...row,
+    name: `${row.baseName ?? row.name} — Antigravity`,
+    baseName: row.baseName ?? row.name,
+    harness: 'antigravity',
+    // A row without capability levels gets the harness levels: [] would mean "no adjustable effort".
+    effortLevels: row.effortLevels ? row.effortLevels.filter((level) => antigravityLevels.includes(level)) : [...antigravityLevels],
+  }));
+}
+
 export async function getAvailableModelsWithOpenCodeApi(): Promise<AvailableModelsApi> {
   const [models, grokModels] = await Promise.all([
     discoverOpenCodeModels().catch((error) => {
@@ -150,5 +179,7 @@ export async function getAvailableModelsWithOpenCodeApi(): Promise<AvailableMode
     }),
     availableGrokModels(),
   ]);
-  return getAvailableModelsApi(models, grokModels);
+  const result = getAvailableModelsApi(models, grokModels);
+  result.google.push(...await antigravityRows(result.google));
+  return result;
 }
