@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MODEL_CAPABILITIES, MODEL_DEPRECATIONS, getModelEffortLevels, resolveModelId } from '../model-capabilities.js';
+import { MODEL_CAPABILITIES, MODEL_DEPRECATIONS, getModelEffortLevels, hasModelCapability, resolveModelId } from '../model-capabilities.js';
 import { getProviderForModel, PROVIDERS } from '../providers.js';
 import { apiLaunchModelId } from '../model-context-windows.js';
 import { getClaudeCodeContextPolicyForModel } from '../agents/provider-env.js';
@@ -114,7 +114,6 @@ describe('November 2026 Gemini, Qwen and GLM refresh (PAN-4827)', () => {
     expect(PROVIDERS.google.models).toContain(target);
     expect(PROVIDERS.google.models).not.toContain(id);
     expect(Object.hasOwn(MODEL_CAPABILITIES, id)).toBe(true);
-    expect(PROVIDERS.google.tierModels.haiku).toBe(target);
   });
 
   it('registers gemini-3.6-flash with its official price', () => {
@@ -174,5 +173,15 @@ describe('November 2026 Gemini, Qwen and GLM refresh (PAN-4827)', () => {
     const ids = [...Object.values(provider.tierModels ?? {}), provider.haikuModel]
       .filter((id): id is string => typeof id === 'string');
     for (const id of ids) expect(Object.hasOwn(MODEL_DEPRECATIONS, id), id).toBe(false);
+  });
+});
+
+describe('Google tier mapping (PAN-5586)', () => {
+  it('sets the Google tiers to Gemini 4 Neon, Carbon and Hydrogen', () => {
+    expect(PROVIDERS.google.tierModels).toEqual({ opus: 'gemini-4-neon', sonnet: 'gemini-4-carbon', haiku: 'gemini-4-hydrogen' });
+    for (const id of Object.values(PROVIDERS.google.tierModels)) {
+      expect(PROVIDERS.google.models).toContain(id);
+      expect(hasModelCapability(id)).toBe(true);
+    }
   });
 });

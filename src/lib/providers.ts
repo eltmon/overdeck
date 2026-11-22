@@ -159,7 +159,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     compatibility: 'direct',
     defaultHarness: 'pi',
     models: ['gemini-4-argon', 'gemini-4-neon', 'gemini-4-carbon', 'gemini-4-hydrogen', 'gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-pro-preview', 'gemini-3-flash-preview', 'gemini-3.1-flash-lite'],
-    tierModels: { opus: 'gemini-3.1-pro-preview', sonnet: 'gemini-3-flash-preview', haiku: 'gemini-3.1-flash-lite' },
+    tierModels: { opus: 'gemini-4-neon', sonnet: 'gemini-4-carbon', haiku: 'gemini-4-hydrogen' },
     tested: true,
     description: 'Route via local CLIProxyAPI Gemini backend using GOOGLE_API_KEY',
   },
