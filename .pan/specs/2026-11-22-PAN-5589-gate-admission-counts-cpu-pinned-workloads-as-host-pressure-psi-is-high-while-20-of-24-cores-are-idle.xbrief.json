@@ -4,17 +4,17 @@
     "created": "2026-11-22T00:55:08Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5589: Gate admission counts CPU-pinned workloads as host pressure: PSI is high while 20 of 24 cores are idle",
-    "updated": "2026-11-22T01:00:56.580Z"
+    "updated": "2026-11-22T01:01:35.673Z"
   },
   "plan": {
     "id": "pan-5589",
     "title": "Gate admission counts CPU-pinned workloads as host pressure: PSI is high while 20 of 24 cores are idle",
-    "status": "proposed",
+    "status": "running",
     "uid": "cdcb9c75-6741-4c25-810d-1d6b8eb09363",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-22T00:55:08Z",
-    "updated": "2026-11-22T01:00:56.580Z",
+    "updated": "2026-11-22T01:01:35.673Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5589",
@@ -339,5 +339,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
