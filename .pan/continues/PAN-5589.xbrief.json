@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5589",
   "created": "2026-11-22T01:01:54.134Z",
-  "updated": "2026-11-22T01:08:16.916Z",
+  "updated": "2026-11-22T01:09:22.896Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,9 +50,18 @@
       "doneAt": "2026-11-22T01:08:08.506Z"
     },
     "cpu-rule-boundary-tests": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5589",
-      "claimedAt": "2026-11-22T01:08:16.916Z"
+      "claimedAt": "2026-11-22T01:08:16.916Z",
+      "doneAt": "2026-11-22T01:09:22.896Z"
+    },
+    "cpu-rule-boundary-tests.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:09:22.896Z"
+    },
+    "cpu-rule-boundary-tests.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:09:22.896Z"
     }
   }
 }
