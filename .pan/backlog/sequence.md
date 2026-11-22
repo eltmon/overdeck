@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-22T00:54:23.087429Z · model: claude-opus-5-5 · open: 946_
+_Last sequenced: 2026-11-22T01:55:41.074453Z · model: claude-opus-5-5 · open: 946_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -933,7 +933,7 @@ _Last sequenced: 2026-11-22T00:54:23.087429Z · model: claude-opus-5-5 · open: 
 | 884 | PAN-2024 | XS | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): ohmypi conversation Tools-toggle |
 | 885 | PAN-2883 | M | high | needs-refinement |  |  | Appears already fixed: resolveIssuePullRequestRef probes strike/<id> at pull-requests.ts:209, which is exactly the fix. Verify and close. |
 | 886 | PAN-2995 | XS | high | needs-refinement |  |  | Same defect as PAN-2828, closed as a duplicate of the fixed #2907; verifyStrikeBranchMergedIntoMain already checks PR-merge and content. |
-| 887 | PAN-4555 | XS | low | ok |  |  | Date-gated: do not start before 2026-12-01. Raise gemini-4-argon pricing rows to list rates; cost tracking halves Argon until then. |
+| 887 | PAN-4555 | XS | low | ok |  |  | Date-gated: start on/after 2026-12-01. Raise gemini-4-argon and gemini-4-carbon pricing rows to list rates. |
 | 888 | PAN-5449 | M | low | ok |  |  | Unblocked: PAN-4590 sast gate merged. A skipped sast scan renders as a green pass; add skipped state + findings list. |
 | 889 | PAN-5434 | M | low | ok |  |  | Codex apply_patch post-edit Semgrep scan; needs a hooks.json composer shared with SageOx. PAN-4591 merged; live Codex probe first. |
 | 890 | PAN-5453 | M | low | ok |  |  | One-time $3 Creem 'Extra 50 GB relay' product, per-account relayCapBytes and a live entitlement push to connect. Billing landed. |
@@ -1281,7 +1281,7 @@ New this pass. pan strike dies at git worktree list --porcelain on a polyrepo wr
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-22T00:54:23.087429Z",
+  "generatedAt": "2026-11-22T01:55:41.074453Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 946,
@@ -12876,8 +12876,8 @@ New this pass. pan strike dies at git worktree list --porcelain on a polyrepo wr
       "score": 20,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Date-gated: do not start before 2026-12-01. Raise gemini-4-argon pricing rows to list rates; cost tracking halves Argon until then.",
-      "rationale": "New since the prior run. Clear file-by-file spec, but the change is only correct on or after 2026-12-01, so it ranks at the tail to keep the Flywheel from picking it early.",
+      "why": "Date-gated: start on/after 2026-12-01. Raise gemini-4-argon and gemini-4-carbon pricing rows to list rates.",
+      "rationale": "Rank held at the tail: a new comment adds the Gemini 4 Carbon rows (PAN-5586) to the scope, but the change is still only correct on or after 2026-12-01.",
       "gate": "auto",
       "planning": "skip"
     },
