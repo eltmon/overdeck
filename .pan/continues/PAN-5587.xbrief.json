@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5587",
   "created": "2026-11-21T22:59:41.238Z",
-  "updated": "2026-11-22T02:05:53.578Z",
+  "updated": "2026-11-22T02:05:58.980Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -422,6 +422,11 @@
     "antigravity-replay-fixtures.ac4": {
       "status": "completed",
       "doneAt": "2026-11-22T02:05:53.577Z"
+    },
+    "antigravity-docs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5587",
+      "claimedAt": "2026-11-22T02:05:58.980Z"
     }
   }
 }
