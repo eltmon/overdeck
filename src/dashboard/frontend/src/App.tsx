@@ -2,6 +2,7 @@ import { lazy, Suspense, useState, useCallback, useEffect, useMemo, useRef } fro
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { Toaster, toast } from 'sonner';
 import { capture } from './lib/telemetry';
+import { useVisualViewportVars } from './lib/visualViewport';
 import { fetchWithTimeout } from './lib/apiFetch';
 import { dashboardMutationJsonHeaders } from './lib/wsTransport';
 import { EmergencyStopOverlay } from './components/EmergencyStopOverlay';
@@ -147,6 +148,7 @@ export default function App() {
     return <Suspense fallback={null}><MobileApp /></Suspense>;
   }
 
+  useVisualViewportVars();
   const [activeTab, setActiveTabState] = useState<Tab>(() => getConversationRouteState().tab);
   const [, setSelectedAgentState] = useState<string | null>(() => {
     const hash = window.location.hash;
@@ -802,7 +804,7 @@ export default function App() {
 
   return (
     <IssueDrawerAvailableContext.Provider value>
-    <div className="h-screen flex flex-col overflow-hidden bg-background">
+    <div className="h-[var(--app-height,100dvh)] flex flex-col overflow-hidden bg-background pt-[env(safe-area-inset-top)]">
       {/* Event-sourced state: connects WsTransport → DashboardStore (PAN-428 B4) */}
       <EventRouter />
 

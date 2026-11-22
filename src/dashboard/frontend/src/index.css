@@ -901,16 +901,28 @@
     margin: 0;
     padding: 0;
     min-height: 100vh;
+    min-height: var(--app-height, 100dvh);
   }
 
   #root {
     height: 100vh;
+    height: var(--app-height, 100dvh);
     /* 100%, not 100vw: on a phone 100vw can exceed the page width, so the
        browser zooms out and the /m shell pans (PAN-2355). */
     width: 100%;
     overflow-y: hidden;
     overflow-x: hidden;
     overscroll-behavior-y: none;
+  }
+
+  /* PAN-5585: a phone shell pinned to the visual viewport, so the iOS keyboard never pushes its header under the status bar. */
+  .app-viewport-shell {
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: var(--app-offset-top, 0px);
+    height: 100vh;
+    height: var(--app-height, 100dvh);
   }
 }
 
