@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canUseHarness, PI_ANTHROPIC_SUBSCRIPTION_BLOCK_REASON, POLICY_RUNTIME_NAMES, PRIME_AGENT_ANTHROPIC_SUBSCRIPTION_BLOCK_REASON } from '../harness-policy.js'
+import { ANTIGRAVITY_MODEL_BLOCK_REASON, canUseHarness, PI_ANTHROPIC_SUBSCRIPTION_BLOCK_REASON, POLICY_RUNTIME_NAMES, PRIME_AGENT_ANTHROPIC_SUBSCRIPTION_BLOCK_REASON } from '../harness-policy.js'
 import type { RuntimeName } from '../runtimes/types.js'
 import type { AuthMode } from '../subscription-types.js'
 
@@ -274,7 +274,7 @@ describe('canUseHarness', () => {
 
   it('gives every RuntimeName an explicit policy decision', () => {
     expect([...POLICY_RUNTIME_NAMES].sort()).toEqual(
-      ['acp', 'claude-code', 'codex', 'grok', 'kimi-code', 'muse', 'ohmypi', 'opencode', 'pi', 'prime-agent'],
+      ['acp', 'antigravity', 'claude-code', 'codex', 'grok', 'kimi-code', 'muse', 'ohmypi', 'opencode', 'pi', 'prime-agent'],
     )
     for (const harness of POLICY_RUNTIME_NAMES) {
       for (const authMode of AUTH_MODES) {
@@ -327,6 +327,24 @@ describe('Grok Build harness pin (PAN-5078)', () => {
     }
     // OpenCode's own clause runs first and names its own models.
     expect(canUseHarness('opencode', 'grok/grok-4.6', 'subscription').allowed).toBe(false)
+  })
+})
+
+describe('Antigravity harness pin (PAN-5587 D9)', () => {
+  it('allows the Google models agy serves on the antigravity harness', () => {
+    expect(canUseHarness('antigravity', 'gemini-4-argon', undefined)).toEqual({ allowed: true })
+    expect(canUseHarness('antigravity', 'gemini-3.1-pro-preview', 'api-key')).toEqual({ allowed: true })
+  })
+
+  it('denies every other model on the antigravity harness with the block reason', () => {
+    expect(canUseHarness('antigravity', 'gemini-3.5-flash-lite', 'api-key')).toEqual({ allowed: false, reason: ANTIGRAVITY_MODEL_BLOCK_REASON })
+    expect(canUseHarness('antigravity', 'claude-sonnet-5-5', 'subscription')).toEqual({ allowed: false, reason: ANTIGRAVITY_MODEL_BLOCK_REASON })
+    expect(ANTIGRAVITY_MODEL_BLOCK_REASON).toContain('gemini-4-argon')
+  })
+
+  it('leaves Google models on other harnesses unchanged', () => {
+    expect(canUseHarness('pi', 'gemini-4-argon', 'api-key').allowed).toBe(true)
+    expect(canUseHarness('acp', 'gemini-4-argon', 'api-key').allowed).toBe(false)
   })
 })
 
