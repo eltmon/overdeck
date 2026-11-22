@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5585",
   "created": "2026-11-21T22:42:01.524Z",
-  "updated": "2026-11-22T00:58:43.750Z",
+  "updated": "2026-11-22T00:58:54.007Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -120,6 +120,11 @@
     "viewport-vars.ac4": {
       "status": "completed",
       "doneAt": "2026-11-22T00:58:43.749Z"
+    },
+    "phone-shells": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5585",
+      "claimedAt": "2026-11-22T00:58:54.007Z"
     }
   }
 }
