@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5588",
   "created": "2026-11-21T23:34:16.196Z",
-  "updated": "2026-11-22T01:31:05.873Z",
+  "updated": "2026-11-22T01:36:51.053Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -100,9 +100,18 @@
       "doneAt": "2026-11-22T01:31:00.260Z"
     },
     "wi6-bypass-message": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5588",
-      "claimedAt": "2026-11-22T01:31:05.872Z"
+      "claimedAt": "2026-11-22T01:31:05.872Z",
+      "doneAt": "2026-11-22T01:36:51.053Z"
+    },
+    "wi6-bypass-message.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:36:51.053Z"
+    },
+    "wi6-bypass-message.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:36:51.053Z"
     }
   }
 }
