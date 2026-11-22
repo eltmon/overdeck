@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5587",
   "created": "2026-11-21T22:59:41.238Z",
-  "updated": "2026-11-22T01:48:37.429Z",
+  "updated": "2026-11-22T01:48:44.075Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -332,6 +332,11 @@
     "frontend-harness-unions.ac4": {
       "status": "completed",
       "doneAt": "2026-11-22T01:48:37.429Z"
+    },
+    "frontend-picker-options": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5587",
+      "claimedAt": "2026-11-22T01:48:44.075Z"
     }
   }
 }
