@@ -161,8 +161,12 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   { provider: 'openai', model: 'gpt-5.2', inputPer1k: 0.00175, outputPer1k: 0.014, cacheReadPer1k: 0.000175, currency: 'USD' }, // developers.openai.com/api/docs/pricing (2026-11-02)
   { provider: 'openai', model: 'o3', inputPer1k: 0.002, outputPer1k: 0.008, currency: 'USD' },
   { provider: 'openai', model: 'o4-mini', inputPer1k: 0.004, outputPer1k: 0.016, cacheReadPer1k: 0.001, currency: 'USD' },
-  // Google — Gemini 4 Argon introductory rates through 2026-11-30; from 2026-12-01 $4/$20/$0.20 per MTok
+  // Google — Gemini 4 Argon and Carbon introductory rates through 2026-11-30; from 2026-12-01 $4/$20/$0.20 per MTok (PAN-4555)
   { provider: 'google', model: 'gemini-4-argon', inputPer1k: 0.002, outputPer1k: 0.010, cacheReadPer1k: 0.0001, currency: 'USD' },
+  { provider: 'google', model: 'gemini-4-carbon', inputPer1k: 0.002, outputPer1k: 0.010, cacheReadPer1k: 0.0001, currency: 'USD' },
+  // Gemini 4 Neon $3/$15/$0.15 and Hydrogen $1.50/$7.50/$0.075 per MTok (aistudio.google.com/docs/pricing, 2026-11-21)
+  { provider: 'google', model: 'gemini-4-neon', inputPer1k: 0.003, outputPer1k: 0.015, cacheReadPer1k: 0.00015, currency: 'USD' },
+  { provider: 'google', model: 'gemini-4-hydrogen', inputPer1k: 0.0015, outputPer1k: 0.0075, cacheReadPer1k: 0.000075, currency: 'USD' },
   // Gemini 3.8 / 3.6 Flash: $0.75/$3.75/$0.075 per MTok through 2026-12-31; from 2027-01-01 $1.50/$7.50/$0.15.
   { provider: 'google', model: 'gemini-3.8-flash', inputPer1k: 0.00075, outputPer1k: 0.00375, cacheReadPer1k: 0.000075, currency: 'USD' },
   { provider: 'google', model: 'gemini-3.6-flash', inputPer1k: 0.00075, outputPer1k: 0.00375, cacheReadPer1k: 0.000075, currency: 'USD' },
