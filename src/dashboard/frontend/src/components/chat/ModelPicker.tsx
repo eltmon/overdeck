@@ -415,8 +415,11 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
   const allModels = groups.flatMap((g) => g.models);
   // Harness-labeled rows share a model id — prefer the row whose harness
   // matches the current one so the trigger label states the actual route.
+  // An exact harness match wins over a harness-less row, so a Google model running on
+  // Antigravity shows its "— Antigravity" row, not the plain Google row (PAN-5587).
   const selectedModel =
-    allModels.find((m) => m.id === value && (m.harness === undefined || m.harness === harness))
+    allModels.find((m) => m.id === value && m.harness !== undefined && m.harness === harness)
+    ?? allModels.find((m) => m.id === value && m.harness === undefined)
     ?? allModels.find((m) => m.id === value);
   const selectedProviderHarness = selectedModel
     ? providerDefaultHarness(selectedModel.provider, providerHarnesses)

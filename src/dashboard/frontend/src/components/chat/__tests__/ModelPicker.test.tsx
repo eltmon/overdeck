@@ -348,6 +348,13 @@ describe('chat ModelPicker Antigravity rows (PAN-5587)', () => {
     expect(onComboChange).toHaveBeenCalledWith('gemini-4-argon', ['low', 'medium', 'high'], 'antigravity');
   });
 
+  it('labels a live Antigravity conversation with the Antigravity row, not the Google default harness', async () => {
+    render(<ModelPicker value="gemini-4-argon" onChange={vi.fn()} harness="antigravity" onHarnessChange={vi.fn()} />);
+
+    expect(await screen.findByTitle('Antigravity harness active')).toBeInTheDocument();
+    expect(screen.queryByTitle('Pi harness active')).not.toBeInTheDocument();
+  });
+
   it('offers Antigravity as a harness option', () => {
     expect(HARNESS_OPTIONS).toContainEqual({ id: 'antigravity', label: 'Antigravity', description: 'Google Antigravity CLI over ACP (Gemini models)' });
   });
