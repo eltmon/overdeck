@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5587",
   "created": "2026-11-21T22:59:41.238Z",
-  "updated": "2026-11-22T00:59:11.369Z",
+  "updated": "2026-11-22T00:59:22.588Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,6 +30,11 @@
     "contracts-harness.ac4": {
       "status": "completed",
       "doneAt": "2026-11-22T00:59:11.369Z"
+    },
+    "antigravity-models": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5587",
+      "claimedAt": "2026-11-22T00:59:22.588Z"
     }
   }
 }
