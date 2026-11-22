@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5589",
+  "created": "2026-11-22T01:01:54.134Z",
+  "updated": "2026-11-22T01:01:54.134Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "extract-cpu-rule": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5589",
+      "claimedAt": "2026-11-22T01:01:54.133Z"
+    }
+  }
+}
