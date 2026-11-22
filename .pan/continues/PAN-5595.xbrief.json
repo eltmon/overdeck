@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5595",
   "created": "2026-11-22T04:25:34.764Z",
-  "updated": "2026-11-22T04:32:33.363Z",
+  "updated": "2026-11-22T04:32:39.771Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,6 +34,11 @@
     "publish-script.ac5": {
       "status": "completed",
       "doneAt": "2026-11-22T04:32:33.363Z"
+    },
+    "workflow-wiring": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5595",
+      "claimedAt": "2026-11-22T04:32:39.771Z"
     }
   }
 }
