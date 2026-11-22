@@ -419,7 +419,7 @@ export function ConversationPanel({
 
       {!embedded && <BookmarksDrawer />}
 
-      <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
+      <div data-testid="conversation-pane-row" className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
         <div className={styles.conversationTerminalBody}>
           {showTerminal && viewMode === 'terminal' && (
             <ConversationTerminalView conversation={conversation} />

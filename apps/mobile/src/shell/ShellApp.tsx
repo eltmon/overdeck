@@ -13,6 +13,7 @@ import { createDirectory, type ShellDirectory } from './directory';
 import { resetTransport } from '../../../../src/dashboard/frontend/src/lib/wsTransport';
 import { deriveConnectionPhase, useConnectionState } from '../../../../src/dashboard/frontend/src/lib/connectionState';
 import { LogoSting } from '../../../../src/dashboard/frontend/src/components/mobile/LogoSting';
+import { useVisualViewportVars } from '../../../../src/dashboard/frontend/src/lib/visualViewport';
 import { installResumeHandler, lastResumedAt } from './lifecycle';
 import { installLinkRecovery } from './linkRecovery';
 import { installLinkTelemetry } from './linkTelemetry';
@@ -98,6 +99,7 @@ interface ShellAppProps {
 }
 
 export default function ShellApp({ navigate = (path) => location.assign(path) }: ShellAppProps) {
+  useVisualViewportVars();
   // Runs in every boot state, including the sign-in screen (PAN-5041).
   useEffect(() => installAppearance(defaultAppearanceDeps()), []);
   const appearance = useAppearance();
@@ -426,7 +428,7 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
     || (boot.kind === 'ready' && (account === null || (services !== null && (!inMachineView || hasSnapshot))));
 
   return (
-    <div data-component="mobile-shell" className="fixed inset-0 flex flex-col bg-background text-foreground">
+    <div data-component="mobile-shell" className="app-viewport-shell flex flex-col bg-background text-foreground">
       {boot.kind === 'loading' ? null : boot.kind === 'failed' ? (
         <p role="alert" className="px-4 pt-[calc(env(safe-area-inset-top)+2rem)] text-sm text-destructive">
           {boot.message}

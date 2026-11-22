@@ -2835,6 +2835,24 @@
   }
 }
 
+/* PAN-5585: at phone width the title takes its own line and the actions wrap
+   below it, so the Conversation | Terminal switch never clips. */
+@container (max-width: 520px) {
+  .conversationHeaderContainer .conversationHeaderPrimary {
+    flex-wrap: wrap;
+  }
+  .conversationHeaderContainer .conversationTerminalTitle {
+    flex-basis: 100%;
+    min-width: 0;
+  }
+  .conversationHeaderContainer .conversationHeaderActions {
+    flex-wrap: wrap;
+    flex-shrink: 1;
+    min-width: 0;
+    margin-left: 0;
+  }
+}
+
 .conversationTerminalTitle {
   font-size: 12px;
   font-weight: 600;

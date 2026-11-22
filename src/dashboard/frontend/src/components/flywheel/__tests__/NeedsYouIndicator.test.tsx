@@ -51,6 +51,13 @@ describe('NeedsYouIndicator (PAN-5292 WI-E2)', () => {
     expect(trigger).toHaveAttribute('aria-label', `${n} thing${n === 1 ? '' : 's'} need you`);
   });
 
+  it('hides the "Needs you · " words below sm while keeping the full text content (PAN-5585)', () => {
+    renderIndicator(Array.from({ length: 3 }, (_, i) => item(`issue:PAN-${i + 1}`)));
+    const trigger = screen.getByTestId('flywheel-needs-you-indicator');
+    expect(trigger).toHaveTextContent('Needs you · 3');
+    expect(within(trigger).getByText('Needs you ·')).toHaveClass('max-sm:hidden');
+  });
+
   it('turns amber only when something needs you', () => {
     const { unmount } = renderIndicator([]);
     const quiet = screen.getByTestId('flywheel-needs-you-indicator');

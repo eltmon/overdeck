@@ -361,7 +361,7 @@ export function SystemHealthPill({ compact = false, children }: { compact?: bool
   const relayPresentation = data ? webhookRelayPresentation(data) : null;
 
   return (
-    <div ref={wrapperRef} className="relative">
+    <div ref={wrapperRef} className="relative max-sm:static">
       <button
         ref={triggerRef}
         type="button"
@@ -401,7 +401,7 @@ export function SystemHealthPill({ compact = false, children }: { compact?: bool
             urlBeforeClickRef.current = null;
             if (before !== null && before !== window.location.pathname + window.location.search) closePopover(false);
           }}
-          className="absolute right-0 top-full z-[200] mt-2 w-[min(24rem,calc(100vw-1rem))] max-h-[calc(100vh-1rem)] overflow-auto rounded-xl border border-border bg-popover p-3 text-sm shadow-lg"
+          className="absolute right-0 top-full z-[200] mt-2 w-[min(24rem,calc(100vw-1rem))] max-h-[calc(100vh-1rem)] overflow-auto rounded-xl border border-border bg-popover p-3 text-sm shadow-lg max-sm:left-2 max-sm:right-2 max-sm:w-auto"
         >
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>

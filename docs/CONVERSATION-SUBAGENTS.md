@@ -209,3 +209,10 @@ In a narrow pane the rail collapses on its own (PAN-5329). `SubagentRail` measur
 pane-local choice, also never written, and it is cleared once the pane is 760 px or wider, where
 the stored preference (or `defaultCollapsed`) applies again. A width of 0 (hidden pane) is ignored.
 
+On a narrow pane the open rail is an overlay (PAN-5585), not an inline sibling that squeezes the
+timeline: it draws `absolute` over the right of the conversation row at `min(100%, 320px)`, above a
+scrim that dims the rest of the row. The 30 px strip stays in flow underneath, so the timeline and
+composer keep their width instead of shrinking to make room for the rail. Tapping the scrim, the
+rail's own X, or any agent row closes the overlay — a row tap selects that agent first. Wide panes
+are unaffected: the rail still renders as the 256 px inline sibling.
+

@@ -144,6 +144,7 @@ export function AgentsMenu() {
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
+        aria-label={agentsWorkingLabel(count)}
         data-testid="agents-menu-trigger"
         onClick={() => setOpen((value) => !value)}
         className="inline-flex h-7 items-center gap-[7px] whitespace-nowrap rounded-md border border-border bg-card px-2.5 text-[12.5px] text-foreground transition-colors hover:bg-accent"
@@ -153,8 +154,9 @@ export function AgentsMenu() {
           aria-hidden="true"
           className={`h-1.5 w-1.5 shrink-0 rounded-full ${count > 0 ? 'bg-state-live' : 'bg-state-waiting'}`}
         />
-        {agentsWorkingLabel(count)}
-        <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+        <span className="max-sm:hidden">{agentsWorkingLabel(count)}</span>
+        <span className="sm:hidden" aria-hidden="true">{count}</span>
+        <ChevronDown className="h-3.5 w-3.5 text-muted-foreground max-sm:hidden" aria-hidden="true" />
       </button>
       {open && (
         <MenuSurface

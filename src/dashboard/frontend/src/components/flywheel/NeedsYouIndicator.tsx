@@ -110,7 +110,7 @@ export function NeedsYouIndicator() {
           aria-hidden="true"
           className={`h-1.5 w-1.5 shrink-0 rounded-full ${count > 0 ? 'bg-state-needs-you' : 'bg-state-waiting'}`}
         />
-        Needs you · {count}
+        <span className="max-sm:hidden">Needs you · </span>{count}
       </button>
       {open && (
         <MenuSurface

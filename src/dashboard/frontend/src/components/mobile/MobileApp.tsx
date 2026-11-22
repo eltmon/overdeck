@@ -29,6 +29,7 @@ import { EventRouter } from '../EventRouter';
 import { NewBuildBanner } from '../NewBuildBanner';
 import { useConnectionState } from '../../lib/connectionState';
 import { isNativeShell } from '../../lib/nativeShell';
+import { useVisualViewportVars } from '../../lib/visualViewport';
 import { MobileNeedsYou } from './MobileNeedsYou';
 import { MobileConversations } from './MobileConversations';
 import { LogoWatermark, MobileScreenHeader, OverdeckLockup } from './brand';
@@ -123,6 +124,7 @@ export default function MobileApp({ headerSlot }: { headerSlot?: ReactNode } = {
   // PAN-5208 D-10: a deep-link open (read once, from the first route) skips the logo sting.
   const [initialDeepLink] = useState(() => route.subjectId !== null || route.conversationId !== null || route.issueId !== null);
   useServiceWorkerRegistration();
+  useVisualViewportVars();
   // The /m web shell's System/Light/Dark (PAN-5208 D-6); a no-op in the phone app.
   useMobileAppearance();
   // Once, from the first render: the install event fires only near page load.
@@ -149,8 +151,10 @@ export default function MobileApp({ headerSlot }: { headerSlot?: ReactNode } = {
     || (route.tab === 'pipeline' && route.issueId !== null);
 
   return (
-    // fixed: the shell never makes the document overflow, so a phone never pans or zooms the page.
-    <div data-component="mobile-app" className="fixed inset-0 flex flex-col bg-background text-foreground">
+    // app-viewport-shell: pinned to the visual viewport (PAN-5585), so the
+    // shell never makes the document overflow and the iOS keyboard never
+    // pushes the header off-screen.
+    <div data-component="mobile-app" className="app-viewport-shell flex flex-col bg-background text-foreground">
       <EventRouter />
       {sessionAuthFailed && !native ? (
         <MobilePairScreen />

@@ -243,4 +243,15 @@ describe('AgentsMenu', () => {
     expect(screen.getByTestId('agents-menu-dot')).toHaveClass('bg-state-waiting');
     expect(screen.getByTestId('agents-menu-dot').className).not.toMatch(/emerald/);
   });
+
+  it('names the trigger with the full label and renders a compact count for narrow bars (PAN-5585)', () => {
+    setWorking([agentRow('agent-pan-1', 'PAN-1'), agentRow('agent-pan-2', 'PAN-2')]);
+    renderMenu();
+
+    const trigger = screen.getByRole('button', { name: '2 agents working' });
+    const countSpan = trigger.querySelector('.sm\\:hidden');
+    expect(countSpan).toHaveTextContent('2');
+    expect(countSpan).toHaveAttribute('aria-hidden', 'true');
+    expect(within(trigger).getByText('2 agents working')).toHaveClass('max-sm:hidden');
+  });
 });
