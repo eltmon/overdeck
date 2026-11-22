@@ -212,6 +212,26 @@ describe('getAcpLauncherFields --effort (PAN-4260)', () => {
     expect(fields.acpEffort).toBe('xhigh');
   });
 
+  it('uses the requested antigravity harness and provider for a bare Google id (PAN-5587)', async () => {
+    const fields = await getAcpLauncherFields('agent-x', 'gemini-4-argon', '/tmp/ws', '/bin/agy', 'work', undefined, 'antigravity');
+    expect(fields.harness).toBe('antigravity');
+    expect(fields.acpProvider).toBe('antigravity');
+    expect(fields.acpEffort).toBe('high');
+  });
+
+  it('clamps max to the model and Antigravity effort levels (PAN-5587)', async () => {
+    const argon = await getAcpLauncherFields('agent-x', 'gemini-4-argon', '/tmp/ws', '/bin/agy', 'work', 'max', 'antigravity');
+    expect(argon.acpEffort).toBe('high');
+    const flash = await getAcpLauncherFields('agent-x', 'gemini-3.8-flash', '/tmp/ws', '/bin/agy', 'work', 'max', 'antigravity');
+    expect(flash.acpEffort).toBe('xhigh');
+  });
+
+  it('keeps deriving the grok harness from the model without a requested harness (PAN-5587)', async () => {
+    vi.mocked(getProviderForModel).mockReturnValueOnce({ name: 'grok' } as never);
+    const fields = await getAcpLauncherFields('agent-x', 'grok/grok-4.6', '/tmp/ws', '/bin/acp-host');
+    expect(fields.harness).toBe('grok');
+  });
+
   it('defaults to high for a Kimi ACP model with no effort', async () => {
     const fields = await getAcpLauncherFields('agent-x', 'k3', '/tmp/ws', '/bin/acp-host');
     expect(fields.acpEffort).toBe('high');

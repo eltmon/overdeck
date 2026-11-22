@@ -665,7 +665,7 @@ export async function spawnConversationSession(
       : undefined;
     await rm(sessionIdPath, { force: true }); // PAN-3357: not a dir removal
     acpFields = {
-      ...(await getAcpLauncherFields(tmuxSession, model, cwd, harnessLaunch.binaryPath, 'work', launchEffort)),
+      ...(await getAcpLauncherFields(tmuxSession, model, cwd, harnessLaunch.binaryPath, 'work', launchEffort, harness)),
       ...(bareContext ? { acpContextFile: undefined } : {}),
       resumeSessionId,
     };

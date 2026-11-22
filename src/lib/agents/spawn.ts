@@ -332,7 +332,7 @@ async function spawnRunWithoutConsentClaim(
         workspace,
         harnessLaunch.binaryPath,
         role,
-        options.effort,
+        options.effort, resolvedHarness,
       )
     : {};
   const museSavedSession = resolvedHarness === 'muse' && options.resumeSessionId

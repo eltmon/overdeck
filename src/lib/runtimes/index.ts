@@ -126,6 +126,7 @@ export function getGlobalRegistry(): RuntimeRegistry {
     globalRegistry.register(createAcpRuntime());
     globalRegistry.register(createAcpRuntime({ name: 'opencode', provider: 'opencode' }));
     globalRegistry.register(createAcpRuntime({ name: 'grok', provider: 'grok' }));
+    globalRegistry.register(createAcpRuntime({ name: 'antigravity', provider: 'antigravity' }));
     globalRegistry.register(createKimiCodeRuntime());
     globalRegistry.register(createMuseRuntime());
     globalRegistry.register(createPrimeAgentRuntime());
