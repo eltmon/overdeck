@@ -58,13 +58,20 @@ else
 fi
 
 if [ "$mode" = tarball ]; then
-  read -r name version <<EOF
-$(tar -xOzf "$pkg" package/package.json | node -e 'const p=JSON.parse(require("fs").readFileSync(0));console.log(p.name+" "+p.version)')
-EOF
+  if ! identity=$(tar -xOzf "$pkg" package/package.json | node -e 'const p=JSON.parse(require("fs").readFileSync(0));console.log(p.name+" "+p.version)'); then
+    echo "could not read a package name and version from $pkg" >&2
+    exit 1
+  fi
 else
-  read -r name version <<EOF
-$(node -e 'const p=JSON.parse(require("fs").readFileSync(process.argv[1]));console.log(p.name+" "+p.version)' "$pkg/package.json")
-EOF
+  if ! identity=$(node -e 'const p=JSON.parse(require("fs").readFileSync(process.argv[1]));console.log(p.name+" "+p.version)' "$pkg/package.json"); then
+    echo "could not read a package name and version from $pkg/package.json" >&2
+    exit 1
+  fi
+fi
+read -r name version <<< "$identity"
+if [ -z "$name" ] || [ -z "$version" ]; then
+  echo "could not read a package name and version from $pkg" >&2
+  exit 1
 fi
 
 attempts="${NPM_VISIBILITY_POLL_ATTEMPTS:-40}"

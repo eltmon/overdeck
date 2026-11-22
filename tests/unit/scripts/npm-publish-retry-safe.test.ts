@@ -112,6 +112,22 @@ function buildTarball(root: string): string {
   return tarball;
 }
 
+function buildMalformedPkgDir(root: string): string {
+  const dir = join(root, 'pkg-malformed');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'package.json'), '{ not valid json');
+  return dir;
+}
+
+function buildMalformedTarball(root: string): string {
+  const srcDir = join(root, 'tgz-malformed-src');
+  mkdirSync(join(srcDir, 'package'), { recursive: true });
+  writeFileSync(join(srcDir, 'package', 'package.json'), '{ not valid json');
+  const tarball = join(root, 'core-malformed.tgz');
+  execFileSync('tar', ['-czf', tarball, 'package'], { cwd: srcDir });
+  return tarball;
+}
+
 function baseEnv(root: string): Record<string, string> {
   return {
     PATH: `${join(root, 'bin')}:${process.env.PATH}`,
@@ -236,6 +252,32 @@ describe('npm-publish-retry-safe.sh', () => {
     expect(publishCalls).toHaveLength(1);
     expect(publishCalls[0]).toContain(tarball);
     expect(publishCalls[0]).toContain('--tag canary');
+  });
+
+  it('exits non-zero and does not skip when the tarball package.json is malformed', () => {
+    const root = makeRoot();
+    installStubNpm(root);
+    const tarball = buildMalformedTarball(root);
+
+    const result = runScript(root, ['--tag', 'latest', tarball], { ...baseEnv(root), FAKE_NPM_VISIBLE_FROM_VIEW: '1' });
+
+    expect(result.status).not.toBe(0);
+    expect(result.output).not.toContain('already visible');
+    const calls = readCallsLog(root);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('exits non-zero and does not skip when the directory package.json is malformed', () => {
+    const root = makeRoot();
+    installStubNpm(root);
+    const dir = buildMalformedPkgDir(root);
+
+    const result = runScript(root, ['--tag', 'latest', dir], { ...baseEnv(root), FAKE_NPM_VISIBLE_FROM_VIEW: '1' });
+
+    expect(result.status).not.toBe(0);
+    expect(result.output).not.toContain('already visible');
+    const calls = readCallsLog(root);
+    expect(calls).toHaveLength(0);
   });
 
   it('exits 2 with usage on bad arguments', () => {
