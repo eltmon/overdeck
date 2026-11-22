@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5587",
   "created": "2026-11-21T22:59:41.238Z",
-  "updated": "2026-11-22T01:15:20.984Z",
+  "updated": "2026-11-22T01:15:28.589Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -148,6 +148,11 @@
     "host-antigravity.ac5": {
       "status": "completed",
       "doneAt": "2026-11-22T01:15:20.984Z"
+    },
+    "runtime-launcher-fields": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5587",
+      "claimedAt": "2026-11-22T01:15:28.589Z"
     }
   }
 }
