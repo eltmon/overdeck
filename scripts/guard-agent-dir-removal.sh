@@ -74,6 +74,10 @@ is_allowlisted() {
     src/lib/overdeck/conversation-runtime.ts)
       [[ "$content" == *'rm(sessionIdPath'* ]]
       ;;
+    src/lib/agents/runtime-command.ts)
+      # PAN-5587: clears a previous launch's acp-launch-error file before an ACP launch.
+      [[ "$content" == *"rm(join(getAgentDir(agentId), hostLaunchErrorFile('acp'))"* ]]
+      ;;
     *)
       return 1
       ;;
