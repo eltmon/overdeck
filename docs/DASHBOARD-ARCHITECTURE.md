@@ -2185,11 +2185,12 @@ opens Home (`/`). After the brand, left to right, the bar holds:
 the search box's placeholder text and keycap, and the four exception chips
 are hidden. The Agents and Needs-you triggers keep their accessible
 name/text content (the Agents trigger's accessible name stays
-`"N agents working"`) but show only a dot and a number. The three menus
-(Agents, Needs you, System health) anchor to the bar instead of overflowing
-the viewport: their wrappers go `max-sm:static` so the popovers' `absolute`
-positioning resolves to the bar, with `left-2 right-2` insets replacing a
-fixed width.
+`"N agents working"`) but show only a dot and a number. The System-health
+popover anchors to the bar instead of overflowing the viewport: its wrapper
+goes `max-sm:static` so the popover's `absolute` positioning resolves to the
+bar, with `left-2 right-2` insets replacing a fixed width. The Agents and
+Needs-you menus are unchanged here: `MenuSurface`'s own viewport constraint
+(D-7) already keeps them inside the viewport.
 
 The Home page's "Needs you" and "Agents working" cards read the same two
 selectors, so the top bar and Home always show the same numbers
