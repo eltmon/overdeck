@@ -5,7 +5,7 @@ import { basename, dirname, join } from 'node:path'
 import { getOverdeckHome } from '../paths.js'
 import { readCpuPsi, type CpuPsi } from '../system-health/cpu-psi.js'
 import { readProcessTreeRssBytes } from '../system-health/process-tree-rss.js'
-import { DEFAULT_QUALITY_GATE_PSI_START_AVG10, resolveQualityGateCpuSettings, type QualityGateCpuSettings } from './quality-gate-cpu.js'
+import { DEFAULT_QUALITY_GATE_PSI_START_AVG10, isQualityGateCpuPressured, resolveQualityGateCpuSettings, type QualityGateCpuSettings } from './quality-gate-cpu.js'
 import {
   evaluateMemoryHeadroom,
   ownerReservationBytes,
@@ -41,13 +41,13 @@ import {
  * alone once the slots are empty, skipping both CPU samples. Under sustained
  * pressure the queue drains one gate at a time. The PSI start threshold is
  * `resources.quality_gate_psi_start_avg10`.
+ *
+ * PAN-5589: PSI alone is not pressure. Workloads pinned to a few cores raise
+ * system-wide PSI and load while other cores sit idle, so contention counts
+ * only from 50 % utilization; 75 % is pressure on its own.
  * Admitted parents set OVERDECK_GATE_ADMITTED=1 for child-process reentrancy.
  */
 
-const QUALITY_GATE_CPU_START_THRESHOLD = 0.75
-const QUALITY_GATE_LOAD_PER_CORE_START_THRESHOLD = 1
-// PAN-4311 D10: with CPU PSI available, start heavy runs only once `some avg10` is below the
-// configured start threshold. Load per core counts IO wait, so it is the fallback only without PSI.
 const QUALITY_GATE_ADMISSION_POLL_MS = 1_000
 const QUALITY_GATE_ADMISSION_SETTLE_MS = 1_500
 const QUALITY_GATE_ADMISSION_STALE_MS = 25 * 60 * 1_000
@@ -257,14 +257,11 @@ export async function sampleQualityGatePressure(
   const cpuUtilization = totalDelta > 0 ? (totalDelta - idleDelta) / totalDelta : 0
   const loadPerCore = loadavg()[0] / after.cores
   const psiSomeAvg10 = (await readPsi()).someAvg10
-  const contended = psiSomeAvg10 != null
-    ? psiSomeAvg10 >= psiStartAvg10
-    : loadPerCore >= QUALITY_GATE_LOAD_PER_CORE_START_THRESHOLD
   return {
     cpuUtilization,
     loadPerCore,
     psiSomeAvg10,
-    pressured: cpuUtilization >= QUALITY_GATE_CPU_START_THRESHOLD || contended,
+    pressured: isQualityGateCpuPressured({ cpuUtilization, loadPerCore, psiSomeAvg10 }, psiStartAvg10),
   }
 }
 
