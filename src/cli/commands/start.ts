@@ -125,7 +125,7 @@ async function resolveExplicitHarnessFlag(
 
   if (!KNOWN_HARNESSES.has(rawHarness)) {
     const harness = rawHarness;
-    process.stderr.write(`Invalid --harness value: ${harness}. Expected 'claude-code', 'pi', 'ohmypi', 'codex', 'acp', 'kimi-code', 'opencode', 'muse', 'prime-agent', or 'grok'.\n`);
+    process.stderr.write(`Invalid --harness value: ${harness}. Expected 'claude-code', 'pi', 'ohmypi', 'codex', 'acp', 'kimi-code', 'opencode', 'muse', 'prime-agent', 'grok', or 'antigravity'.\n`);
     return exitCli(1);
   }
   const harness = rawHarness as RuntimeName;
