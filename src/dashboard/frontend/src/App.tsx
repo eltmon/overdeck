@@ -111,6 +111,7 @@ function PrdViewerHost() {
 }
 
 export default function App() {
+  useVisualViewportVars();
   useEffect(() => {
     normalizeCurrentRoute();
     // PAN-4475: the shared-conversation route is chosen on load; a same-tab hash change into it reloads.
@@ -148,7 +149,6 @@ export default function App() {
     return <Suspense fallback={null}><MobileApp /></Suspense>;
   }
 
-  useVisualViewportVars();
   const [activeTab, setActiveTabState] = useState<Tab>(() => getConversationRouteState().tab);
   const [, setSelectedAgentState] = useState<string | null>(() => {
     const hash = window.location.hash;
