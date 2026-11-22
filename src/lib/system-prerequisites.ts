@@ -242,6 +242,19 @@ export const PREREQUISITES: readonly PrerequisiteDefinition[] = [
       win: 'https://x.ai/cli',
     },
   },
+  {
+    // The id is the binary name: this probes the agy CLI, never the Antigravity desktop app.
+    id: 'agy',
+    name: 'Antigravity CLI',
+    required: false,
+    purpose: 'Antigravity agents (antigravity harness, ACP; Gemini models)',
+    versionArgs: ['--version'],
+    install: {
+      linux: 'curl -fsSL https://antigravity.google/cli/install.sh | bash',
+      mac: 'curl -fsSL https://antigravity.google/cli/install.sh | bash',
+      win: 'irm https://antigravity.google/cli/install.ps1 | iex',
+    },
+  },
 ];
 
 export type PrerequisiteProbe = (cmd: string, args: string[]) => Promise<string>;
