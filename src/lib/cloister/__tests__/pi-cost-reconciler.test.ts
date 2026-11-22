@@ -47,6 +47,17 @@ describe('reconcilePiCostEventsForRunningAgents', () => {
     expect(mocks.reconcile).toHaveBeenCalledWith({ source: 'ohmypi' });
   });
 
+  it('reconciles antigravity costs when a running agent has harness antigravity (PAN-5587)', async () => {
+    mocks.getAgentState.mockReturnValue({ harness: 'antigravity' });
+
+    await reconcilePiCostEventsForRunningAgents([
+      { id: 'agent-pan-1', tmuxActive: true } as never,
+    ]);
+
+    expect(mocks.reconcile).toHaveBeenCalledWith({ source: 'antigravity' });
+    expect(mocks.reconcile).toHaveBeenCalledTimes(1);
+  });
+
   it('reconciles grok costs when a running agent has harness grok (PAN-5078)', async () => {
     mocks.getAgentState.mockReturnValue({ harness: 'grok' });
 
