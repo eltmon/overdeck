@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5586",
   "created": "2026-11-21T22:41:59.121Z",
-  "updated": "2026-11-22T00:59:56.287Z",
+  "updated": "2026-11-22T01:00:01.219Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -70,6 +70,11 @@
     "pricing.ac3": {
       "status": "completed",
       "doneAt": "2026-11-22T00:59:56.286Z"
+    },
+    "pi-provisioning": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5586",
+      "claimedAt": "2026-11-22T01:00:01.219Z"
     }
   }
 }
