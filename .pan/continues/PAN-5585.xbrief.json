@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5585",
   "created": "2026-11-21T22:42:01.524Z",
-  "updated": "2026-11-22T00:55:43.279Z",
+  "updated": "2026-11-22T00:55:50.714Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -98,6 +98,11 @@
     "header-wrap.ac2": {
       "status": "completed",
       "doneAt": "2026-11-22T00:55:43.279Z"
+    },
+    "viewport-vars": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5585",
+      "claimedAt": "2026-11-22T00:55:50.713Z"
     }
   }
 }
