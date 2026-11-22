@@ -85,5 +85,12 @@ describe('shared branding registry', () => {
     expect(HARNESS_BRANDS.antigravity.Icon).not.toBe(HARNESS_BRANDS.acp.Icon);
     render(<HarnessLogo harness="antigravity" />);
     expect(screen.getByLabelText('Antigravity logo')).toBeInTheDocument();
+    const AntigravityIcon = HARNESS_BRANDS.antigravity.Icon;
+    render(<AntigravityIcon />);
+    expect(screen.getByLabelText('Antigravity harness mark')).toBeInTheDocument();
+  });
+
+  it('adds no antigravity provider brand: Antigravity is a harness for Google models (PAN-5587)', () => {
+    expect(Object.keys(PROVIDER_BRANDS)).not.toContain('antigravity');
   });
 });
