@@ -131,8 +131,8 @@ export const MODEL_API_IDS: Record<string, { apiModel: string; endpoint?: string
   // Google models
   'gemini-3-pro-preview': { apiModel: 'gemini-3.1-pro-preview' },
   'gemini-3-flash-preview': { apiModel: 'gemini-3-flash-preview' },
-  'gemini-2.5-pro': { apiModel: 'gemini-3.1-pro-preview' },
-  'gemini-2.5-flash': { apiModel: 'gemini-3-flash-preview' },
+  'gemini-2.5-pro': { apiModel: 'gemini-3.8-flash' },
+  'gemini-2.5-flash': { apiModel: 'gemini-3.5-flash-lite' },
   // Kimi models
   'kimi-k2': { apiModel: 'moonshot-v1-8k' },
   'kimi-k2.5': { apiModel: 'moonshot-v1-32k' },

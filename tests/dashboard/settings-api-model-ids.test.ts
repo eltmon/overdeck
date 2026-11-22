@@ -14,8 +14,8 @@ describe('settings API test model IDs', () => {
   it('maps Google model IDs to live apiModel targets', () => {
     expect(MODEL_API_IDS['gemini-3-pro-preview']?.apiModel).toBe('gemini-3.1-pro-preview');
     expect(MODEL_API_IDS['gemini-3-flash-preview']?.apiModel).toBe('gemini-3-flash-preview');
-    expect(MODEL_API_IDS['gemini-2.5-pro']?.apiModel).toBe('gemini-3.1-pro-preview');
-    expect(MODEL_API_IDS['gemini-2.5-flash']?.apiModel).toBe('gemini-3-flash-preview');
+    expect(MODEL_API_IDS['gemini-2.5-pro']?.apiModel).toBe('gemini-3.8-flash');
+    expect(MODEL_API_IDS['gemini-2.5-flash']?.apiModel).toBe('gemini-3.5-flash-lite');
   });
 
   it('never maps to a retired gemini-1.5 id or a dead Qwen id', () => {
