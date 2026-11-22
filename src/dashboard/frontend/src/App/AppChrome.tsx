@@ -210,10 +210,12 @@ export function AppChrome({
           <AgentsMenu />
           <NeedsYouIndicator />
           {/* Exception chips: each renders only while its condition is true (E-D9). */}
-          <DeaconFrozenChip />
-          <StoppedAgentsBanner variant="pill" />
-          <LowCostModePill onOpenSettings={onOpenSettings} />
-          <StaleBuildChip />
+          <div data-testid="topbar-exception-chips" className="flex items-center gap-1.5 max-sm:hidden">
+            <DeaconFrozenChip />
+            <StoppedAgentsBanner variant="pill" />
+            <LowCostModePill onOpenSettings={onOpenSettings} />
+            <StaleBuildChip />
+          </div>
           <SystemHealthPill>
             <GitHubQuotaSection />
             <HealthSection title="Auto-resume"><DeaconPauseToggle /></HealthSection>
