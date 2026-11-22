@@ -34,7 +34,7 @@ import {
   type QualityGateAdmissionDeps,
   type QualityGatePressureSample,
 } from '../../../../src/lib/cloister/quality-gate-admission.js'
-import { resolveQualityGateCpuSettings } from '../../../../src/lib/cloister/quality-gate-cpu.js'
+import { QUEUE_CPU_MARKER_FILE, resolveQualityGateCpuSettings } from '../../../../src/lib/cloister/quality-gate-cpu.js'
 import { recordGateFootprintPeak } from '../../../../src/lib/cloister/quality-gate-memory.js'
 
 const homes: string[] = []
@@ -1164,6 +1164,29 @@ describe('CPU bypass (PAN-5520)', () => {
     return undefined
   }
 
+  /** PAN-5588: the queue's CPU marker, `cpu-blocked-since.json`'s `since`, or undefined when absent. */
+  function markerSince(rootDir: string): number | undefined {
+    try {
+      const since = JSON.parse(readFileSync(join(rootDir, QUEUE_CPU_MARKER_FILE), 'utf8')).since
+      return typeof since === 'number' ? since : undefined
+    } catch {
+      return undefined
+    }
+  }
+
+  /** A field of the waiter ticket for `gateName`, or undefined. */
+  function ticketField(rootDir: string, gateName: string, field: string): unknown {
+    for (const entry of readdirSync(rootDir).filter((name) => name.startsWith('waiter-') && name.endsWith('.json'))) {
+      try {
+        const ticket = JSON.parse(readFileSync(join(rootDir, entry), 'utf8'))
+        if (ticket.gateName === gateName) return ticket[field]
+      } catch {
+        // Mid-replace; the next drive step reads it again.
+      }
+    }
+    return undefined
+  }
+
   it('admits a head alone once its CPU block outlasts the bound, though pressure never clears', async () => {
     const rootDir = home()
     let clock = 1
@@ -1192,6 +1215,7 @@ describe('CPU bypass (PAN-5520)', () => {
     const samplePressure = vi.fn(async () => (call++ === 0 ? high : call % 2 === 0 ? low : high))
     const headPromise = acquireQualityGateAdmission(request, cpuDeps(rootDir, () => clock, { samplePressure }))
     await driveUntil(() => cpuBlockedSince(rootDir) === 1)
+    await driveUntil(() => markerSince(rootDir) === 1)
     await drive(() => samplePressure.mock.calls.length >= 6)
     expect(cpuBlockedSince(rootDir)).toBe(1)
 
@@ -1226,7 +1250,7 @@ describe('CPU bypass (PAN-5520)', () => {
     await head.release()
   })
 
-  it('keeps FIFO behind a CPU-blocked head, and counts the bound only for the head', async () => {
+  it('keeps FIFO behind a CPU-blocked head, and the next head inherits the queue\'s CPU block (PAN-5588)', async () => {
     const rootDir = home()
     let clock = 1
     const headPromise = acquireQualityGateAdmission(request, cpuDeps(rootDir, () => clock, { slots: 2 }))
@@ -1240,12 +1264,187 @@ describe('CPU bypass (PAN-5520)', () => {
     clock = 2_000
     const head = await driveUntilResolved(headPromise)
     expect(head.cpuBypassed).toBe(true)
-    // The second gate is now head with a slot held: it waits on CPU and starts its own clock.
+    expect(markerSince(rootDir)).toBe(1)
+    // The second gate is now head with a slot held: it samples CPU itself but cannot bypass alone yet.
     await drive(() => cpuBlockedSince(rootDir) === 2_000)
     expect(cpuBlockedSince(rootDir)).toBe(2_000)
     expect(secondSettled()).toBe(false)
+
     await head.release()
-    clock = 4_000
+    // The queue's marker still dates to clock 1, so the second head does not wait a second bound.
+    expect((await driveUntilResolved(secondPromise)).cpuBypassed).toBe(true)
+    await (await secondPromise).release()
+  })
+
+  it('the next head starts alone without a second wait when slots: 1 (PAN-5588)', async () => {
+    const rootDir = home()
+    let clock = 1
+    const headPromise = acquireQualityGateAdmission(request, cpuDeps(rootDir, () => clock, { slots: 1 }))
+    await driveUntil(() => cpuBlockedSince(rootDir) === 1)
+    const samplePressure = vi.fn(async () => high)
+    const secondPromise = acquireQualityGateAdmission({ ...request, gateName: 'tsc' }, cpuDeps(rootDir, () => clock, { slots: 1, samplePressure }))
+    const secondSettled = settledFlag(secondPromise)
+    // Queued behind the head without its own footprintKey, the second waiter never reaches the CPU section.
+    await drive(() => readdirSync(rootDir).filter((entry) => entry.startsWith('waiter-')).length === 2)
+    expect(secondSettled()).toBe(false)
+    expect(samplePressure).not.toHaveBeenCalled()
+
+    clock = 2_000
+    const head = await driveUntilResolved(headPromise)
+    expect(head.cpuBypassed).toBe(true)
+    await head.release()
+
+    const second = await driveUntilResolved(secondPromise)
+    expect(second.cpuBypassed).toBe(true)
+    expect(samplePressure).toHaveBeenCalled()
+    await second.release()
+  })
+
+  it('never runs two gates at once under sustained pressure (PAN-5588)', async () => {
+    const rootDir = home()
+    let clock = 1
+    const firstPromise = acquireQualityGateAdmission({ ...request, gateName: 'first' }, cpuDeps(rootDir, () => clock, { slots: 2 }))
+    await driveUntil(() => cpuBlockedSince(rootDir) === 1)
+    const secondSamplePressure = vi.fn(async () => high)
+    const secondPromise = acquireQualityGateAdmission(
+      { ...request, gateName: 'second' },
+      cpuDeps(rootDir, () => clock, { slots: 2, samplePressure: secondSamplePressure }),
+    )
+    const thirdPromise = acquireQualityGateAdmission({ ...request, gateName: 'third' }, cpuDeps(rootDir, () => clock, { slots: 2 }))
+    const secondSettled = settledFlag(secondPromise)
+    const thirdSettled = settledFlag(thirdPromise)
+
+    clock = 2_000
+    const first = await driveUntilResolved(firstPromise)
+    expect(first.cpuBypassed).toBe(true)
+
+    const callsAtAdmission = secondSamplePressure.mock.calls.length
+    await drive(() => secondSamplePressure.mock.calls.length >= callsAtAdmission + 3)
+    expect(secondSettled()).toBe(false)
+    expect(thirdSettled()).toBe(false)
+    expect(existsSync(join(rootDir, 'slot-1.json'))).toBe(false)
+
+    await first.release()
+    const second = await driveUntilResolved(secondPromise)
+    expect(second.cpuBypassed).toBe(true)
+    expect(thirdSettled()).toBe(false)
+    expect(readdirSync(rootDir).filter((entry) => entry === 'owner.json' || /^slot-\d+\.json$/.test(entry))).toEqual(['owner.json'])
+
+    await second.release()
+    const third = await driveUntilResolved(thirdPromise)
+    expect(third.cpuBypassed).toBe(true)
+    await third.release()
+  })
+
+  it('an unpressured admission clears the marker, so a later episode waits the full bound (PAN-5588)', async () => {
+    const rootDir = home()
+    writeFileSync(join(rootDir, QUEUE_CPU_MARKER_FILE), JSON.stringify({ since: 1 }))
+    const samplePressure = vi.fn(async () => low)
+    const handle = await driveUntilResolved(acquireQualityGateAdmission(request, cpuDeps(rootDir, () => 5_000, { samplePressure })))
+    expect(handle.cpuBypassed).toBe(false)
+    expect(existsSync(join(rootDir, QUEUE_CPU_MARKER_FILE))).toBe(false)
+    await handle.release()
+
+    let clock = 10_000
+    const highPressure = vi.fn(async () => high)
+    const secondPromise = acquireQualityGateAdmission({ ...request, gateName: 'tsc' }, cpuDeps(rootDir, () => clock, { samplePressure: highPressure }))
+    const secondSettled = settledFlag(secondPromise)
+    await driveUntil(() => cpuBlockedSince(rootDir) === 10_000)
+
+    clock = 10_900
+    await drive(() => highPressure.mock.calls.length >= 5)
+    expect(secondSettled()).toBe(false)
+
+    clock = 11_100
+    expect((await driveUntilResolved(secondPromise)).cpuBypassed).toBe(true)
+    await (await secondPromise).release()
+  })
+
+  it('a stale marker plus an unpressured sample admits normally (PAN-5588)', async () => {
+    const rootDir = home()
+    writeFileSync(join(rootDir, QUEUE_CPU_MARKER_FILE), JSON.stringify({ since: 1 }))
+    const samplePressure = vi.fn(async () => low)
+    const handle = await driveUntilResolved(acquireQualityGateAdmission(request, cpuDeps(rootDir, () => 1_000_000, { samplePressure })))
+    expect(handle.cpuBypassed).toBe(false)
+    expect(samplePressure.mock.calls.length).toBeGreaterThanOrEqual(2)
+    expect(existsSync(join(rootDir, QUEUE_CPU_MARKER_FILE))).toBe(false)
+    await handle.release()
+  })
+
+  it('a gate that passes a memory-blocked head keeps the queue\'s CPU block (PAN-5588)', async () => {
+    const GiB = 1024 ** 3
+    const MiB = 1024 ** 2
+    const rootDir = home()
+    let clock = 1
+    let pressured = true
+    let available = 20 * GiB
+    const samplePressure = vi.fn(async () => (pressured ? high : low))
+    const readFootprintEstimate = async (key: string) => (key === 'big' ? 10 * GiB : 1 * GiB)
+    const sharedDeps = (extra: Partial<QualityGateAdmissionDeps> = {}): QualityGateAdmissionDeps => ({
+      ...deps(rootDir),
+      now: () => clock,
+      slots: 2,
+      cpuBypassMs: 1_000,
+      headBypassMs: 60_000,
+      softReserveBytes: 4 * GiB,
+      hardReserveBytes: 4 * GiB,
+      samplePressure,
+      readFootprintEstimate,
+      sampleMemory: async () => ({ memAvailableBytes: available, memTotalBytes: 64 * GiB }),
+      readTreeRssBytes: async () => 100 * MiB,
+      ...extra,
+    })
+
+    const headPromise = acquireQualityGateAdmission(
+      { workspacePath: '/tmp/big', gateName: 'big-head', attempt: 1, footprintKey: 'big' },
+      sharedDeps(),
+    )
+    await driveUntil(() => cpuBlockedSince(rootDir) === 1)
+    await driveUntil(() => markerSince(rootDir) === 1)
+
+    // The head still fit at 20 GiB; dropping to 8 GiB now fails its 10 GiB estimate against the soft reserve.
+    available = 8 * GiB
+    await driveUntil(() => typeof ticketField(rootDir, 'big-head', 'memoryBlockedSince') === 'number')
+
+    const smallPromise = acquireQualityGateAdmission(
+      { workspacePath: '/tmp/small', gateName: 'small-pass', attempt: 1, footprintKey: 'small' },
+      sharedDeps(),
+    )
+    pressured = false
+    const small = await driveUntilResolved(smallPromise)
+    expect(small.cpuBypassed).toBe(false)
+    expect(markerSince(rootDir)).toBe(1)
+    await small.release()
+
+    pressured = true
+    available = 20 * GiB
+    clock = 2_000
+    const head = await driveUntilResolved(headPromise)
+    expect(head.cpuBypassed).toBe(true)
+    await head.release()
+
+    const thirdPromise = acquireQualityGateAdmission(
+      { workspacePath: '/tmp/third', gateName: 'third', attempt: 1 },
+      sharedDeps(),
+    )
+    const third = await driveUntilResolved(thirdPromise)
+    expect(third.cpuBypassed).toBe(true)
+    await third.release()
+  })
+
+  it('a gate that enqueues after the previous one released inherits the episode (PAN-5588)', async () => {
+    const rootDir = home()
+    let clock = 1
+    const firstPromise = acquireQualityGateAdmission(request, cpuDeps(rootDir, () => clock, { slots: 1 }))
+    await driveUntil(() => cpuBlockedSince(rootDir) === 1)
+
+    clock = 2_000
+    const first = await driveUntilResolved(firstPromise)
+    expect(first.cpuBypassed).toBe(true)
+    await first.release()
+    expect(markerSince(rootDir)).toBe(1)
+
+    const secondPromise = acquireQualityGateAdmission({ ...request, gateName: 'tsc' }, cpuDeps(rootDir, () => clock, { slots: 1 }))
     expect((await driveUntilResolved(secondPromise)).cpuBypassed).toBe(true)
     await (await secondPromise).release()
   })

@@ -77,9 +77,9 @@ export function admittedAloneMessage(subject: string, footprintBytes: number): s
     + `needs ${gib(footprintBytes)}, which leaves less than the soft reserve but at least the hard reserve free`
 }
 
-/** PAN-5520: the line a gate admitted past the CPU bypass bound prints, because it may start under CPU pressure. */
+/** PAN-5520/PAN-5588: the line a gate admitted past the queue's CPU bypass bound prints, because it may start under CPU pressure. */
 export function cpuBypassedMessage(subject: string): string {
-  return `[gate-admission] ${subject} admitted alone after waiting past the CPU bypass bound: it starts without waiting for CPU pressure to clear and may run slowly`
+  return `[gate-admission] ${subject} admitted alone: the admission queue has been blocked on CPU past the bypass bound, so it starts without waiting for CPU pressure to clear and may run slowly`
 }
 
 /** The memory numbers of a memory-reason admission timeout, or null for any other failure. */

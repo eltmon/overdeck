@@ -23,7 +23,7 @@ export interface CpuResourcesYamlConfig {
   quality_gate_slots?: number;
   /** new quality gates wait while CPU PSI `some avg10` is at or above this percentage and utilization is at least 50% (PAN-5520, PAN-5589) */
   quality_gate_psi_start_avg10?: number;
-  /** minutes the admission-queue head may wait on CPU pressure before it starts alone once the slots are empty; under 30 (PAN-5520) */
+  /** minutes the admission queue may stay blocked on CPU pressure before its head starts alone once the slots are empty; counted per queue episode; under 30 (PAN-5520, PAN-5588) */
   quality_gate_cpu_bypass_minutes?: number;
 }
 

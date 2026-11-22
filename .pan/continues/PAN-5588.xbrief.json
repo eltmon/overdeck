@@ -1,0 +1,117 @@
+{
+  "version": "1",
+  "issueId": "PAN-5588",
+  "created": "2026-11-21T23:34:16.196Z",
+  "updated": "2026-11-22T01:36:51.053Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "wi1-extract-admission-files": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5588",
+      "claimedAt": "2026-11-21T23:34:16.196Z",
+      "doneAt": "2026-11-22T00:57:56.427Z"
+    },
+    "wi1-extract-admission-files.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T00:57:56.427Z"
+    },
+    "wi1-extract-admission-files.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T00:57:56.427Z"
+    },
+    "wi1-extract-admission-files.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T00:57:56.427Z"
+    },
+    "wi2-queue-cpu-marker-helpers": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5588",
+      "claimedAt": "2026-11-22T00:58:34.150Z",
+      "doneAt": "2026-11-22T01:03:55.913Z"
+    },
+    "wi2-queue-cpu-marker-helpers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:03:55.913Z"
+    },
+    "wi2-queue-cpu-marker-helpers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:03:55.913Z"
+    },
+    "wi2-queue-cpu-marker-helpers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:03:55.913Z"
+    },
+    "wi3-queue-level-cpu-bound": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5588",
+      "claimedAt": "2026-11-22T01:04:15.672Z",
+      "doneAt": "2026-11-22T01:23:37.724Z"
+    },
+    "wi3-queue-level-cpu-bound.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:23:37.724Z"
+    },
+    "wi3-queue-level-cpu-bound.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:23:37.724Z"
+    },
+    "wi3-queue-level-cpu-bound.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:23:37.724Z"
+    },
+    "wi3-queue-level-cpu-bound.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:23:37.724Z"
+    },
+    "wi3-queue-level-cpu-bound.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:23:37.724Z"
+    },
+    "wi4-docs-queue-level-bound": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5588",
+      "claimedAt": "2026-11-22T01:23:44.066Z",
+      "doneAt": "2026-11-22T01:30:20.493Z"
+    },
+    "wi4-docs-queue-level-bound.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:30:20.493Z"
+    },
+    "wi4-docs-queue-level-bound.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:30:20.493Z"
+    },
+    "wi4-docs-queue-level-bound.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:30:20.493Z"
+    },
+    "wi5-changelog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5588",
+      "claimedAt": "2026-11-22T01:30:26.431Z",
+      "doneAt": "2026-11-22T01:31:00.260Z"
+    },
+    "wi5-changelog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:31:00.260Z"
+    },
+    "wi6-bypass-message": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5588",
+      "claimedAt": "2026-11-22T01:31:05.872Z",
+      "doneAt": "2026-11-22T01:36:51.053Z"
+    },
+    "wi6-bypass-message.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:36:51.053Z"
+    },
+    "wi6-bypass-message.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:36:51.053Z"
+    }
+  }
+}

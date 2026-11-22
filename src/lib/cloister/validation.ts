@@ -499,7 +499,7 @@ export async function runQualityGates(
           }
           if (admission.cpuBypassed) {
             console.log(cpuBypassedMessage(identity));
-            opts.onLog?.(`${name} admitted alone after waiting past the CPU bypass bound`);
+            opts.onLog?.(`${name} admitted alone: the admission queue has been blocked on CPU past the bypass bound`);
           }
           if (await opts.shouldStop?.()) {
             stopped = true;

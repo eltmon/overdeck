@@ -114,9 +114,11 @@ target-branch sync, skipped when CI is already green on the exact tip commit
   cores raises them while the other cores sit idle (PAN-5589). If not
   pressured, it writes the holder record, waits 1.5 seconds, and samples
   again; if the host is pressured on that second look, it gives the slot back
-  and keeps waiting. The CPU wait is bounded: a queue head that has waited on
-  CPU for `resources.quality_gate_cpu_bypass_minutes` (default 10) starts
-  alone once no slot is held (PAN-5520). A gate with a memory footprint also waits while starting
+  and keeps waiting. The CPU wait is bounded: a queue head starts alone once
+  no slot is held after the queue has been CPU-blocked for
+  `resources.quality_gate_cpu_bypass_minutes` (default 10, PAN-5520); the
+  bound counts once per pressure episode, so the next head does not wait it
+  again (PAN-5588). A gate with a memory footprint also waits while starting
   it would push MemAvailable below `resources.governor_soft_reserve_gb`; see
   [CPU and memory admission](#cpu-and-memory-admission-pan-4311-pan-4546-pan-5248-pan-5285-pan-5520).
 - **Agent shells share the queue.** Both `vitest.config.ts` and
@@ -582,8 +584,8 @@ already queued, without killing them:
   its estimate and reserve at enqueue, so after a reserve change it can look
   as if it fits and still never start; one that has looked that way for 30 s
   with a slot free is treated as blocked on memory.
-- **Admitted past CPU pressure (PAN-5520).** CPU contention slows a gate down
-  but does not break it, so the CPU wait has a bound,
+- **Admitted past CPU pressure (PAN-5520, PAN-5588).** CPU contention slows a
+  gate down but does not break it, so the CPU wait has a bound,
   `resources.quality_gate_cpu_bypass_minutes` (default 10, under 30 so the
   head starts before the wrappers' 30-minute wait ends). The clock starts at
   the first CPU sample that blocks the head as head, before or after the
@@ -594,11 +596,22 @@ already queued, without killing them:
   bound the head starts once no slot is held, without sampling CPU before or
   after the settle; while any slot is held it keeps waiting. Its memory rule
   still applies as usual. Waiters behind a CPU-blocked head keep their places
-  (FIFO yields only to memory), so under sustained pressure the queue drains
-  one gate at a time, and each head's clock starts only once it is head.
-  Both CPU settings are read from the global config on every poll, so
-  raising `resources.quality_gate_psi_start_avg10` or lowering the bound
-  reaches gates that are already queued.
+  (FIFO yields only to memory). The first head to block writes
+  `cpu-blocked-since.json` (`{"since": <ms>}`) in the admission root; a head
+  that has itself sampled pressure counts from the earlier of its own
+  `cpuBlockedSince` and the marker, so after one gate starts alone the next
+  starts as soon as the slots are empty (one gate at a time, back to back). A
+  head that has not sampled yet never uses the marker, so a leftover marker
+  plus a low sample is a normal admission. Only an unpressured admission of
+  the queue head (both samples low) deletes the marker; a later gate that
+  passes a memory-blocked head keeps it; a `cpuBypassed` admission and a
+  release keep it too, so a gate that enqueues after the previous one
+  released still starts alone after one pressured sample. A marker that
+  outlives its pressure episode (no gate admitted while it was low) lets the
+  next episode's first head start alone after one pressured sample instead of
+  the full bound. Both CPU settings are read from the global config on every
+  poll, so raising `resources.quality_gate_psi_start_avg10` or lowering the
+  bound reaches gates that are already queued.
 - **Pinned workloads are not pressure (PAN-5589).** PSI `some avg10` and load
   average are system-wide: they count every task waiting for a CPU, including
   tasks whose affinity mask (`taskset`) or cgroup quota confines them to a few
@@ -619,8 +632,8 @@ already queued, without killing them:
   to the run log. A changed reason is printed at most once a minute. A gate
   admitted alone prints `[gate-admission] <key> admitted alone after waiting
   past the bypass bound: needs X GiB, …`, and a gate admitted past CPU
-  pressure prints `[gate-admission] <key> admitted alone after waiting past the
-  CPU bypass bound: …`.
+  pressure prints `[gate-admission] <key> admitted alone: the admission queue
+  has been blocked on CPU past the bypass bound, …`.
 - **Status readers.** Each waiter writes its current reason and the time it
   began into its `waiter-*.json` ticket (`wait: { since, reason }`).
   The read-only snapshot `readQualityGateQueue()` in
@@ -1789,9 +1802,10 @@ Auto-resume is intentionally suppressible:
   to `~/.overdeck/logs/deacon.log` every 5 minutes. Quality-gate admission
   (`quality-gate-admission.ts`) treats the host as contended at PSI `some
   avg10 >= resources.quality_gate_psi_start_avg10` (default 25), with load per
-  core `>= 1` as the fallback, but only from 50 % utilization (PAN-5589); a head blocked on CPU longer than
-  `resources.quality_gate_cpu_bypass_minutes` (default 10) starts alone once
-  the slots are empty (PAN-5520). Admission has
+  core `>= 1` as the fallback, but only from 50 % utilization (PAN-5589); a
+  head starts alone once the slots are empty after the queue has been
+  CPU-blocked longer than `resources.quality_gate_cpu_bypass_minutes`
+  (default 10; per queue episode, PAN-5520, PAN-5588). Admission has
   `resources.quality_gate_slots` slots (default 2, read from the global
   config only): slot 0 is `owner.json` and slot *i* is `slot-<i>.json`.
   Waiters stay FIFO, and the head takes the lowest free slot only while fewer

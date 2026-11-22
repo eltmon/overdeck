@@ -171,8 +171,9 @@ describe('runAdmittedCommand (PAN-5248)', () => {
     const { deps, warn } = setup({ acquire: vi.fn(async () => ({ ...fakeHandle(), cpuBypassed: true })) })
     await runAdmittedCommand(input, deps)
     const lines = warn.mock.calls.map(([line]) => String(line))
-    expect(lines).toContain('[gate-admission] tsc:tsconfig.json admitted alone after waiting past the CPU bypass bound: '
-      + 'it starts without waiting for CPU pressure to clear and may run slowly')
+    expect(lines).toContain('[gate-admission] tsc:tsconfig.json admitted alone: '
+      + 'the admission queue has been blocked on CPU past the bypass bound, '
+      + 'so it starts without waiting for CPU pressure to clear and may run slowly')
   })
 
   it('releases and resolves 1 when the command cannot start', async () => {
