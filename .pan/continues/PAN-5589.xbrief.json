@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5589",
   "created": "2026-11-22T01:01:54.134Z",
-  "updated": "2026-11-22T01:01:54.134Z",
+  "updated": "2026-11-22T01:04:47.676Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,22 @@
   "sessionHistory": [],
   "items": {
     "extract-cpu-rule": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5589",
-      "claimedAt": "2026-11-22T01:01:54.133Z"
+      "claimedAt": "2026-11-22T01:01:54.133Z",
+      "doneAt": "2026-11-22T01:04:47.676Z"
+    },
+    "extract-cpu-rule.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:04:47.676Z"
+    },
+    "extract-cpu-rule.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:04:47.676Z"
+    },
+    "extract-cpu-rule.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:04:47.676Z"
     }
   }
 }
