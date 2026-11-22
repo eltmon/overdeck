@@ -1,0 +1,204 @@
+{
+  "version": "1",
+  "issueId": "PAN-5586",
+  "created": "2026-11-21T22:41:59.121Z",
+  "updated": "2026-11-22T01:28:38.134Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-22T01:25Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-11-22T01:25:12.083Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-22T01:25Z] ci-monitor → FAILED — seq 2",
+      "timestamp": "2026-11-22T01:25:29.311Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-22T01:28Z] coderabbit → FINDINGS — seq 3",
+      "timestamp": "2026-11-22T01:28:38.134Z"
+    }
+  ],
+  "items": {
+    "capability-rows": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5586",
+      "claimedAt": "2026-11-21T22:41:59.121Z",
+      "doneAt": "2026-11-22T00:47:25.894Z"
+    },
+    "capability-rows.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T00:47:25.894Z"
+    },
+    "capability-rows.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T00:47:25.894Z"
+    },
+    "capability-rows.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T00:47:25.894Z"
+    },
+    "capability-rows.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-22T00:47:25.894Z"
+    },
+    "capability-rows.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-22T00:47:25.894Z"
+    },
+    "provider-routing": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5586",
+      "claimedAt": "2026-11-22T00:47:52.776Z",
+      "doneAt": "2026-11-22T00:57:48.844Z"
+    },
+    "provider-routing.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T00:57:48.844Z"
+    },
+    "provider-routing.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T00:57:48.844Z"
+    },
+    "provider-routing.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T00:57:48.844Z"
+    },
+    "pricing": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5586",
+      "claimedAt": "2026-11-22T00:57:53.274Z",
+      "doneAt": "2026-11-22T00:59:56.286Z"
+    },
+    "pricing.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T00:59:56.286Z"
+    },
+    "pricing.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T00:59:56.286Z"
+    },
+    "pricing.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T00:59:56.286Z"
+    },
+    "pi-provisioning": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5586",
+      "claimedAt": "2026-11-22T01:00:01.219Z",
+      "doneAt": "2026-11-22T01:02:40.965Z"
+    },
+    "pi-provisioning.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:02:40.965Z"
+    },
+    "pi-provisioning.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:02:40.965Z"
+    },
+    "picker-catalog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5586",
+      "claimedAt": "2026-11-22T01:02:46.053Z",
+      "doneAt": "2026-11-22T01:07:23.960Z"
+    },
+    "picker-catalog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:07:23.960Z"
+    },
+    "picker-catalog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:07:23.960Z"
+    },
+    "tier-mapping": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5586",
+      "claimedAt": "2026-11-22T01:07:28.592Z",
+      "doneAt": "2026-11-22T01:09:16.059Z"
+    },
+    "tier-mapping.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:09:16.059Z"
+    },
+    "tier-mapping.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:09:16.059Z"
+    },
+    "tier-mapping.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:09:16.059Z"
+    },
+    "deprecation-remaps": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5586",
+      "claimedAt": "2026-11-22T01:09:20.636Z",
+      "doneAt": "2026-11-22T01:11:07.910Z"
+    },
+    "deprecation-remaps.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:11:07.910Z"
+    },
+    "deprecation-remaps.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:11:07.910Z"
+    },
+    "deprecation-remaps.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:11:07.910Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5586",
+      "claimedAt": "2026-11-22T01:11:12.402Z",
+      "doneAt": "2026-11-22T01:13:17.346Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:13:17.346Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:13:17.346Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:13:17.346Z"
+    },
+    "pi-provisioning.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:15:25.007Z"
+    },
+    "picker-catalog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:15:53.577Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-11-22T01:25:12Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-5586\n\n# Review — PAN-5586\n## Verdict: CHANGES REQUESTED — tests/lib/model-fallback.test.ts still asserts the old Google model counts; 3 tests fail (AC-1 unmet, CI test shard will go red)\n## Context\n- Run ID: agent-pan-5586-review-e6b2e699\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-5586/.pan/review/agent-pan-5586-review-e6b2e699/context.json\n- Branch / workspace: feature/pan-5586 / /home/eltmon/Projects/overdeck/workspaces/feature-pan-5586\n- PR: https://github.com/eltmon/overdeck/pull/5590\n- HEAD reviewed: e6b2e6998428d700dc8949754a82c94838675c8f\n- Base / prior cycle SHA: merge-base 50294f099f64f2ca03bc3633dd4e6ca04c97ad89; no prior cycle\n\n## Blocking Findings\n### [correctness / requirements] `model-fallback.test.ts` not updated for the three new Google ids — `tests/lib/model-fallback.test.ts:166`\n- Severity: ! (MUST)\n- Classification / requirement scope: implementation defect (missed work-item step); in_pr_scope\n- Trigger and changed-code connection: the PR adds `gemini-4-neon`, `gemini-4-carbon` and `gemini-4-hydrogen` to `MODEL_PROVIDERS` in `src/lib/model-fallback.ts` (lines 75-77). `getModelsByProvider('google')` and `getAvailableModels()` derive from that table, so their counts grow by 3. The PRD's WI-1 step 5 explicitly lists the required test edits (`toHaveLength(11)` → `14` at line 166, `toBe(46)` → `49` at line 405, `toBe(20)` → `23` at line 441, plus comments and `toContain` / `getModelProvider` / `getFallbackModel` assertions). None were made; the file is not in the diff.\n- Expected / observed / impact: expected the file to pass with the new counts. Observed 3 failures:\n  - `getModelsByProvider > should return all Google models`: expected length 11, got 14\n  - `getAvailableModels > should return all models when all providers enabled`: expected 46, got 49\n  - `getAvailableModels > should include Google models when Google enabled`: expected 20, got 23\n  This file is in the normal `tests/lib` suite, so the CI `test-shard` jobs will fail on this HEAD. AC-1 names this file explicitly and is unmet.\n- Evidence: `npx vitest run tests/lib/model-fallback.test.ts` at HEAD e6b2e699 → 3 failed. The new `model-capabilities.test.ts` case already asserts `getModelsByProvider('google')` has length 14, so the two test files now contradict each other.\n- Fix: apply WI-1 step 5 to `tests/lib/model-fallback.test.ts`: change line 166 to `toHaveLength(14)` and add `toContain` for the three ids; line 405 → `toBe(49)` with comment `// 13 Anthropic + 15 OpenAI + 10 Google + 11 Kimi`; line 441 → `toBe(23)` with comment `// 13 Anthropic + 10 current Google`; add `getModelProvider(id) === 'google'` near line 96 and `getFallbackModel` expectations near line 326. Then rerun the AC-1 command.\n\n## Non-blocking Findings\n- `~` [requirements] Capability-row `notes` strings in `src/lib/model-capability-additions.ts` (Neon line ~364, Carbon ~390, Hydrogen ~416) are much shorter than the PRD's WI-1 text. They drop release dates, output caps (Carbon's 32,768 non-streaming cap), thinking defaults, caching and pricing details, which the Argon row records. The PRD also asked for inline `costPer1MTokens` price comments. No behavior depends on `notes`, so this is advisory. Restoring the PRD text would keep the matrix self-documenting, and PAN-4555's follow-up comment expects to edit Carbon's notes.\n- `?` [validation] `tests/lib/ohmypi-models.test.ts > provisions the dashscope provider…` fails on this host only because the shell exports `DASHSCOPE_BASE_URL=https://dashscope-us…`. With the variable unset, all 7 tests pass. This is pre-existing and host-environmental, and it is unrelated to this PR.\n- Spec note: the PR body should record the deviation from the issue body that the PRD calls out (Hydrogen also supports xhigh). The code follows the official page, which is correct.\n\n## Coverage\n### Changed-file ledger\n| File | Status |\n| --- | --- |\n| src/dashboard/frontend/src/components/Settings/modelCatalog.ts | reviewed: three rows after Argon, D1 order, prices 9/6/4.5 match D5 |\n| src/dashboard/server/routes/settings.ts | reviewed: +3/-3 line-neutral (1102 lines, NFR-1 met); MODEL_API_IDS remap; validation list |\n| src/lib/settings.ts | reviewed: GoogleModel union + available list in D1 order |\n| src/dashboard/frontend/src/lib/dashboard-utils.ts | reviewed: specific names before the `gemini-4` catch-all (ordering is correct) |\n| src/lib/cost.ts | reviewed: rows match D5 and the PRD snippet; no new id is a prefix of another |\n| src/lib/model-capability-additions.ts | reviewed: rows correct; skills match D4 (statically compared); notes advisory above |\n| src/lib/model-capability-class.ts | reviewed: D3 classes |\n| src/lib/model-deprecations.ts | reviewed: D6 remaps; targets are live ids, not chained |\n| src/lib/model-fallback.ts | reviewed: MODEL_PROVIDERS + FALLBACK_MAP per D7 (the test file was not updated: blocker) |\n| src/lib/ohmypi-models.ts | reviewed: three rows only (NonGoal 3 met) |\n| src/lib/pi-models.ts | reviewed: provisionPlan extended; the installed-catalog filter still skips shipped ids (test proves it) |\n| src/lib/providers.ts | reviewed: models, tierModels (FR-6), lookup list |\n| .overdeck/context/codebase/architecture.md | reviewed: doc-only note |\n| .pan/continues, .pan/drafts, .pan/specs | reviewed as planning artifacts (PRD/ACs read in full) |\n| changelog.d/pan-5586.md | reviewed: `&#36;` escapes, lint:docs passes |\n| docs/MODEL-CONTEXT-AUDIT.md, docs/USAGE.md | reviewed: FR-9 content |\n| test files (10) | reviewed; all pass except the missing model-fallback.test.ts update |\n\n### Dimensions\n- Correctness: data-table additions are consistent across every lookup site. The one defect is the stale count assertions in model-fallback.test.ts.\n- Security: not applicable. These are static model tables, so no trust boundary or input handling changed.\n- Performance: not applicable. The change adds constant entries to small arrays and maps.\n- Requirements/UX: FR-1 to FR-9 are implemented. AC-1 is unmet because of the blocker.\n\n### AC matrix\n| AC | Status | Evidence |\n| --- | --- | --- |\n| 1 (WI-1) | **unmet** | model-capabilities, settings-model-catalog and model-capability-class pass; tests/lib/model-fallback.test.ts has 3 failures |\n| 2 (WI-2) | met | model-catalog-audit + settings tests pass; settings.ts +3/-3 |\n| 3 (WI-3) | met | cost.test.ts passes (12/18/9); the PAN-4555 comment carries the Carbon rows |\n| 4 (WI-4) | met | pi-models passes; ohmypi-models passes with host DASHSCOPE_BASE_URL unset |\n| 5 (WI-5) | met | frontend gemini-qwen-glm-catalog.test.ts 6/6 pass; file is in scripts/frontend-test-subset.txt |\n| 6 (WI-6) | met | providers.test.ts + audit pass |\n| 7 (WI-7) | met | model-deprecation + settings-api-model-ids pass |\n| 8 (WI-8) | met | `npm run lint:docs` passed; grep count is 1 in each of the three files |\n| 9 (Parity) | met | `comm -23` prints only `src/dashboard/frontend/src/lib/__tests__/dashboard-utils.test.ts` |\n| NonGoals | met | model-capabilities.ts untouched; Argon rows unchanged; no history edits; no new FALLBACK_MAP rows for 3.8-flash/3.5-flash-lite |\n\n## Verification\n- `npx vitest run` over the 12 AC test files: 395 passed, 4 failed. Of the failures, 3 are in model-fallback.test.ts (caused by this PR) and 1 is the ohmypi dashscope test (host env; passes with `env -u DASHSCOPE_BASE_URL`).\n- Frontend: `npx vitest run src/components/Settings/__tests__/gemini-qwen-glm-catalog.test.ts`: 6 passed.\n- `npm run lint:docs`: passed.\n- CI (`gh pr checks 5590`) at HEAD e6b2e699: test shards, build, lint-group (core/effect/skills) and test-e2e are **pending**, so they are unverified. `overdeck/test` (typecheck + lint gate) passed.\n- `npm run lint:effect-diagnostics`: not run. The change adds no Effect code, only static model tables. CI `lint-group (effect)` is pending.\n\n## Scope Note\nNone.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-5586/.pan/review/agent-pan-5586-review-e6b2e699/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-5586 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 2,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-22T01:25:29Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5586\n\nPull request: https://github.com/eltmon/overdeck/pull/5590 (head `e6b2e699`)\n\nSource: check_run:test-shard (3/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-shard (3/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/137049954478/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/44970809351/job/137049954478  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/lib/model-fallback.test.ts\u001b[2m > \u001b[22mmodel-fallback\u001b[2m > \u001b[22mgetModelsByProvider\u001b[2m > \u001b[22mshould return all Google models\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/lib/model-fallback.test.ts\u001b[2m > \u001b[22mmodel-fallback\u001b[2m > \u001b[22mgetModelsByProvider\u001b[2m > \u001b[22mshould return all Google models\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected [ 'gemini-4-argon', …(13) ] to have a length of 11 but got 14\u001b[39m\n\n\u001b[32m- Expected\u001b[39m\n\u001b[31m+ Received\u001b[39m\n\n\u001b[32m- 11\u001b[39m\n\u001b[31m+ 14\u001b[39m\n\n\u001b[36m \u001b[2m❯\u001b[22m tests/lib/model-fallback.test.ts:\u001b[2m166:22\u001b[22m\u001b[39m\n    \u001b[90m164|\u001b[39m       \u001b[34mexpect\u001b[39m(models)\u001b[33m.\u001b[39m\u001b[34mtoContain\u001b[39m(\u001b[32m'gemini-2.5-pro'\u001b[39m)\u001b[33m;\u001b[39m \u001b[90m// legacy\u001b[39m\n    \u001b[90m165|\u001b[39m       \u001b[34mexpect\u001b[39m(models)\u001b[33m.\u001b[39m\u001b[34mtoContain\u001b[39m(\u001b[32m'gemini-2.5-flash'\u001b[39m)\u001b[33m;\u001b[39m \u001b[90m// legacy\u001b[39m\n    \u001b[90m166|\u001b[39m       \u001b[34mexpect\u001b[39m(models)\u001b[33m.\u001b[39m\u001b[34mtoHaveLength\u001b[39m(\u001b[34m11\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m   |\u001b[39m                      \u001b[31m^\u001b[39m\n    \u001b[90m167|\u001b[39m     })\u001b[33m;\u001b[39m\n    \u001b[90m168|\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯\u001b[22m\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/lib/model-fallback.test.ts\u001b[2m > \u001b[22mmodel-fallback\u001b[2m > \u001b[22mgetAvailableModels\u001b[2m > \u001b[22mshould return all models when all providers enabled\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/lib/model-fallback.test.ts\u001b[2m > \u001b[22mmodel-fallback\u001b[2m > \u001b[22mgetAvailableModels\u001b[2m > \u001b[22mshould return all models when all providers enabled\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected 49 to be 46 // Object.is equality\u001b[39m\n\n\u001b[32m- Expected\u001b[39m\n\u001b[31m+ Received\u001b[39m\n\n\u001b[32m- 46\u001b[39m\n\u001b[31m+ 49\u001b[39m\n\n\u001b[36m \u001b[2m❯\u001b[22m tests/lib/model-fallback.test.ts:\u001b[2m405:29\u001b[22m\u001b[39m\n    \u001b[90m403|\u001b[39m       \u001b[35mconst\u001b[39m models \u001b[3\n…\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m702 passed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[33m1 skipped\u001b[39m\u001b[90m (704)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    },
+    {
+      "seq": 3,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-22T01:28:38Z",
+      "markdownBody": "# CodeRabbit findings for PAN-5586 (PR #5590)\n\nCodeRabbit posted 2 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4655945940 · changelog.d/pan-5586.md:3 [Minor]: Carbon cost tracking keeps the introductory $2/$10 rate after 2026-11-30.\n  https://github.com/eltmon/overdeck/pull/5590#discussion_r4655945940\n- Thread 4655945944 · src/lib/pi-models.ts:89 [Major]: Provisioned Gemini 4 Neon, Carbon and Hydrogen rows must carry the Google pricing rates.\n  https://github.com/eltmon/overdeck/pull/5590#discussion_r4655945944\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5590/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-5586 -m \"CodeRabbit <thread ids>: <what you changed>\"`.\n   If you only replied, you are done.\n5. If PR #5590 has already merged when you read this, stop: after the merge Overdeck files a follow-up issue\n   for every thread with no reply, no later commit to its file, and no re-review request naming its thread id."
+    }
+  ]
+}

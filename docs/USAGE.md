@@ -178,10 +178,13 @@ Overdeck supports multiple AI model providers through direct Anthropic-compatibl
 
 **Google (Gemini)**
 - `gemini-4-argon` - Flagship model
+- `gemini-4-neon` - Opus tier (default for Google opus-tier work); thinks up to xhigh
+- `gemini-4-carbon` - Sonnet tier; Google's strongest reasoning model
+- `gemini-4-hydrogen` - Haiku tier; fast and cost-efficient; thinks up to xhigh
 - `gemini-3.8-flash` - Fast tier
 - `gemini-3.6-flash` - Fast tier
 - `gemini-3.5-flash-lite` - Budget tier
-- `gemini-3.1-pro-preview` - Flagship tier
+- `gemini-3.1-pro-preview` - Previous flagship
 - `gemini-3-flash-preview` - Fast tier; supports `thinking_level: minimal|low|medium|high`
 - `gemini-3.1-flash-lite` - Budget tier
 

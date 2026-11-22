@@ -38,6 +38,16 @@ describe('Model Deprecation System', () => {
       expect(resolveModelId('k3')).toBe('k3');
     });
 
+    it('remaps gemini-2.5-pro and gemini-2.5-flash to Google\'s 2026-12-01 routing targets (PAN-5586)', () => {
+      expect(MODEL_DEPRECATIONS['gemini-2.5-pro']).toBe('gemini-3.8-flash');
+      expect(MODEL_DEPRECATIONS['gemini-2.5-flash']).toBe('gemini-3.5-flash-lite');
+      expect(resolveModelId('gemini-2.5-pro')).toBe('gemini-3.8-flash');
+      expect(resolveModelId('gemini-2.5-flash')).toBe('gemini-3.5-flash-lite');
+      expect(Object.hasOwn(MODEL_DEPRECATIONS, 'gemini-3.8-flash')).toBe(false);
+      expect(Object.hasOwn(MODEL_DEPRECATIONS, 'gemini-3.5-flash-lite')).toBe(false);
+      expect(MODEL_DEPRECATIONS['gemini-3-pro-preview']).toBe('gemini-3.1-pro-preview');
+    });
+
     it('remaps the retired K2.5/K2.6 Kimi generation to the live coding model', () => {
       for (const retired of ['kimi-k2', 'kimi-k2.5', 'kimi-k2.6', 'K2.6-code-preview']) {
         expect(resolveModelId(retired)).toBe('kimi-k2.7-code');

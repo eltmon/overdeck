@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { capabilityClassOf } from '../model-capability-class.js';
-import { CLIPROXY_CODEX_CONTEXT_WINDOW, CLIPROXY_GPT56_CONTEXT_WINDOW, CLIPROXY_GPT56_LONG_CONTEXT_WINDOW, MODEL_CAPABILITIES, modelSupportsSamplingParams } from '../model-capabilities.js';
+import { CLIPROXY_CODEX_CONTEXT_WINDOW, CLIPROXY_GPT56_CONTEXT_WINDOW, CLIPROXY_GPT56_LONG_CONTEXT_WINDOW, getModelEffortLevels, MODEL_CAPABILITIES, modelSupportsSamplingParams } from '../model-capabilities.js';
 
 describe('model capabilities', () => {
   it('locks gpt-5.5 contextWindow to the CLIProxy Codex ceiling', () => {
@@ -290,5 +290,33 @@ describe('model capabilities', () => {
     });
     expect(capabilityClassOf('gemini-4-argon')).toBe('frontier');
     expect(modelSupportsSamplingParams('gemini-4-argon')).toBe(false);
+  });
+
+  it.each([
+    ['gemini-4-neon', 9, ['low', 'medium', 'high', 'xhigh'], 'frontier'],
+    ['gemini-4-carbon', 6, ['low', 'medium', 'high'], 'frontier'],
+    ['gemini-4-hydrogen', 4.5, ['low', 'medium', 'high', 'xhigh'], 'workhorse'],
+  ] as const)('registers %s as a Google model with cost %f and effort levels %j', (id, cost, effortLevels, capClass) => {
+    expect(MODEL_CAPABILITIES[id]).toMatchObject({
+      model: id,
+      provider: 'google',
+      contextWindow: 1048576,
+      maxOutputTokens: 65536,
+      supportsSamplingParams: false,
+      costPer1MTokens: cost,
+    });
+    expect(getModelEffortLevels(id)).toEqual(effortLevels);
+    expect(capabilityClassOf(id)).toBe(capClass);
+  });
+
+  it.each([
+    ['gemini-4-neon', 'claude-sonnet-5-5'],
+    ['gemini-4-carbon', 'claude-sonnet-5-5'],
+    ['gemini-4-hydrogen', 'claude-haiku-4-5'],
+  ] as const)('routes %s to google and falls back to %s', async (id, fallback) => {
+    const { getModelProvider, getFallbackModel, getModelsByProvider } = await import('../model-fallback.js');
+    expect(getModelProvider(id)).toBe('google');
+    expect(getFallbackModel(id, 'claude-sonnet-5-5')).toBe(fallback);
+    expect(getModelsByProvider('google')).toHaveLength(14);
   });
 });

@@ -25,8 +25,9 @@ export const MODEL_DEPRECATIONS: Record<string, ModelId> = {
   // Google deprecated models
   'gemini-3-pro-preview': 'gemini-3.1-pro-preview',
   'gemini-3-flash': 'gemini-3-flash-preview',
-  'gemini-2.5-pro': 'gemini-3.1-pro-preview',
-  'gemini-2.5-flash': 'gemini-3-flash-preview',
+  // Google's 2026-12-01 routing targets (aistudio.google.com/docs/deprecations, checked 2026-11-21).
+  'gemini-2.5-pro': 'gemini-3.8-flash',
+  'gemini-2.5-flash': 'gemini-3.5-flash-lite',
   // Shut down 2026-05-25 (ai.google.dev/gemini-api/docs/deprecations). The GA id itself
   // is scheduled to shut down 2027-05-07 → gemini-3.5-flash-lite.
   'gemini-3.1-flash-lite-preview': 'gemini-3.1-flash-lite',

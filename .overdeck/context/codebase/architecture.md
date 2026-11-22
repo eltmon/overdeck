@@ -92,8 +92,9 @@ terminal backend (Herdr by default, tmux when `terminal.backend: tmux`).
   capability (`(deprecated)` displayName), cost and `getProviderForModel` lookup-list rows stay.
   `tierModels`/`haikuModel` become Claude Code tier env vars, so they must never name a retired id;
   `tier-table.ts` validates tiered-execution ids against `provider.models`. `getPricing` prefix-matches
-  in table order, so a longer id's cost row goes above its prefix. Google/DashScope also need
-  `ohmypi-models.ts` registry rows (their default harness is ohmypi).
+  in table order, so a longer id's cost row goes above its prefix. Tier models of pi-default
+  providers (Google, DashScope, MiniMax, Z.AI, MiMo, xAI, Mistral, Nous) need a `pi-models.ts`
+  `provisionPlan` row for older pi builds; Google/DashScope also keep `ohmypi-models.ts` rows while omp remains.
   `MODEL_CAPABILITIES` is `Record<ModelId, …>`: a retired id stays in its type union and
   routing list (only `models`/`tierModels`/pickers drop it). A provider-native id containing `/`
   (Nous `qwen/qwen3.6-plus`) needs a carve-out before the OpenRouter slash catch-all in
