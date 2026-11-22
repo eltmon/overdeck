@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5587",
   "created": "2026-11-21T22:59:41.238Z",
-  "updated": "2026-11-22T01:02:12.501Z",
+  "updated": "2026-11-22T01:02:20.558Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -70,6 +70,11 @@
     "harness-policy.ac3": {
       "status": "completed",
       "doneAt": "2026-11-22T01:02:12.501Z"
+    },
+    "antigravity-auth": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5587",
+      "claimedAt": "2026-11-22T01:02:20.558Z"
     }
   }
 }
