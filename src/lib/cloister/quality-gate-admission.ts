@@ -1,10 +1,11 @@
-import { link, mkdir, open, readFile, readdir, rename, stat, unlink } from 'node:fs/promises'
+import { mkdir, readdir } from 'node:fs/promises'
 import { cpus, loadavg } from 'node:os'
-import { basename, dirname, join } from 'node:path'
+import { join } from 'node:path'
 
 import { getOverdeckHome } from '../paths.js'
 import { readCpuPsi, type CpuPsi } from '../system-health/cpu-psi.js'
 import { readProcessTreeRssBytes } from '../system-health/process-tree-rss.js'
+import { fileAgeMs, isErrnoException, publishExclusive, readJson, replaceFile, unlinkIfExists } from './quality-gate-admission-files.js'
 import { DEFAULT_QUALITY_GATE_PSI_START_AVG10, resolveQualityGateCpuSettings, type QualityGateCpuSettings } from './quality-gate-cpu.js'
 import {
   evaluateMemoryHeadroom,
@@ -214,11 +215,6 @@ export class QualityGateAdmissionTimeoutError extends Error {
 }
 
 let ticketSequence = 0
-let tempSequence = 0
-
-function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && 'code' in error
-}
 
 function processIsAlive(pid: number): boolean {
   try {
@@ -298,58 +294,6 @@ function ticketPath(root: string, ticketId: string): string {
   return join(root, `waiter-${ticketId}.json`)
 }
 
-/**
- * Publish `value` at `path` atomically; throws EEXIST when `path` exists (PAN-4610).
- * Hard link rather than rename: a rename would replace an existing owner or
- * breaker file and break the exclusion every caller relies on (D13).
- */
-async function publishExclusive(path: string, value: unknown): Promise<void> {
-  const temp = join(dirname(path), `.tmp-${process.pid}-${tempSequence++}-${basename(path)}`)
-  const file = await open(temp, 'wx', 0o600)
-  try {
-    await file.writeFile(`${JSON.stringify(value)}\n`, 'utf8')
-  } finally {
-    await file.close()
-  }
-  try {
-    await link(temp, path)
-  } finally {
-    await unlinkIfExists(temp)
-  }
-}
-
-/** PAN-5285: overwrite our own ticket atomically (temp file, then rename). */
-async function replaceFile(path: string, value: unknown): Promise<void> {
-  const temp = join(dirname(path), `.tmp-${process.pid}-${tempSequence++}-${basename(path)}`)
-  try {
-    const file = await open(temp, 'wx', 0o600)
-    try {
-      await file.writeFile(`${JSON.stringify(value)}\n`, 'utf8')
-    } finally {
-      await file.close()
-    }
-    await rename(temp, path)
-  } finally {
-    await unlinkIfExists(temp)
-  }
-}
-
-async function readJson<T>(path: string): Promise<T | null> {
-  try {
-    return JSON.parse(await readFile(path, 'utf8')) as T
-  } catch {
-    return null
-  }
-}
-
-async function unlinkIfExists(path: string): Promise<void> {
-  try {
-    await unlink(path)
-  } catch (error) {
-    if (!isErrnoException(error) || error.code !== 'ENOENT') throw error
-  }
-}
-
 function sameOwner(left: AdmissionOwner | null, right: AdmissionOwner): boolean {
   return left?.ticketId === right.ticketId
     && left.pid === right.pid
@@ -412,17 +356,6 @@ async function clearStaleOwner(
     }
   } finally {
     await unlinkIfExists(slotBreakerPath(root, slot))
-  }
-}
-
-/** Milliseconds since `path` was last modified, or null when it no longer exists. */
-async function fileAgeMs(path: string): Promise<number | null> {
-  try {
-    // Wall clock on purpose: mtime is wall-clock, and fake timers fake Date too.
-    return Date.now() - (await stat(path)).mtimeMs
-  } catch (error) {
-    if (isErrnoException(error) && error.code === 'ENOENT') return null
-    throw error
   }
 }
 
