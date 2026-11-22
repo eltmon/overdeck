@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5587",
   "created": "2026-11-21T22:59:41.238Z",
-  "updated": "2026-11-22T01:31:28.353Z",
+  "updated": "2026-11-22T01:31:33.516Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -256,6 +256,11 @@
     "cli-harness-lists.ac3": {
       "status": "completed",
       "doneAt": "2026-11-22T01:31:28.352Z"
+    },
+    "picker-catalog-rows": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5587",
+      "claimedAt": "2026-11-22T01:31:33.516Z"
     }
   }
 }
