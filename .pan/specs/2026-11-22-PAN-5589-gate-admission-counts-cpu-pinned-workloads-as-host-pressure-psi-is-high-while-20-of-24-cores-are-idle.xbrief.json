@@ -1,0 +1,343 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-22T00:55:08Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5589: Gate admission counts CPU-pinned workloads as host pressure: PSI is high while 20 of 24 cores are idle",
+    "updated": "2026-11-22T01:00:56.580Z"
+  },
+  "plan": {
+    "id": "pan-5589",
+    "title": "Gate admission counts CPU-pinned workloads as host pressure: PSI is high while 20 of 24 cores are idle",
+    "status": "proposed",
+    "uid": "cdcb9c75-6741-4c25-810d-1d6b8eb09363",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-22T00:55:08Z",
+    "updated": "2026-11-22T01:00:56.580Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5589",
+        "label": "PAN-5589",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5589.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "cloister",
+      "quality-gate-admission",
+      "cpu-pressure",
+      "psi"
+    ],
+    "narratives": {
+      "Problem": "sampleQualityGatePressure in src/lib/cloister/quality-gate-admission.ts marks the host pressured whenever CPU PSI some avg10 reaches the start threshold (or, without PSI, load per core reaches 1). PSI and load are system-wide and count tasks that wait only because a taskset affinity mask or cgroup quota confines them to a few cores. On 2026-11-21 seven encodes pinned to 4 of 24 cores read PSI 35 at 44 % utilization, and every local quality gate waited on 'CPU pressure' for over an hour while 20 cores were idle.",
+      "Proposal": "Extract the pressure decision into a pure function isQualityGateCpuPressured in src/lib/cloister/quality-gate-cpu.ts (the admission module is 997 of its 1000-line cap), then add QUALITY_GATE_CONTENDED_UTILIZATION_FLOOR = 0.5: pressured = utilization >= 0.75 || (utilization >= 0.5 && contended), with the same floor on the load-average fallback. Add a PAN-5589 paragraph to the admission module header, rewrite the three sample tests that asserted PSI-alone pressure at 0 % utilization so they run at 60 %, add the issue's four cases plus boundary tests, and document the rule in docs/PIPELINE-GATES.md, configuration/memory-governor.mdx, the schema comment and changelog.d/pan-5589.md.",
+      "NonGoals": "- No new resources.* config key for the 0.5 floor.\n- No affinity-aware or per-core sampling (/proc/stat per core, cgroup cpusets, sched_getaffinity).\n- No change to the 0.75 utilization trigger, the PSI start threshold default (25), or the CPU bypass bound and its clock (PAN-5588 owns the clock).\n- No change to src/lib/cloister/cpu-pressure.ts / assessCpuPressure (lane launches, agent-start warning, Flywheel hold).\n- No change to the QualityGatePressureSample shape or the cpu wait-reason ticket format.\n- No move of the admission file helpers (publishExclusive, replaceFile, readJson, unlinkIfExists, fileAgeMs); PAN-5588 extracts those.\n- No allowlist row or cap raise in scripts/file-size-allowlist.txt.\n- No deletion or skipping of any existing test; no edits to admission test describe blocks other than 'sampleQualityGatePressure (PAN-4311)'."
+    },
+    "autoDecisions": [
+      {
+        "summary": "The three existing sampleQualityGatePressure cases that assert pressured: true from PSI or load at 0 % utilization are rewritten in place to run at 60 % utilization; every other admission test stays byte-for-byte unchanged.",
+        "rationale": "The issue's own fix and its first AC case (PSI 35, utilization 0.44 -> false) contradict those three cases, so 'existing admission tests pass unchanged' can only mean the queue/slot/memory/fairness/bypass tests, which inject samplePressure. Rewriting at 60 % keeps the PSI-threshold, configured-threshold and load-fallback coverage."
+      },
+      {
+        "summary": "The pressure decision moves to a pure function isQualityGateCpuPressured in quality-gate-cpu.ts; sampleQualityGatePressure and cpuTotals stay in the admission module.",
+        "rationale": "quality-gate-admission.ts is 997 lines against a 1000-line cap with no allowlist row, and the issue asks for a header paragraph there. Moving only the thresholds and decision frees 7 lines, avoids an import-path change for tests, and stays clear of PAN-5588's file-helper extraction."
+      },
+      {
+        "summary": "The 0.5 floor is a code constant, not a config key.",
+        "rationale": "The issue names a new constant of 0.5 and asks for no setting."
+      },
+      {
+        "summary": "Gate admission only; assessCpuPressure (governor, lanes, agent-start warnings) is left alone.",
+        "rationale": "The issue scopes the fix to sampleQualityGatePressure. The governor uses PSI avg60 against different thresholds and its own callers; changing it is a separate decision."
+      }
+    ],
+    "items": [
+      {
+        "id": "extract-cpu-rule",
+        "title": "Extract the quality-gate CPU pressure decision into quality-gate-cpu.ts without changing behavior",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-22T00:55:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-5589",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/quality-gate-cpu.ts",
+            "src/lib/cloister/quality-gate-admission.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/quality-gate-admission.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular",
+            "wc -l src/lib/cloister/quality-gate-admission.ts"
+          ],
+          "expected_outputs": [
+            "quality-gate-admission.test.ts passes with the test file unchanged",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle",
+            "wc prints 990 or fewer lines for quality-gate-admission.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 exactly. In src/lib/cloister/quality-gate-cpu.ts add exported constants QUALITY_GATE_CPU_START_THRESHOLD = 0.75 and QUALITY_GATE_LOAD_PER_CORE_START_THRESHOLD = 1, an exported interface QualityGateCpuReading { cpuUtilization: number; loadPerCore: number; psiSomeAvg10: number | null }, and isQualityGateCpuPressured(reading, psiStartAvg10) that returns reading.cpuUtilization >= 0.75 || contended, where contended is PSI >= psiStartAvg10 when PSI is non-null, else loadPerCore >= 1 (today's rule, unchanged). In src/lib/cloister/quality-gate-admission.ts delete lines 47-50 (the two threshold consts and the two-line '// PAN-4311 D10:' comment), add isQualityGateCpuPressured to the './quality-gate-cpu.js' import on line 8, and replace the contended block plus pressured expression in sampleQualityGatePressure with pressured: isQualityGateCpuPressured({ cpuUtilization, loadPerCore, psiSomeAvg10 }, psiStartAvg10). quality-gate-cpu.ts must not import anything from quality-gate-admission.ts. Do not touch cpuTotals, the admission loop, the file helpers, or any test file."
+        },
+        "items": [
+          {
+            "id": "extract-cpu-rule.ac1",
+            "title": "Given the WI-1 commit, src/lib/cloister/quality-gate-cpu.ts exports isQualityGateCpuPressured, QUALITY_GATE_CPU_START_THRESHOLD and QUALITY_GATE_LOAD_PER_CORE_START_THRESHOLD, and sampleQualityGatePressure returns pressured from isQualityGateCpuPressured",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-cpu-rule.ac2",
+            "title": "When npx vitest run tests/unit/lib/cloister/quality-gate-admission.test.ts runs at the WI-1 commit with that test file unmodified, every test passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-cpu-rule.ac3",
+            "title": "wc -l src/lib/cloister/quality-gate-admission.ts returns 990 or fewer lines and npm run lint:circular exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "utilization-floor",
+        "title": "Apply the 50 % contended-utilization floor to PSI and load in the gate pressure rule",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-22T00:55:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5589",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/quality-gate-cpu.ts",
+            "src/lib/cloister/quality-gate-admission.ts",
+            "tests/unit/lib/cloister/quality-gate-admission.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/quality-gate-admission.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "quality-gate-admission.test.ts passes including the four new PAN-5589 cases",
+            "typecheck completes without errors",
+            "file-size guard passed",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2 exactly. In quality-gate-cpu.ts add exported QUALITY_GATE_CONTENDED_UTILIZATION_FLOOR = 0.5 with the PAN-5589 doc comment, change isQualityGateCpuPressured to: return true at utilization >= 0.75; return false below 0.5; otherwise return PSI >= psiStartAvg10 (load per core >= 1 when PSI is null). Update its doc comment and the DEFAULT_QUALITY_GATE_PSI_START_AVG10 doc comment as the PRD gives. In the quality-gate-admission.ts module header insert the four-line PAN-5589 paragraph after the line ending '`resources.quality_gate_psi_start_avg10`.' and before 'Admitted parents set OVERDECK_GATE_ADMITTED=1'; do not edit the PAN-5520 paragraph lines. In tests/unit/lib/cloister/quality-gate-admission.test.ts, only inside describe('sampleQualityGatePressure (PAN-4311)'), add the cpusAt(busy) helper (two mockReturnValueOnce calls on osMocks.cpus: four cores at zero, then user busy*100 / idle 100-busy*100), rewrite the three D7 cases in place at cpusAt(0.6) with the titles and expectations the PRD gives, leave 'lets PSI win over a high load per core' unchanged, and add the four PAN-5589 cases (PSI 35 at 0.44 -> false; PSI 35 at 0.6 -> true; PSI 5 at 0.8 -> true; no PSI, loadavg [4.8,0,0] on 4 cores at 0.44 -> false). Use toMatchObject({ pressured }) and toBeCloseTo for cpuUtilization. Never delete, skip or .only a test."
+        },
+        "items": [
+          {
+            "id": "utilization-floor.ac1",
+            "title": "Given PSI some avg10 35 and 44 % utilization, sampleQualityGatePressure returns pressured: false; given PSI 35 and 60 % utilization it returns pressured: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "utilization-floor.ac2",
+            "title": "Given PSI 5 and 80 % utilization sampleQualityGatePressure returns pressured: true; given no PSI, load per core 1.2 and 44 % utilization it returns pressured: false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "utilization-floor.ac3",
+            "title": "git diff origin/main -- tests/unit/lib/cloister/quality-gate-admission.test.ts shows changes only inside the 'sampleQualityGatePressure (PAN-4311)' describe, the three rewritten cases still exist at 60 % utilization, and the file contains no new skip/only",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "utilization-floor.ac4",
+            "title": "The quality-gate-admission.ts module header contains a 'PAN-5589: PSI alone is not pressure' paragraph after the PAN-5520 paragraph, and bash scripts/lint-file-size.sh exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cpu-rule-boundary-tests",
+        "title": "Add boundary tests for isQualityGateCpuPressured in a new quality-gate-cpu.test.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-22T00:55:08Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "test",
+          "issueLabel": "pan-5589",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/cloister/quality-gate-cpu.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/quality-gate-cpu.test.ts"
+          ],
+          "expected_outputs": [
+            "quality-gate-cpu.test.ts exits 0 with 8 table rows and 1 constants test reported passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. Create tests/unit/lib/cloister/quality-gate-cpu.test.ts importing isQualityGateCpuPressured, QUALITY_GATE_CONTENDED_UTILIZATION_FLOOR and QUALITY_GATE_CPU_START_THRESHOLD from '../../../../src/lib/cloister/quality-gate-cpu.js'. With psiStartAvg10 = 25, assert via it.each: (0.49, PSI 99, load 0) -> false; (0.5, 25, 0) -> true; (0.5, 24.9, 0) -> false; (0.74, 0, 0) -> false; (0.75, 0, 0) -> true; (0.49, null, 5) -> false; (0.5, null, 1) -> true; (0.5, null, 0.99) -> false. Also assert the floor equals 0.5 and the start threshold equals 0.75. No mocks, timers or source reading."
+        },
+        "items": [
+          {
+            "id": "cpu-rule-boundary-tests.ac1",
+            "title": "When npx vitest run tests/unit/lib/cloister/quality-gate-cpu.test.ts runs, it exits 0 and reports 9 tests passed (8 table rows plus 1 constants test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cpu-rule-boundary-tests.ac2",
+            "title": "The test returns true at exactly 0.5 utilization with PSI 25 and false at 0.49 utilization with PSI 99, proving the floor is inclusive at 0.5",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-and-changelog",
+        "title": "Document the 50 % PSI floor in PIPELINE-GATES.md, memory-governor.mdx, the schema comment and changelog.d/pan-5589.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-22T00:55:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5589",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md",
+            "configuration/memory-governor.mdx",
+            "changelog.d/pan-5589.md",
+            "src/lib/config-yaml/schema-cpu.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n \"PAN-5589\" docs/PIPELINE-GATES.md src/lib/config-yaml/schema-cpu.ts",
+            "grep -n \"50 %\" configuration/memory-governor.mdx",
+            "grep -n \"issues/5589\" changelog.d/pan-5589.md"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "grep prints at least one PAN-5589 line in each of PIPELINE-GATES.md and schema-cpu.ts",
+            "grep prints at least two '50 %' lines in memory-governor.mdx",
+            "grep prints the issues/5589 link line in changelog.d/pan-5589.md"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4 steps 1-9 exactly: edit the 'The pressure rule' bullet (around line 108), the admission-section clause (around line 499) and the Agent Auto-Resume Gates CPU bullet (around line 1777) of docs/PIPELINE-GATES.md, and add the new 'Pinned workloads are not pressure (PAN-5589)' bullet directly after the 'Admitted past CPU pressure (PAN-5520)' bullet without editing that bullet. Do not rename any heading. Edit the quality_gate_slots and quality_gate_psi_start_avg10 table rows and the admission prose paragraph in configuration/memory-governor.mdx. Change the quality_gate_psi_start_avg10 comment in src/lib/config-yaml/schema-cpu.ts. Create changelog.d/pan-5589.md with exactly one '#### Fixed' heading and the PRD's bullet. Leave CLAUDE.md and the codebase map unchanged."
+        },
+        "items": [
+          {
+            "id": "docs-and-changelog.ac1",
+            "title": "docs/PIPELINE-GATES.md contains a '**Pinned workloads are not pressure (PAN-5589).**' bullet after the PAN-5520 bullet, and its 'The pressure rule' bullet states PSI and load count only at or above 0.5 utilization",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-changelog.ac2",
+            "title": "configuration/memory-governor.mdx contains rows for resources.quality_gate_slots and resources.quality_gate_psi_start_avg10 that say PSI counts only from 50 % CPU utilization",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-changelog.ac3",
+            "title": "changelog.d/pan-5589.md exists with a single '#### Fixed' heading and a bullet linking https://github.com/eltmon/overdeck/issues/5589, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "extract-cpu-rule",
+        "to": "utilization-floor",
+        "type": "blocks"
+      },
+      {
+        "from": "utilization-floor",
+        "to": "cpu-rule-boundary-tests",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-22-PAN-5589-gate-admission-counts-cpu-pinned-workloads-as-host-pressure-psi-is-high-while-20-of-24-cores-are-idle.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
