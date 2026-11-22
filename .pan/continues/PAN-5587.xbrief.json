@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5587",
   "created": "2026-11-21T22:59:41.238Z",
-  "updated": "2026-11-22T01:00:22.197Z",
+  "updated": "2026-11-22T01:00:28.630Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,6 +52,11 @@
     "antigravity-models.ac4": {
       "status": "completed",
       "doneAt": "2026-11-22T01:00:22.196Z"
+    },
+    "harness-policy": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5587",
+      "claimedAt": "2026-11-22T01:00:28.629Z"
     }
   }
 }
