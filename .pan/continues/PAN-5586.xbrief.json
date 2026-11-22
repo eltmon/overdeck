@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5586",
   "created": "2026-11-21T22:41:59.121Z",
-  "updated": "2026-11-22T01:15:25.007Z",
+  "updated": "2026-11-22T01:15:53.577Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -156,6 +156,10 @@
     "pi-provisioning.ac3": {
       "status": "completed",
       "doneAt": "2026-11-22T01:15:25.007Z"
+    },
+    "picker-catalog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:15:53.577Z"
     }
   }
 }
