@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5586",
   "created": "2026-11-21T22:41:59.121Z",
-  "updated": "2026-11-22T01:11:07.911Z",
+  "updated": "2026-11-22T01:11:12.402Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -134,6 +134,11 @@
     "deprecation-remaps.ac3": {
       "status": "completed",
       "doneAt": "2026-11-22T01:11:07.910Z"
+    },
+    "docs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5586",
+      "claimedAt": "2026-11-22T01:11:12.402Z"
     }
   }
 }
