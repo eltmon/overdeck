@@ -72,6 +72,9 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
 
   // Google models (current)
   'gemini-4-argon': 'google',
+  'gemini-4-neon': 'google',
+  'gemini-4-carbon': 'google',
+  'gemini-4-hydrogen': 'google',
   'gemini-3.8-flash': 'google',
   'gemini-3.6-flash': 'google',
   'gemini-3.5-flash-lite': 'google',
@@ -201,6 +204,9 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
 
   // Google → Anthropic
   'gemini-4-argon': 'claude-sonnet-5-5', // Flagship → Sonnet
+  'gemini-4-neon': 'claude-sonnet-5-5', // Flagship → Sonnet
+  'gemini-4-carbon': 'claude-sonnet-5-5', // Flagship → Sonnet
+  'gemini-4-hydrogen': 'claude-haiku-4-5', // Fast model → Haiku
   'gemini-3.1-pro-preview': 'claude-sonnet-5-5', // Flagship → Sonnet
   'gemini-3-flash-preview': 'claude-haiku-4-5', // Fast model → Haiku
   'gemini-3.6-flash': 'claude-haiku-4-5', // Fast model → Haiku
