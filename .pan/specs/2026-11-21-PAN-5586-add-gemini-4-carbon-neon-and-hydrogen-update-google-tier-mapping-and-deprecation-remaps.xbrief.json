@@ -4,17 +4,17 @@
     "created": "2026-11-21T22:33:05Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5586: Add Gemini 4 Carbon, Neon and Hydrogen; update Google tier mapping and deprecation remaps",
-    "updated": "2026-11-21T22:41:03.526Z"
+    "updated": "2026-11-21T22:41:35.156Z"
   },
   "plan": {
     "id": "pan-5586",
     "title": "Add Gemini 4 Carbon, Neon and Hydrogen; update Google tier mapping and deprecation remaps",
-    "status": "proposed",
+    "status": "running",
     "uid": "f012aee6-a22f-493d-a4db-3b250c18dce6",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-21T22:33:05Z",
-    "updated": "2026-11-21T22:41:03.526Z",
+    "updated": "2026-11-21T22:41:35.156Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5586",
@@ -632,5 +632,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
