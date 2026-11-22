@@ -22,6 +22,16 @@ import {
   resolveKimiAuthMethodId,
   translateKimiAcpModelId,
 } from "./kimi.js";
+import {
+  ANTIGRAVITY_EFFORT_CONFIG_ID,
+  buildAntigravityAcpSpawnInput,
+  clampAntigravityThoughtLevel,
+  extractAntigravityTurnUsage,
+  makeAntigravityAcpRuntime,
+  resolveAntigravityAuthMethodId,
+  translateAntigravityAcpModelId,
+} from "./antigravity.js";
+import { resolveAntigravityCredential, type AntigravityCredential } from "../antigravity-auth.js";
 import type { AcpTurnUsage } from "./transcript.js";
 
 const openCodeSupport = {
@@ -48,6 +58,20 @@ const ACP_PROVIDER_SUPPORT = {
     effortConfigId: GROK_EFFORT_CONFIG_ID,
     harness: "grok",
     extractTurnUsage: extractGrokTurnUsage,
+    displayName: "Grok Build",
+  },
+  antigravity: {
+    buildSpawnInput: buildAntigravityAcpSpawnInput,
+    // Table default; the runtime factory selects the resolved credential's method.
+    resolveAuthMethodId: (result: EffectAcpSchema.InitializeResponse) => resolveAntigravityAuthMethodId(result, "gemini-api-key"),
+    makeRuntime: makeAntigravityAcpRuntime,
+    translateModelId: translateAntigravityAcpModelId,
+    effortConfigId: ANTIGRAVITY_EFFORT_CONFIG_ID,
+    resolveEffortValue: clampAntigravityThoughtLevel,
+    harness: "antigravity",
+    extractTurnUsage: extractAntigravityTurnUsage,
+    displayName: "Antigravity",
+    resolveCredential: () => resolveAntigravityCredential(),
   },
 } as const;
 
@@ -56,9 +80,18 @@ interface AcpProviderSupportOptions {
   /** ACP config option the host sets to the resolved effort right after the model. */
   readonly effortConfigId?: string;
   /** Harness recorded in the session index; absent means "acp". */
-  readonly harness?: "acp" | "opencode" | "grok";
-  /** Turn usage and cost from a `session/prompt` result, copied to the turn_completed transcript entry. */
-  readonly extractTurnUsage?: (response: EffectAcpSchema.PromptResponse) => AcpTurnUsage | undefined;
+  readonly harness?: "acp" | "opencode" | "grok" | "antigravity";
+  /**
+   * Turn usage and cost from a `session/prompt` result, copied to the turn_completed
+   * transcript entry. `model` is the Overdeck model id the host launched with.
+   */
+  readonly extractTurnUsage?: (response: EffectAcpSchema.PromptResponse, model: string) => AcpTurnUsage | undefined;
+  /** Map the requested effort onto the values the effort config option currently offers. */
+  readonly resolveEffortValue?: (effort: string, offered: readonly string[]) => string;
+  /** Operator-facing agent name used in host error messages. */
+  readonly displayName?: string;
+  /** Resolve the agent's credential in the host before the runtime is built (PAN-5587 D5). */
+  readonly resolveCredential?: () => Promise<AntigravityCredential>;
 }
 
 export type AcpProviderName = keyof typeof ACP_PROVIDER_SUPPORT;

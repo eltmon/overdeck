@@ -22,9 +22,11 @@ export interface AcpTranscriptToolCallState {
 
 /** Token counts and cost an ACP agent reported for one prompt turn (PAN-5078 D9). */
 export interface AcpTurnUsage {
-  /** Overdeck model id, e.g. "grok/grok-4.6". */
+  /** Overdeck model id, e.g. "grok/grok-4.6", or a bare Google id such as "gemini-4-argon". */
   readonly model: string;
-  /** Uncached input tokens: the reported input minus cache reads. */
+  /** Cost source that imports this usage; absent on Grok entries. */
+  readonly source?: "antigravity";
+  /** Uncached input tokens (Grok: the reported input minus cache reads; Antigravity reports it uncached). */
   readonly inputTokens: number;
   readonly outputTokens: number;
   readonly cacheReadTokens: number;

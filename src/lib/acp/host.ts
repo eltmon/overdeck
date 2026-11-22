@@ -323,7 +323,7 @@ export class AcpHost {
           promptId,
           event: "turn_completed",
           stopReason: promptResult.stopReason,
-          usage: resolveAcpProviderSupport(this.options.provider).extractTurnUsage?.(promptResult),
+          usage: resolveAcpProviderSupport(this.options.provider).extractTurnUsage?.(promptResult, this.options.model ?? ""),
         });
       } catch (error) {
         const message = errorMessage(error);
