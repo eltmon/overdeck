@@ -4,17 +4,17 @@
     "created": "2026-11-21T22:58:40.011Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5587: Antigravity harness: run Gemini models through agy acp (API key and Agent Platform auth only)",
-    "updated": "2026-11-21T22:58:46.321Z"
+    "updated": "2026-11-21T22:59:20.950Z"
   },
   "plan": {
     "id": "pan-5587",
     "title": "Antigravity harness: run Gemini models through agy acp (API key and Agent Platform auth only)",
-    "status": "proposed",
+    "status": "running",
     "uid": "ebf81933-c9d4-4b96-81e4-f27fee6efc6c",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-21T22:58:40.011Z",
-    "updated": "2026-11-21T22:58:46.321Z",
+    "updated": "2026-11-21T22:59:20.950Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5587",
@@ -2004,5 +2004,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
