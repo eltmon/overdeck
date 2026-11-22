@@ -1,0 +1,342 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-22T04:17:12Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5595: Release workflow: npm staged versions look unpublished; the run passes while core is not installable, and a rerun fails E409",
+    "updated": "2026-11-22T04:24:34.967Z"
+  },
+  "plan": {
+    "id": "pan-5595",
+    "title": "Release workflow: npm staged versions look unpublished; the run passes while core is not installable, and a rerun fails E409",
+    "status": "proposed",
+    "uid": "7827bd0a-59ba-4eab-a7f8-6912ef9e947e",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-22T04:17:12Z",
+    "updated": "2026-11-22T04:24:34.967Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5595",
+        "label": "PAN-5595",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5595.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "release",
+      "ci",
+      "npm",
+      "github-actions",
+      "docs"
+    ],
+    "narratives": {
+      "Problem": "The release workflow's three npm publish steps (.github/workflows/release.yml lines 372-416) decide 'already on npm' with `npm view <pkg>@<version> version` and never check visibility after publishing. npm can hold a new version as staged: npm view cannot see it, the tarball 404s, and a second publish fails E409 'Cannot publish over previously staged version'. In run 44976899182 @overdeck/core@0.90.0 was staged, the job passed, and a rerun failed E409 with no explanation.",
+      "Proposal": "Extract the publish logic into scripts/npm-publish-retry-safe.sh (--tag <dist-tag> <package.tgz|package-dir>). It skips an already-visible version, publishes with --ignore-scripts --provenance --access public --tag, treats an E409 'previously staged version' as staged, then polls npm view (40 checks x 30 s, env-overridable) until the version is visible. On timeout it exits 3 with a GitHub ::error:: annotation and maintainer instructions: confirm with npx --yes npm@11 stage list and stage view, approve only the stage id showing the exact package and version (stage approve, or Staged Packages in npmjs.com account settings), check registry visibility instead if nothing is staged, rerun the job, never republish. release.yml calls the script for core, contracts and desktop. A Vitest test drives the script with a stub npm on PATH. docs/RELEASING.md and the pan-release skill describe the staged state and recovery. Full detail: .pan/drafts/PAN-5595.md.",
+      "NonGoals": "- Do not explain or change why npm staged @overdeck/core but not contracts/desktop; the cause is unverified\n- Do not run `npm stage` subcommands from CI (OIDC trust tokens cannot) or change the npmjs.com Trusted Publisher config\n- Do not approve or reject the currently staged @overdeck/core@0.90.0\n- Do not switch the workflow to `npm stage publish`\n- Do not special-case E403 'cannot publish over the previously published versions'\n- Do not change the npm version the job installs (npm@11)\n- Do not change any release.yml job or step other than the three publish steps\n- Do not add a changelog.d entry (maintainer-only CI behavior)\n- Never suggest republishing the same version in any message or doc"
+    },
+    "autoDecisions": [
+      {
+        "summary": "The script interface is `scripts/npm-publish-retry-safe.sh --tag <dist-tag> <package.tgz|package-dir>`, with exit codes 0 = visible, 2 = usage, 3 = poll timeout, and npm's own status otherwise",
+        "rationale": "The issue suggested this script name. One positional argument covers core's prebuilt tarball and the contracts/desktop directories, and a distinct exit code lets the tests tell a timeout apart from a real publish error."
+      },
+      {
+        "summary": "Always pass --tag, including --tag latest",
+        "rationale": "npm publish --tag latest is the same as the default, so one code path replaces the two if/else branches in each step."
+      },
+      {
+        "summary": "Poll as a counted loop: NPM_VISIBILITY_POLL_ATTEMPTS (default 40) and NPM_VISIBILITY_POLL_INTERVAL_SECONDS (default 30)",
+        "rationale": "The defaults match the issue's 20 minutes at 30 s. A counted loop with interval 0 lets the tests run without wall-clock waits (fake-timer rule), where a date or $SECONDS deadline would not."
+      },
+      {
+        "summary": "Docs and messages say `npm stage` needs npm 11.15 or later, not the issue's 11.5",
+        "rationale": "Planning checked npm tarballs: 11.5.1 and 11.10.0 to 11.14.1 have no lib/commands/stage/; 11.15.0, 11.18.0, 11.20.0 and 11.21.3 do. The issue's '11.5' is a typo."
+      },
+      {
+        "summary": "The approval commands use `npx --yes npm@11 stage …`",
+        "rationale": "A maintainer's global npm may be older than 11.15 (this machine has 10.9.4); the npx form works anywhere."
+      },
+      {
+        "summary": "No changelog.d entry",
+        "rationale": "The change affects only CI release behavior that maintainers see. CLAUDE.md requires entries only for user-facing changes."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Four items, 6 files, 3 subsystems (scripts, CI workflow, docs).",
+      "canonicalFilename": "2026-11-22-PAN-5595-release-workflow-npm-staged-versions-look-unpublished-the-run-passes-while-core-is-not-installable-and-a-rerun-fails-e409.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "publish-script",
+        "title": "Add scripts/npm-publish-retry-safe.sh with its stub-npm Vitest test",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-22T04:17:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-5595",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/npm-publish-retry-safe.sh",
+            "tests/unit/scripts/npm-publish-retry-safe.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash -n scripts/npm-publish-retry-safe.sh",
+            "npx vitest run tests/unit/scripts/npm-publish-retry-safe.test.ts"
+          ],
+          "expected_outputs": [
+            "bash -n exits 0 with no output",
+            "tests/unit/scripts/npm-publish-retry-safe.test.ts: 7 tests pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement WI-1 of .pan/drafts/PAN-5595.md exactly. Create scripts/npm-publish-retry-safe.sh (bash, set -euo pipefail, header comment naming PAN-5595). Interface: `--tag <dist-tag> <package>`, where <package> is a .tgz (tarball mode: name/version via `tar -xOzf <tgz> package/package.json | node`, then `npm publish <tgz> --ignore-scripts --provenance --access public --tag <tag>` from cwd) or a dir containing package.json (dir mode: node reads <dir>/package.json passed as an argv path, then `cd <dir> && npm publish --ignore-scripts --provenance --access public --tag <tag>`). Bad args print `usage:` to stderr and exit 2. Visibility = trimmed stdout of `npm view <name>@<version> version --prefer-online 2>/dev/null` equals <version> (never exit status). Flow: if visible, print 'already visible … Skipping the publish (retry-safe).' and exit 0. Otherwise publish, capturing combined output with `if output=$(…); then status=0; else status=$?; fi` and printing it. On non-zero status: if the output matches /previously staged version/i, set staged=1 and print 'already staged on npm. Skipping the publish and waiting for it to become visible.'; otherwise exit with npm's status (no poll). Then poll up to NPM_VISIBILITY_POLL_ATTEMPTS (default 40) times, sleeping NPM_VISIBILITY_POLL_INTERVAL_SECONDS (default 30) between attempts but not after the last, using an `if` (not `&&`) so set -e is safe. On a hit, print 'is visible on npm.' and exit 0. On timeout, print the exact Timeout message from the PRD Decisions section (first line 'most likely holds' after a clean publish, 'holds' after E409) and exit 3. Create tests/unit/scripts/npm-publish-retry-safe.test.ts following tests/unit/scripts/vendor-okf-skill.test.ts (execFileSync bash, mkdtemp roots cleaned in afterEach). Use a stub npm in <root>/bin on PATH with file-based state, as the PRD specifies (FAKE_NPM_VERSION, FAKE_NPM_VISIBLE_FROM_VIEW, FAKE_NPM_PUBLISH=ok|staged|fail, every call appended to <root>/calls.log), plus NPM_VISIBILITY_POLL_INTERVAL_SECONDS=0 and NPM_VISIBILITY_POLL_ATTEMPTS=3. Write the seven named tests from the PRD. Do not readFile any .ts file (lint:source-introspection)."
+        },
+        "items": [
+          {
+            "id": "publish-script.ac1",
+            "title": "Given the version is already visible, when the script runs, then it exits 0, prints 'already visible', and the stub's calls.log records no publish call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "publish-script.ac2",
+            "title": "Given FAKE_NPM_PUBLISH=ok and visibility from the 3rd view, when the script runs with --tag latest, then it exits 0 and calls.log records exactly one publish whose argv contains '--ignore-scripts --provenance --access public --tag latest'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "publish-script.ac3",
+            "title": "Given npm publish fails with E409 'Cannot publish over previously staged version' and the version becomes visible on the 2nd view, when the script runs, then it prints 'already staged', makes no second publish call, and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "publish-script.ac4",
+            "title": "Given a staged E409 and a version that never becomes visible with NPM_VISIBILITY_POLL_ATTEMPTS=3, when the script runs, then it exits 3 after exactly 1+3 view calls and prints '::error::@overdeck/core@0.90.0 is not visible on npm after 3 checks', 'npx --yes npm@11 stage list @overdeck/core', 'npx --yes npm@11 stage view <stage-id>', 'shows @overdeck/core and version 0.90.0', 'npx --yes npm@11 stage approve <stage-id>', 'Staged Packages in your npmjs.com account settings', 'If stage list shows no staged 0.90.0' and 'Do not publish @overdeck/core@0.90.0 again', and no 'https://www.npmjs.com/package/'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "publish-script.ac5",
+            "title": "Given npm publish fails with E403, when the script runs, then it exits 1 with the E403 output and calls.log records exactly one view call (no poll). Given no args, a missing --tag, or a path that is neither .tgz nor a package dir, it exits 2 and prints 'usage:'. Given a .tgz with --tag canary, the publish argv contains the tarball path and '--tag canary'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "workflow-wiring",
+        "title": "Call the publish script from the three release.yml publish steps and rewrite release-workflow.test.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-22T04:17:12Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-5595",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".github/workflows/release.yml",
+            "tests/unit/scripts/release-workflow.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/scripts/release-workflow.test.ts",
+            "node -e \"require('yaml').parse(require('fs').readFileSync('.github/workflows/release.yml','utf8'))\""
+          ],
+          "expected_outputs": [
+            "tests/unit/scripts/release-workflow.test.ts passes",
+            "the YAML parse exits 0 with no output"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-7",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement WI-2 of .pan/drafts/PAN-5595.md. In .github/workflows/release.yml, replace the run bodies of 'Publish CLI to npm', 'Publish contracts to npm' and 'Publish desktop to npm' (lines 372-416) with the PRD's 'After' YAML. Each step gets `env: NPM_TAG: ${{ needs.classify.outputs.npm_tag }}`. Core runs `TGZ=$(ls \"$RUNNER_TEMP\"/release/*.tgz)` and then `bash scripts/npm-publish-retry-safe.sh --tag \"$NPM_TAG\" \"$TGZ\"`. Contracts and desktop run the script with `packages/contracts` and `apps/desktop`. Keep the comment block above the core step and add one line naming PAN-5595 and the staged-version poll. Change nothing else in the file. Rewrite tests/unit/scripts/release-workflow.test.ts: it currently expects 6 `npm publish ` lines, which become 0. Parse release.yml with the `yaml` package and find the npm job's three publish steps by name. Assert each run contains `bash scripts/npm-publish-retry-safe.sh --tag \"$NPM_TAG\"`, each env.NPM_TAG equals '${{ needs.classify.outputs.npm_tag }}', core passes \"$TGZ\", contracts passes packages/contracts, and desktop passes apps/desktop. Assert no npm-job run contains 'npm publish' or 'npm view', and existsSync('scripts/npm-publish-retry-safe.sh') is true. Workflow edits need an SSH push if the HTTPS push is refused: `git push git@github.com:eltmon/overdeck.git HEAD:feature/pan-5595`."
+        },
+        "items": [
+          {
+            "id": "workflow-wiring.ac1",
+            "title": "Given the edited release.yml, when the npm job's steps are parsed, then 'Publish CLI to npm', 'Publish contracts to npm' and 'Publish desktop to npm' each run `bash scripts/npm-publish-retry-safe.sh --tag \"$NPM_TAG\"` with \"$TGZ\", packages/contracts and apps/desktop respectively, and each step's env.NPM_TAG is '${{ needs.classify.outputs.npm_tag }}'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workflow-wiring.ac2",
+            "title": "Given the edited release.yml, `grep -nE 'npm (publish|view)' .github/workflows/release.yml` returns no line inside the npm job's run blocks, and `git diff origin/main -- .github/workflows/release.yml` touches only the three publish steps and their comment",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workflow-wiring.ac3",
+            "title": "When `npx vitest run tests/unit/scripts/release-workflow.test.ts` runs, then it passes and asserts the three script calls, the absence of inline npm publish/view, and that scripts/npm-publish-retry-safe.sh exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-releasing",
+        "title": "Document npm staged versions and approval in docs/RELEASING.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-22T04:17:12Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5595",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/RELEASING.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n 'previously staged version' docs/RELEASING.md",
+            "grep -n 'npm@11 stage approve' docs/RELEASING.md"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "each grep prints at least one line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement WI-3 of .pan/drafts/PAN-5595.md. (1) In '### How CI authenticates (steady state)' (line 221), replace the sentence 'Each publish step is retry-safe: if `name@version` already exists on npm, it skips that package.' with a paragraph saying each publish step runs scripts/npm-publish-retry-safe.sh, skips a version that is already visible, waits up to 20 minutes (40 checks, 30 s apart) after publishing for the version to become visible, and treats an E409 'previously staged version' as staged rather than as a failure. (2) After '### npm publish or GitHub Release fails after tag push' (line 287), add the section '### The npm job failed: \"<pkg>@<version> is not visible on npm\"'. It covers: that the version is most likely staged (npm view can't see it, the tarball 404s, a second publish gets E409; example @overdeck/core@0.90.0 in run 44976899182), certain only when the job log shows the E409, since a registry delay after a clean publish looks the same; that CI cannot approve because OIDC trust tokens cannot run npm stage; the approval fenced block (npm login; npx --yes npm@11 stage list @overdeck/core, package name only; npx --yes npm@11 stage view <stage-id>, required, to check the package name and exact version; npx --yes npm@11 stage approve <stage-id>, which prompts for 2FA; needs npm 11.15 or later). Approve only the stage id whose stage view shows the exact package and version, since a package can have several staged versions. The alternative is Staged Packages in the npmjs.com account settings (no package-page URL). If stage list shows no staged entry for the version, check registry visibility (npm view, npm's status page) instead of approving; that approving during the poll lets the job continue, otherwise re-run the failed npm job; never publish the same version again or cut a new tag around it. (3) Extend the line-170 Stable-tags bullet to say each publish waits for the version to become visible (PAN-5595)."
+        },
+        "items": [
+          {
+            "id": "docs-releasing.ac1",
+            "title": "Given docs/RELEASING.md, `grep -n 'The npm job failed: \"<pkg>@<version> is not visible on npm\"' docs/RELEASING.md` returns one heading line, and that section contains 'previously staged version', 'npx --yes npm@11 stage list', 'npx --yes npm@11 stage view <stage-id>', 'npx --yes npm@11 stage approve <stage-id>', 'npm 11.15' and 'Staged Packages in your npmjs.com account settings', and no 'npmjs.com/package/' link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-releasing.ac2",
+            "title": "Given docs/RELEASING.md, the 'How CI authenticates' section names scripts/npm-publish-retry-safe.sh and says the step waits up to 20 minutes for visibility; the troubleshooting section says to approve only a stage id whose stage view shows the exact package and version, to check registry visibility when no staged entry exists, to re-run the failed npm job, and never to publish the same version again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-releasing.ac3",
+            "title": "When `npm run lint:docs` runs after the edit, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-skill",
+        "title": "Document npm staged versions in the pan-release skill",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-22T04:17:12Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5595",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/pan-release/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'stage approve' sync-sources/skills/pan-release/SKILL.md",
+            "npm run build && npm run lint:skills"
+          ],
+          "expected_outputs": [
+            "grep prints at least one line",
+            "lint:skills exits 0 (if the slot cannot build, CI's lint job is the gate)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement WI-4 of .pan/drafts/PAN-5595.md in sync-sources/skills/pan-release/SKILL.md only (.claude/skills/ is an untracked sync target). (1) In step 5 ('**Verify a clean install after npm shows the new version.**', line 65), after the 'It must print `X.Y.Z`…' text, add a paragraph saying: if the npm job failed with '::error::<pkg>@<version> is not visible on npm', the version is most likely staged. Confirm with `npx --yes npm@11 stage list <pkg>` and `npx --yes npm@11 stage view <stage-id>`, and approve only the stage id showing that package and exact version with `npx --yes npm@11 stage approve <stage-id>` (2FA, npm 11.15 or later), or under Staged Packages in the npmjs.com account settings. If no staged entry exists, check registry visibility instead of approving. Then re-run the failed npm job. Never publish the same version again. See docs/RELEASING.md. (2) Extend the bullet at line 96-97 ('The publish steps are retry-safe (skip a package if that version already exists).') to say the steps wait up to 20 minutes for the version to become visible and fail with approval instructions when npm holds it as staged. Add no `pan` commands to fenced blocks."
+        },
+        "items": [
+          {
+            "id": "docs-skill.ac1",
+            "title": "Given sync-sources/skills/pan-release/SKILL.md, step 5 contains 'npx --yes npm@11 stage view <stage-id>', 'npx --yes npm@11 stage approve <stage-id>', the rule to approve only a stage id showing the exact package and version, and the instruction to re-run the failed npm job instead of republishing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-skill.ac2",
+            "title": "Given the skill's Publishing section, when a reader opens the retry-safe bullet, then it states that the publish steps wait up to 20 minutes for the version to become visible and exit with approval instructions when npm holds it as staged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "publish-script",
+        "to": "workflow-wiring",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
