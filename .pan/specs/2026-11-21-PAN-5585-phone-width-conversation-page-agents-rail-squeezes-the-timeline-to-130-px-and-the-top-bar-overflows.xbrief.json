@@ -4,17 +4,17 @@
     "created": "2026-11-21T22:30:45Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5585: Phone-width conversation page: Agents rail squeezes the timeline to 130 px and the top bar overflows",
-    "updated": "2026-11-21T22:41:15.900Z"
+    "updated": "2026-11-21T22:41:47.447Z"
   },
   "plan": {
     "id": "pan-5585",
     "title": "Phone-width conversation page: Agents rail squeezes the timeline to 130 px and the top bar overflows",
-    "status": "proposed",
+    "status": "running",
     "uid": "53fde6e6-e96a-4641-ad9a-086ba8343a7a",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-21T22:30:45Z",
-    "updated": "2026-11-21T22:41:15.900Z",
+    "updated": "2026-11-21T22:41:47.447Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5585",
@@ -704,5 +704,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
