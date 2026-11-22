@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5586",
   "created": "2026-11-21T22:41:59.121Z",
-  "updated": "2026-11-22T00:47:25.894Z",
+  "updated": "2026-11-22T00:47:52.777Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,6 +34,11 @@
     "capability-rows.ac5": {
       "status": "completed",
       "doneAt": "2026-11-22T00:47:25.894Z"
+    },
+    "provider-routing": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5586",
+      "claimedAt": "2026-11-22T00:47:52.776Z"
     }
   }
 }
