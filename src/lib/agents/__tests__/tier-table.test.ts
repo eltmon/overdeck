@@ -152,6 +152,18 @@ describe('tiered execution tier table', () => {
     }))).not.toThrow();
   });
 
+  it('accepts an antigravity tier on a Gemini model agy serves (PAN-5587)', () => {
+    expect(() => validateTieredExecutionConfig(validConfig({
+      tiers: {
+        cheap: {
+          model: 'gemini-4-argon',
+          harness: 'antigravity',
+          difficulties: ['trivial', 'simple', 'medium', 'complex', 'expert'],
+        },
+      },
+    }))).not.toThrow();
+  });
+
   it('rejects Anthropic subscription auth on ohmypi through the harness policy gate', () => {
     expect(() => validateTieredExecutionConfig(validConfig({
       tiers: {

@@ -514,7 +514,7 @@ function validateModelRef(
 function validateRoleFields(fieldPath: string, roleConfig: Record<string, unknown>, errors: string[]): void {
   const harness = roleConfig.harness;
   if (harness !== undefined && harness !== null && harness !== '' && !(typeof harness === 'string' && KNOWN_HARNESSES.has(harness))) {
-    errors.push(`${fieldPath}.harness must be claude-code, pi, ohmypi, codex, acp, kimi-code, opencode, muse, prime-agent, grok, null, or empty string`);
+    errors.push(`${fieldPath}.harness must be claude-code, pi, ohmypi, codex, acp, kimi-code, opencode, muse, prime-agent, grok, antigravity, null, or empty string`);
   }
 
   errors.push(...effortConfigErrors(fieldPath, roleConfig.effort, []));
@@ -1237,7 +1237,7 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
           continue;
         }
         if (harness !== undefined && harness !== '' && !(typeof harness === 'string' && KNOWN_HARNESSES.has(harness))) {
-          errors.push(`models.provider_harnesses.${provider} must be claude-code, pi, ohmypi, codex, acp, kimi-code, opencode, muse, prime-agent, grok, or empty string`);
+          errors.push(`models.provider_harnesses.${provider} must be claude-code, pi, ohmypi, codex, acp, kimi-code, opencode, muse, prime-agent, grok, antigravity, or empty string`);
         }
       }
     }
