@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5588",
   "created": "2026-11-21T23:34:16.196Z",
-  "updated": "2026-11-22T01:30:20.494Z",
+  "updated": "2026-11-22T01:30:26.431Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -88,6 +88,11 @@
     "wi4-docs-queue-level-bound.ac3": {
       "status": "completed",
       "doneAt": "2026-11-22T01:30:20.493Z"
+    },
+    "wi5-changelog": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5588",
+      "claimedAt": "2026-11-22T01:30:26.431Z"
     }
   }
 }
