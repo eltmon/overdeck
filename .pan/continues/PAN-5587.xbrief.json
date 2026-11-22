@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5587",
   "created": "2026-11-21T22:59:41.238Z",
-  "updated": "2026-11-22T01:57:21.199Z",
+  "updated": "2026-11-22T01:57:22.510Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -378,6 +378,11 @@
     "acp-usage-collector-extract.ac2": {
       "status": "completed",
       "doneAt": "2026-11-22T01:57:21.199Z"
+    },
+    "antigravity-cost-collector": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5587",
+      "claimedAt": "2026-11-22T01:57:22.510Z"
     }
   }
 }
