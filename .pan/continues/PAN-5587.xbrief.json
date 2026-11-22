@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5587",
   "created": "2026-11-21T22:59:41.238Z",
-  "updated": "2026-11-22T01:00:28.630Z",
+  "updated": "2026-11-22T01:02:12.501Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -54,9 +54,22 @@
       "doneAt": "2026-11-22T01:00:22.196Z"
     },
     "harness-policy": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5587",
-      "claimedAt": "2026-11-22T01:00:28.629Z"
+      "claimedAt": "2026-11-22T01:00:28.629Z",
+      "doneAt": "2026-11-22T01:02:12.501Z"
+    },
+    "harness-policy.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:02:12.501Z"
+    },
+    "harness-policy.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:02:12.501Z"
+    },
+    "harness-policy.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:02:12.501Z"
     }
   }
 }
