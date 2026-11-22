@@ -4,12 +4,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const availability = vi.hoisted(() => ({
   resolveHarnessBinary: vi.fn(async (): Promise<string | null> => null),
   readGrokSignIn: vi.fn(async () => ({ signedIn: false, reason: 'missing' as const })),
+  readAntigravityAuthStatus: vi.fn(async (): Promise<{ ready: boolean; method: 'gemini-api-key' | 'agent-platform' | null }> => ({ ready: false, method: null })),
 }));
 vi.mock('../harness-binary.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../harness-binary.js')>()),
   resolveHarnessBinary: availability.resolveHarnessBinary,
 }));
 vi.mock('../grok-sign-in.js', () => ({ readGrokSignIn: availability.readGrokSignIn }));
+vi.mock('../antigravity-auth.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../antigravity-auth.js')>()),
+  readAntigravityAuthStatus: availability.readAntigravityAuthStatus,
+}));
 vi.mock('../opencode-models.js', () => ({ discoverOpenCodeModels: vi.fn(async () => []) }));
 
 import { getAvailableModelsApi, getAvailableModelsWithOpenCodeApi } from '../settings-model-catalog.js';
@@ -237,5 +242,53 @@ describe('Grok Build picker availability (PAN-5078)', () => {
     availability.resolveHarnessBinary.mockResolvedValue('/home/test/.grok/bin/grok');
     availability.readGrokSignIn.mockResolvedValue({ signedIn: false, reason: 'expired' });
     expect((await getAvailableModelsWithOpenCodeApi()).grok).toEqual([]);
+  });
+});
+
+describe('Antigravity picker rows (PAN-5587 D13)', () => {
+  beforeEach(() => {
+    availability.resolveHarnessBinary.mockReset();
+    availability.readGrokSignIn.mockReset();
+    availability.readAntigravityAuthStatus.mockReset();
+    availability.readGrokSignIn.mockResolvedValue({ signedIn: false, reason: 'missing' });
+  });
+
+  const antigravityRowsOf = (google: ReadonlyArray<{ harness?: string }>) => google.filter((row) => row.harness === 'antigravity');
+
+  it('adds one "— Antigravity" row per Antigravity model when agy is installed and a credential is ready', async () => {
+    availability.resolveHarnessBinary.mockImplementation(async (harness?: unknown) => (harness === 'antigravity' ? '/home/test/.local/bin/agy' : null));
+    availability.readAntigravityAuthStatus.mockResolvedValue({ ready: true, method: 'gemini-api-key' });
+    const { google } = await getAvailableModelsWithOpenCodeApi();
+    const rows = antigravityRowsOf(google);
+    expect(rows.map((row) => row.id).sort()).toEqual(['gemini-3.1-pro-preview', 'gemini-3.6-flash', 'gemini-3.8-flash', 'gemini-4-argon', 'gemini-4-carbon', 'gemini-4-hydrogen', 'gemini-4-neon']);
+    expect(rows.every((row) => row.name.endsWith(' — Antigravity'))).toBe(true);
+    expect(rows.find((row) => row.id === 'gemini-4-argon')).toMatchObject({ harness: 'antigravity', effortLevels: ['low', 'medium', 'high'] });
+    const plainArgon = google.find((row) => row.id === 'gemini-4-argon' && row.harness === undefined);
+    expect(plainArgon).toBeDefined();
+    expect(plainArgon?.name).not.toContain('Antigravity');
+  });
+
+  it('gives a row without capability levels the Antigravity harness levels, never []', async () => {
+    availability.resolveHarnessBinary.mockResolvedValue('/home/test/.local/bin/agy');
+    availability.readAntigravityAuthStatus.mockResolvedValue({ ready: true, method: 'gemini-api-key' });
+    const { google } = await getAvailableModelsWithOpenCodeApi();
+    for (const row of antigravityRowsOf(google)) expect(row.effortLevels?.length ?? 0).toBeGreaterThan(0);
+    expect(antigravityRowsOf(google).find((row) => row.id === 'gemini-3.8-flash')).toMatchObject({
+      effortLevels: ['low', 'medium', 'high', 'xhigh'],
+    });
+  });
+
+  it('adds no rows when agy is not installed', async () => {
+    availability.resolveHarnessBinary.mockResolvedValue(null);
+    availability.readAntigravityAuthStatus.mockResolvedValue({ ready: true, method: 'gemini-api-key' });
+    expect(antigravityRowsOf((await getAvailableModelsWithOpenCodeApi()).google)).toEqual([]);
+  });
+
+  it('adds no rows when no credential is ready', async () => {
+    availability.resolveHarnessBinary.mockResolvedValue('/home/test/.local/bin/agy');
+    availability.readAntigravityAuthStatus.mockResolvedValue({ ready: false, method: null });
+    const { google } = await getAvailableModelsWithOpenCodeApi();
+    expect(antigravityRowsOf(google)).toEqual([]);
+    expect(google.some((row) => row.id === 'gemini-4-argon')).toBe(true);
   });
 });

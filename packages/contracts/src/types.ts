@@ -89,9 +89,9 @@ export type AgentResolution = typeof AgentResolution.Type
 // all predate PAN-1989 and really ran on pi, so they now read as 'pi'.
 // All new write sites use canonical harness literals.
 
-export type Harness = 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent' | 'grok'
+export type Harness = 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent' | 'grok' | 'antigravity'
 
-export const KNOWN_HARNESSES: ReadonlySet<string> = new Set<Harness>(['claude-code', 'pi', 'ohmypi', 'codex', 'acp', 'kimi-code', 'opencode', 'muse', 'prime-agent', 'grok'])
+export const KNOWN_HARNESSES: ReadonlySet<string> = new Set<Harness>(['claude-code', 'pi', 'ohmypi', 'codex', 'acp', 'kimi-code', 'opencode', 'muse', 'prime-agent', 'grok', 'antigravity'])
 
 /**
  * Normalize a snapshot's runtime field to a known Harness value.

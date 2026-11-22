@@ -45,9 +45,11 @@ vi.mock('../../runtimes/ohmypi-fifo.js', async (importOriginal) => ({
   createOhmypiFifo: vi.fn(() => Effect.succeed('/tmp/fake-agent-dir/rpc.in')),
 }));
 
+const rmMock = vi.hoisted(() => vi.fn(async () => undefined));
 vi.mock('fs/promises', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   mkdir: vi.fn(async () => undefined),
+  rm: rmMock,
 }));
 
 const initCodexHomeMock = vi.hoisted(() => vi.fn());
@@ -210,6 +212,32 @@ describe('getAcpLauncherFields --effort (PAN-4260)', () => {
   it('clamps max to xhigh for a Grok Build model (PAN-5078)', async () => {
     const fields = await getAcpLauncherFields('agent-x', 'grok/grok-4.6', '/tmp/ws', '/bin/acp-host', undefined, 'max');
     expect(fields.acpEffort).toBe('xhigh');
+  });
+
+  it('uses the requested antigravity harness and provider for a bare Google id (PAN-5587)', async () => {
+    const fields = await getAcpLauncherFields('agent-x', 'gemini-4-argon', '/tmp/ws', '/bin/agy', 'work', undefined, 'antigravity');
+    expect(fields.harness).toBe('antigravity');
+    expect(fields.acpProvider).toBe('antigravity');
+    expect(fields.acpEffort).toBe('high');
+  });
+
+  it('clears a stale acp-launch-error before the host launches (PAN-5587 review)', async () => {
+    rmMock.mockClear();
+    await getAcpLauncherFields('agent-stale', 'gemini-4-argon', '/tmp/ws', '/bin/agy', 'work', undefined, 'antigravity');
+    expect(rmMock).toHaveBeenCalledWith(expect.stringMatching(/agent-stale[\\/]acp-launch-error$/), { force: true });
+  });
+
+  it('clamps max to the model and Antigravity effort levels (PAN-5587)', async () => {
+    const argon = await getAcpLauncherFields('agent-x', 'gemini-4-argon', '/tmp/ws', '/bin/agy', 'work', 'max', 'antigravity');
+    expect(argon.acpEffort).toBe('high');
+    const flash = await getAcpLauncherFields('agent-x', 'gemini-3.8-flash', '/tmp/ws', '/bin/agy', 'work', 'max', 'antigravity');
+    expect(flash.acpEffort).toBe('xhigh');
+  });
+
+  it('keeps deriving the grok harness from the model without a requested harness (PAN-5587)', async () => {
+    vi.mocked(getProviderForModel).mockReturnValueOnce({ name: 'grok' } as never);
+    const fields = await getAcpLauncherFields('agent-x', 'grok/grok-4.6', '/tmp/ws', '/bin/acp-host');
+    expect(fields.harness).toBe('grok');
   });
 
   it('defaults to high for a Kimi ACP model with no effort', async () => {

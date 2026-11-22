@@ -9,6 +9,7 @@ import {
   OHMYPI_CAPABILITIES,
   PI_CAPABILITIES,
   GROK_CAPABILITIES,
+  ANTIGRAVITY_CAPABILITIES,
   OPENCODE_CAPABILITIES,
   PRIME_AGENT_CAPABILITIES,
   type HarnessCapabilities,
@@ -38,7 +39,7 @@ export type HarnessReadinessKind =
   | "prime-agent-host-ready"
 export type HarnessTranscriptKind = "claude-jsonl" | "ohmypi-jsonl" | "codex-rollout-jsonl" | "acp-jsonl" | "kimi-wire-jsonl" | "muse-jsonl" | "prime-agent-jsonl"
 export type HarnessSessionIdSource = "launcher-session-id" | "transcript-jsonl" | "codex-thread-id" | "acp-session-id" | "kimi-session-newest" | "muse-session-log" | "prime-agent-session-id"
-export type HarnessContextLayerKind = "claude" | "pi" | "codex" | "acp" | "kimi-code" | "opencode" | "muse" | "prime-agent" | "grok"
+export type HarnessContextLayerKind = "claude" | "pi" | "codex" | "acp" | "kimi-code" | "opencode" | "muse" | "prime-agent" | "grok" | "antigravity"
 /** How Overdeck can steer a running turn (PAN-4292): Claude Code send-now keys, the Pi control channel, or null = no steer. */
 export type HarnessSteerKind = "send-now-keys" | "control-channel" | null
 export type HarnessFeedKind = "claude_code" | "pi" | "codex" | "acp" | "kimi_code" | "muse" | "prime_agent"
@@ -261,6 +262,16 @@ export const GROK_BEHAVIOR: HarnessBehavior = {
   effortLevels: ["low", "medium", "high", "xhigh"],
 }
 
+export const ANTIGRAVITY_BEHAVIOR: HarnessBehavior = {
+  ...ACP_BEHAVIOR,
+  displayName: "Antigravity",
+  capabilities: ANTIGRAVITY_CAPABILITIES,
+  contextLayerKind: "antigravity",
+  executableName: "agy",
+  processNames: ["acp-host", "agy"],
+  effortLevels: ["low", "medium", "high", "xhigh"],
+}
+
 export const MUSE_BEHAVIOR: HarnessBehavior = {
   displayName: "Muse Code",
   capabilities: MUSE_CAPABILITIES,
@@ -323,6 +334,7 @@ const BEHAVIORS: Record<RuntimeName, HarnessBehavior> = {
   muse: MUSE_BEHAVIOR,
   "prime-agent": PRIME_AGENT_BEHAVIOR,
   grok: GROK_BEHAVIOR,
+  antigravity: ANTIGRAVITY_BEHAVIOR,
 }
 
 /** Map a stored or requested harness string to a RuntimeName; anything unknown → null. */

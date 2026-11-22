@@ -286,6 +286,14 @@ export const GROK_CAPABILITIES: HarnessCapabilities = {
   npmPackage: "@xai-official/grok",
 }
 
+export const ANTIGRAVITY_CAPABILITIES: HarnessCapabilities = {
+  ...OPENCODE_CAPABILITIES,
+  binaryLabel: "Antigravity CLI",
+  installHint: "curl -fsSL https://antigravity.google/cli/install.sh | bash",
+  updateArgs: ["update"],
+  npmPackage: null,
+}
+
 export const MUSE_CAPABILITIES: HarnessCapabilities = {
   contextChannel: "append-system-prompt-file",
   initialPromptMustLand: false,

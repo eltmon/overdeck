@@ -29,6 +29,10 @@ describe('POST /api/workers (PAN-4649 FR-4)', () => {
     expect(parseStartWorkerBody({ issueId: 'PAN-1', prompt: 'x', harness: 'grok' })).toMatchObject({ ok: true, value: { harness: 'grok' } });
   });
 
+  it('parseStartWorkerBody accepts the antigravity harness (PAN-5587)', () => {
+    expect(parseStartWorkerBody({ issueId: 'PAN-1', prompt: 'x', harness: 'antigravity' })).toMatchObject({ ok: true, value: { harness: 'antigravity' } });
+  });
+
   it('startWorkerFromBody returns the started worker and passes parentId null', async () => {
     const start = vi.fn(async () => ({ id: 'worker-pan-1-1', cwd: '/w/.swarm/worker-1', branch: 'feature/pan-1-worker-1', paneReady: true as const }));
     const result = await startWorkerFromBody({ issueId: 'PAN-1', prompt: 'investigate', model: 'opus' }, start);

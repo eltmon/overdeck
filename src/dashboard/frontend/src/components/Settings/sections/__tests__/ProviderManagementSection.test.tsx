@@ -45,3 +45,37 @@ describe('ProviderManagementSection Grok Build row (PAN-5078)', () => {
     expect(screen.getByText('grok login')).toBeInTheDocument();
   });
 });
+
+describe('ProviderManagementSection Google default harness (PAN-5587)', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } })));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('offers Antigravity as a default harness for Google and not for other providers', async () => {
+    const user = userEvent.setup();
+    const googleForm = {
+      ...formData,
+      models: { providers: { anthropic: true, google: true }, provider_harnesses: {}, provider_default_harnesses: { google: 'pi' } },
+    } as unknown as SettingsConfig;
+    render(
+      <ProviderManagementSection
+        claudeAuth={null}
+        codexAuth={undefined}
+        formData={googleForm}
+        onHarnessModelPermutationsToggle={vi.fn()}
+        onOpenRouterApiKeySaved={vi.fn()}
+        onSettingsChange={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Expand Google details' }));
+    expect(screen.getByRole('option', { name: 'Antigravity' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Expand Anthropic details' }));
+    expect(screen.getAllByRole('option', { name: 'Antigravity' })).toHaveLength(1);
+  });
+});
+

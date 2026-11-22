@@ -29,6 +29,7 @@ import { HARNESS_MARKERS } from '../../../src/lib/context-layers/harness.js';
 import { getTranscriptAdapter } from '../../../src/lib/conversations/transcript-adapter.js';
 import { harnessBinaryName } from '../../../src/lib/harness-binary.js';
 import { POLICY_RUNTIME_NAMES } from '../../../src/lib/harness-policy.js';
+import { PREREQUISITES } from '../../../src/lib/system-prerequisites.js';
 import { resolveAllowedHarness } from '../../../src/lib/overdeck/conversation-runtime.js';
 import { normalizeHarness } from '../../../src/lib/overdeck/conversations.js';
 import { getHarnessBehavior } from '../../../src/lib/runtimes/behavior.js';
@@ -49,6 +50,7 @@ const MODEL_FOR: Record<RuntimeName, string> = {
   muse: 'muse-spark-1.3',
   'prime-agent': 'gpt-5.4',
   grok: 'grok/grok-4.7',
+  antigravity: 'gemini-4-argon',
 };
 
 /**
@@ -114,6 +116,12 @@ const GROK_LITERAL_FILES = [
   'src/cli/commands/context-layers.ts',
 ] as const;
 
+/**
+ * Unforced hand-copied harness lists that must name antigravity (PAN-5587 WI-20): the Grok
+ * list minus system-prerequisites.ts, whose row id is the binary name `agy` (checked below).
+ */
+const ANTIGRAVITY_LITERAL_FILES = GROK_LITERAL_FILES.filter((file) => file !== 'src/lib/system-prerequisites.ts');
+
 /** The CLI --harness help strings name the value in prose, not as a quoted literal. */
 const CLI_HELP_FILE = 'src/cli/index.ts';
 
@@ -156,6 +164,21 @@ describe('harness no-loss audit (PAN-3668 WI-22)', () => {
 
   it.each(GROK_LITERAL_FILES)('%s names grok (PAN-5078)', (file) => {
     expect(readFileSync(join(ROOT, file), 'utf8')).toContain("'grok'");
+  });
+
+  it.each(ANTIGRAVITY_LITERAL_FILES)('%s names antigravity (PAN-5587)', (file) => {
+    expect(readFileSync(join(ROOT, file), 'utf8')).toContain("'antigravity'");
+  });
+
+  it('lists the agy binary in the system prerequisites (PAN-5587)', () => {
+    expect(PREREQUISITES.find((row) => row.id === 'agy')).toMatchObject({ name: 'Antigravity CLI', required: false });
+  });
+
+  it('lists antigravity in every CLI --harness help string (PAN-5587)', () => {
+    const source = readFileSync(join(ROOT, CLI_HELP_FILE), 'utf8');
+    const helpStrings = source.match(/Coding-agent harness: [^']*/g) ?? [];
+    expect(helpStrings.length).toBeGreaterThan(0);
+    for (const help of helpStrings) expect(help).toContain('| antigravity');
   });
 
   it('lists grok in every CLI --harness help string (PAN-5078)', () => {

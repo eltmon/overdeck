@@ -2,7 +2,7 @@ import { Schema } from "effect"
 import type { Harness } from "./types"
 
 export const CONTEXT_LAYER_KINDS = ["global", "project", "workspace"] as const
-export const CONTEXT_PREVIEW_HARNESSES = ["claude-code", "pi", "ohmypi", "codex", "acp", "kimi-code", "opencode", "muse", "prime-agent", "grok"] as const satisfies readonly Harness[]
+export const CONTEXT_PREVIEW_HARNESSES = ["claude-code", "pi", "ohmypi", "codex", "acp", "kimi-code", "opencode", "muse", "prime-agent", "grok", "antigravity"] as const satisfies readonly Harness[]
 
 export const ContextLayerKind = Schema.Literals(CONTEXT_LAYER_KINDS)
 export type ContextLayerKind = typeof ContextLayerKind.Type
@@ -139,6 +139,7 @@ export const ContextHarnessPreviews = Schema.Struct({
   "kimi-code": Schema.String,
   opencode: Schema.optional(Schema.String),
   grok: Schema.optional(Schema.String),
+  antigravity: Schema.optional(Schema.String),
   muse: Schema.String,
   "prime-agent": Schema.String,
   fullPrompt: Schema.String,

@@ -293,7 +293,7 @@ function validateRoleFields(role: Role, roleConfig: RoleConfig): void {
     throw new Error(`config.yaml: roles.${role}.autonomousModel must be a scalar model reference`);
   }
   if (roleConfig.harness !== undefined && !KNOWN_HARNESSES.has(roleConfig.harness)) {
-    throw new Error(`config.yaml: roles.${role}.harness must be claude-code, pi, ohmypi, codex, acp, kimi-code, opencode, muse, prime-agent, or grok`);
+    throw new Error(`config.yaml: roles.${role}.harness must be claude-code, pi, ohmypi, codex, acp, kimi-code, opencode, muse, prime-agent, grok, or antigravity`);
   }
   const effortErrors = effortConfigErrors(`roles.${role}`, roleConfig.effort, []);
   if (effortErrors.length > 0) {

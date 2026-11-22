@@ -61,7 +61,7 @@ Fixtures come from the recorder only. Do not hand-edit them.
 
 ```bash
 node --import tsx src/lib/protocol-capture/record.ts \
-  --harness <codex|acp|grok> --scenario <name> --out <path> \
+  --harness <codex|acp|grok|antigravity> --scenario <name> --out <path> \
   [--model <id>] [--effort <level>] [--note <text>]
 ```
 
@@ -82,6 +82,8 @@ boundary stay in the fixture. A failed run deletes its partial fixture.
 | acp | `interrupt` | count from 1 to 400 | interrupt on the first `[assistant]` pane line | `…/replay/kimi-interrupt.jsonl` |
 | grok | `grok-turn-completion` | `Reply with exactly OK.` | none | `src/lib/acp/__tests__/fixtures/replay/grok-turn-completion.jsonl` |
 | grok | `grok-resume` | `Reply with exactly OK.` | prime one uncaptured turn, then capture a host resumed with its session id (`session/load`) | `src/lib/acp/__tests__/fixtures/replay/grok-resume.jsonl` |
+| antigravity | `antigravity-turn-completion` | `Reply with exactly OK.` | none | `src/lib/acp/__tests__/fixtures/replay/antigravity-turn-completion.jsonl` |
+| antigravity | `antigravity-resume` | `Reply with exactly OK.` | prime one uncaptured turn, then capture a host resumed with its session id (`session/load`) | `src/lib/acp/__tests__/fixtures/replay/antigravity-resume.jsonl` |
 
 Defaults: Codex `gpt-5.6-luna`, effort `low`; ACP (Kimi) `k3`, effort `low`
 (K3 refuses to launch without an effort level); Grok `grok/grok-4.6`, effort
@@ -89,7 +91,16 @@ Defaults: Codex `gpt-5.6-luna`, effort `low`; ACP (Kimi) `k3`, effort `low`
 records the ACP host with provider `grok`; its fixture header says
 `harness: acp, provider: grok`, and the replay spawner builds the Grok runtime
 for it. `grok-resume` primes its session in the same temp working directory,
-because Grok keeps sessions per directory.
+because Grok keeps sessions per directory. Antigravity: `gemini-4-argon`, effort
+`high` (Antigravity requires an explicit model). `agy` starts every session at
+`thought_level` `low`, and the runtime skips a `set_config_option` whose value
+already matches, so `high` is what puts a `thought_level` frame in the fixture.
+The `antigravity` harness records the ACP host with provider `antigravity`; the
+replay spawner builds the Antigravity runtime with a synthetic credential
+(`GEMINI_API_KEY=test-gemini-key`), so a replay never reads config.
+`antigravity-resume` primes and captures in the same scratch `--gemini-dir`,
+because `agy` keeps sessions there; the fixture shows `agy` resetting the model
+after `session/load` and the host setting it again.
 
 **Prerequisites.** Codex needs `~/.codex/auth.json`; the recorder builds a temp
 `CODEX_HOME` with `initCodexHome`, which links it. The `user-input` scenario
@@ -114,6 +125,31 @@ HOME="$GROK_HOME_DIR" node --import tsx src/lib/protocol-capture/record.ts \
 
 Grok's `authenticate` result `_meta` carries account fields (email, team id,
 subscription tier); the scrubber redacts them by key.
+
+Antigravity needs the `agy` CLI and a Gemini API key; each scenario runs one or
+two real `gemini-4-argon` turns (a few cents). The recorder resolves the
+credential with `resolveAntigravityCredential()`, which reads the Google key
+from an **enabled** Google provider in `$OVERDECK_HOME/config.yaml`. Point the
+recorder at a throwaway home that holds only that key, written by a script that
+never prints it (Overdeck never selects Antigravity's Google sign-in, so OAuth is
+not an option):
+
+```bash
+AGY_HOME=<scratch dir>/agy-record-home   # mode 0700
+# config.yaml (mode 0600), written by a script that copies the key without echoing it:
+#   models:
+#     providers:
+#       google: { enabled: true, api_key: <literal key> }
+OVERDECK_HOME="$AGY_HOME" node --import tsx src/lib/protocol-capture/record.ts \
+  --harness antigravity --scenario antigravity-turn-completion \
+  --out src/lib/acp/__tests__/fixtures/replay/antigravity-turn-completion.jsonl
+```
+
+The recorder always passes a scratch `--gemini-dir` inside its temp Overdeck
+home, never the default `~/.gemini`. The key travels only in the `agy` child's
+environment, so no frame carries it; the scrubber also redacts Google API keys
+(`AIza…`), and `fixture-hygiene.test.ts` fails on a key prefix or a
+`GEMINI_API_KEY=` assignment in any fixture.
 
 **Approval prompt.** The planned prompt was a network `curl`, but in the
 `workspace-write` sandbox it fails at DNS without asking for approval

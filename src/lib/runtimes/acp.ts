@@ -47,7 +47,7 @@ export interface AcpSpawnConfig extends SpawnConfig {
 }
 
 export interface AcpRuntimeOptions {
-  readonly name?: 'acp' | 'opencode' | 'grok'
+  readonly name?: 'acp' | 'opencode' | 'grok' | 'antigravity'
   readonly provider?: string
   readonly overdeckHome?: string
   readonly execCommand?: (command: string) => Promise<{ readonly stdout: string }>
@@ -65,7 +65,7 @@ export class AcpSpawnTimeout extends Error {
 }
 
 export class AcpRuntimeSync implements AgentRuntimeSync {
-  readonly name: 'acp' | 'opencode' | 'grok'
+  readonly name: 'acp' | 'opencode' | 'grok' | 'antigravity'
   private readonly provider: string
   private readonly overdeckHome: string | undefined
   private readonly execCommand: (command: string) => Promise<{ readonly stdout: string }>
@@ -74,7 +74,7 @@ export class AcpRuntimeSync implements AgentRuntimeSync {
 
   constructor(options: AcpRuntimeOptions = {}) {
     this.name = options.name ?? 'acp'
-    this.provider = options.provider ?? (this.name === 'opencode' ? 'opencode' : this.name === 'grok' ? 'grok' : 'kimi')
+    this.provider = options.provider ?? (this.name === 'opencode' ? 'opencode' : this.name === 'grok' ? 'grok' : this.name === 'antigravity' ? 'antigravity' : 'kimi')
     this.overdeckHome = options.overdeckHome
     this.execCommand = options.execCommand ?? execAsync
     this.prepareLaunch = options.prepareLaunch ?? (() => prepareHarnessLaunch(this.name))
@@ -177,6 +177,7 @@ export class AcpRuntimeSync implements AgentRuntimeSync {
   async spawnAgent(config: AcpSpawnConfig): Promise<Agent> {
     if (this.name === 'opencode' && !config.model) throw new Error('OpenCode requires an explicit model')
     if (this.name === 'grok' && !config.model) throw new Error('Grok Build requires an explicit model')
+    if (this.name === 'antigravity' && !config.model) throw new Error('Antigravity requires an explicit model')
     const provider = config.provider ?? (this.name === 'opencode' && config.model?.startsWith('opencode-go/') ? 'opencode-go' : this.provider)
     const { binaryPath } = await this.prepareLaunch()
     const contextFile = materializeAcpContextFile(
@@ -199,7 +200,7 @@ export class AcpRuntimeSync implements AgentRuntimeSync {
       shellQuote(contextFile),
     ]
     const effort = resolveEffort({ explicit: config.effort, model: config.model, harness: this.name }).effort
-    if (this.name === 'opencode' || this.name === 'grok') command.push('--effort', shellQuote(effort))
+    if (this.name === 'opencode' || this.name === 'grok' || this.name === 'antigravity') command.push('--effort', shellQuote(effort))
     if (config.sessionId) command.push('--resume', shellQuote(config.sessionId))
     if (config.model) command.push('--model', shellQuote(config.model))
     if (provider === 'kimi' && config.model) {

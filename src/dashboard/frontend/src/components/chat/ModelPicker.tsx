@@ -210,10 +210,11 @@ const HARNESS_INDICATOR_LABELS: Partial<Record<Harness, string>> = {
   pi: 'Pi',
   ohmypi: 'oh-my-pi',
   codex: 'Codex',
+  antigravity: 'Antigravity',
 };
 
 function isHarness(value: unknown): value is Harness {
-  return value === 'claude-code' || value === 'pi' || value === 'ohmypi' || value === 'codex' || value === 'acp' || value === 'kimi-code' || value === 'opencode' || value === 'muse' || value === 'prime-agent' || value === 'grok';
+  return value === 'claude-code' || value === 'pi' || value === 'ohmypi' || value === 'codex' || value === 'acp' || value === 'kimi-code' || value === 'opencode' || value === 'muse' || value === 'prime-agent' || value === 'grok' || value === 'antigravity';
 }
 
 function providerDefaultHarness(provider: string, providerHarnesses: ProviderHarnesses): Harness {
@@ -322,15 +323,22 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
           // spawns — see expandHarnessRows. baseName is the clean display
           // name; a stale server that still suffixes native names gets
           // stripped here so we never double-suffix.
-          const mapped = models.map((m) => ({
-            id: m.id,
-            label: m.baseName ?? m.name.replace(/ — Kimi Code CLI$/, ''),
-            provider: prov,
-            costDisplay: formatCost(m.costPer1MTokens, prov),
-            costPer1MTokens: m.costPer1MTokens,
-            effortLevels: m.effortLevels ?? STATIC_EFFORT_LEVELS[m.id] ?? [],
-            baseName: m.baseName,
-          }));
+          // A non-Kimi row the server labels with a harness suffix (e.g. "Gemini 4 Argon — Antigravity")
+          // is a second launch route for the same model id: keep its harness and label so selecting it
+          // launches that route (PAN-5587 D13). Kimi rows are expanded by expandHarnessRows instead.
+          const mapped = models.map((m) => {
+            const routeHarness = prov !== 'kimi' && m.baseName && m.name !== m.baseName && isHarness(m.harness) ? m.harness : undefined;
+            return {
+              id: m.id,
+              label: routeHarness ? m.name : m.baseName ?? m.name.replace(/ — Kimi Code CLI$/, ''),
+              provider: prov,
+              costDisplay: formatCost(m.costPer1MTokens, prov),
+              costPer1MTokens: m.costPer1MTokens,
+              effortLevels: m.effortLevels ?? STATIC_EFFORT_LEVELS[m.id] ?? [],
+              baseName: m.baseName,
+              ...(routeHarness ? { harness: routeHarness } : {}),
+            };
+          });
           newGroups.push({
             provider: prov,
             label: PROVIDER_LABELS[prov] ?? prov,
@@ -407,8 +415,11 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
   const allModels = groups.flatMap((g) => g.models);
   // Harness-labeled rows share a model id — prefer the row whose harness
   // matches the current one so the trigger label states the actual route.
+  // An exact harness match wins over a harness-less row, so a Google model running on
+  // Antigravity shows its "— Antigravity" row, not the plain Google row (PAN-5587).
   const selectedModel =
-    allModels.find((m) => m.id === value && (m.harness === undefined || m.harness === harness))
+    allModels.find((m) => m.id === value && m.harness !== undefined && m.harness === harness)
+    ?? allModels.find((m) => m.id === value && m.harness === undefined)
     ?? allModels.find((m) => m.id === value);
   const selectedProviderHarness = selectedModel
     ? providerDefaultHarness(selectedModel.provider, providerHarnesses)

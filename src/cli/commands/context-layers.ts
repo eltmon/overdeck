@@ -58,6 +58,7 @@ function contextDiffHarnesses(rawHarness: string | undefined): Harness[] {
     case 'kimi-code':
     case 'opencode':
     case 'grok':
+    case 'antigravity':
     case 'muse':
     case 'prime-agent':
       break;

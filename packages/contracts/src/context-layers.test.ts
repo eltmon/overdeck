@@ -96,7 +96,7 @@ describe("context dashboard contracts", () => {
 
   it("names harness previews with shared harness values and fullPrompt", () => {
     const harnesses: readonly Harness[] = CONTEXT_PREVIEW_HARNESSES
-    expect(harnesses).toEqual(["claude-code", "pi", "ohmypi", "codex", "acp", "kimi-code", "opencode", "muse", "prime-agent", "grok"])
+    expect(harnesses).toEqual(["claude-code", "pi", "ohmypi", "codex", "acp", "kimi-code", "opencode", "muse", "prime-agent", "grok", "antigravity"])
 
     const parsed = decodePreviewResponse({
       operation: "preview",
@@ -110,6 +110,7 @@ describe("context dashboard contracts", () => {
         muse: "Muse rendered context",
         "prime-agent": "Prime Agent rendered context",
         grok: "Grok Build rendered context",
+        antigravity: "Antigravity rendered context",
         fullPrompt: "Overdeck injected prompt audit",
       },
       diagnostics: [],
@@ -121,6 +122,7 @@ describe("context dashboard contracts", () => {
     expect(parsed.previews["kimi-code"]).toBe("Kimi Code rendered context")
     expect(parsed.previews["prime-agent"]).toBe("Prime Agent rendered context")
     expect(parsed.previews.grok).toBe("Grok Build rendered context")
+    expect(parsed.previews.antigravity).toBe("Antigravity rendered context")
     expect(parsed.previews.fullPrompt).toBe("Overdeck injected prompt audit")
   })
 

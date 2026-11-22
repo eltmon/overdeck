@@ -90,6 +90,7 @@ export async function buildHarnessPolicyDecisions(
       muse: canUseHarness('muse', model, authMode),
       'prime-agent': canUseHarness('prime-agent', model, authMode),
       grok: canUseHarness('grok', model, authMode),
+      antigravity: canUseHarness('antigravity', model, authMode),
     };
   }
   return decisions;

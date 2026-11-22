@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, statfsSync, statSync, writeFileSync } from 'fs';
-import { mkdir, rename as renameAsync, stat as statAsync, writeFile } from 'fs/promises';
+import { mkdir, rename as renameAsync, rm, stat as statAsync, writeFile } from 'fs/promises';
 import { exec } from 'child_process';
 import { request as httpRequest } from 'node:http';
 import { randomUUID } from 'crypto';
@@ -136,8 +136,9 @@ export async function getAcpLauncherFields(
   binaryPath: string,
   role?: Role,
   effort?: string,
+  requestedHarness?: RuntimeName,
 ): Promise<{
-  harness: 'acp' | 'opencode' | 'grok';
+  harness: 'acp' | 'opencode' | 'grok' | 'antigravity';
   acpAgentId: string;
   acpProvider: string;
   acpWorkspace: string;
@@ -147,11 +148,14 @@ export async function getAcpLauncherFields(
   model: string;
   unsetProviderEnv: true;
 }> {
-  const harness = model.startsWith('grok/') ? 'grok' : model.startsWith('opencode/') || model.startsWith('opencode-go/') ? 'opencode' : 'acp';
+  // Antigravity runs bare Google ids, so its harness comes from the caller (PAN-5587 D2).
+  // A previous launch's error (e.g. a missing Antigravity credential) must not fail this launch's readiness poll.
+  await rm(join(getAgentDir(agentId), hostLaunchErrorFile('acp')), { force: true }); // PAN-3357: not a dir removal
+  const harness = requestedHarness === 'antigravity' ? 'antigravity' : model.startsWith('grok/') ? 'grok' : model.startsWith('opencode/') || model.startsWith('opencode-go/') ? 'opencode' : 'acp';
   return {
     harness,
     acpAgentId: agentId,
-    acpProvider: getProviderForModel(model).name,
+    acpProvider: harness === 'antigravity' ? 'antigravity' : getProviderForModel(model).name,
     acpWorkspace: workspace,
     acpBinaryPath: binaryPath,
     acpContextFile: materializeAcpContextFile(getAgentDir(agentId), workspace, harness, { overdeckMcp: await overdeckMcpEnabledFor(harness).catch(() => false) }),

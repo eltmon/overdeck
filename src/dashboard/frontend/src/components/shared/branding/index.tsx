@@ -114,6 +114,15 @@ const GrokHarnessIcon = (props: IconProps) => (
   </svg>
 );
 
+// Original geometric mark (an upward chevron lifting off a baseline); no Google or Antigravity logo artwork.
+const AntigravityHarnessIcon = (props: IconProps) => (
+  <svg viewBox="0 0 24 24" role="img" aria-label="Antigravity harness mark" {...props}>
+    <rect width="24" height="24" rx="5" fill="currentColor" />
+    <path d="M7 13.5 12 8.5l5 5" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M8.5 17h7" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+  </svg>
+);
+
 export const PROVIDER_BRANDS: Record<Provider, BrandDef> = {
   opencode: { id: 'opencode', label: 'OpenCode Zen', color: '#475569', Icon: OpenCodeHarnessIcon },
   'opencode-go': { id: 'opencode-go', label: 'OpenCode Go', color: '#475569', Icon: OpenCodeHarnessIcon },
@@ -142,6 +151,7 @@ export const HARNESS_BRANDS: Record<Harness, BrandDef> = {
   'kimi-code': { id: 'kimi-code', label: 'Kimi Code', color: PROVIDER_BRANDS.kimi.color, Icon: KimiIcon },
   'prime-agent': { id: 'prime-agent', label: 'Prime Agent', color: '#475569', Icon: Cpu },
   grok: { id: 'grok', label: 'Grok Build', color: '#475569', Icon: GrokHarnessIcon },
+  antigravity: { id: 'antigravity', label: 'Antigravity', color: '#4b5563', Icon: AntigravityHarnessIcon },
 };
 
 export const PROVIDER_COLORS: Record<Provider, string> = Object.fromEntries(

@@ -588,6 +588,7 @@ const REGISTRY: Partial<Record<RuntimeName, ConversationTranscriptAdapter>> = {
   'acp': acpAdapter,
   'opencode': acpAdapter,
   'grok': acpAdapter,
+  'antigravity': acpAdapter,
   'kimi-code': kimiCodeAdapter,
   muse: museAdapter,
   'prime-agent': primeAgentAdapter,

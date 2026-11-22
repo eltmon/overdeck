@@ -586,7 +586,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
           workspacePath,
           harnessLaunch.binaryPath,
           'plan',
-          resolvedEffort.effort,
+          resolvedEffort.effort, effectiveHarness,
         )
       : {};
     // PAN-1837 review fix: planning explicitly threads harness but omitted

@@ -50,6 +50,13 @@ describe('resolveAllowedHarness (PAN-1842)', () => {
     expect(resolveHarnessMock).toHaveBeenCalledWith({ model: 'grok/grok-4.6', explicit: 'grok' });
   });
 
+  it('passes an explicit antigravity pick through to resolveHarness (PAN-5587)', async () => {
+    resolveHarnessMock.mockImplementation(async ({ explicit }) => explicit ?? 'claude-code');
+
+    expect(await resolveAllowedHarness('antigravity', 'gemini-4-argon')).toBe('antigravity');
+    expect(resolveHarnessMock).toHaveBeenCalledWith({ model: 'gemini-4-argon', explicit: 'antigravity' });
+  });
+
   it('surfaces resolveHarness errors instead of falling back to claude-code', async () => {
     resolveHarnessMock.mockRejectedValue(new Error('model denied'));
 

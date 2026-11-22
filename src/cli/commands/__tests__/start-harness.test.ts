@@ -102,6 +102,7 @@ describe('pan start --harness flag (PAN-636)', () => {
     ).rejects.toThrow(/__exit__:1/)
     const written = stderrSpy.mock.calls.map(call => String(call[0])).join('')
     expect(written).toMatch(/Invalid --harness value: cursor/)
+    expect(written).toContain("'grok', or 'antigravity'")
   })
 
   it('accepts --harness kimi-code with a Kimi model (PAN-1837)', async () => {
@@ -140,6 +141,25 @@ describe('pan start --harness flag (PAN-636)', () => {
     registerStartCommand(program)
     const start = program.commands.find((command) => command.name() === 'start')
     expect(start?.helpInformation()).toContain('| grok')
+  })
+
+  it('accepts --harness antigravity with a Gemini model agy serves (PAN-5587)', async () => {
+    const { __testInternals } = await import('../start.js')
+    await expect(
+      __testInternals.resolveExplicitHarnessFlag('antigravity', 'gemini-4-argon'),
+    ).resolves.toBe('antigravity')
+    expect(exitSpy).not.toHaveBeenCalled()
+    expect(stderrSpy).not.toHaveBeenCalled()
+  })
+
+  it('lists antigravity in the pan start --harness help (PAN-5587)', async () => {
+    const { Command } = await import('commander')
+    const { registerStartCommand } = await import('../start-register.js')
+    const program = new Command()
+    registerStartCommand(program)
+    const start = program.commands.find((command) => command.name() === 'start')
+    // Commander wraps long option descriptions, so compare with whitespace collapsed.
+    expect(start?.helpInformation().replace(/\s+/g, ' ')).toContain('| grok | antigravity (defaults')
   })
 
   it('refuses a below-floor GPT-6 model on --harness codex before any spawn work (PAN-4363)', async () => {

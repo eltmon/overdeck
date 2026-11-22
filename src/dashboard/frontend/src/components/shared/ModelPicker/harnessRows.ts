@@ -31,6 +31,7 @@ export const HARNESS_ROW_LABELS = {
   muse: 'Muse Code',
   acp: 'ACP (Kimi Code)',
   'prime-agent': 'Prime Agent',
+  antigravity: 'Antigravity',
 } as const;
 
 type RowBase = {

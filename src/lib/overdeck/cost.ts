@@ -23,6 +23,7 @@ import { recordSkipVerdict } from '../costs/skip-cache.js';
 import { collectCodexCostEvents } from '../costs/codex-collector.js';
 import { collectPrimeAgentCostEvents } from '../costs/prime-agent-collector.js';
 import { collectGrokCostEvents } from '../costs/grok-collector.js';
+import { collectAntigravityCostEvents } from '../costs/antigravity-collector.js';
 export { collectCodexCostEvents, type SkipVerdictEntry } from '../costs/codex-collector.js';
 
 // ── Filesystem helpers ────────────────────────────────────────────────────────
@@ -517,7 +518,7 @@ export class CostWriter extends Context.Service<
     readonly record: (event: CostEvent, opts?: { dryRun?: boolean }) => Effect.Effect<boolean, CostIngestError>;
     // Catch-up sweep (PAN-1935: pi/codex sweep lands here)
     readonly reconcile: (opts?: {
-      source?: 'claude' | 'ohmypi' | 'codex' | 'acp' | 'prime-agent' | 'grok' | 'wal';
+      source?: 'claude' | 'ohmypi' | 'codex' | 'acp' | 'prime-agent' | 'grok' | 'antigravity' | 'wal';
       dryRun?: boolean;
       extraRoots?: string[];
       extraRootSpecs?: CostReconcileExtraRoot[];
@@ -613,7 +614,7 @@ export const CostWriterLive = Layer.effect(
     // OVERDECK_HOME/agents/<id>/codex-home/sessions/**/*.jsonl (codex),
     // parses each with the existing parsers, and feeds into record() (which deduplicates).
     const reconcile = (opts?: {
-      source?: 'claude' | 'ohmypi' | 'codex' | 'acp' | 'prime-agent' | 'grok' | 'wal';
+      source?: 'claude' | 'ohmypi' | 'codex' | 'acp' | 'prime-agent' | 'grok' | 'antigravity' | 'wal';
       dryRun?: boolean;
       extraRoots?: string[];
       extraRootSpecs?: CostReconcileExtraRoot[];
@@ -632,12 +633,12 @@ export const CostWriterLive = Layer.effect(
           latestEventTs: null,
           warnings: [],
         };
-        if (source !== 'ohmypi' && source !== 'codex' && source !== 'prime-agent' && source !== 'grok') return empty;
-        if (source === 'prime-agent' || source === 'grok') {
+        if (source !== 'ohmypi' && source !== 'codex' && source !== 'prime-agent' && source !== 'grok' && source !== 'antigravity') return empty;
+        if (source === 'prime-agent' || source === 'grok' || source === 'antigravity') {
           // PAN-3668 D16: Prime session JSONL under agents/*/prime-sessions/.
-          // PAN-5078 D9: Grok turn usage on agents/*/acp-session.jsonl turn_completed entries.
-          const collected = yield* Effect.promise<Awaited<ReturnType<typeof collectGrokCostEvents | typeof collectPrimeAgentCostEvents>>>(
-            () => source === 'grok' ? collectGrokCostEvents() : collectPrimeAgentCostEvents());
+          // PAN-5078 D9 / PAN-5587 D12: Grok and Antigravity turn usage on agents/*/acp-session.jsonl turn_completed entries.
+          const collected = yield* Effect.promise<Awaited<ReturnType<typeof collectGrokCostEvents | typeof collectAntigravityCostEvents | typeof collectPrimeAgentCostEvents>>>(
+            () => source === 'grok' ? collectGrokCostEvents() : source === 'antigravity' ? collectAntigravityCostEvents() : collectPrimeAgentCostEvents());
           let imported = 0;
           let duplicatesSkipped = 0;
           let earliestEventTs: string | null = null;

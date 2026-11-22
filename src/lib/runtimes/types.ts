@@ -40,7 +40,7 @@ export type {
  * PAN-636 added 'pi'; PAN-1989 folded it into 'ohmypi'; PAN-5212 restored
  * 'pi' (the Pi Coding Agent) as its own runtime. Stored 'pi' rows read as pi.
  */
-export type RuntimeName = 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent' | 'grok';
+export type RuntimeName = 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent' | 'grok' | 'antigravity';
 
 /** Kept as an alias of {@link RuntimeName}: 'pi' became a RuntimeName in PAN-5212. */
 export type HarnessName = RuntimeName;

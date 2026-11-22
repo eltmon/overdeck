@@ -75,6 +75,30 @@ describe('handleConversationRestartAll', () => {
     expect(setConversationHarness).toHaveBeenCalledWith('g', 'grok');
   });
 
+  it('waits for the ACP host when it restarts an Antigravity conversation (PAN-5587)', async () => {
+    resolveAllowedHarness.mockResolvedValue('antigravity');
+    listConversations.mockReturnValue([
+      { id: 4, name: 'a', tmuxSession: 'conv-p', clearedToConvId: null, claudeSessionId: 'agy-session', harness: 'antigravity', cwd: '/fixture', model: 'gemini-4-argon', effort: 'high', issueId: null, bareContext: false },
+    ]);
+
+    await handleConversationRestartAll({ resolveSessionFile: async () => null });
+
+    expect(waitForConversationRuntimeReady).toHaveBeenCalledWith('conv-p', 'antigravity', 'respawn');
+    expect(setConversationHarness).toHaveBeenCalledWith('a', 'antigravity');
+  });
+
+  it('stops the Antigravity runtime when its restart fails (PAN-5587)', async () => {
+    resolveAllowedHarness.mockResolvedValue('antigravity');
+    vi.mocked(waitForConversationRuntimeReady).mockRejectedValueOnce(new Error('host exited'));
+    listConversations.mockReturnValue([
+      { id: 4, name: 'a', tmuxSession: 'conv-p', clearedToConvId: null, claudeSessionId: 'agy-session', harness: 'antigravity', cwd: '/fixture', model: 'gemini-4-argon', effort: 'high', issueId: null, bareContext: false },
+    ]);
+
+    await handleConversationRestartAll({ resolveSessionFile: async () => null });
+
+    expect(stopConversationRuntime).toHaveBeenCalledTimes(1);
+  });
+
   it('stops the Grok runtime when its restart fails (PAN-5078)', async () => {
     resolveAllowedHarness.mockResolvedValue('grok');
     vi.mocked(waitForConversationRuntimeReady).mockRejectedValueOnce(new Error('host exited'));

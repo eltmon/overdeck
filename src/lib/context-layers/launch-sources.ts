@@ -13,7 +13,7 @@ export async function claudeSystemPromptFiles(workspace: string, harness: Runtim
   const behavior = getHarnessBehavior(effectiveHarness);
   // Host-materialized harnesses (ACP, OpenCode, Grok Build, Muse, Prime Agent) get their context
   // from their own per-agent artifact, never Claude system-prompt files.
-  if (behavior.contextLayerKind === 'acp' || behavior.contextLayerKind === 'opencode' || behavior.contextLayerKind === 'grok' || behavior.contextLayerKind === 'muse' || behavior.contextLayerKind === 'prime-agent') {
+  if (behavior.contextLayerKind === 'acp' || behavior.contextLayerKind === 'opencode' || behavior.contextLayerKind === 'grok' || behavior.contextLayerKind === 'antigravity' || behavior.contextLayerKind === 'muse' || behavior.contextLayerKind === 'prime-agent') {
     return [];
   }
 

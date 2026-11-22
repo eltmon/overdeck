@@ -19,9 +19,13 @@ import {
   DEFAULT_ACP_TURN_STALL_TIMEOUT_MS,
   OPENCODE_PERMISSION_WATCHDOG_STALE_MS,
   type AcpHostRuntime,
+  acpLaunchErrorPath,
+  main as acpHostMain,
   parseAcpHostArgs,
   parseTurnStallTimeoutMs,
   reserveOpenCodePort} from "../host.js";
+import { resolveAcpProviderSupport } from "../providers.js";
+import { ANTIGRAVITY_AUTH_REQUIRED, AntigravityCredentialError } from "../../antigravity-auth.js";
 import { parseSessionUpdateEvent } from "../runtime-model.js";
 import type { AcpSessionRuntimeEvent } from "../session-runtime.js";
 import { parseAcpConversationMessages } from "../../../dashboard/server/services/acp-conversation-parser.js";
@@ -48,6 +52,8 @@ interface StubRuntimeOptions {
   readonly configError?: Error;
   readonly assistantResponse?: string;
   readonly promptMeta?: Record<string, unknown>;
+  /** Returned as the ACP-standard `usage` on the `session/prompt` result. */
+  readonly promptUsage?: Record<string, unknown>;
   /** Streamed as ACP `agent_thought_chunk` updates before the assistant response. */
   readonly thoughtResponse?: ReadonlyArray<string>;
   readonly updateDuringStart?: string;
@@ -163,7 +169,11 @@ async function makeStubRuntime(options: StubRuntimeOptions = {}): Promise<StubRu
             rawPayload: {},
           });
         }
-        return { stopReason: "end_turn" as const, ...(options.promptMeta ? { _meta: options.promptMeta } : {}) };
+        return {
+          stopReason: "end_turn" as const,
+          ...(options.promptMeta ? { _meta: options.promptMeta } : {}),
+          ...(options.promptUsage ? { usage: options.promptUsage } : {}),
+        } as EffectAcpSchema.PromptResponse;
       }),
     cancel: Effect.void,
     getConfigOptions: Effect.succeed(options.configOptions ?? []),
@@ -679,6 +689,97 @@ describe("AcpHost", () => {
     expect(output.text()).toContain("Grok sign-in is required. Run grok login, then retry.");
     await expect(readFile(join(overdeckHome, "agents", "agent-grok-auth", "acp-launch-error"), "utf-8"))
       .resolves.toContain("grok login");
+  });
+
+  const antigravityThoughtLevels = (): EffectAcpSchema.SessionConfigOption[] => [{
+    id: "thought_level", name: "Thought level", type: "select", currentValue: "high",
+    options: [{ value: "low", name: "Low" }, { value: "high", name: "High" }],
+  }];
+
+  it.each([[undefined], ["agy-session-1"]] as const)("sets the agy model and clamps effort onto offered thought levels (resume: %s) (PAN-5587)", async (resumeSessionId) => {
+    const overdeckHome = await makeHome();
+    process.env.OVERDECK_HOME = overdeckHome;
+    const stub = await makeStubRuntime({ configOptions: antigravityThoughtLevels() });
+    const agentId = `agent-antigravity-effort-${resumeSessionId ?? "fresh"}`;
+    const host = new AcpHost({ agentId, provider: "antigravity",
+      workspace: process.cwd(), model: "gemini-3.1-pro-preview", effort: "medium",
+      ...(resumeSessionId ? { resumeSessionId } : {}),
+      overdeckHome, runtime: stub.runtime });
+    hosts.push(host);
+    await host.start();
+    expect(stub.setModels).toEqual(["gemini-3.1-pro"]);
+    expect(stub.order.slice(-2)).toEqual(["set-model", "config:thought_level:low"]);
+    expect(readSessionIndex(agentId)).toEqual([
+      expect.objectContaining({ harness: "antigravity", model: "gemini-3.1-pro-preview" }),
+    ]);
+    await expect(host.handleOp({ op: "set-effort", effort: "xhigh" })).resolves.toEqual({
+      status: 200, body: { ok: true, effort: "high" },
+    });
+    expect(stub.order.at(-1)).toBe("config:thought_level:high");
+  });
+
+  it("records Antigravity turn usage under the launch model (PAN-5587 D12)", async () => {
+    const overdeckHome = await makeHome();
+    const stub = await makeStubRuntime({
+      configOptions: antigravityThoughtLevels(),
+      promptUsage: { inputTokens: 12101, outputTokens: 117, cachedReadTokens: 7739, cachedWriteTokens: 0, thoughtTokens: 0, totalTokens: 19957 },
+    });
+    const host = new AcpHost({ agentId: "agent-antigravity-usage", provider: "antigravity",
+      workspace: process.cwd(), model: "gemini-3.1-pro-preview", effort: "high",
+      overdeckHome, runtime: stub.runtime });
+    hosts.push(host);
+    await host.start();
+    await host.handleOp({ op: "message", content: "hello" });
+    await host.waitForIdle();
+    const entries = await readTranscriptEntries(join(overdeckHome, "agents", "agent-antigravity-usage", "acp-session.jsonl"));
+    const completed = entries.find((entry) => entry.event === "turn_completed");
+    expect(completed?.usage).toMatchObject({
+      model: "gemini-3.1-pro-preview", source: "antigravity", inputTokens: 12101, outputTokens: 117, cacheReadTokens: 7739, cacheWriteTokens: 0,
+    });
+  });
+
+  it("names the provider when an Antigravity launch has no effort (PAN-5587)", async () => {
+    const stub = await makeStubRuntime({ configOptions: antigravityThoughtLevels() });
+    const host = new AcpHost({ agentId: "agent-antigravity-no-effort", provider: "antigravity",
+      workspace: process.cwd(), model: "gemini-4-argon",
+      overdeckHome: await makeHome(), runtime: stub.runtime });
+    hosts.push(host);
+    await expect(host.start()).rejects.toThrow("Antigravity launch requires --effort.");
+  });
+
+  it("prints the Antigravity credential remediation on an authentication failure (PAN-5587)", async () => {
+    const overdeckHome = await makeHome();
+    const stub = await makeStubRuntime({ startError: new Error("authentication required") });
+    const output = makeOutput();
+    const host = new AcpHost({ agentId: "agent-antigravity-auth", provider: "antigravity",
+      workspace: process.cwd(), model: "gemini-4-argon", effort: "high",
+      overdeckHome, runtime: stub.runtime, stdout: output.writable });
+    await expect(host.start()).rejects.toThrow("authentication required");
+    expect(output.text()).toContain(ANTIGRAVITY_AUTH_REQUIRED);
+    await expect(readFile(acpLaunchErrorPath(overdeckHome, "agent-antigravity-auth"), "utf-8"))
+      .resolves.toBe(`${ANTIGRAVITY_AUTH_REQUIRED}\n`);
+  });
+
+  it("writes acp-launch-error and never builds the runtime when the credential fails (PAN-5587 FR-13)", async () => {
+    const overdeckHome = await makeHome();
+    process.env.OVERDECK_HOME = overdeckHome;
+    const support = resolveAcpProviderSupport("antigravity");
+    const resolveCredential = vi.spyOn(support, "resolveCredential")
+      .mockRejectedValue(new AntigravityCredentialError(ANTIGRAVITY_AUTH_REQUIRED));
+    const makeRuntime = vi.spyOn(support, "makeRuntime");
+    try {
+      await expect(acpHostMain([
+        "--agent", "agent-antigravity-precheck", "--provider", "antigravity",
+        "--workspace", process.cwd(), "--binary-path", "/tools/agy",
+        "--model", "gemini-4-argon", "--effort", "high",
+      ])).rejects.toThrow(ANTIGRAVITY_AUTH_REQUIRED);
+      await expect(readFile(acpLaunchErrorPath(overdeckHome, "agent-antigravity-precheck"), "utf-8"))
+        .resolves.toBe(`${ANTIGRAVITY_AUTH_REQUIRED}\n`);
+      expect(makeRuntime).not.toHaveBeenCalled();
+    } finally {
+      resolveCredential.mockRestore();
+      makeRuntime.mockRestore();
+    }
   });
 
   it("authenticates delivery, forwards prompts, and records both sides of the turn", async () => {

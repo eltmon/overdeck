@@ -760,7 +760,7 @@ export async function buildAgentLaunchConfig(opts: {
         opts.workspace,
         opts.harnessBinaryPath!,
         launchRole,
-        opts.effort,
+        opts.effort, opts.harness,
       )
     : {};
 

@@ -38,6 +38,7 @@ import { CODEX_CLI_INSTALL_COMMAND, codexModelMinimumVersion, compareVersions } 
 import type { RuntimeName } from './runtimes/types.js'
 import type { AuthMode } from './subscription-types.js'
 import { getProviderForModel } from './providers.js'
+import { antigravityModelIds, isAntigravityModel } from './antigravity-models.js'
 
 export type HarnessPolicyDecision = {
   allowed: boolean
@@ -74,6 +75,7 @@ export const POLICY_RUNTIME_NAMES = Object.keys({
   muse: true,
   'prime-agent': true,
   grok: true,
+  antigravity: true,
 } satisfies Record<RuntimeName, true>) as RuntimeName[]
 
 const OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK: HarnessPolicyDecision = {
@@ -105,6 +107,10 @@ const PRIME_AGENT_ANTHROPIC_SUBSCRIPTION_BLOCK: HarnessPolicyDecision = {
 
 /** Canonical reason returned for the blocked prime-agent cell (exposed for tests + UI). */
 export const PRIME_AGENT_ANTHROPIC_SUBSCRIPTION_BLOCK_REASON = PRIME_AGENT_ANTHROPIC_SUBSCRIPTION_BLOCK.reason!
+
+/** PAN-5587 D9: Antigravity runs only the Google ids its CLI serves. */
+export const ANTIGRAVITY_MODEL_BLOCK_REASON =
+  `Antigravity runs only the Gemini models its CLI serves: ${antigravityModelIds().join(', ')}. Select one of them, or another harness for this model.`;
 
 const ACP_KIMI_ONLY_BLOCK: HarnessPolicyDecision = {
   allowed: false,
@@ -185,6 +191,9 @@ export function canUseHarness(
     return harness === 'grok' && isGrokProvider
       ? ALLOWED
       : { allowed: false, reason: 'Grok Build model IDs require the Grok Build harness, and the Grok Build harness runs only grok/* models. Select a grok/* model.' };
+  }
+  if (harness === 'antigravity') {
+    return isAntigravityModel(model) ? ALLOWED : { allowed: false, reason: ANTIGRAVITY_MODEL_BLOCK_REASON };
   }
   const isMuseModel = providerName === 'meta';
   if (harness === 'muse' || isMuseModel) {

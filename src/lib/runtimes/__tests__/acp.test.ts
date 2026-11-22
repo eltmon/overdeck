@@ -119,6 +119,36 @@ describe('Grok Build ACP runtime (PAN-5078)', () => {
   })
 })
 
+describe('Antigravity ACP runtime (PAN-5587)', () => {
+  it('refuses to spawn without an explicit model', async () => {
+    const runtime = new AcpRuntimeSync({ name: 'antigravity', overdeckHome: makeHome() })
+    await expect(runtime.spawnAgent({ agentId: 'agent-antigravity-no-model', workspace: '/tmp/w', runtime: 'antigravity' } as never))
+      .rejects.toThrow('Antigravity requires an explicit model')
+  })
+
+  it('launches the host with provider antigravity and an effort', async () => {
+    const home = makeHome()
+    tmuxMocks.tmuxCreateSession.mockImplementation(async (agentId: string) => {
+      writeAgentFile(home, agentId, 'acp-session-id', 'agy-session\n')
+      writeAgentFile(home, agentId, 'acp-token', 'secret\n')
+    })
+    tmuxMocks.tmuxSessionExists.mockResolvedValue(true)
+    const runtime = new AcpRuntimeSync({
+      name: 'antigravity',
+      overdeckHome: home,
+      prepareLaunch: async () => ({ binaryPath: '/opt/agy/bin/agy', pathExport: '' }),
+    })
+
+    await runtime.spawnAgent({ agentId: 'agent-antigravity', workspace: '/tmp/w', runtime: 'antigravity', model: 'gemini-4-argon', effort: 'high' } as never)
+
+    const command = tmuxMocks.tmuxCreateSession.mock.calls[0]?.[2]
+    expect(command).toContain("--provider 'antigravity'")
+    expect(command).toContain("--binary-path '/opt/agy/bin/agy'")
+    expect(command).toContain("--model 'gemini-4-argon'")
+    expect(command).toContain("--effort 'high'")
+  })
+})
+
 describe('AcpRuntimeSync', () => {
   it('uses the ACP transcript mtime for activity and heartbeat without cost data', () => {
     const home = makeHome()

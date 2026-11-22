@@ -31,7 +31,9 @@ import {
   isRejectPermissionOption,
   selectAutoPermissionOutcome,
 } from "./permissions.js";
-import { resolveAcpModelId, resolveAcpProviderSupport } from "./providers.js";
+import { resolveAcpModelId, resolveAcpProviderSupport, type AcpProviderSupport } from "./providers.js";
+import { collectSessionConfigOptionValues } from "./runtime-model.js";
+import { ANTIGRAVITY_AUTH_REQUIRED } from "../antigravity-auth.js";
 import { appendSessionIdToHistory } from "../session-history.js";
 import {
   AcpSessionRuntime,
@@ -180,9 +182,11 @@ export class AcpHost {
       const support = resolveAcpProviderSupport(this.options.provider);
       if (support.effortConfigId) {
         const configOptions = await Effect.runPromise(this.options.runtime.getConfigOptions);
-        if (configOptions.some((option) => option.id === support.effortConfigId)) {
-          if (!this.options.effort) throw new Error("Grok Build launch requires --effort.");
-          await Effect.runPromise(this.options.runtime.setConfigOption(support.effortConfigId, this.options.effort));
+        const effortOption = configOptions.find((option) => option.id === support.effortConfigId);
+        if (effortOption) {
+          if (!this.options.effort) throw new Error(`${support.displayName ?? this.options.provider} launch requires --effort.`);
+          const value = resolveSupportEffort(support, this.options.effort, effortOption);
+          await Effect.runPromise(this.options.runtime.setConfigOption(support.effortConfigId, value));
         } else if (this.options.effort && this.options.effort !== "high") {
           throw new Error(`The selected model does not expose a reasoning effort setting (${this.options.effort} requested).`);
         }
@@ -212,7 +216,9 @@ export class AcpHost {
         ? "Kimi authentication is required. Run `kimi`, then /login, and retry."
         : this.options.provider === "grok" && isAuthenticationFailure(error)
           ? "Grok sign-in is required. Run grok login, then retry."
-          : errorMessage(error);
+          : this.options.provider === "antigravity" && isAuthenticationFailure(error)
+            ? ANTIGRAVITY_AUTH_REQUIRED
+            : errorMessage(error);
       this.writePaneLine(`[error] ${launchError}`);
       await writeFile(this.errorPath(), `${launchError}\n`, { mode: FILE_MODE });
       await chmod(this.errorPath(), FILE_MODE);
@@ -323,7 +329,7 @@ export class AcpHost {
           promptId,
           event: "turn_completed",
           stopReason: promptResult.stopReason,
-          usage: resolveAcpProviderSupport(this.options.provider).extractTurnUsage?.(promptResult),
+          usage: resolveAcpProviderSupport(this.options.provider).extractTurnUsage?.(promptResult, this.options.model ?? ""),
         });
       } catch (error) {
         const message = errorMessage(error);
@@ -368,9 +374,12 @@ export class AcpHost {
       await Effect.runPromise(this.options.runtime.setConfigOption("effort", effort));
       return { status: 200, body: { ok: true, effort } };
     }
-    const effortConfigId = resolveAcpProviderSupport(this.options.provider).effortConfigId;
+    const support = resolveAcpProviderSupport(this.options.provider);
+    const effortConfigId = support.effortConfigId;
     if (effortConfigId) {
-      const effort = op.effort.trim();
+      const configOptions = await Effect.runPromise(this.options.runtime.getConfigOptions);
+      const effortOption = configOptions.find((option) => option.id === effortConfigId);
+      const effort = effortOption ? resolveSupportEffort(support, op.effort.trim(), effortOption) : op.effort.trim();
       await Effect.runPromise(this.options.runtime.setConfigOption(effortConfigId, effort));
       return { status: 200, body: { ok: true, effort } };
     }
@@ -721,7 +730,7 @@ export class AcpHost {
   }
 
   private errorPath(): string {
-    return join(this.agentDir(), "acp-launch-error");
+    return acpLaunchErrorPath(this.overdeckHome, this.options.agentId);
   }
 
   private openCodePortPath(): string {
@@ -838,6 +847,20 @@ export function parseAcpHostArgs(argv: ReadonlyArray<string>): AcpHostArgs {
   };
 }
 
+/** `<OVERDECK_HOME>/agents/<agentId>/acp-launch-error`, which waitForHostReady reads. */
+export function acpLaunchErrorPath(overdeckHome: string, agentId: string): string {
+  return join(overdeckHome, "agents", agentId, "acp-launch-error");
+}
+
+/** The provider's mapping of the requested effort onto the option's offered values, else the request. */
+function resolveSupportEffort(
+  support: AcpProviderSupport,
+  effort: string,
+  option: EffectAcpSchema.SessionConfigOption,
+): string {
+  return support.resolveEffortValue ? support.resolveEffortValue(effort, collectSessionConfigOptionValues(option)) : effort;
+}
+
 export async function reserveOpenCodePort(): Promise<number> {
   const server = createNetServer();
   await new Promise<void>((resolve, reject) => {
@@ -875,7 +898,10 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     await capture?.close();
   };
   const mcpServers = args.mcpConfig ? await readAcpMcpServers(args.mcpConfig) : [];
+  let hostStarted = false;
   try {
+    // Resolved before the runtime is built, so a credential failure never spawns the agent (PAN-5587 D5).
+    const credential = support.resolveCredential ? await support.resolveCredential() : undefined;
     const runtime = await Effect.runPromise(
       Effect.gen(function* () {
         const childProcessSpawner = yield* ChildProcessSpawner.ChildProcessSpawner;
@@ -893,6 +919,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
           ...(openCodePort === undefined ? {} : { port: openCodePort }),
           ...(capture ? { protocolLogging: acpCaptureProtocolLogging(capture) } : {}),
           ...(mcpServers.length > 0 ? { mcpServers } : {}),
+          ...(credential ? { credential } : {}),
         });
       }).pipe(
         Effect.provideService(Scope.Scope, scope),
@@ -916,6 +943,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
       openCodePort,
       turnStallTimeoutMs: parseTurnStallTimeoutMs(process.env.OVERDECK_ACP_TURN_STALL_MS),
     });
+    hostStarted = true;
     await host.start();
     const stop = () => {
       void host.stop().catch((error) => {
@@ -926,9 +954,20 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     process.once("SIGTERM", stop);
     process.once("SIGINT", stop);
   } catch (error) {
+    // AcpHost.start() writes its own launch error; earlier failures are written here
+    // so the spawn reports them instead of timing out (PAN-5587 FR-13).
+    if (!hostStarted) await writePreStartLaunchError(args.agentId, error);
     await closeScope();
     throw error;
   }
+}
+
+async function writePreStartLaunchError(agentId: string, error: unknown): Promise<void> {
+  const overdeckHome = process.env.OVERDECK_HOME ?? join(homedir(), ".overdeck");
+  const path = acpLaunchErrorPath(overdeckHome, agentId);
+  await mkdir(join(overdeckHome, "agents", agentId), { recursive: true });
+  await writeFile(path, `${errorMessage(error)}\n`, { mode: FILE_MODE });
+  await chmod(path, FILE_MODE);
 }
 
 if (basename(fileURLToPath(import.meta.url)) === basename(process.argv[1] ?? "")) {

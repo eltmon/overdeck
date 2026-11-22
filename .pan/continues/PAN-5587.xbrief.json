@@ -1,0 +1,506 @@
+{
+  "version": "1",
+  "issueId": "PAN-5587",
+  "created": "2026-11-21T22:59:41.238Z",
+  "updated": "2026-11-22T02:57:46.062Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-22T02:51Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-11-22T02:51:45.195Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-22T02:57Z] ci-monitor → FAILED — seq 2",
+      "timestamp": "2026-11-22T02:57:46.062Z"
+    }
+  ],
+  "items": {
+    "contracts-harness": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5587",
+      "claimedAt": "2026-11-21T22:59:41.238Z",
+      "doneAt": "2026-11-22T00:59:11.369Z"
+    },
+    "contracts-harness.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T00:59:11.369Z"
+    },
+    "contracts-harness.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T00:59:11.369Z"
+    },
+    "contracts-harness.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T00:59:11.369Z"
+    },
+    "contracts-harness.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-22T00:59:11.369Z"
+    },
+    "antigravity-models": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5587",
+      "claimedAt": "2026-11-22T00:59:22.588Z",
+      "doneAt": "2026-11-22T01:00:22.196Z"
+    },
+    "antigravity-models.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:00:22.196Z"
+    },
+    "antigravity-models.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:00:22.196Z"
+    },
+    "antigravity-models.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:00:22.196Z"
+    },
+    "antigravity-models.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:00:22.196Z"
+    },
+    "harness-policy": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5587",
+      "claimedAt": "2026-11-22T01:00:28.629Z",
+      "doneAt": "2026-11-22T01:02:12.501Z"
+    },
+    "harness-policy.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:02:12.501Z"
+    },
+    "harness-policy.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:02:12.501Z"
+    },
+    "harness-policy.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:02:12.501Z"
+    },
+    "antigravity-auth": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5587",
+      "claimedAt": "2026-11-22T01:02:20.558Z",
+      "doneAt": "2026-11-22T01:05:05.598Z"
+    },
+    "antigravity-auth.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:05:05.598Z"
+    },
+    "antigravity-auth.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:05:05.598Z"
+    },
+    "antigravity-auth.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:05:05.598Z"
+    },
+    "antigravity-auth.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:05:05.598Z"
+    },
+    "antigravity-auth.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:05:05.598Z"
+    },
+    "acp-antigravity-module": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5587",
+      "claimedAt": "2026-11-22T01:08:04.108Z",
+      "doneAt": "2026-11-22T01:12:04.368Z"
+    },
+    "acp-antigravity-module.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:12:04.368Z"
+    },
+    "acp-antigravity-module.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:12:04.368Z"
+    },
+    "acp-antigravity-module.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:12:04.368Z"
+    },
+    "acp-antigravity-module.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:12:04.368Z"
+    },
+    "acp-antigravity-module.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:12:04.368Z"
+    },
+    "host-antigravity": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5587",
+      "claimedAt": "2026-11-22T01:12:10.164Z",
+      "doneAt": "2026-11-22T01:15:20.984Z"
+    },
+    "host-antigravity.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:15:20.984Z"
+    },
+    "host-antigravity.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:15:20.984Z"
+    },
+    "host-antigravity.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:15:20.984Z"
+    },
+    "host-antigravity.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:15:20.984Z"
+    },
+    "host-antigravity.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:15:20.984Z"
+    },
+    "runtime-launcher-fields": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5587",
+      "claimedAt": "2026-11-22T01:15:28.589Z",
+      "doneAt": "2026-11-22T01:18:16.078Z"
+    },
+    "runtime-launcher-fields.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:18:16.078Z"
+    },
+    "runtime-launcher-fields.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:18:16.078Z"
+    },
+    "runtime-launcher-fields.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:18:16.078Z"
+    },
+    "runtime-launcher-fields.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:18:16.078Z"
+    },
+    "config-validation-messages": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5587",
+      "claimedAt": "2026-11-22T01:18:22.215Z",
+      "doneAt": "2026-11-22T01:21:53.317Z"
+    },
+    "config-validation-messages.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:21:53.317Z"
+    },
+    "config-validation-messages.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:21:53.317Z"
+    },
+    "config-validation-messages.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:21:53.317Z"
+    },
+    "conversation-lists": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5587",
+      "claimedAt": "2026-11-22T01:21:54.643Z",
+      "doneAt": "2026-11-22T01:24:09.305Z"
+    },
+    "conversation-lists.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:24:09.305Z"
+    },
+    "conversation-lists.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:24:09.305Z"
+    },
+    "conversation-lists.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:24:09.305Z"
+    },
+    "launch-context-lists": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5587",
+      "claimedAt": "2026-11-22T01:24:11.086Z",
+      "doneAt": "2026-11-22T01:26:01.182Z"
+    },
+    "launch-context-lists.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:26:01.182Z"
+    },
+    "launch-context-lists.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:26:01.182Z"
+    },
+    "launch-context-lists.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:26:01.182Z"
+    },
+    "server-route-lists": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5587",
+      "claimedAt": "2026-11-22T01:26:02.635Z",
+      "doneAt": "2026-11-22T01:29:13.098Z"
+    },
+    "server-route-lists.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:29:13.098Z"
+    },
+    "server-route-lists.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:29:13.098Z"
+    },
+    "cli-harness-lists": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5587",
+      "claimedAt": "2026-11-22T01:29:14.564Z",
+      "doneAt": "2026-11-22T01:31:28.352Z"
+    },
+    "cli-harness-lists.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:31:28.352Z"
+    },
+    "cli-harness-lists.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:31:28.352Z"
+    },
+    "cli-harness-lists.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:31:28.352Z"
+    },
+    "picker-catalog-rows": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5587",
+      "claimedAt": "2026-11-22T01:31:33.516Z",
+      "doneAt": "2026-11-22T01:35:43.501Z"
+    },
+    "picker-catalog-rows.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:35:43.501Z"
+    },
+    "picker-catalog-rows.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:35:43.501Z"
+    },
+    "picker-catalog-rows.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:35:43.501Z"
+    },
+    "doctor-antigravity": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5587",
+      "claimedAt": "2026-11-22T01:35:45.105Z",
+      "doneAt": "2026-11-22T01:37:52.375Z"
+    },
+    "doctor-antigravity.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:37:52.375Z"
+    },
+    "doctor-antigravity.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:37:52.375Z"
+    },
+    "doctor-antigravity.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:37:52.375Z"
+    },
+    "no-loss-audit": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5587",
+      "claimedAt": "2026-11-22T01:37:59.471Z",
+      "doneAt": "2026-11-22T01:46:23.078Z"
+    },
+    "no-loss-audit.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:46:23.078Z"
+    },
+    "no-loss-audit.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:46:23.078Z"
+    },
+    "no-loss-audit.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:46:23.078Z"
+    },
+    "frontend-harness-unions": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5587",
+      "claimedAt": "2026-11-22T01:46:24.762Z",
+      "doneAt": "2026-11-22T01:48:37.429Z"
+    },
+    "frontend-harness-unions.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:48:37.429Z"
+    },
+    "frontend-harness-unions.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:48:37.429Z"
+    },
+    "frontend-harness-unions.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:48:37.429Z"
+    },
+    "frontend-harness-unions.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:48:37.429Z"
+    },
+    "frontend-picker-options": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5587",
+      "claimedAt": "2026-11-22T01:48:44.075Z",
+      "doneAt": "2026-11-22T01:52:08.900Z"
+    },
+    "frontend-picker-options.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:52:08.900Z"
+    },
+    "frontend-picker-options.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:52:08.900Z"
+    },
+    "frontend-picker-options.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:52:08.900Z"
+    },
+    "frontend-branding": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5587",
+      "claimedAt": "2026-11-22T01:52:10.209Z",
+      "doneAt": "2026-11-22T01:54:53.752Z"
+    },
+    "frontend-branding.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:54:53.752Z"
+    },
+    "frontend-branding.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:54:53.752Z"
+    },
+    "acp-usage-collector-extract": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5587",
+      "claimedAt": "2026-11-22T01:55:01.856Z",
+      "doneAt": "2026-11-22T01:57:21.199Z"
+    },
+    "acp-usage-collector-extract.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:57:21.199Z"
+    },
+    "acp-usage-collector-extract.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:57:21.199Z"
+    },
+    "antigravity-cost-collector": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5587",
+      "claimedAt": "2026-11-22T01:57:22.510Z",
+      "doneAt": "2026-11-22T02:00:14.696Z"
+    },
+    "antigravity-cost-collector.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T02:00:14.696Z"
+    },
+    "antigravity-cost-collector.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T02:00:14.696Z"
+    },
+    "antigravity-cost-collector.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T02:00:14.696Z"
+    },
+    "antigravity-cost-collector.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-22T02:00:14.696Z"
+    },
+    "antigravity-replay-fixtures": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5587",
+      "claimedAt": "2026-11-22T02:00:20.819Z",
+      "doneAt": "2026-11-22T02:05:53.577Z"
+    },
+    "antigravity-replay-fixtures.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T02:05:53.577Z"
+    },
+    "antigravity-replay-fixtures.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T02:05:53.577Z"
+    },
+    "antigravity-replay-fixtures.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T02:05:53.577Z"
+    },
+    "antigravity-replay-fixtures.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-22T02:05:53.577Z"
+    },
+    "antigravity-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5587",
+      "claimedAt": "2026-11-22T02:05:58.980Z",
+      "doneAt": "2026-11-22T02:07:55.303Z"
+    },
+    "antigravity-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T02:07:55.303Z"
+    },
+    "antigravity-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T02:07:55.303Z"
+    },
+    "antigravity-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T02:07:55.303Z"
+    },
+    "antigravity-docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-22T02:07:55.303Z"
+    },
+    "live-verification": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5587",
+      "claimedAt": "2026-11-22T02:08:03.868Z",
+      "doneAt": "2026-11-22T02:26:24.015Z"
+    },
+    "live-verification.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T02:26:24.015Z"
+    },
+    "live-verification.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T02:26:24.015Z"
+    },
+    "live-verification.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T02:26:24.015Z"
+    },
+    "live-verification.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-22T02:26:24.015Z"
+    },
+    "live-verification.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-22T02:26:24.015Z"
+    },
+    "live-verification.ac6": {
+      "status": "completed",
+      "doneAt": "2026-11-22T02:26:24.015Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-11-22T02:51:45Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-5587\n\n# Review — PAN-5587\n## Verdict: CHANGES REQUESTED — `ANTIGRAVITY_MODEL_IDS` omits gemini-4-neon/carbon/hydrogen although PAN-5586 is on this branch, so the issue AC's `gemini-4-carbon` conversation is refused\n\n## Context\n- Run ID: agent-pan-5587-review-2b489955\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-5587/.pan/review/agent-pan-5587-review-2b489955/context.json\n- Branch / workspace: feature/pan-5587 / /home/eltmon/Projects/overdeck/workspaces/feature-pan-5587\n- PR: https://github.com/eltmon/overdeck/pull/5594\n- HEAD reviewed: 2b4899559454035dd73d1fdf8026174e6181a918\n- Base: merge-base a99d6ac6a36b (origin/main); PRD planning base 83bda8904e4. Prior cycle: none (first review).\n- Requirements source: the manifest's `acceptanceCriteria` is empty, so the AC matrix below uses the issue #5587 body plus PRD `.pan/drafts/PAN-5587.md` (FR-1..14, NFR-1..8, AC-1..23).\n\n## Blocking Findings\n\n### [requirements] Antigravity model map lacks the Gemini 4 ids that PAN-5586 registered — `src/lib/antigravity-models.ts:4`\n- Severity: ! (MUST)\n- Classification / requirement scope: unmet in-scope acceptance criterion (implementation defect at the reviewed HEAD, with a spec-ordering gap behind it); in_pr_scope. This is not a regression.\n- Trigger and changed-code connection: The issue's acceptance criteria say: \"A conversation started with harness `antigravity` on `gemini-4-carbon` (once #5586 lands, otherwise `gemini-4-argon`) answers a prompt, survives a dashboard reload, and resumes.\" PRD D8 gives the rule: \"if `git grep -n \"'gemini-4-carbon'\" src/lib/settings.ts` finds the id (PAN-5586 landed), also add `gemini-4-neon`, `gemini-4-carbon` and `gemini-4-hydrogen` with identical values.\" At this HEAD the condition is true. `src/lib/settings.ts:42` `GoogleModel` contains all three ids. PAN-5586 (`3dc8ac55560`, #5590) is an ancestor of the model-map commit `8e75b268ded`, because the branch was rebased onto main after PAN-5586 merged. `ANTIGRAVITY_MODEL_IDS` still has only `gemini-4-argon`, `gemini-3.8-flash`, `gemini-3.6-flash` and `gemini-3.1-pro-preview`.\n  - When the item was written, the implementer followed D8's fallback and commented on PAN-5586. PAN-5586 then closed without adding the rows, because `antigravity-models.ts` was not yet on main. HZ-7 assumed PAN-5586 would land after this issue, so the hand-off fell through and no one is now responsible for the rows.\n- Expected / observed / impact:\n  - Expected: `canUseHarness('antigravity', 'gemini-4-carbon').allowed === true`, a \"Gemini 4 Carbon — Antigravity\" picker row, and a successful carbon launch.\n  - Observed: every entry point refuses carbon, neon and hydrogen. Conversation create (`resolveAllowedHarness` → `resolveHarness`, `src/lib/harness-resolve.ts:106-112`) throws `Harness antigravity denied for gemini-4-carbon (Antigravity runs only the Gemini models its CLI serves: …) — refusing to silently reroute…`. `pan start --harness antigravity --model gemini-4-carbon` is refused by `src/cli/commands/start.ts:138`. The catalog filter `isAntigravityModel(row.id)` (`src/lib/settings-model-catalog.ts`, `antigravityRows`) adds no row for the three ids. The host's `translateAntigravityModelId` would throw for them.\n  - Impact: PAN-5586 made neon, carbon and hydrogen the Google tier models (`src/lib/providers.ts:162`, `tierModels: { opus: 'gemini-4-neon', sonnet: 'gemini-4-carbon', haiku: 'gemini-4-hydrogen' }`). So no Google tier default can run on Antigravity. An operator who follows the documented `models.providers.google.harness: antigravity` default (`configuration/harnesses.mdx`, \"Choosing it\") gets a policy failure on every tier-model launch. The live record still says \"`gemini-4-carbon` is not registered (PAN-5586 open)\" (`.pan/drafts/PAN-5587-live-verification.md`, line 40), so the carbon run that the AC asks for never happened.\n- Evidence: static trace as above. `git merge-base --is-ancestor 3dc8ac55560 8e75b268ded` returns true. `git grep gemini-4-carbon -- src` finds the id in settings, cost pricing (`src/lib/cost.ts:167-170`, neon, carbon and hydrogen rows exist), and model capabilities (`src/lib/model-capability-additions.ts:178-230`), but not in the Antigravity map or its tests. Planning finding 4 says `agy` serves `gemini-4-neon | gemini-4-carbon | gemini-4-hydrogen` under those same names. Limit: I did not run a live carbon launch. The policy, catalog and translate refusals are deterministic from the code.\n- Fix:\n  1. In `src/lib/antigravity-models.ts`, add `'gemini-4-neon': 'gemini-4-neon'`, `'gemini-4-carbon': 'gemini-4-carbon'` and `'gemini-4-hydrogen': 'gemini-4-hydrogen'`.\n  2. Extend `tests/unit/lib/antigravity-models.test.ts` and `src/lib/__tests__/harness-policy.test.ts` to allow `antigravity` + `gemini-4-carbon`.\n  3. Update the model lists in `configuration/harnesses.mdx` (\"Models\") and `reference/harness-landscape.mdx` (\"Vendor / model\").\n  4. Rerun live check 1 on `gemini-4-carbon` and update `.pan/drafts/PAN-5587-live-verification.md` line 40.\n  5. Spec correction for future cross-issue hand-offs: HZ-7 and D8 should also cover the case where the related issue lands after the item is committed but before this PR merges. Re-evaluate the D8 condition after every rebase.\n\n## Non-blocking Findings\n\n- `?` **Possible stale `acp-launch-error` on a retry (pre_existing class).** `waitForHostReady` (`src/lib/agents/runtime-command.ts:511`) reads `<agent>/acp-launch-error` first. Only `AcpRuntimeSync.spawnAgent` (`src/lib/runtimes/acp.ts:212`) deletes the file before launch; the `buildAgentLaunchConfig` path relies on the new host's `start()` to `rm` it.\n  - With this PR, credential failures now write that file before the host starts. If the operator fixes the key and restarts the same agent or conversation, the readiness poll could read the old error before the new host removes it. Kimi and Grok auth failures share the same path today, so this is not new.\n  - To establish impact: reproduce a same-id restart after a credential failure. If it reproduces, the fix is to delete the error file in the launcher or spawn path before the pane starts.\n- `?` **The picker offers a level the model may not have.** A row without capability levels gets all four harness levels. The host then silently clamps them to the model's `thought_level` values; for example `xhigh` on `gemini-4-argon` runs `high`. D11 and D13 prescribe exactly this behavior, so this is a spec note, not a defect.\n- `?` **Doctor can throw.** `checkAntigravity` (`src/cli/commands/doctor-antigravity.ts`) awaits `readAntigravityAuthStatus()`, which rethrows any non-credential error, such as a config parse failure. That error would reject `collectDoctorChecks` instead of becoming a warn row. Other doctor checks probably fail on a broken config too, so this is optional hardening.\n- `?` **Env-reference detection is broad.** In `resolveAntigravityCredential`, `UNRESOLVED_ENV_REFERENCE` matches a `$NAME` substring anywhere in the value, and the error message echoes the whole value. Real Gemini keys contain no `$` (`[0-9A-Za-z_-]`), so no key can leak this way today. Anchoring the regex (`^\\$\\{?…\\}?$`) would remove the theoretical case.\n- Spec note: the \"Choosing it\" docs do warn that unserved Google ids fail policy under `harness: antigravity`. Once the blocker is fixed, the tier models work, and only non-agy ids (`gemini-3.5-flash-lite`, `gemini-3-flash-preview`, …) fail, as documented.\n- `reference/harness-landscape.mdx:581`: the feature-comparison matrix still lists Gemini CLI as \"Candidate\". The AC asked to replace the rows at lines 119 and 279, and those were replaced. This matrix row describes Gemini CLI as a research candidate, which is acceptable.\n\n## Coverage\n\n### Dimensions\n- **Correctness:** traced the credential resolver → host `main()` (pre-start error) → `makeAntigravityAcpRuntime` → spawn env/args → auth-method selection → host `start()` (setModel, then the generic `thought_level` clamp; on resume `setModel` always runs after `session/load`) → `extractTurnUsage` with the launch model → collector → `CostWriter` reconcile. Also traced the launcher-field harness threading at all four `getAcpLauncherFields` callers (spawn.ts, spawn-prep.ts, spawn-planning-session.ts, conversation-runtime.ts), recovery (passes `harness: recoveryHarness`), and the ModelPicker route-row selection. The grok-collector extraction is behavior-preserving (same walk, same matching via `startsWith('grok/')`, same request-id prefix).\n- **Security:** the trust boundary is the operator config key, which goes to the agy child env only. `INHERITED_CREDENTIAL_ENV` is deleted first. `--gemini-dir` isolates agy from `~/.gemini` OAuth. The OAuth ids can never be returned (allowlist plus advertised check). No key appears in messages, fixtures (0 `AIza` hits; a new hygiene test and a scrub pattern were added) or logs. No skip-permissions, sandbox or telemetry flags are passed. No new route.\n- **Performance:** the catalog adds one binary probe and one async config read per `available-models` call, which is bounded and matches the Grok pattern. The collector reuses the existing per-agent JSONL walk; the reconcile runs only when an Antigravity agent is running (`pi-cost-reconciler`). There is no sync I/O on server paths: auth uses `fs/promises`.\n- **Requirements/UX:** see the AC matrix. The picker journey (row → `onComboChange(id, levels, 'antigravity')` → harness label), the doctor states, and the fail-fast credential error were all checked.\n\n### Changed-file ledger (139 files)\n- **High risk, reviewed:** `src/lib/agents/spawn-prep.ts`, `src/lib/agents/spawn.ts`, `src/lib/planning/spawn-planning-session.ts` (one-line harness threading, net 0 lines), `src/lib/antigravity-auth.ts` (full).\n- **Core new or changed, reviewed in full:** `src/lib/acp/antigravity.ts`, `src/lib/acp/providers.ts`, `src/lib/acp/host.ts`, `src/lib/acp/transcript.ts`, `src/lib/acp/context.ts`, `src/lib/antigravity-models.ts`, `src/lib/runtimes/{acp,index,types}.ts`, `src/lib/agents/{runtime-command,recovery,tier-table}.ts`, `src/lib/costs/{acp-turn-usage-collector,antigravity-collector,grok-collector}.ts`, `src/lib/overdeck/cost.ts`, `src/lib/cloister/pi-cost-reconciler.ts`, `src/lib/settings-model-catalog.ts`, `src/lib/harness-policy.ts`, `src/lib/harness-policy-decisions.ts`, `src/lib/harness-binary.ts`, `src/lib/system-prerequisites.ts`, `src/cli/commands/doctor-antigravity.ts`, `src/cli/commands/doctor.ts`, `src/lib/protocol-capture/{record,scrub}.ts`.\n- **Union/list one-liners, reviewed:** `packages/contracts/src/{artifacts,context-layers,fleet-versions,flywheel,harness-behavior,harness-capabilities,telemetry,types}.ts`, `composer-commands.generated.ts` (help-text regeneration only), `src/lib/config-yaml/{merge,roles,schema}.ts`, `src/lib/context-layers/{harness,launch-sources}.ts`, `src/lib/conversations/{harness-discovery,transcript-adapter}.ts`, `src/lib/overdeck/{conversations,conversation-runtime,conversation-restart-all}.ts`, `src/lib/launcher-generator.ts`, `src/lib/settings-api.ts`, `src/lib/telemetry/pipeline.ts`, `src/lib/artifacts/lifecycle.ts`, `src/cli/{index,commands/start,start-register,strike,worker,artifacts,context-layers}.ts`, `src/dashboard/server/routes/{context,costs,workers}.ts`.\n- **Frontend, reviewed:** `chat/ModelPicker.tsx` (route-row logic: Kimi rows excluded, Grok rows have name === baseName, so no behavior change for them), `chat/useComposerEffort.ts`, `shared/ModelPicker/{ModelPicker,harnessRows}.ts(x)`, `shared/branding/index.tsx` (original geometric icon, no vendor logo), `Settings/sections/ProviderManagementSection.tsx` (offered for google only), `Settings/{types,RolesPanel}.ts(x)`, `CrewRow.tsx`, `TieredExecutionSection.tsx`, `CommandDeck/{ConversationList,ForkModal,useConversationMutations}.ts(x)`, `PlanDialog.tsx`, `context/ContextPage.tsx`, `home/homeComposerIntents.ts`, `sessionFeed/types.ts`, `hooks/useSwitchModel.ts`, `types.ts`.\n- **Tests, reviewed (by intent and by running):** all 7 new test files plus the modified tests listed in the diff stat. New tests live under `src/**/__tests__` and `tests/unit`, which the normal vitest config and CI shards pick up; the frontend tests run under the frontend config.\n- **Fixtures:** `antigravity-{resume,turn-completion}.jsonl` and `replay-spawner.ts` were reviewed. They contain no key material.\n- **Docs, reviewed:** `configuration/harnesses.mdx` (Antigravity section covers install, both auth methods, clause 6, models, effort, isolation, resume, MCP and cost estimates), `reference/harness-landscape.mdx`, `docs/{ROLES,TELEMETRY,PROTOCOL-REPLAY-TESTS}.md`, `CLAUDE.md`, `.overdeck/context/codebase/{architecture,stack}.md`, `changelog.d/pan-5587.md`.\n- **Planning artifacts, not applicable:** `.pan/drafts/*`, `.pan/continues/*`, `.pan/specs/*xbrief.json` are plan state, not shipped code. I read them for requirements only.\n\n### AC matrix\nIssue #5587 acceptance criteria:\n\n| AC | Status | Evidence |\n| --- | --- | --- |\n| `pan doctor` reports agy and auth state, and says why OAuth is not used | met | `doctor-antigravity.ts` (warn/warn/ok, each with `ANTIGRAVITY_OAUTH_NOT_OFFERED`); `tests/unit/cli/doctor-antigravity.test.ts` passed; live check 5 |\n| Conversation on `gemini-4-carbon` once #5586 lands answers, survives reload, resumes | **unmet** | #5586 is on the branch and carbon is refused by policy (blocking finding). Live checks 1 and 2 passed on `gemini-4-argon` only |\n| Unit tests: runtime command, auth selection (OAuth never chosen), transcript adapter | met | `runtimes/__tests__/acp.test.ts`, `antigravity.test.ts` (\"refuses to fall back to an OAuth method\", \"never selects an OAuth method even when asked\"), `antigravity-auth.test.ts`, `transcript-adapter.test.ts` |\n| ModelPicker shows Antigravity as a harness for Google models | met (for served ids) | `ModelPicker.test.tsx` Antigravity block; `HARNESS_OPTIONS`; catalog rows. Gemini 4 neon/carbon/hydrogen are missing because of the blocker |\n| Docs (harnesses.mdx, harness-landscape rows 119/279, ToS reason, changelog.d) | met | Diff reviewed. Model lists need the blocker fix |\n\nPRD acceptance criteria:\n\n| PRD AC | Status | Evidence |\n| --- | --- | --- |\n| AC-1 | met | `harness-behavior.test.ts` |\n| AC-2 | met | `antigravity-models.test.ts` |\n| AC-3 | met | `harness-policy.test.ts` |\n| AC-4 | met | `antigravity-auth.test.ts` (settings key, no env key, `$VAR` refusal, Agent Platform, clause 6, no key in the message) |\n| AC-5 | met | `antigravity.test.ts` (args, OAuth refusal, clamp examples, usage mapping) |\n| AC-6 | met | `host.test.ts` and `host-replay.test.ts` (clamp after setModel, also on resume; launch model on usage; pre-start error) |\n| AC-7 | met | `runtime-command-effort.test.ts`, `runtimes/__tests__/acp.test.ts` |\n| AC-8 to AC-12 | met | validation, list and route tests (`config-yaml.test.ts`, `normalize-harness`, `conversation-restart-all`, `context.test.ts`, `workers-route`, `start-harness`) |\n| AC-13 | met for served ids | `settings-model-catalog.test.ts` |\n| AC-14 | met | doctor test |\n| AC-15 | met | `useComposerEffort.test.tsx`; frontend typecheck covered by CI `build`/lint |\n| AC-16 | met | ModelPicker test |\n| AC-17 | met | `branding.test.tsx` |\n| AC-18 | met | grok reconcile tests in CI shards; the extraction is behavior-preserving |\n| AC-19 | met | `cost-antigravity-reconcile.test.ts` (2 then 0) |\n| AC-20 | met | `prime-agent-no-loss-audit.test.ts` |\n| AC-21 | met | `host-replay.test.ts`, `fixture-hygiene.test.ts`, 0 `AIza` hits |\n| AC-22 | met | docs reviewed; CI `lint` passed |\n| AC-23 | partially met | live checks 1-7 passed on `gemini-4-argon`. Agent Platform is \"not verified live\", which D18 allows. The carbon variant is outstanding (blocker) |\n\n### Non-goals\nNone was violated. No OAuth or `--login` path, no Gemini CLI harness, `runsOnFlyMachine` is inherited `false`, no new provider or ids, no `systemPrompt.append`, no skip-permissions/sandbox/telemetry flags, and no ratchet or allowlist was raised (the file-size guard passed).\n\n## Verification\n- **CI on PR #5594 at HEAD 2b48995 (`gh pr checks 5594`):** test-shard 1/4 to 4/4, test, test-e2e, build (22), lint, and lint-group core/effect/skills/state all pass. `overdeck/test` (the verification gate) passes. `bare-host-linux` was still pending; it is not a required test job, so it is recorded as unverified.\n- **Focused backend tests:** `npx vitest run` on 12 files (antigravity, auth, models, harness-policy, settings-model-catalog, cost-antigravity-reconcile, acp-turn-usage-collector, doctor-antigravity, host-replay, runtimes acp, runtime-command-effort, no-loss audit): 308 passed.\n- **Focused frontend tests:** ModelPicker, ProviderManagementSection, branding, ForkModal and useComposerEffort: 63 passed.\n- `bash scripts/lint-file-size.sh`: passed.\n- `npm run lint:effort`: passed.\n- `npm run lint:effect-diagnostics`: passed (227 known, none new).\n- **Not run:** the full `npm test`, per the role (CI owns it), and no live agy run, because the reviewer must not touch live operator state.\n\n## Scope Note\nThe blocker comes from a cross-issue hand-off. PRD D8 and HZ-7 assumed PAN-5586 would land either before WI-2 or after this PR, but it landed in between. The branch was then rebased onto it without the D8 condition being checked again. The fix is small: three map rows, their tests, the model lists in two docs, and one live re-run.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-5587/.pan/review/agent-pan-5587-review-2b489955/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-5587 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 2,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-22T02:57:46Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5587\n\nPull request: https://github.com/eltmon/overdeck/pull/5594 (head `52c658d9`)\n\nSource: check_run:lint-group (core)\n\n## Failing checks (1)\n\n### lint-group (core)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/137072641390/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/44978178319/job/137072641390  \n```\n✗ direct agent state directory removal outside removeAgentStateDir:\nsrc/lib/agents/runtime-command.ts:153:  await rm(join(getAgentDir(agentId), hostLaunchErrorFile('acp')), { force: true });\nRoute directory cleanup through src/lib/agents/state-dir-removal.ts.\nNamed-file exemptions must be allowlisted and carry: // PAN-3357: not a dir removal\n##[error]Process completed with exit code 1.\nPost job cleanup.\n[command]/usr/bin/git version\ngit version 2.56.1\nTemporarily overriding HOME='/home/runner/work/_temp/50485ae8-7984-4a55-bcd9-da79197396cd' before making global git config changes\nAdding repository directory to the temporary git global config as a safe directory\n[command]/usr/bin/git config --global --add safe.directory /home/runner/work/overdeck/overdeck\n[command]/usr/bin/git config --local --name-only --get-regexp core\\.sshCommand\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'core\\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp http\\.https\\:\\/\\/github\\.com\\/\\.extraheader\nhttp.https://github.com/.extraheader\n[command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'http\\.https\\:\\/\\/github\\.com\\/\\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\\.gitdir:\n[command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url\nCleaning up orphan processes\n##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ]
+}

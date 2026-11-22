@@ -48,7 +48,7 @@ function mapForHarness(harness: Conversation['harness'], effort: string): string
     if (effort === 'medium') return 'high';
     if (effort === 'xhigh') return 'max';
   }
-  if (harness === 'grok' && effort === 'max') return 'xhigh';
+  if ((harness === 'grok' || harness === 'antigravity') && effort === 'max') return 'xhigh';
   return effort;
 }
 
@@ -71,7 +71,7 @@ export function resolveComposerEffort(conversation: Conversation): EffortLevel {
 
 function supportsLiveChange(harness: string, piConversation: boolean, agentId: string | undefined): boolean {
   if (agentId) return harness === 'claude-code';
-  return harness === 'claude-code' || piConversation || harness === 'codex' || harness === 'acp' || harness === 'opencode' || harness === 'grok';
+  return harness === 'claude-code' || piConversation || harness === 'codex' || harness === 'acp' || harness === 'opencode' || harness === 'grok' || harness === 'antigravity';
 }
 
 export function useComposerEffort({

@@ -26,7 +26,7 @@ describe('shared branding registry', () => {
       'dashscope',
       'openrouter',
     ]);
-    expect(Object.keys(HARNESS_BRANDS)).toEqual(['opencode', 'muse', 'claude-code', 'codex', 'pi', 'ohmypi', 'acp', 'kimi-code', 'prime-agent', 'grok']);
+    expect(Object.keys(HARNESS_BRANDS)).toEqual(['opencode', 'muse', 'claude-code', 'codex', 'pi', 'ohmypi', 'acp', 'kimi-code', 'prime-agent', 'grok', 'antigravity']);
 
     for (const brand of [...Object.values(PROVIDER_BRANDS), ...Object.values(HARNESS_BRANDS)]) {
       expect(brand.id).toBeTruthy();
@@ -78,5 +78,19 @@ describe('shared branding registry', () => {
     expect(HARNESS_BRANDS.grok.label).toBe('Grok Build');
     render(<HarnessLogo harness="grok" />);
     expect(screen.getByLabelText('Grok Build logo')).toBeInTheDocument();
+  });
+
+  it('resolves Antigravity for the antigravity harness with its own mark (PAN-5587)', () => {
+    expect(HARNESS_BRANDS.antigravity.label).toBe('Antigravity');
+    expect(HARNESS_BRANDS.antigravity.Icon).not.toBe(HARNESS_BRANDS.acp.Icon);
+    render(<HarnessLogo harness="antigravity" />);
+    expect(screen.getByLabelText('Antigravity logo')).toBeInTheDocument();
+    const AntigravityIcon = HARNESS_BRANDS.antigravity.Icon;
+    render(<AntigravityIcon />);
+    expect(screen.getByLabelText('Antigravity harness mark')).toBeInTheDocument();
+  });
+
+  it('adds no antigravity provider brand: Antigravity is a harness for Google models (PAN-5587)', () => {
+    expect(Object.keys(PROVIDER_BRANDS)).not.toContain('antigravity');
   });
 });

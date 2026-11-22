@@ -20,6 +20,7 @@ import { getProjectPanPaths } from '../../lib/pan-dir/paths.js';
 import { getMainDivergence, type MainDivergence } from '../../lib/state-plane.js';
 import { checkKimi } from './doctor-kimi.js';
 import { checkGrok } from './doctor-grok.js';
+import { checkAntigravity } from './doctor-antigravity.js';
 import { checkPi } from './doctor-pi.js';
 import { checkHostTools } from './doctor-host-tools.js';
 import { checkSageox } from './doctor-sageox.js';
@@ -743,6 +744,7 @@ export async function collectDoctorChecks(options: DoctorOptions = {}): Promise<
   // Kimi Code CLI (ACP harness). Resolve the same configured executable used at launch.
   for (const c of await checkKimi()) checks.push(c);
   for (const c of await checkGrok()) checks.push(c); // PAN-5078: optional ACP harness + sign-in
+  for (const c of await checkAntigravity()) checks.push(c); // PAN-5587: optional ACP harness + API key / Agent Platform
   for (const c of await checkSageox()) checks.push(c); // PAN-2444: ox host contract + pack commit
   for (const c of await checkAtlassianMcp()) checks.push(c); // PAN-5165: Rovo MCP endpoint + credentials
   for (const c of await checkPrimeAgent()) checks.push(c); // PAN-3668: version pin + orphaned daemons

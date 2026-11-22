@@ -64,7 +64,7 @@ function normalizeProviderConfig(
 
 function validateProviderHarness(provider: ModelProvider, harness: RuntimeName | undefined): void {
   if (harness !== undefined && !KNOWN_HARNESSES.has(harness)) {
-    throw new Error(`config.yaml: models.providers.${provider}.harness must be claude-code, pi, ohmypi, codex, acp, kimi-code, opencode, muse, prime-agent, or grok`);
+    throw new Error(`config.yaml: models.providers.${provider}.harness must be claude-code, pi, ohmypi, codex, acp, kimi-code, opencode, muse, prime-agent, grok, or antigravity`);
   }
 }
 

@@ -221,7 +221,7 @@ const PI_CONVERSATION_SOURCE_CONTRACT = [
 export async function resolveAllowedHarness(requested: unknown, model?: string | null): Promise<RuntimeName> {
   if (!model) return 'claude-code';
   const explicit: RuntimeName | undefined =
-    requested === 'pi' || requested === 'ohmypi' || requested === 'claude-code' || requested === 'codex' || requested === 'acp' || requested === 'kimi-code' || requested === 'opencode' || requested === 'muse' || requested === 'prime-agent' || requested === 'grok'
+    requested === 'pi' || requested === 'ohmypi' || requested === 'claude-code' || requested === 'codex' || requested === 'acp' || requested === 'kimi-code' || requested === 'opencode' || requested === 'muse' || requested === 'prime-agent' || requested === 'grok' || requested === 'antigravity'
       ? requested
       : undefined;
   return resolveHarness({ model, explicit });
@@ -665,7 +665,7 @@ export async function spawnConversationSession(
       : undefined;
     await rm(sessionIdPath, { force: true }); // PAN-3357: not a dir removal
     acpFields = {
-      ...(await getAcpLauncherFields(tmuxSession, model, cwd, harnessLaunch.binaryPath, 'work', launchEffort)),
+      ...(await getAcpLauncherFields(tmuxSession, model, cwd, harnessLaunch.binaryPath, 'work', launchEffort, harness)),
       ...(bareContext ? { acpContextFile: undefined } : {}),
       resumeSessionId,
     };

@@ -38,6 +38,8 @@ export const SECRET_VALUE_PATTERNS: readonly RegExp[] = [
   /xox[abpr]-[A-Za-z0-9-]{10,}/g,
   /eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]+/g,
   /Bearer\s+[A-Za-z0-9._~+/-]+=*/g,
+  // Google API keys (a Gemini key is what agy authenticates with, PAN-5587).
+  /AIza[0-9A-Za-z_-]{35}/g,
 ];
 
 export const EMAIL_PATTERN = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
