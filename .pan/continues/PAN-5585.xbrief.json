@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5585",
   "created": "2026-11-21T22:42:01.524Z",
-  "updated": "2026-11-22T01:03:20.633Z",
+  "updated": "2026-11-22T01:17:21.886Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -154,9 +154,26 @@
       "doneAt": "2026-11-22T01:03:12.770Z"
     },
     "phone-width-e2e": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5585",
-      "claimedAt": "2026-11-22T01:03:20.633Z"
+      "claimedAt": "2026-11-22T01:03:20.633Z",
+      "doneAt": "2026-11-22T01:17:21.885Z"
+    },
+    "phone-width-e2e.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:17:21.885Z"
+    },
+    "phone-width-e2e.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:17:21.885Z"
+    },
+    "phone-width-e2e.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:17:21.885Z"
+    },
+    "phone-width-e2e.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:17:21.885Z"
     }
   }
 }
