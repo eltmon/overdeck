@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5587",
   "created": "2026-11-21T22:59:41.238Z",
-  "updated": "2026-11-22T02:00:20.819Z",
+  "updated": "2026-11-22T02:05:53.578Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -402,9 +402,26 @@
       "doneAt": "2026-11-22T02:00:14.696Z"
     },
     "antigravity-replay-fixtures": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5587",
-      "claimedAt": "2026-11-22T02:00:20.819Z"
+      "claimedAt": "2026-11-22T02:00:20.819Z",
+      "doneAt": "2026-11-22T02:05:53.577Z"
+    },
+    "antigravity-replay-fixtures.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T02:05:53.577Z"
+    },
+    "antigravity-replay-fixtures.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T02:05:53.577Z"
+    },
+    "antigravity-replay-fixtures.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T02:05:53.577Z"
+    },
+    "antigravity-replay-fixtures.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-22T02:05:53.577Z"
     }
   }
 }
