@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5588",
   "created": "2026-11-21T23:34:16.196Z",
-  "updated": "2026-11-22T01:30:26.431Z",
+  "updated": "2026-11-22T01:31:00.260Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -90,9 +90,14 @@
       "doneAt": "2026-11-22T01:30:20.493Z"
     },
     "wi5-changelog": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5588",
-      "claimedAt": "2026-11-22T01:30:26.431Z"
+      "claimedAt": "2026-11-22T01:30:26.431Z",
+      "doneAt": "2026-11-22T01:31:00.260Z"
+    },
+    "wi5-changelog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:31:00.260Z"
     }
   }
 }
