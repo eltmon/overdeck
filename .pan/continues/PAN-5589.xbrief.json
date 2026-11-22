@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5589",
   "created": "2026-11-22T01:01:54.134Z",
-  "updated": "2026-11-22T01:04:47.676Z",
+  "updated": "2026-11-22T01:05:16.764Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
     "extract-cpu-rule.ac3": {
       "status": "completed",
       "doneAt": "2026-11-22T01:04:47.676Z"
+    },
+    "utilization-floor": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5589",
+      "claimedAt": "2026-11-22T01:05:16.764Z"
     }
   }
 }
