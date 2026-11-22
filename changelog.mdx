@@ -11,6 +11,27 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
 
 {/* RELEASE STEP: do not edit this page for an unreleased change. Each PR adds its bullets to changelog.d/<issue>.md (format: changelog.d/README.md), and pan release stable folds them into a dated <Update> block here. See docs/RELEASING.md "Update the public changelog". If a new model needs a newer Claude Code, say so in its entry and confirm its minClaudeCodeVersion is set. */}
 
+<Update label="v0.90.0" description="2026-11-21">
+  #### New
+
+  - **Add known skill packs from the dashboard:** the Skills page lists known packs and pack groups you have not added, such as the `video` group, and **Add…** previews each pinned commit and adds it once you trust it. The new-conversation skills list offers the same for groups. `pan skills pack list` now prints the packs you have not added and the command that adds each, and a new `pan-skills` skill tells agents how to add a missing pack. ([#5540](https://github.com/eltmon/overdeck/issues/5540))
+  - **Gemini 4 Carbon, Neon and Hydrogen:** `gemini-4-carbon`, `gemini-4-neon` and `gemini-4-hydrogen` are in the model pickers, the model catalog and cost tracking, with 1,048,576-token windows. Neon (&#36;3 / &#36;15 per MTok) and Hydrogen (&#36;1.50 / &#36;7.50) think up to xhigh; Carbon (&#36;2 / &#36;10 through 2026-11-30, then &#36;4 / &#36;20) thinks up to high. ([#5586](https://github.com/eltmon/overdeck/issues/5586))
+
+  #### Improved
+
+  - **Google tier models:** Google's opus, sonnet and haiku tiers now use Gemini 4 Neon, Carbon and Hydrogen. Saved `gemini-2.5-pro` and `gemini-2.5-flash` selections now migrate to `gemini-3.8-flash` and `gemini-3.5-flash-lite`, the models Google routes them to from 2026-12-01. ([#5586](https://github.com/eltmon/overdeck/issues/5586))
+
+  #### Fixed
+
+  - **Plan finalize auto-start reporting:** `pan plan finalize` reads auto-start consent from the current consent record again, so an auto-start plan no longer reports that it awaits your approval, and a deferred work start is explained. When promotion is not confirmed, finalize now says to check the issue and run `pan plan done <id>` instead of promising an automatic recovery that never ran. ([#5526](https://github.com/eltmon/overdeck/issues/5526))
+  - **Secret requests open where you can answer them:** clicking a secret or machine-link request in Needs you now opens a dialog with the input, and the agent's conversation shows the request at the top. ([#5541](https://github.com/eltmon/overdeck/issues/5541))
+  - **Phone-width conversation page:** the Agents rail now opens over the conversation instead of squeezing it, the top bar and conversation header fit a phone screen, and the phone app's header stays visible while the keyboard is open. ([#5585](https://github.com/eltmon/overdeck/issues/5585))
+  - **Gates no longer stall for an hour under outside CPU load:** when CPU pressure from other work holds the admission queue past `resources.quality_gate_cpu_bypass_minutes`, queued quality gates, Vitest runs and typecheck lanes now run one at a time back to back instead of each waiting the full bound again. ([#5588](https://github.com/eltmon/overdeck/issues/5588))
+  - **Quality gates no longer wait on CPU that is free:** a workload pinned to a few cores, such as encodes run with `taskset`, raised CPU pressure readings and held every local gate in the admission queue while most cores sat idle. Gates now treat CPU pressure readings as contention only once the whole machine is at least 50% busy. ([#5589](https://github.com/eltmon/overdeck/issues/5589))
+
+  [Compare v0.89.1...v0.90.0](https://github.com/eltmon/overdeck/compare/v0.89.1...v0.90.0)
+</Update>
+
 <Update label="v0.89.1" description="2026-11-18">
   #### New
 
