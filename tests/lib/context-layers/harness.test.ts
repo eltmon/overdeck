@@ -109,6 +109,19 @@ describe('validateTemplate', () => {
     expect(rendered).not.toContain('opencode block');
   });
 
+  it('accepts antigravity as a known harness marker (PAN-5587)', () => {
+    const v = validateTemplate('{{#harness:antigravity}}x{{/harness:antigravity}}');
+    expect(v.ok).toBe(true);
+    expect(v.issues).toHaveLength(0);
+  });
+
+  it('renders antigravity blocks and drops grok blocks for an Antigravity launch (PAN-5587)', () => {
+    const rendered = renderForHarness('shared\n{{#harness:antigravity}}antigravity block{{/harness:antigravity}}\n{{#harness:grok}}grok block{{/harness:grok}}', 'antigravity');
+    expect(rendered).toContain('shared');
+    expect(rendered).toContain('antigravity block');
+    expect(rendered).not.toContain('grok block');
+  });
+
   it('warns — but does not error — on an unknown harness name', () => {
     const v = validateTemplate('{{#harness:cursor}}x{{/harness:cursor}}');
     expect(v.ok).toBe(true);
