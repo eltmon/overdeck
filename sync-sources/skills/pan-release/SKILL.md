@@ -73,6 +73,18 @@ version's block already exists (a retag).
    `EUNSUPPORTEDPROTOCOL`), the release is broken for every new user: fix it and
    ship a patch release the same day.
 
+   If the `npm` job instead failed with `::error::<pkg>@<version> is not
+   visible on npm`, the version is most likely **staged** (PAN-5595): npm
+   accepted it but holds it back until a maintainer approves it. Confirm it
+   with `npx --yes npm@11 stage list <pkg>` and
+   `npx --yes npm@11 stage view <stage-id>`, and approve only the stage id
+   whose output shows that exact package and version, with
+   `npx --yes npm@11 stage approve <stage-id>` (2FA, npm 11.15 or later). You
+   can also approve under Staged Packages in your npmjs.com account settings.
+   If no staged entry for that version exists, check registry visibility
+   instead of approving. Then re-run the failed `npm` job. Never publish the
+   same version again. See `docs/RELEASING.md` for details.
+
 ## What the CLI does
 
 `pan release stable` and `pan release canary`:
@@ -94,7 +106,9 @@ the GitHub Release with desktop binaries — automatically**. There is **no manu
 
 - CI authenticates via **npm Trusted Publishing (OIDC)** — the workflow's
   `id-token: write` plus a Trusted Publisher configured on each package. The
-  publish steps are retry-safe (skip a package if that version already exists).
+  publish steps are retry-safe (skip a package if that version already exists)
+  and wait up to 20 minutes for the version to become visible on npm, failing
+  with approval instructions if npm holds it as staged (PAN-5595).
 - **Do NOT add `registry-url` or a `NODE_AUTH_TOKEN` to the npm job's
   `setup-node`.** `registry-url` writes a dummy `_authToken` into `.npmrc` that
   shadows OIDC and makes `npm publish` fail with a 404. (This broke the
