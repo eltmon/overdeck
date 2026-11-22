@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5589",
   "created": "2026-11-22T01:01:54.134Z",
-  "updated": "2026-11-22T01:09:22.896Z",
+  "updated": "2026-11-22T01:09:27.678Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -62,6 +62,11 @@
     "cpu-rule-boundary-tests.ac2": {
       "status": "completed",
       "doneAt": "2026-11-22T01:09:22.896Z"
+    },
+    "docs-and-changelog": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5589",
+      "claimedAt": "2026-11-22T01:09:27.678Z"
     }
   }
 }
