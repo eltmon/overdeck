@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-22T03:04:49Z · model: claude-opus-5-5 · open: 942_
+_Last sequenced: 2026-11-22T04:24:59Z · model: claude-opus-5-5 · open: 942_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -11,7 +11,7 @@ _Last sequenced: 2026-11-22T03:04:49Z · model: claude-opus-5-5 · open: 942_
 | 6 | PAN-5489 | S | high | ok |  |  | pan plan from an agent shell fails workspace creation without HUME_API_KEY, leaves a half-built workspace and hides the cause. |
 | 7 | PAN-5566 | M | high | ok |  |  | UI/help text says Auto blocks destructive calls but the hook approves all; repo .pan.yaml can set bypass mode. |
 | 8 | PAN-5385 | S | critical | ok |  |  | Anywhere remote access is down for trickle clients: machine drops ICE candidates sent before session registers; small server fix |
-| 9 | PAN-5587 | L | medium | ok |  |  | In pipeline (planning). Antigravity harness on agy acp, API-key/Agent Platform auth only (OAuth breaches ToS); modeled on Grok ACP. |
+| 9 | PAN-5595 | S | high | ok |  |  | In pipeline. Release passes while npm holds core as staged (uninstallable); rerun hits E409. Poll visibility, handle staged. |
 | 10 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 10 | PAN-5523 | S | high | ok |  |  | pan conversations move/heal send raw fetch with no token, so routes refuse with Missing origin; same fix pattern as in-pipeline PAN-5516. |
 | 11 | PAN-4553 | S | critical | ok |  |  | Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges. |
@@ -974,9 +974,9 @@ New bug: operators choose Auto believing it gates destructive calls, and a proje
 
 New issue. Phones (iOS, Android) and the connector cannot reach the machine at all, directly or through the relay, because RtcTransport.accept awaits ICE servers before registering the signalling session and drops trickle candidates that arrive in that window. The root cause and the fix (buffer candidates from offer acceptance) are stated in the body and touch only the dashboard server, so this is a small, well-defined fix for a full outage of a shipped feature. It takes the open rank-8 slot ahead of the remaining pipeline-substrate bugs.
 
-### PAN-5587 (rank 9)
+### PAN-5595 (rank 9)
 
-New since the prior run and already in the pipeline (planning), so it is pinned at the free rank-9 slot. Scope is large (runtime, ACP layer, policy, costs, sign-in, UI) but follows the Grok ACP checklist with a clear auth decision; the CLI is not yet verified on this host, which planning must confirm. It informs PAN-752 by closing its OAuth question for Antigravity.
+New since the prior run and already in the pipeline, so it takes the rank-9 slot freed when PAN-5587 merged. It is substrate work on the release path: the 0.90.0 run reported success while @overdeck/core was not installable, so every release can silently ship nothing. The fix is small and fully specified (extract a tested publish script, poll visibility, treat staged E409 as published, document the approval commands).
 
 ### PAN-4636 (rank 10)
 
@@ -1277,7 +1277,7 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-22T03:04:49Z",
+  "generatedAt": "2026-11-22T04:24:59Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 942,
@@ -1361,15 +1361,15 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
       "planning": "auto"
     },
     {
-      "issue": "PAN-5587",
+      "issue": "PAN-5595",
       "rank": 9,
-      "size": "L",
-      "importance": "medium",
-      "score": 58,
+      "size": "S",
+      "importance": "high",
+      "score": 74,
       "condition": "ok",
       "dependsOn": [],
-      "why": "In pipeline (planning). Antigravity harness on agy acp, API-key/Agent Platform auth only (OAuth breaches ToS); modeled on Grok ACP.",
-      "rationale": "New since the prior run and already in the pipeline (planning), so it is pinned at the free rank-9 slot. Scope is large (runtime, ACP layer, policy, costs, sign-in, UI) but follows the Grok ACP checklist with a clear auth decision; the CLI is not yet verified on this host, which planning must confirm. It informs PAN-752 by closing its OAuth question for Antigravity.",
+      "why": "In pipeline. Release passes while npm holds core as staged (uninstallable); rerun hits E409. Poll visibility, handle staged.",
+      "rationale": "New since the prior run and already in the pipeline, so it takes the rank-9 slot freed when PAN-5587 merged. It is substrate work on the release path: the 0.90.0 run reported success while @overdeck/core was not installable, so every release can silently ship nothing. The fix is small and fully specified (extract a tested publish script, poll visibility, treat staged E409 as published, document the approval commands).",
       "gate": "auto",
       "planning": "auto"
     },
@@ -14341,13 +14341,6 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
-    },
-    {
-      "from": "PAN-5587",
-      "to": "PAN-752",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.6
     },
     {
       "from": "PAN-750",
