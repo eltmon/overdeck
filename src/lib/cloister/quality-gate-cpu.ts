@@ -1,15 +1,20 @@
 /**
  * PAN-5520: CPU settings for quality-gate admission, read from the global
  * config only (D5), so every workspace sharing the machine-wide admission root
- * applies the same rule.
+ * applies the same rule. PAN-5588: also holds the queue's CPU marker.
  */
+
+import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
+
+import { isErrnoException, publishExclusive, readJson, unlinkIfExists } from './quality-gate-admission-files.js'
 
 /** PAN-4311 D10: start new gates only while CPU PSI `some avg10` is below this percentage. */
 export const DEFAULT_QUALITY_GATE_PSI_START_AVG10 = 25
 /**
- * How long the queue head may wait on CPU pressure before it starts alone
- * once the slots are empty. Below the wrappers' 30-minute admission wait, so
- * the head starts before it times out.
+ * How long the admission queue may stay CPU-blocked before its head starts
+ * alone once the slots are empty (PAN-5588: counted per queue episode, not
+ * per head).
  */
 export const DEFAULT_QUALITY_GATE_CPU_BYPASS_MS = 10 * 60 * 1_000
 
@@ -32,5 +37,57 @@ export async function resolveQualityGateCpuSettings(): Promise<QualityGateCpuSet
     }
   } catch {
     return defaults
+  }
+}
+
+/** PAN-5588: the queue's CPU-pressure episode, `{"since": <epoch ms>}`, in the admission root. */
+export const QUEUE_CPU_MARKER_FILE = 'cpu-blocked-since.json'
+
+function validSince(value: unknown): number | null {
+  const since = (value as { since?: unknown } | null)?.since
+  return typeof since === 'number' && Number.isFinite(since) && since > 0 ? since : null
+}
+
+/** When the queue's CPU block began, or null when there is none or the marker is unreadable (FR-8). Never throws. */
+export async function readQueueCpuBlockedSince(root: string): Promise<number | null> {
+  try {
+    return validSince(await readJson(join(root, QUEUE_CPU_MARKER_FILE)))
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Start the queue's CPU block at `since` unless a valid one is recorded (FR-2).
+ * Published create-exclusive, so of two heads racing, the first marker stays.
+ * An invalid marker is replaced (FR-8). Never throws (NFR-1).
+ */
+export async function markQueueCpuBlocked(root: string, since: number): Promise<void> {
+  const path = join(root, QUEUE_CPU_MARKER_FILE)
+  try {
+    let raw: string | null = null
+    try {
+      raw = await readFile(path, 'utf8')
+    } catch (error) {
+      if (!isErrnoException(error) || error.code !== 'ENOENT') return
+    }
+    if (raw !== null) {
+      let parsed: unknown = null
+      try { parsed = JSON.parse(raw) } catch { /* invalid: replace it */ }
+      if (validSince(parsed) != null) return
+      await unlinkIfExists(path)
+    }
+    await publishExclusive(path, { since })
+  } catch {
+    // EEXIST (another head won) or any fs error: best effort.
+  }
+}
+
+/** End the queue's CPU block (FR-4). Never throws. */
+export async function clearQueueCpuBlock(root: string): Promise<void> {
+  try {
+    await unlinkIfExists(join(root, QUEUE_CPU_MARKER_FILE))
+  } catch {
+    // Best effort.
   }
 }
