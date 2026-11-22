@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5588",
   "created": "2026-11-21T23:34:16.196Z",
-  "updated": "2026-11-22T00:58:34.150Z",
+  "updated": "2026-11-22T01:03:55.913Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -28,9 +28,22 @@
       "doneAt": "2026-11-22T00:57:56.427Z"
     },
     "wi2-queue-cpu-marker-helpers": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5588",
-      "claimedAt": "2026-11-22T00:58:34.150Z"
+      "claimedAt": "2026-11-22T00:58:34.150Z",
+      "doneAt": "2026-11-22T01:03:55.913Z"
+    },
+    "wi2-queue-cpu-marker-helpers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:03:55.913Z"
+    },
+    "wi2-queue-cpu-marker-helpers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:03:55.913Z"
+    },
+    "wi2-queue-cpu-marker-helpers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T01:03:55.913Z"
     }
   }
 }
