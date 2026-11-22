@@ -14,11 +14,11 @@ describe('providers', () => {
     expect(getProviderEnv(PROVIDERS.google, 'AIza-test')).toEqual({
       ANTHROPIC_AUTH_TOKEN: 'AIza-test',
       GEMINI_API_KEY: 'AIza-test',
-      ANTHROPIC_DEFAULT_OPUS_MODEL: 'gemini-3.1-pro-preview',
-      ANTHROPIC_DEFAULT_SONNET_MODEL: 'gemini-3-flash-preview',
-      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'gemini-3.1-flash-lite',
-      ANTHROPIC_SMALL_FAST_MODEL: 'gemini-3.1-flash-lite',
-      CLAUDE_CODE_SUBAGENT_MODEL: 'gemini-3.1-flash-lite',
+      ANTHROPIC_DEFAULT_OPUS_MODEL: 'gemini-4-neon',
+      ANTHROPIC_DEFAULT_SONNET_MODEL: 'gemini-4-carbon',
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'gemini-4-hydrogen',
+      ANTHROPIC_SMALL_FAST_MODEL: 'gemini-4-hydrogen',
+      CLAUDE_CODE_SUBAGENT_MODEL: 'gemini-4-hydrogen',
     });
   });
 

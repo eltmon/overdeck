@@ -131,8 +131,8 @@ export const MODEL_API_IDS: Record<string, { apiModel: string; endpoint?: string
   // Google models
   'gemini-3-pro-preview': { apiModel: 'gemini-3.1-pro-preview' },
   'gemini-3-flash-preview': { apiModel: 'gemini-3-flash-preview' },
-  'gemini-2.5-pro': { apiModel: 'gemini-3.1-pro-preview' },
-  'gemini-2.5-flash': { apiModel: 'gemini-3-flash-preview' },
+  'gemini-2.5-pro': { apiModel: 'gemini-3.8-flash' },
+  'gemini-2.5-flash': { apiModel: 'gemini-3.5-flash-lite' },
   // Kimi models
   'kimi-k2': { apiModel: 'moonshot-v1-8k' },
   'kimi-k2.5': { apiModel: 'moonshot-v1-32k' },
@@ -586,7 +586,7 @@ const postValidateApiKeyRoute = HttpRouter.add(
             });
             if (resp.ok || resp.status === 400) {
               valid = true;
-              models = ['gemini-4-argon', 'gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-pro-preview', 'gemini-3-flash-preview', 'gemini-3.1-flash-lite'];
+              models = ['gemini-4-argon', 'gemini-4-neon', 'gemini-4-carbon', 'gemini-4-hydrogen', 'gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-pro-preview', 'gemini-3-flash-preview', 'gemini-3.1-flash-lite'];
             } else if (resp.status === 401 || resp.status === 403) {
               error = 'Invalid API key';
             } else if (resp.status === 429) {

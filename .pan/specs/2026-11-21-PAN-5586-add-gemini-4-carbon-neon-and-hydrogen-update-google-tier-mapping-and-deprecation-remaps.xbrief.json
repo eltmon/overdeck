@@ -1,0 +1,636 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-21T22:33:05Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5586: Add Gemini 4 Carbon, Neon and Hydrogen; update Google tier mapping and deprecation remaps",
+    "updated": "2026-11-21T22:41:35.156Z"
+  },
+  "plan": {
+    "id": "pan-5586",
+    "title": "Add Gemini 4 Carbon, Neon and Hydrogen; update Google tier mapping and deprecation remaps",
+    "status": "running",
+    "uid": "f012aee6-a22f-493d-a4db-3b250c18dce6",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-21T22:33:05Z",
+    "updated": "2026-11-21T22:41:35.156Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5586",
+        "label": "PAN-5586",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5586.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "models",
+      "google",
+      "gemini",
+      "catalog",
+      "pricing"
+    ],
+    "metadata": {
+      "sizeJustification": "One Google catalog refresh: 26 files, 15 of them tests or docs, all edits additive rows in the model registry. The surface counter treats each doc file as its own subsystem (docs/USAGE.md, docs/MODEL-CONTEXT-AUDIT.md, changelog.d/pan-5586.md), which pushes the subsystem count to 7. Splitting into sibling issues would ship ids that are selectable but unpriced or tier ids pi cannot bind.",
+      "canonicalFilename": "2026-11-21-PAN-5586-add-gemini-4-carbon-neon-and-hydrogen-update-google-tier-mapping-and-deprecation-remaps.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Google released gemini-4-carbon, gemini-4-neon and gemini-4-hydrogen in November 2026. Overdeck does not know them: users cannot pick them, cost tracking cannot price them, pi launches on pi 0.85/1.5.2 cannot bind them, and PROVIDERS.google.tierModels still names the Gemini 3.1 generation. MODEL_DEPRECATIONS also remaps gemini-2.5-pro/flash to ids Google no longer routes them to.",
+      "Proposal": "Follow the gemini-4-argon registration pattern (PRD .pan/drafts/PAN-5586.md): capability rows and classes, provider routing and selectable lists, cost rows, pi/omp provisioning, dashboard picker and friendly names, then set Google tierModels to neon/carbon/hydrogen and remap gemini-2.5-pro -> gemini-3.8-flash and gemini-2.5-flash -> gemini-3.5-flash-lite in both MODEL_DEPRECATIONS and MODEL_API_IDS. Comment on PAN-4555 so its 2026-12-01 price raise also covers Carbon. Document the change in docs/USAGE.md, docs/MODEL-CONTEXT-AUDIT.md and changelog.d/pan-5586.md.",
+      "NonGoals": "- No change to gemini-4-argon's prices, capability row or supportsImages flag (PAN-4555 owns the Argon raise).\n- No dated-pricing mechanism in cost.ts; Carbon is priced exactly like Argon on the branch.\n- No ohmypi behavior changes beyond adding three registry rows (omp removal is PAN-4003).\n- No edits to history: .pan/, .release/ and changelog.mdx keep their existing Argon text.\n- No retirement of gemini-3.1-pro-preview, gemini-3-flash-preview or any other live Google id.\n- No new FALLBACK_MAP rows for gemini-3.8-flash or gemini-3.5-flash-lite (pre-existing gap).\n- No growth of src/dashboard/server/routes/settings.ts and no edit to src/lib/model-capabilities.ts; no allowlist raise.\n- No new frontend test file and no edit to scripts/frontend-test-subset.txt."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Insert the three ids directly after gemini-4-argon in every ordered list, in the order neon, carbon, hydrogen.",
+        "rationale": "Argon stays first, so the existing settings-model-catalog assertion existing.google[0] === Argon keeps holding and the diff stays minimal."
+      },
+      {
+        "summary": "Google tierModels follow the issue: opus gemini-4-neon, sonnet gemini-4-carbon, haiku gemini-4-hydrogen.",
+        "rationale": "The issue is explicit and Google publishes no tier labels, although its index calls Carbon 'our strongest reasoning model'; Neon is the most expensive Gemini 4 model through 2026-11-30."
+      },
+      {
+        "summary": "Capability classes: neon frontier, carbon frontier, hydrogen workhorse.",
+        "rationale": "Carbon costs what Argon (frontier) costs and Google calls it its strongest reasoning model; Hydrogen costs more than gemini-3.6-flash (workhorse), so 'small' would make tier-fitness warn on every medium tier using Google's haiku id. The class only drives Settings warnings."
+      },
+      {
+        "summary": "Carbon uses Argon's introductory rates ($2/$10/$0.10, blended 6) unless PAN-4555 already merged, in which case it uses list rates ($4/$20/$0.20, blended 12).",
+        "rationale": "No dated-pricing mechanism exists on main; PAN-4555 is a manual date-gated edit, so Carbon must move in lockstep with Argon. A comment on PAN-4555 adds Carbon to that edit."
+      },
+      {
+        "summary": "Align MODEL_API_IDS (Settings test route) with the new gemini-2.5 remaps.",
+        "rationale": "Google routes 2.5 Pro to 3.8 Flash and 2.5 Flash to 3.5 Flash-Lite from 2026-12-01; probing a different wire model than Google serves would mislead the key test."
+      },
+      {
+        "summary": "Hydrogen gets xhigh thinking even though the issue lists xhigh only for Neon.",
+        "rationale": "The issue says the official page wins; Google's thinking guide and pi 1.6.0's catalog both list xhigh for Hydrogen. The PR body must note the difference."
+      },
+      {
+        "summary": "Skill scores inherit: Neon and Carbon copy Argon's skills, Hydrogen copies gemini-3.8-flash's; all three set supportsImages true and supportsSamplingParams false.",
+        "rationale": "The repo convention is to inherit the previous family baseline until benchmarked; Google lists image input and states sampling parameters are ignored on all three."
+      },
+      {
+        "summary": "Friendly-name assertions go in gemini-qwen-glm-catalog.test.ts, not dashboard-utils.test.ts.",
+        "rationale": "Only the former is in scripts/frontend-test-subset.txt, so CI runs it; no new frontend test file is needed."
+      }
+    ],
+    "items": [
+      {
+        "id": "capability-rows",
+        "title": "Add Gemini 4 Neon, Carbon and Hydrogen capability rows, classes and fallback rows",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-21T22:33:05Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5586",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/settings.ts",
+            "src/lib/model-capability-additions.ts",
+            "src/lib/model-capability-class.ts",
+            "src/lib/model-fallback.ts",
+            "src/lib/__tests__/model-capabilities.test.ts",
+            "src/lib/__tests__/settings-model-catalog.test.ts",
+            "tests/lib/model-fallback.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/model-capabilities.test.ts src/lib/__tests__/settings-model-catalog.test.ts src/lib/__tests__/model-capability-class.test.ts tests/lib/model-fallback.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "all four test files pass, including the new Gemini 4 it.each cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1"
+          ],
+          "acJustification": "One indivisible commit: growing the GoogleModel union forces rows in MODEL_CAPABILITIES and MODEL_PROVIDERS (Record<ModelId,...>), and the rows immediately change picker and fallback test counts."
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Add 'gemini-4-neon' | 'gemini-4-carbon' | 'gemini-4-hydrogen' after 'gemini-4-argon' in the GoogleModel union (src/lib/settings.ts line 42). In src/lib/model-capability-additions.ts insert three rows right after the gemini-4-argon row (ends line 176), in the order neon, carbon, hydrogen, with the exact fields and notes strings in the PRD: contextWindow 1048576, maxOutputTokens 65536, supportsImages true, supportsSamplingParams false; costPer1MTokens 9 / 6 / 4.5; effortLevels neon and hydrogen ['low','medium','high','xhigh'], carbon ['low','medium','high']; skills copied from gemini-4-argon (neon, carbon) and gemini-3.8-flash (hydrogen). In src/lib/model-capability-class.ts add neon and carbon as 'frontier' after the Argon row (line 33) and hydrogen as 'workhorse' after gemini-3.6-flash (line 70). In src/lib/model-fallback.ts add the three ids to MODEL_PROVIDERS as 'google' (after line 74) and to FALLBACK_MAP after the Argon row (line 203): neon and carbon -> 'claude-sonnet-5-5', hydrogen -> 'claude-haiku-4-5'. Update tests exactly as PRD WI-1 step 5 lists (model-capabilities it.each, settings-model-catalog filter + first-four-ids assertion, model-fallback counts 11->14 (line 166), 20->23 (line 441, comment '13 Anthropic + 10 current Google') and 46->49 (line 405, comment '13 Anthropic + 15 OpenAI + 10 Google + 11 Kimi') plus provider and fallback expectations). If PAN-4555 already merged on the branch (Argon cost row reads inputPer1k 0.004), Carbon's costPer1MTokens is 12 instead of 6."
+        },
+        "items": [
+          {
+            "id": "capability-rows.ac1",
+            "title": "Given the new rows, MODEL_CAPABILITIES['gemini-4-neon'|'gemini-4-carbon'|'gemini-4-hydrogen'] returns provider 'google', contextWindow 1048576, maxOutputTokens 65536, supportsSamplingParams false and costPer1MTokens 9 / 6 / 4.5, asserted by a new it.each in model-capabilities.test.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "capability-rows.ac2",
+            "title": "getModelEffortLevels returns ['low','medium','high','xhigh'] for neon and hydrogen and ['low','medium','high'] for carbon",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "capability-rows.ac3",
+            "title": "capabilityClassOf returns 'frontier' for gemini-4-neon and gemini-4-carbon and 'workhorse' for gemini-4-hydrogen",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "capability-rows.ac4",
+            "title": "getAvailableModelsApi().google lists gemini-4-argon, gemini-4-neon, gemini-4-carbon, gemini-4-hydrogen as its first four ids, and settings-model-catalog.test.ts passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "capability-rows.ac5",
+            "title": "getModelProvider returns 'google' and getFallbackModel returns claude-sonnet-5-5 (neon, carbon) and claude-haiku-4-5 (hydrogen); getModelsByProvider('google') has length 14",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "provider-routing",
+        "title": "Make the three Gemini 4 ids selectable in the Google provider lists",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-21T22:33:05Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5586",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/providers.ts",
+            "src/lib/settings.ts",
+            "src/dashboard/server/routes/settings.ts",
+            "src/lib/__tests__/model-catalog-audit.test.ts",
+            "tests/lib/settings.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/model-catalog-audit.test.ts tests/lib/settings.test.ts src/lib/__tests__/model-capability-class.test.ts",
+            "git diff --stat origin/main -- src/dashboard/server/routes/settings.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the three test files pass, including three new it.each rows in model-catalog-audit.test.ts",
+            "routes/settings.ts diff shows equal insertions and deletions"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Insert 'gemini-4-neon', 'gemini-4-carbon', 'gemini-4-hydrogen' right after 'gemini-4-argon' in: PROVIDERS.google.models (src/lib/providers.ts line 161), the getProviderForModel Google lookup list (providers.ts line 494, search \"if (['gemini-4-argon',\"), the settings googleModels list (src/lib/settings.ts line 230), and the Google key-validation list in src/dashboard/server/routes/settings.ts line 589 (same line, no new lines: the file is 1102 lines with cap 1104). Tests: add ['gemini-4-neon','google',1048576], ['gemini-4-carbon','google',1048576], ['gemini-4-hydrogen','google',1048576] after the Argon row of the it.each table in src/lib/__tests__/model-catalog-audit.test.ts (line 50); update the expected Google list in tests/lib/settings.test.ts line 297 to the 10-id list in the PRD. Do not touch tierModels (item tier-mapping)."
+        },
+        "items": [
+          {
+            "id": "provider-routing.ac1",
+            "title": "getProviderForModel returns PROVIDERS.google for each new id and PROVIDERS.google.models contains each id, asserted by the model-catalog-audit it.each rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provider-routing.ac2",
+            "title": "Given a configured Google API key, getAvailableModels(settings).google returns exactly the 10-id list from the PRD with the new ids at positions 2-4",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provider-routing.ac3",
+            "title": "The Settings Google key-validation response lists the three new ids, and git diff --stat for routes/settings.ts shows equal insertions and deletions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pricing",
+        "title": "Price Gemini 4 Carbon, Neon and Hydrogen in cost.ts and add Carbon to PAN-4555",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-21T22:33:05Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5586",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cost.ts",
+            "tests/lib/cost.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/cost.test.ts",
+            "gh issue view 4555 --comments"
+          ],
+          "expected_outputs": [
+            "cost.test.ts passes including the three new 1M+1M pricing cases",
+            "PAN-4555 shows a comment naming gemini-4-carbon and the rows to update"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In src/lib/cost.ts replace the Argon comment (line 164) and add rows right after the gemini-4-argon row: gemini-4-carbon inputPer1k 0.002 / outputPer1k 0.010 / cacheReadPer1k 0.0001; gemini-4-neon 0.003 / 0.015 / 0.00015; gemini-4-hydrogen 0.0015 / 0.0075 / 0.000075 (use the exact snippet in the PRD). If PAN-4555 already merged on the branch, Carbon uses 0.004 / 0.020 / 0.0002. In tests/lib/cost.test.ts after 'prices gemini-4-argon at its introductory rates' (line 207) add an it.each asserting getPricing('google', id).model === id, calculateCost({inputTokens:1_000_000, outputTokens:1_000_000}) toBeCloseTo 12 / 18 / 9 and 1M cache-read cost toBeCloseTo 0.1 / 0.15 / 0.075 for carbon / neon / hydrogen. Then post the PAN-4555 comment whose exact text is in PRD WI-3 step 3 with `gh issue comment 4555 --body-file <file in scratchpad>` (skip only if Carbon already uses list rates; say so in the PR)."
+        },
+        "items": [
+          {
+            "id": "pricing.ac1",
+            "title": "Given 1,000,000 input and 1,000,000 output tokens, calculateCost returns 12 USD for gemini-4-carbon, 18 for gemini-4-neon and 9 for gemini-4-hydrogen (24 for Carbon only if PAN-4555 merged first)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pricing.ac2",
+            "title": "getPricing('google', id) returns a row whose model equals id for each new id, and 1M cache-read tokens cost 0.1 / 0.15 / 0.075 USD",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pricing.ac3",
+            "title": "gh issue view 4555 --comments shows a new comment that names gemini-4-carbon and lists the cost.ts, model-capability-additions.ts, modelCatalog.ts and ohmypi-models.ts rows to raise on 2026-12-01",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pi-provisioning",
+        "title": "Provision the three Gemini 4 ids for older pi builds and the omp registry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-21T22:33:05Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5586",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/pi-models.ts",
+            "src/lib/ohmypi-models.ts",
+            "src/lib/__tests__/pi-models.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/pi-models.test.ts tests/lib/ohmypi-models.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "both test files pass, including the two new Gemini 4 provisioning cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. In src/lib/pi-models.ts provisionPlan 'google' case (line 81) list gemini-4-argon, gemini-4-neon, gemini-4-carbon, gemini-4-hydrogen with names 'Gemini 4 Argon' / 'Gemini 4 Neon' / 'Gemini 4 Carbon' / 'Gemini 4 Hydrogen'; extend the header comment (lines 12-13) to say pi 1.6.0 added the three ids (verified 2026-11-21). In src/lib/ohmypi-models.ts after the Argon row (line 52) add the three omp rows with costs neon {3,15,0.15}, carbon {2,10,0.1} (or {4,20,0.2} if PAN-4555 merged), hydrogen {1.5,7.5,0.075}, cacheWrite 0. In src/lib/__tests__/pi-models.test.ts add two cases to describe('provisionPiProviderForModel') exactly as PRD WI-4 step 3 describes, using the existing catalog() and ids() helpers."
+        },
+        "items": [
+          {
+            "id": "pi-provisioning.ac1",
+            "title": "Given no readable pi catalog, provisionPiProviderForModel('gemini-4-hydrogen') writes providers.google.models with ids [gemini-4-argon, gemini-4-neon, gemini-4-carbon, gemini-4-hydrogen] and no baseUrl or apiKey on the provider",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pi-provisioning.ac2",
+            "title": "The written Hydrogen entry contains api 'google-generative-ai', contextWindow 1048576 and input ['text','image']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pi-provisioning.ac3",
+            "title": "Given a pi catalog that ships all four Gemini 4 ids, provisioning gemini-4-neon creates no models.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "picker-catalog",
+        "title": "List the three Gemini 4 ids in the dashboard model picker with friendly names",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-21T22:33:05Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5586",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/modelCatalog.ts",
+            "src/dashboard/frontend/src/lib/dashboard-utils.ts",
+            "src/dashboard/frontend/src/components/Settings/__tests__/gemini-qwen-glm-catalog.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/__tests__/gemini-qwen-glm-catalog.test.ts src/lib/__tests__/dashboard-utils.test.ts"
+          ],
+          "expected_outputs": [
+            "both frontend test files pass, including the new PAN-5586 describe block"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. In src/dashboard/frontend/src/components/Settings/modelCatalog.ts add the three entries (exact objects in the PRD) right after the gemini-4-argon entry (line 94): neon tier 'premium' cost 9, carbon tier 'balanced' cost 6 (12 if PAN-4555 merged), hydrogen icon Zap tier 'fast' cost 4.5. In src/dashboard/frontend/src/lib/dashboard-utils.ts add the three includes() lines after the Argon line (line 82) and before the includes('gemini-4') catch-all. Extend src/dashboard/frontend/src/components/Settings/__tests__/gemini-qwen-glm-catalog.test.ts (already in scripts/frontend-test-subset.txt) with a describe('Gemini 4 Carbon, Neon and Hydrogen (PAN-5586)') block per PRD WI-5 step 3. Do not create a new test file."
+        },
+        "items": [
+          {
+            "id": "picker-catalog.ac1",
+            "title": "MODELS_BY_PROVIDER.google.models renders gemini-4-argon, gemini-4-neon, gemini-4-carbon, gemini-4-hydrogen as its first four ids with costPer1MTokens 6 / 9 / 6 / 4.5",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "picker-catalog.ac2",
+            "title": "getFriendlyModelName returns 'Gemini 4 Neon' for 'google/gemini-4-neon', 'Gemini 4 Carbon' for 'gemini-4-carbon' and 'Gemini 4 Hydrogen' for 'gemini-4-hydrogen'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "picker-catalog.ac3",
+            "title": "getFriendlyModelName('gemini-4-argon') still returns 'Gemini 4 Argon' and dashboard-utils.test.ts passes unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tier-mapping",
+        "title": "Point Google tierModels at Gemini 4 Neon, Carbon and Hydrogen",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-21T22:33:05Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5586",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/providers.ts",
+            "tests/lib/providers.test.ts",
+            "src/lib/__tests__/model-catalog-audit.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/lib/providers.test.ts src/lib/__tests__/model-catalog-audit.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "both test files pass, including the new 'sets the Google tiers to Gemini 4 (PAN-5586)' case"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Set src/lib/providers.ts line 162 to tierModels: { opus: 'gemini-4-neon', sonnet: 'gemini-4-carbon', haiku: 'gemini-4-hydrogen' }. Update tests/lib/providers.test.ts lines 13-23 so getProviderEnv(PROVIDERS.google, 'AIza-test') expects ANTHROPIC_DEFAULT_OPUS_MODEL gemini-4-neon, ANTHROPIC_DEFAULT_SONNET_MODEL gemini-4-carbon, and gemini-4-hydrogen for ANTHROPIC_DEFAULT_HAIKU_MODEL, ANTHROPIC_SMALL_FAST_MODEL and CLAUDE_CODE_SUBAGENT_MODEL. In src/lib/__tests__/model-catalog-audit.test.ts delete the line `expect(PROVIDERS.google.tierModels.haiku).toBe(target);` (line 114) and add it('sets the Google tiers to Gemini 4 (PAN-5586)') asserting the tierModels object and that each tier id is in PROVIDERS.google.models and hasModelCapability (import hasModelCapability from '../model-capabilities.js' if it is not imported)."
+        },
+        "items": [
+          {
+            "id": "tier-mapping.ac1",
+            "title": "PROVIDERS.google.tierModels resolves to { opus: 'gemini-4-neon', sonnet: 'gemini-4-carbon', haiku: 'gemini-4-hydrogen' } and PROVIDERS.google.models contains each tier id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tier-mapping.ac2",
+            "title": "getProviderEnv(PROVIDERS.google, 'AIza-test') returns ANTHROPIC_DEFAULT_OPUS_MODEL gemini-4-neon, ANTHROPIC_DEFAULT_SONNET_MODEL gemini-4-carbon and gemini-4-hydrogen for the haiku, small-fast and subagent vars",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tier-mapping.ac3",
+            "title": "The PROVIDERS tier-id test ('tier ids and haikuModel name no retired model') passes for google with no tier id in MODEL_DEPRECATIONS",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deprecation-remaps",
+        "title": "Remap gemini-2.5-pro and gemini-2.5-flash to Google's 2026-12-01 routing targets",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-21T22:33:05Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5586",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/model-deprecations.ts",
+            "src/dashboard/server/routes/settings.ts",
+            "tests/lib/model-deprecation.test.ts",
+            "tests/dashboard/settings-api-model-ids.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/lib/model-deprecation.test.ts tests/dashboard/settings-api-model-ids.test.ts src/lib/__tests__/model-capability-class.test.ts",
+            "git diff --stat origin/main -- src/dashboard/server/routes/settings.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the three test files pass, including the new Gemini 2.5 remap case",
+            "routes/settings.ts diff shows equal insertions and deletions"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. In src/lib/model-deprecations.ts set 'gemini-2.5-pro': 'gemini-3.8-flash' and 'gemini-2.5-flash': 'gemini-3.5-flash-lite' (lines 28-29) with a comment citing aistudio.google.com/docs/deprecations and the 2026-12-01 routing. In src/dashboard/server/routes/settings.ts lines 134-135 set MODEL_API_IDS 'gemini-2.5-pro' apiModel 'gemini-3.8-flash' and 'gemini-2.5-flash' apiModel 'gemini-3.5-flash-lite' (line-neutral). Add a case to tests/lib/model-deprecation.test.ts asserting MODEL_DEPRECATIONS and resolveModelId for both ids and that neither target is a MODEL_DEPRECATIONS key; update tests/dashboard/settings-api-model-ids.test.ts lines 17-18 to the new targets. Leave gemini-3-pro-preview and gemini-3-flash remaps unchanged."
+        },
+        "items": [
+          {
+            "id": "deprecation-remaps.ac1",
+            "title": "resolveModelId('gemini-2.5-pro') returns 'gemini-3.8-flash' and resolveModelId('gemini-2.5-flash') returns 'gemini-3.5-flash-lite'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deprecation-remaps.ac2",
+            "title": "MODEL_API_IDS['gemini-2.5-pro'].apiModel returns 'gemini-3.8-flash' and MODEL_API_IDS['gemini-2.5-flash'].apiModel returns 'gemini-3.5-flash-lite', asserted by settings-api-model-ids.test.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deprecation-remaps.ac3",
+            "title": "MODEL_DEPRECATIONS still maps gemini-3-pro-preview to gemini-3.1-pro-preview, and git diff --stat for routes/settings.ts shows equal insertions and deletions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document the Gemini 4 models, Google tiers and 2.5 remaps",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-21T22:33:05Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5586",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/USAGE.md",
+            "docs/MODEL-CONTEXT-AUDIT.md",
+            "changelog.d/pan-5586.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -c gemini-4-hydrogen docs/USAGE.md docs/MODEL-CONTEXT-AUDIT.md changelog.d/pan-5586.md"
+          ],
+          "expected_outputs": [
+            "lint:docs passes",
+            "grep prints a non-zero count for each of the three files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. In docs/USAGE.md 'Google (Gemini)' list (lines 179-186) insert the three bullets from the PRD after the Argon line and change the gemini-3.1-pro-preview description to 'Previous flagship'. In docs/MODEL-CONTEXT-AUDIT.md after the Gemini 4 Argon bullet (line 67) add one bullet per new model (aistudio.google.com/docs/models/gemini-4-<name> link, id, release date, 1,048,576 context, output limits, thinking levels, prices, caching and sampling facts from the PRD Verified facts table) and one bullet stating Google's 2026-12-01 routing of gemini-2.5-pro -> gemini-3.8-flash and gemini-2.5-flash -> gemini-3.5-flash-lite, each marked 'checked 2026-11-21'. Create changelog.d/pan-5586.md with the exact New and Improved sections in the PRD (use &#36; for dollar signs). Run npm run lint:docs."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "docs/USAGE.md Google list contains gemini-4-neon, gemini-4-carbon and gemini-4-hydrogen bullets naming their Opus, Sonnet and Haiku tiers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "docs/MODEL-CONTEXT-AUDIT.md contains one sourced bullet per new model with its prices and thinking levels, plus a bullet stating the two gemini-2.5 routing targets",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "changelog.d/pan-5586.md contains a '#### New' bullet naming the three ids and a '#### Improved' bullet naming the new Google tiers and 2.5 remaps, and npm run lint:docs passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "capability-rows",
+        "to": "provider-routing",
+        "type": "blocks"
+      },
+      {
+        "from": "capability-rows",
+        "to": "pi-provisioning",
+        "type": "blocks"
+      },
+      {
+        "from": "provider-routing",
+        "to": "pi-provisioning",
+        "type": "blocks"
+      },
+      {
+        "from": "provider-routing",
+        "to": "tier-mapping",
+        "type": "blocks"
+      },
+      {
+        "from": "pi-provisioning",
+        "to": "tier-mapping",
+        "type": "blocks"
+      },
+      {
+        "from": "provider-routing",
+        "to": "deprecation-remaps",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

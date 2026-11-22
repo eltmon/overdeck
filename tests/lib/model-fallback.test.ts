@@ -72,6 +72,9 @@ describe('model-fallback', () => {
 
     it('should return google for Gemini models', () => {
       expect(getModelProvider('gemini-4-argon')).toBe('google');
+      expect(getModelProvider('gemini-4-neon')).toBe('google');
+      expect(getModelProvider('gemini-4-carbon')).toBe('google');
+      expect(getModelProvider('gemini-4-hydrogen')).toBe('google');
       expect(getModelProvider('gemini-3-pro-preview')).toBe('google');
       expect(getModelProvider('gemini-3-flash-preview')).toBe('google');
     });
@@ -155,6 +158,9 @@ describe('model-fallback', () => {
     it('should return all Google models', () => {
       const models = getModelsByProvider('google');
       expect(models).toContain('gemini-4-argon');
+      expect(models).toContain('gemini-4-neon');
+      expect(models).toContain('gemini-4-carbon');
+      expect(models).toContain('gemini-4-hydrogen');
       expect(models).toContain('gemini-3.1-pro-preview');
       expect(models).toContain('gemini-3-flash-preview');
       expect(models).toContain('gemini-3.1-flash-lite-preview');
@@ -163,7 +169,7 @@ describe('model-fallback', () => {
       expect(models).toContain('gemini-3-pro-preview'); // legacy
       expect(models).toContain('gemini-2.5-pro'); // legacy
       expect(models).toContain('gemini-2.5-flash'); // legacy
-      expect(models).toHaveLength(11);
+      expect(models).toHaveLength(14);
     });
 
     it('should return all Nous Portal models', () => {
@@ -325,6 +331,9 @@ describe('model-fallback', () => {
 
     it('should return fallback for Google models', () => {
       expect(getFallbackModel('gemini-4-argon', PROVIDER_FALLBACK)).toBe('claude-sonnet-5-5');
+      expect(getFallbackModel('gemini-4-neon', PROVIDER_FALLBACK)).toBe('claude-sonnet-5-5');
+      expect(getFallbackModel('gemini-4-carbon', PROVIDER_FALLBACK)).toBe('claude-sonnet-5-5');
+      expect(getFallbackModel('gemini-4-hydrogen', PROVIDER_FALLBACK)).toBe('claude-haiku-4-5');
       expect(getFallbackModel('gemini-3-pro-preview', PROVIDER_FALLBACK)).toBe('claude-sonnet-5-5');
       expect(getFallbackModel('gemini-3-flash-preview', PROVIDER_FALLBACK)).toBe('claude-haiku-4-5');
     });
@@ -402,7 +411,7 @@ describe('model-fallback', () => {
       const enabled = new Set<ModelProvider>(['anthropic', 'openai', 'google', 'kimi']);
       const models = getAvailableModels(enabled);
 
-      expect(models.length).toBe(46); // 13 Anthropic + 15 OpenAI + 7 Google + 11 Kimi
+      expect(models.length).toBe(49); // 13 Anthropic + 15 OpenAI + 10 Google + 11 Kimi
     });
 
     it('should include OpenAI models when OpenAI enabled', () => {
@@ -431,6 +440,9 @@ describe('model-fallback', () => {
       const enabled = new Set<ModelProvider>(['anthropic', 'google']);
       const models = getAvailableModels(enabled);
 
+      expect(models).toContain('gemini-4-neon');
+      expect(models).toContain('gemini-4-carbon');
+      expect(models).toContain('gemini-4-hydrogen');
       expect(models).toContain('gemini-3.1-pro-preview');
       expect(models).toContain('gemini-3-flash-preview');
       expect(models).toContain('gemini-3.6-flash');
@@ -438,7 +450,7 @@ describe('model-fallback', () => {
       expect(models).toContain('gemini-3.1-flash-lite');
       expect(models).not.toContain('gemini-2.5-pro');
       expect(models).not.toContain('gemini-2.5-flash');
-      expect(models.length).toBe(20); // 13 Anthropic + 7 current Google
+      expect(models.length).toBe(23); // 13 Anthropic + 10 current Google
     });
   });
 

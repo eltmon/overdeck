@@ -73,6 +73,28 @@ const geminiArgon = {
   effortLevels: ['low', 'medium', 'high'],
   costPer1MTokens: 6,
 };
+// Gemini 4 Neon, Carbon and Hydrogen (November 2026) are additions after the fixture was captured.
+const geminiNeon = {
+  id: 'gemini-4-neon',
+  name: 'Gemini 4 Neon (1M context)',
+  contextWindow: 1048576,
+  effortLevels: ['low', 'medium', 'high', 'xhigh'],
+  costPer1MTokens: 9,
+};
+const geminiCarbon = {
+  id: 'gemini-4-carbon',
+  name: 'Gemini 4 Carbon (1M context)',
+  contextWindow: 1048576,
+  effortLevels: ['low', 'medium', 'high'],
+  costPer1MTokens: 6,
+};
+const geminiHydrogen = {
+  id: 'gemini-4-hydrogen',
+  name: 'Gemini 4 Hydrogen (1M context)',
+  contextWindow: 1048576,
+  effortLevels: ['low', 'medium', 'high', 'xhigh'],
+  costPer1MTokens: 4.5,
+};
 // Kimi K3.1 Pro / K3.1 Pro Highspeed (2026-10-23) are additions after the fixture was captured.
 const kimiK31AdditionIds = new Set(['k3.1-pro', 'k3.1-pro-highspeed', 'kimi-code/k3.1-pro', 'kimi-code/k3.1-pro-highspeed']);
 // MiMo V2.5 Pro / V2.5 were retired 2026-10-21; the V2.6 series replaces them (PAN-4825).
@@ -126,7 +148,7 @@ function withoutOpus55<T extends { anthropic: Array<{ id: string }>; openai: Arr
     ...catalog,
     anthropic: catalog.anthropic.filter((model) => ![fable52.id, opus55.id, sonnet55.id, haiku55.id].includes(model.id)),
     openai: catalog.openai.filter((model) => !gpt6AdditionIds.has(model.id)),
-    google: catalog.google.filter((model) => ![geminiArgon.id, gemini36FlashId, gemini31FlashLiteId].includes(model.id)),
+    google: catalog.google.filter((model) => ![geminiArgon.id, geminiNeon.id, geminiCarbon.id, geminiHydrogen.id, gemini36FlashId, gemini31FlashLiteId].includes(model.id)),
     meta: catalog.meta.filter((model) => model.id !== museWonderId && model.id !== museEmberId && model.id !== museWonderFullId),
     kimi: catalog.kimi.filter((model) => !kimiK31AdditionIds.has(model.id)),
     mimo: catalog.mimo.filter((model) => !mimoV26Ids.includes(model.id)),
@@ -147,7 +169,7 @@ describe('model catalog no-loss audit', () => {
     expect(existing.anthropic.findIndex((model) => model.id === haiku55.id)).toBeLessThan(existing.anthropic.findIndex((model) => model.id === 'claude-haiku-4-5'));
     expect(existing.openai.slice(0, 7).map((model) => model.id)).toEqual(['gpt-6.2-astra', 'gpt-6.2-sol', 'gpt-6-astra', 'gpt-6.1-sol', 'gpt-6.1-terra', 'gpt-6-sol', 'gpt-6-luna']);
     expect(existing.openai.filter((model) => gpt6AdditionIds.has(model.id))).toEqual(gpt6Additions);
-    expect(existing.google[0]).toEqual(geminiArgon);
+    expect(existing.google.slice(0, 4)).toEqual([geminiArgon, geminiNeon, geminiCarbon, geminiHydrogen]);
     expect(withoutOpus55(existing)).toEqual(expectedPreviousCatalog);
     expect(opencode).toEqual([]);
     expect(go).toEqual([]);

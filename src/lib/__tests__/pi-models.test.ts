@@ -90,6 +90,21 @@ describe('provisionPiProviderForModel', () => {
     expect(() => read()).toThrow()
   })
 
+  it('provisions Gemini 4 Neon, Carbon and Hydrogen alongside Argon (PAN-5586)', () => {
+    provisionPiProviderForModel('gemini-4-hydrogen', { agentDir: dir, catalogDir: null })
+    const google = read().providers.google
+    expect(ids(google)).toEqual(['gemini-4-argon', 'gemini-4-neon', 'gemini-4-carbon', 'gemini-4-hydrogen'])
+    const hydrogen = google.models.find((m: { id: string }) => m.id === 'gemini-4-hydrogen')
+    expect(hydrogen).toMatchObject({ api: 'google-generative-ai', contextWindow: 1048576, input: ['text', 'image'] })
+    expect(google).not.toHaveProperty('baseUrl')
+    expect(google).not.toHaveProperty('apiKey')
+  })
+
+  it('does not create models.json when the installed pi already ships all four Gemini 4 ids (PAN-5586)', () => {
+    provisionPiProviderForModel('gemini-4-neon', { agentDir: dir, catalogDir: catalog('google', ['gemini-4-argon', 'gemini-4-neon', 'gemini-4-carbon', 'gemini-4-hydrogen']) })
+    expect(() => read()).toThrow()
+  })
+
   it('refuses to overwrite an unparseable models.json', () => {
     writeFileSync(join(dir, 'models.json'), '{ not json')
     expect(() => provisionPiProviderForModel('grok-4.7', { agentDir: dir, catalogDir: null })).toThrow(/not valid JSON/)

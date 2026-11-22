@@ -212,6 +212,17 @@ describe('cost module', () => {
       expect(argon?.cacheReadPer1k).toBe(0.0001);
     });
 
+    it.each([
+      ['gemini-4-carbon', 12, 0.1],
+      ['gemini-4-neon', 18, 0.15],
+      ['gemini-4-hydrogen', 9, 0.075],
+    ] as const)('prices %s at its introductory rates (PAN-5586)', (id, total, cached) => {
+      const pricing = getPricing('google', id);
+      expect(pricing?.model).toBe(id);
+      expect(calculateCost({ inputTokens: 1_000_000, outputTokens: 1_000_000 }, pricing!)).toBeCloseTo(total, 6);
+      expect(calculateCost({ inputTokens: 0, outputTokens: 0, cacheReadTokens: 1_000_000 }, pricing!)).toBeCloseTo(cached, 6);
+    });
+
     it('prices gpt-6.1-sol distinctly from gpt-6-sol', () => {
       const sol61 = getPricing('openai', 'gpt-6.1-sol');
       const sol6 = getPricing('openai', 'gpt-6-sol');
