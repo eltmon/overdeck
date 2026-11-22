@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5588",
   "created": "2026-11-21T23:34:16.196Z",
-  "updated": "2026-11-21T23:34:16.196Z",
+  "updated": "2026-11-22T00:57:56.427Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,22 @@
   "sessionHistory": [],
   "items": {
     "wi1-extract-admission-files": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5588",
-      "claimedAt": "2026-11-21T23:34:16.196Z"
+      "claimedAt": "2026-11-21T23:34:16.196Z",
+      "doneAt": "2026-11-22T00:57:56.427Z"
+    },
+    "wi1-extract-admission-files.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-22T00:57:56.427Z"
+    },
+    "wi1-extract-admission-files.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-22T00:57:56.427Z"
+    },
+    "wi1-extract-admission-files.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-22T00:57:56.427Z"
     }
   }
 }
