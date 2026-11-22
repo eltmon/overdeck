@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5589",
   "created": "2026-11-22T01:01:54.134Z",
-  "updated": "2026-11-22T01:08:08.507Z",
+  "updated": "2026-11-22T01:08:16.916Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -48,6 +48,11 @@
     "utilization-floor.ac4": {
       "status": "completed",
       "doneAt": "2026-11-22T01:08:08.506Z"
+    },
+    "cpu-rule-boundary-tests": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5589",
+      "claimedAt": "2026-11-22T01:08:16.916Z"
     }
   }
 }
