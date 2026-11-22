@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5588",
   "created": "2026-11-21T23:34:16.196Z",
-  "updated": "2026-11-22T00:57:56.427Z",
+  "updated": "2026-11-22T00:58:34.150Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
     "wi1-extract-admission-files.ac3": {
       "status": "completed",
       "doneAt": "2026-11-22T00:57:56.427Z"
+    },
+    "wi2-queue-cpu-marker-helpers": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5588",
+      "claimedAt": "2026-11-22T00:58:34.150Z"
     }
   }
 }
