@@ -29,6 +29,7 @@ import { HARNESS_MARKERS } from '../../../src/lib/context-layers/harness.js';
 import { getTranscriptAdapter } from '../../../src/lib/conversations/transcript-adapter.js';
 import { harnessBinaryName } from '../../../src/lib/harness-binary.js';
 import { POLICY_RUNTIME_NAMES } from '../../../src/lib/harness-policy.js';
+import { PREREQUISITES } from '../../../src/lib/system-prerequisites.js';
 import { resolveAllowedHarness } from '../../../src/lib/overdeck/conversation-runtime.js';
 import { normalizeHarness } from '../../../src/lib/overdeck/conversations.js';
 import { getHarnessBehavior } from '../../../src/lib/runtimes/behavior.js';
@@ -170,7 +171,7 @@ describe('harness no-loss audit (PAN-3668 WI-22)', () => {
   });
 
   it('lists the agy binary in the system prerequisites (PAN-5587)', () => {
-    expect(readFileSync(join(ROOT, 'src/lib/system-prerequisites.ts'), 'utf8')).toContain("'agy'");
+    expect(PREREQUISITES.find((row) => row.id === 'agy')).toMatchObject({ name: 'Antigravity CLI', required: false });
   });
 
   it('lists antigravity in every CLI --harness help string (PAN-5587)', () => {
