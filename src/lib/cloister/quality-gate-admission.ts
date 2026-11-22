@@ -41,6 +41,10 @@ import {
  * alone once the slots are empty, skipping both CPU samples. Under sustained
  * pressure the queue drains one gate at a time. The PSI start threshold is
  * `resources.quality_gate_psi_start_avg10`.
+ *
+ * PAN-5589: PSI alone is not pressure. Workloads pinned to a few cores raise
+ * system-wide PSI and load while other cores sit idle, so contention counts
+ * only from 50 % utilization; 75 % is pressure on its own.
  * Admitted parents set OVERDECK_GATE_ADMITTED=1 for child-process reentrancy.
  */
 
