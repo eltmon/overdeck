@@ -10,7 +10,9 @@
  * user registry before the launch, keyed by its real provider id.
  *
  * Which ids pi ships changes between versions (pi 1.5.2 added gemini-4-argon,
- * MiniMax-M3.1-Flash, the MiMo v2.6 ids and grok-4.7 over 0.85.0), and an
+ * MiniMax-M3.1-Flash, the MiMo v2.6 ids and grok-4.7 over 0.85.0; pi 1.6.0
+ * added gemini-4-neon, gemini-4-carbon and gemini-4-hydrogen, verified
+ * 2026-11-21 in pi 1.6.0's google.json), and an
  * entry with the same id as a built-in model REPLACES it. So the installed
  * pi's catalog is read first (`pi-ai/dist/providers/data/<provider>.json`
  * beside the `pi` binary), and only the ids it lacks are written. An entry
@@ -78,7 +80,15 @@ interface ProvisionPlan {
 function provisionPlan(piProvider: string): ProvisionPlan | undefined {
   switch (piProvider) {
     case 'google':
-      return { api: 'google-generative-ai', models: [{ id: 'gemini-4-argon', name: 'Gemini 4 Argon' }] };
+      return {
+        api: 'google-generative-ai',
+        models: [
+          { id: 'gemini-4-argon', name: 'Gemini 4 Argon' },
+          { id: 'gemini-4-neon', name: 'Gemini 4 Neon' },
+          { id: 'gemini-4-carbon', name: 'Gemini 4 Carbon' },
+          { id: 'gemini-4-hydrogen', name: 'Gemini 4 Hydrogen' },
+        ],
+      };
     case 'minimax':
       return { api: 'anthropic-messages', models: [{ id: 'MiniMax-M3.1-Flash', name: 'MiniMax M3.1 Flash' }] };
     case 'zai':
