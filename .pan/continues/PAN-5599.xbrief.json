@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5599",
   "created": "2026-11-23T05:24:22.748Z",
-  "updated": "2026-11-23T05:34:57.132Z",
+  "updated": "2026-11-23T05:35:05.163Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,6 +34,11 @@
     "phase-finished-rule.ac5": {
       "status": "completed",
       "doneAt": "2026-11-23T05:34:57.132Z"
+    },
+    "dispatch-finished-rule": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5599",
+      "claimedAt": "2026-11-23T05:35:05.162Z"
     }
   }
 }
