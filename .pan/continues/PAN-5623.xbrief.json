@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5623",
   "created": "2026-11-23T20:20:25.006Z",
-  "updated": "2026-11-23T20:20:25.006Z",
+  "updated": "2026-11-23T20:30:07.423Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,26 @@
   "sessionHistory": [],
   "items": {
     "wi1-journal-types-skip": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5623",
-      "claimedAt": "2026-11-23T20:20:25.006Z"
+      "claimedAt": "2026-11-23T20:20:25.006Z",
+      "doneAt": "2026-11-23T20:30:07.422Z"
+    },
+    "wi1-journal-types-skip.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:30:07.422Z"
+    },
+    "wi1-journal-types-skip.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:30:07.422Z"
+    },
+    "wi1-journal-types-skip.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:30:07.422Z"
+    },
+    "wi1-journal-types-skip.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:30:07.422Z"
     }
   }
 }
