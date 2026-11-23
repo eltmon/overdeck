@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5638",
   "created": "2026-11-23T19:38:42.567Z",
-  "updated": "2026-11-23T20:41:43.718Z",
+  "updated": "2026-11-23T20:41:49.565Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -114,6 +114,11 @@
     "wi5-ready-set-github-members.ac5": {
       "status": "completed",
       "doneAt": "2026-11-23T20:41:43.718Z"
+    },
+    "wi6-docs-changelog": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5638",
+      "claimedAt": "2026-11-23T20:41:49.565Z"
     }
   }
 }
