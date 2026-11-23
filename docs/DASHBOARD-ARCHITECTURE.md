@@ -1266,8 +1266,11 @@ as a `task_complete` that carries `error`, with the structured code in `codex_er
 - **Status route.** `GET /api/settings/codex-auth` passes the scan to `checkCodexAuthStatus`, which
   returns `status: 'burned'`, `source: 'native'` and `affectedAgents` (the failing session ids)
   while an active failure exists.
-- **Spawn gates.** `assertCodexNativeAuthForSpawn` (`pan start` and every CLI spawn path) and the
-  dashboard issue-spawn subscription check refuse a new Codex spawn while an active failure exists.
+- **Spawn gates.** `assertCodexNativeAuthForSpawn` (`pan start` and every CLI spawn path) refuses a
+  new Codex-harness spawn while an active failure exists. The dashboard issue-spawn route
+  (`codexSubscriptionSpawnBlock`, `src/lib/codex/subscription-spawn-gate.ts`) refuses only a GPT
+  model on a ChatGPT subscription, which signs in through the same credentials; a Claude spawn
+  is never refused by a Codex sign-in failure.
 - **Banner timing.** `useCodexAuthStatus` polls every 30 s and treats data as stale after 15 s
   (`CODEX_AUTH_REFETCH_MS`, `CODEX_AUTH_STALE_MS`). With the 15 s scan cache, the banner appears
   within about 45 s of a failed turn and names how many Codex sessions are failing.

@@ -27,8 +27,8 @@ import { loadConfigSync } from '../../../../lib/config.js';
 import type { AgentState } from '../../../../lib/agents/agent-state.js';
 import { operatorInterventionEvent } from '../../../../lib/operator-interventions.js';
 import { assessCpuPressure, type CpuPressureVerdict } from '../../../../lib/cloister/cpu-pressure.js';
-import { CodexAuthCheckError, checkCodexAuthStatus } from '../../../../lib/codex-auth.js';
-import { scanCodexAuthFailures } from '../../../../lib/codex/auth-failure-scan.js';
+import { CodexAuthCheckError } from '../../../../lib/codex-auth.js';
+import { codexSubscriptionSpawnBlock } from '../../../../lib/codex/subscription-spawn-gate.js';
 import { canUseHarness } from '../../../../lib/harness-policy.js';
 import { emitActivityEntry } from '../../../../lib/activity-logger.js';
 import { extractPrefix, parseIssueId } from '../../../../lib/issue-id.js';
@@ -451,24 +451,23 @@ export const spawnIssueAgentForRoute = (input: { body: unknown; internalRequest:
     // forwarding a resolved default would skip tier resolution and stamp record.workModel.
     const explicitModel: string | null = requestedModel ? spawnModel : null;
     const providerAuthMode = yield* Effect.promise(() => getProviderAuthMode(spawnModel));
-    if (providerAuthMode === 'subscription') {
-      const codexAuth = yield* Effect.tryPromise({
-        // PAN-5633: a live Codex session that failed a turn on sign-in marks the token family burned.
-        try: async () => checkCodexAuthStatus({ authFailures: await scanCodexAuthFailures() }),
-        catch: (cause) => new CodexAuthCheckError({
-          message: cause instanceof Error ? cause.message : String(cause),
-          cause,
-        }),
-      });
-      if (codexAuth.status === 'expired' || codexAuth.status === 'burned') {
-        return jsonResponse({
-          success: false,
-          blocked: true,
-          skipped: true,
-          error: `Codex authentication ${codexAuth.status}. GPT subscription agents cannot spawn with expired/burned tokens.`,
-          hint: 'Click "Re-authenticate" in the Codex auth banner or Settings page to refresh your OpenAI subscription tokens.',
-        }, { status: 429 });
-      }
+    // PAN-5633: only GPT subscription spawns use the shared Codex sign-in, so only they
+    // are refused while it is expired or burned (a live Codex session failed a turn on it).
+    const codexAuth = yield* Effect.tryPromise({
+      try: () => codexSubscriptionSpawnBlock(spawnModel, providerAuthMode),
+      catch: (cause) => new CodexAuthCheckError({
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+    });
+    if (codexAuth) {
+      return jsonResponse({
+        success: false,
+        blocked: true,
+        skipped: true,
+        error: `Codex authentication ${codexAuth.status}. GPT subscription agents cannot spawn with expired/burned tokens.`,
+        hint: 'Click "Re-authenticate" in the Codex auth banner or Settings page to refresh your OpenAI subscription tokens.',
+      }, { status: 429 });
     }
 
     // Pre-flight provider health check — detect quota/auth/network errors
