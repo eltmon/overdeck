@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-23T10:05:21Z · model: claude-opus-5-5 · open: 956_
+_Last sequenced: 2026-11-23T10:35:00Z · model: claude-opus-5-5 · open: 957_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -21,6 +21,7 @@ _Last sequenced: 2026-11-23T10:05:21Z · model: claude-opus-5-5 · open: 956_
 | 9 | PAN-5601 | S | high | ok |  |  | pan orders start and the dashboard Start swallow FlywheelAlreadyRunning and drop the book; deliver it to the live conv. Needs handoff |
 | 10 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 10 | PAN-5523 | S | high | ok |  |  | pan conversations move/heal send raw fetch with no token, so routes refuse with Missing origin; same fix pattern as in-pipeline PAN-5516. |
+| 10 | PAN-5625 | M | critical | ok |  |  | Approved green PR for new standalone project BT-1 sits 'held'; train never batches and per-PR scheduler defers forever. |
 | 11 | PAN-4553 | S | critical | ok |  |  | Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges. |
 | 12 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
 | 13 | PAN-4710 | S | high | ok |  |  | Deferred plan hand-off retries omit the guardrail ack, so they're refused at 'agent count high' and give up silently; needs handoff |
@@ -1028,6 +1029,10 @@ New substrate bug with a verified root cause: adoption (PAN-4605) calls startRev
 
 Rank unchanged; PAN-5516 closed, so that dependency is removed.
 
+### PAN-5625 (rank 10)
+
+New bug with live evidence: the merge train and the per-PR auto-merge scheduler each defer to the other, so an approved, green PR in a new standalone GitHub project never merges. That blocks the pipeline's final step for every newly registered project, so it ranks with the other merge-path blockers.
+
 ### PAN-4553 (rank 11)
 
 Rank unchanged; its duplicate PAN-4929 entered the pipeline with an open PR, so this issue now waits on that PR instead of being picked up separately.
@@ -1280,10 +1285,6 @@ New pipeline bug placed in a freed critical-tier slot. Reviews whose reviewers d
 
 New issue from the Deft adoption PRD. Its dependency PAN-3308 has closed. The main-push guard exists only in the overdeck repo, so agents in other registered projects can still push to main, which is the PAN-2204 hazard class.
 
-### PAN-4550 (rank 70)
-
-Found cutting v0.65.0: CI was green but the local release check failed on two host-dependent tests. XS fix that removes false reds from the release verb, so it sits above routine medium work.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1291,10 +1292,10 @@ Found cutting v0.65.0: CI was green but the local release check failed on two ho
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-23T10:05:21Z",
+  "generatedAt": "2026-11-23T10:35:00Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 956,
+  "openCount": 957,
   "nodes": [
     {
       "issue": "PAN-5611",
@@ -1503,6 +1504,19 @@ Found cutting v0.65.0: CI was green but the local release check failed on two ho
       "dependsOn": [],
       "why": "pan conversations move/heal send raw fetch with no token, so routes refuse with Missing origin; same fix pattern as in-pipeline PAN-5516.",
       "rationale": "Rank unchanged; PAN-5516 closed, so that dependency is removed.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5625",
+      "rank": 10,
+      "size": "M",
+      "importance": "critical",
+      "score": 82,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Approved green PR for new standalone project BT-1 sits 'held'; train never batches and per-PR scheduler defers forever.",
+      "rationale": "New bug with live evidence: the merge train and the per-PR auto-merge scheduler each defer to the other, so an approved, green PR in a new standalone GitHub project never merges. That blocks the pipeline's final step for every newly registered project, so it ranks with the other merge-path blockers.",
       "gate": "auto",
       "planning": "auto"
     },
