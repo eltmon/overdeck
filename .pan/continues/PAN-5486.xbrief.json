@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5486",
   "created": "2026-11-23T03:25:55.145Z",
-  "updated": "2026-11-23T03:34:11.440Z",
+  "updated": "2026-11-23T03:47:16.087Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -61,6 +61,11 @@
       "status": "in_progress",
       "claimedBy": "agent-pan-5486",
       "claimedAt": "2026-11-23T03:34:11.440Z"
+    },
+    "core-pin-docs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5486",
+      "claimedAt": "2026-11-23T03:47:16.087Z"
     }
   }
 }
