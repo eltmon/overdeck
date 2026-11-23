@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5638",
   "created": "2026-11-23T19:38:42.567Z",
-  "updated": "2026-11-23T20:23:26.563Z",
+  "updated": "2026-11-23T20:23:35.608Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -70,6 +70,11 @@
     "wi3-polyrepo-verdict-post.ac4": {
       "status": "completed",
       "doneAt": "2026-11-23T20:23:26.562Z"
+    },
+    "wi4-polyrepo-rejection-visible": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5638",
+      "claimedAt": "2026-11-23T20:23:35.608Z"
     }
   }
 }
