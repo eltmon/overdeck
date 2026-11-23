@@ -357,16 +357,17 @@ async function defaultPolicies(): Promise<FlywheelPolicies> {
 }
 
 async function defaultRunningBook(panDir: string): Promise<FlywheelOrderBookSummary | null> {
-  const { listBooks, computeBookProgress } = await import('../orders/resolver.js');
-  const { currentOrderBook } = await import('../orders/phase.js');
+  const { listBooks, computeBookProgress, backfillUnknownOrderIssues } = await import('../orders/resolver.js');
+  const { currentOrderBook, isBookFinished } = await import('../orders/phase.js');
   let books;
   try {
     books = listBooks(panDir);
   } catch {
     return null;
   }
-  // The active book, by the same rule dispatch uses: running, else the first ready (PAN-5597).
-  const book = currentOrderBook(books);
+  await backfillUnknownOrderIssues(books);
+  // The active book, by the rule dispatch and the orders API use (PAN-5599): running, else the first unfinished ready book.
+  const book = currentOrderBook(books, (candidate) => isBookFinished(computeBookProgress(candidate)));
   if (!book) return null;
   const progress = computeBookProgress(book);
   return { id: book.id, name: book.name, status: book.status, landed: progress.landed, total: progress.total };

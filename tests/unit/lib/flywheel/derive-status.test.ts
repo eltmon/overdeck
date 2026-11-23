@@ -36,6 +36,7 @@ vi.mock('../../../../src/lib/orders/resolver.js', async (importOriginal) => {
       id.toUpperCase(),
       { issue: id.toUpperCase(), open: !closed.has(id.toUpperCase()), parked: false },
     ] as const))),
+    backfillUnknownOrderIssues: vi.fn(async () => {}),
   };
 });
 
@@ -300,6 +301,18 @@ describe('deriveFlywheelStatus (PAN-3964 FR-1)', () => {
       });
       expect(mockListBooks).toHaveBeenCalledWith('/repos/overdeck/.pan');
       expect(status.orderBook).toEqual({ id: 'ready-1', name: 'Book ready-1', status: 'ready', landed: 1, total: 2 });
+    });
+
+    it('skips a finished first ready book and reports the next ready book', async () => {
+      mockListBooks.mockReturnValueOnce([
+        orderBook('ready-a', 'ready', ['PAN-1']),
+        orderBook('ready-b', 'ready', ['PAN-2']),
+      ]);
+      const status = await deriveFlywheelStatus({
+        projectRoot: '/repos/overdeck',
+        deps: baseDeps({ runningBook: undefined }),
+      });
+      expect(status.orderBook).toEqual({ id: 'ready-b', name: 'Book ready-b', status: 'ready', landed: 0, total: 1 });
     });
 
     it('reports no order book when only draft and complete books exist', async () => {
