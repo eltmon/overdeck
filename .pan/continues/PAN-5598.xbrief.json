@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5598",
   "created": "2026-11-23T02:56:35.201Z",
-  "updated": "2026-11-23T04:32:19.371Z",
+  "updated": "2026-11-23T04:32:26.576Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -190,6 +190,11 @@
     "cli-orders-read-verbs.ac4": {
       "status": "completed",
       "doneAt": "2026-11-23T04:32:19.370Z"
+    },
+    "docs-mcp-orders": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5598",
+      "claimedAt": "2026-11-23T04:32:26.576Z"
     }
   }
 }
