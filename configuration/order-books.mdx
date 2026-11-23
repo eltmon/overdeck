@@ -8,17 +8,17 @@ import { ThemedImage } from "/snippets/themed-image.mdx";
 
 # Order Books
 
-An order book is an operator-curated Flywheel campaign. It replaces a prose list of “special orders” with a durable queue. The queue sets lane capacity, prerequisites, planning checks, pickup posture and completion rules, and the Flywheel follows them.
+An order book is a list of issues the Flywheel works through, in the order you set. It replaces a prose list of “special orders” with a durable queue: the book sets which issues run in parallel, which run one at a time, what each issue waits for, and when pickup pauses, and the Flywheel follows it.
 
-Use an order book when the sequence matters: a migration campaign, a refactor that must stay behind a serial gate, or a release-hardening run whose scope must not expand into the normal backlog.
+Use an order book when the order of work matters: a migration, a refactor that must not overlap with other work, or a release push whose scope must not expand into the normal backlog.
 
 <ThemedImage
   light="/images/order-books/page-light.png"
   dark="/images/order-books/page-dark.png"
-  alt="Order Book design mockup showing OPEN and DRAIN posture, parallel Lane A, serial Lane B, and landed campaign history"
+  alt="The Order books page: the book list grouped Active, Queued and Drafts on the left, and the active Workflow redesign book with its parallel lane and one-at-a-time lane, each issue showing its full title and one status such as Working, In review or Waiting for a free slot"
 />
 
-The design mockup shows the core model: Lane A overlaps up to its configured limit, Lane B admits one issue at a time, and DRAIN stops new pickup while in-flight work finishes.
+The page lists your books on the left and the selected book on the right: its phase, what the phase means, the actions that apply, and one issue list with the parallel lane above the one-at-a-time lane.
 
 ## Order books and the backlog
 
@@ -30,27 +30,35 @@ Membership in the active book counts as operator release, even when:
 flywheel.auto_pickup_backlog=false
 ```
 
-That setting still holds every off-book issue. The Flywheel can work through the book without opening the rest of the backlog.
+With that setting, an issue outside the active book still needs the `released` label before the Flywheel picks it up on its own. The Flywheel can work through the book without opening the rest of the backlog. A manual `pan start <id>` works for any issue, in the book or not.
 
-The Flywheel keeps to the active book. A manual `pan start <id>` for an issue outside the book is not blocked.
+## The four phases
+
+The page shows each book in one phase. Overdeck derives the phase from the book's stored status every time it reads the book, and dispatch uses the same rule, so the page cannot disagree with what the Flywheel does.
+
+| Phase | What it means | How a book gets here |
+| --- | --- | --- |
+| **Draft** | Nothing starts from a draft. | **+ New book** creates one. **Move back to draft** and **Restore as draft** return a book here. |
+| **Queued** | The book waits in line, shown with its place (`#2`, `#3`). | **Queue book** on a draft. |
+| **Active** | The Flywheel works from this book. Its issues are cleared to start, and `pan start` still works for anything else. | The first queued book in queue order becomes active. |
+| **Archived** | Kept for the record. Its issues are free to join another book. | **Archive** on a draft or queued book. |
+
+Only one book is active at a time. Queue order is the order the books were created; to run a later book first, move the books ahead of it back to draft.
+
+A book is **finished** when every issue in it has landed or is parked. A finished book still holds the active slot until you archive it, so queued books cannot start. The page says so and offers **Archive and move on**.
 
 ## Build a book
 
 Open **Order books** in the dashboard, or go directly to `/orders`.
 
-1. Click **+ New book**, enter a name, and create the draft.
-2. Add open issues from search or from the ranked backlog-candidates rail. Adding an issue changes the plan only; it does not dispatch work.
-3. Put parallel-safe work in **Lane A**. Put work that must serialize against the same subsystem in **Lane B**.
-4. Drag rows to change lane order, or use the lane-swap action to move an issue between A and B.
-5. Set Lane A concurrency and, when needed, an optional brief-overlay path.
-6. Resolve every blocking validation finding, then click **Queue book**. A queued book is `ready`.
-7. Click **Start run** when the book should become the active Flywheel campaign.
+1. Click **+ New book**, enter a name, and click **Create book**.
+2. Add issues from the **Add issues** panel. With an empty search it lists the top of your backlog; type to search open issues by ID, title or label. **Add to** picks the lane. You can also drag a row from the panel onto a lane. Adding an issue only changes the list; work starts when the book is active.
+3. Put work that can overlap in the **Parallel lane**. Put work that would collide in the **One-at-a-time lane**.
+4. Drag rows to change their order, or use **Run one at a time** and **Run in parallel** on a row to move it between lanes.
+5. Fix everything the problems box lists, then click **Queue book**. The book becomes queued, and active once the books ahead of it are archived or moved back to draft.
+6. If the Flywheel is stopped when the book is active, click **Start Flywheel**.
 
-The book strip lists drafts and queued books together. A book is `draft` until you queue it, then `ready`. Starting it launches the Flywheel bound to that book. The Progress view shows the book as drained once every item is terminal.
-
-```text
-draft → ready
-```
+To rename a book, click its name. The **⋯** menu also offers **Rename**, **Copy book ID for the CLI** and **Archive**.
 
 ### Add from other surfaces
 
@@ -59,63 +67,66 @@ You can promote an issue without leaving its current view:
 - **Add to order book** appears in the shared issue action menu used by the board and issue drawer.
 - Backlog rows expose **+ Order book** and ask only whether the issue belongs in Lane A or Lane B.
 
-These are narrow add actions. Editing, validation, settings, ordering, and lifecycle controls remain on `/orders`.
+These are narrow add actions. Editing, ordering and phase changes stay on `/orders`. An issue that belongs to a book shows its position, such as `A3`, and links to `/orders?book=<id>`.
 
 ## Read the page
 
-### Pickup posture
+### The issue list
 
-**OPEN** permits eligible book items to dispatch and renders blue-tinted: dispatch is live, machine working.
+Each book has one issue list with two lanes, stacked full width.
 
-**DRAIN** tells the Flywheel to start no new book items and renders amber: a human paused pickup. Work already in the pipeline continues toward a terminal state.
+- **Parallel lane** (`Lane A`): up to the limit you set with **−** and **+**, issues run at the same time.
+- **One-at-a-time lane** (`Lane B`): runs top to bottom, one issue at a time.
 
-Run settings always show posture attribution (who set it, when, and why) beneath the posture control, regardless of which posture is active. If the recorded reason predates the current posture (for example, a leftover "Operator paused new pickup." reason after reopening), an amber stale-reason flag calls that out.
+Every row shows the position, the issue ID, the full title, and one status. A muted second line lists only what applies: `after <issue>`, `re-check PRD first`, `plan when it starts` or `no PRD`. Landed issues collapse behind **Show n landed**.
 
-### Lane A
+The status is either what the issue is doing or the one reason it waits:
 
-Lane A is parallel. The **Lane A concurrency** setting controls how many Lane A issues may be in flight at once. The Flywheel starts no new Lane A item while that many are in flight.
+| Status | Meaning |
+| --- | --- |
+| **Working** | An agent is working on the issue. |
+| **In review** | The issue is in review or ready to merge. |
+| **Landed** | The issue is closed. |
+| **Waiting for PAN-…** | A prerequisite has not landed yet. |
+| **Waiting for a free slot (2 of 2 running)** | The parallel lane is full. |
+| **Waiting its turn** | Another issue in the one-at-a-time lane is running. |
+| **PRD needs a re-check first** | The issue is set to re-check its PRD against `main` before it starts. |
+| **Pickup paused** | Pickup is paused for this book. |
+| **Starts next** | Nothing holds the issue back; the Flywheel picks it up next. |
+| **Ready, Flywheel is stopped** | Nothing holds the issue back, but the Flywheel is not running. |
+| **Not queued yet**, **Book is not active yet**, **Not started** | The book is a draft, queued, or archived. |
 
-### Lane B
+**Options** on a row sets **Start only after these issues land**, **Re-check the PRD against main before starting**, and **Write the plan when it starts**.
 
-Lane B is strictly serial. The Flywheel starts no second Lane B issue while another Lane B item is in flight.
+### Pause pickup
 
-Each compact row leads with the lane position, such as `B11 · book`, then the issue id. Rows also show prerequisite, PRD, and re-verification state.
+On the active book, **Pause pickup** asks for a reason. Work already running finishes; nothing new starts from the book until you click **Resume pickup**. While pickup is paused the page says who paused it, when, and why.
 
-### Start validation
+### Problems
 
-The validation panel separates blockers from warnings. Start is blocked when:
+The problems box lists what must be fixed before a draft can be queued:
 
-- an issue is closed or cannot be resolved as open;
-- an issue belongs to another non-complete book;
+- an issue is closed or cannot be resolved as open (**Remove** takes it out of the book);
+- an issue belongs to another book that is not archived (**Remove** takes it out);
 - a prerequisite is missing;
 - prerequisites form a cycle;
-- a Lane B issue has no draft PRD or canonical spec;
-- the book has no items (`empty-book`); or
+- a one-at-a-time issue has no draft PRD or canonical spec;
+- the book has no issues (`empty-book`); or
 - the shared issue store is unavailable or empty (`issue-store-unavailable`): run `pan up` once, then retry.
 
-A Lane B issue marked for planning at pickup turns the missing-PRD result into a warning. Warnings stay visible but do not prevent queueing or starting.
+A closed issue in a queued or active book is not a problem: it has landed. A one-at-a-time issue marked **Write the plan when it starts** turns the missing-PRD result into a warning. Warnings stay visible but do not block queueing.
 
-Use **Preview brief** to inspect the scope that the Flywheel will receive before the run starts.
+### More settings
 
-### Setup and Progress
+**More settings** holds the **Extra instructions file**, a markdown file added to every issue's kickoff brief, and **Preview what the Flywheel receives**.
 
-**Setup** contains the book editor, run settings, add rails, and validation. Run settings save automatically per field: each field shows its own saved or error state beside its label, and a failed save offers Retry rather than silently discarding the change.
-
-**Progress** turns the book into a live checklist. For held issues it shows the same conditions the Flywheel checks before it dispatches:
-
-- book membership;
-- OPEN or DRAIN pickup posture;
-- a free lane slot;
-- terminal prerequisites; and
-- completed PRD re-verification.
-
-The Flywheel page and issue tree also show read-only order-book projections. Those projections link to `/orders?project=<key>` for the project the book actually lives in, so the link lands on the right books.
+The Flywheel page shows the active book's issue list read-only and links to `/orders?project=<key>&book=<id>`.
 
 ### Pick the project
 
 Order books are per-project state, and the page header carries a **Project** picker listing every project Overdeck has registered. It opens on the project the server resolved for you, and choosing another one reloads the page against that project's books: every read and write the page makes is scoped to the selection, so you cannot edit one project's book while looking at another's.
 
-The selection is mirrored into the URL as `/orders?project=mind-your-now`, which makes it a shareable deep link: opening that URL selects the project before the first load. Without the parameter the page shows the project containing the dashboard server's own working directory, exactly as it did before.
+The selection is mirrored into the URL as `/orders?project=mind-your-now`, which makes it a shareable deep link: opening that URL selects the project before the first load. Without the parameter the page shows the project containing the dashboard server's own working directory, exactly as it did before. Add `book=<id>` (`/orders?project=mind-your-now&book=2026-08-01-frontend-sweep`) to open a specific book; without it the page opens the active book.
 
 ## Use the CLI
 
@@ -142,7 +153,17 @@ pan orders start 2026-07-18-refactor-p3-remainder
 pan flywheel start --orders 2026-07-18-refactor-p3-remainder
 ```
 
-`queue` is the CLI form of the dashboard's **Queue book** action: it moves a draft to `ready`. It refuses a book that is not a draft. The CLI `pan orders queue` and `pan orders start` skip the validation panel's checks; validate on `/orders` first.
+`queue` is the CLI form of the dashboard's **Queue book** action: it moves a draft to the queue. It refuses a book that is not a draft. The CLI `pan orders queue` and `pan orders start` skip the problems check; fix problems on `/orders` first.
+
+`pan orders list` shows each book's phase: `active`, `queued #<n>`, `draft` or `archived`, with ` (finished)` when every issue has landed or is parked. Three more verbs move a book between phases:
+
+```bash
+pan orders unqueue 2026-07-18-refactor-p3-remainder    # queued → draft
+pan orders archive 2026-07-18-refactor-p3-remainder    # draft or queued → archived
+pan orders unarchive 2026-07-18-refactor-p3-remainder  # archived → draft
+```
+
+`unarchive` is refused, with `cannot be restored: <ISSUE> already belongs to order book <otherId>`, when one of the book's issues has since joined another book that is not archived. The dashboard's **Restore as draft** follows the same rule.
 
 `pan orders start <id>` and `pan flywheel start --orders <id>` both open the one `conv-flywheel` conversation with the book named in its `/pan-flywheel` prompt. They differ when a flywheel is already running: `pan orders start` leaves it running and returns without naming the new book to it, while `pan flywheel start --orders` refuses with "already running" (`pan flywheel stop` first). A paused flywheel makes both refuse; resume it (`pan flywheel resume`) or replace it (`pan flywheel start --fresh --orders <id>`).
 
@@ -157,26 +178,20 @@ pan orders queue 2026-08-01-frontend-sweep --project mind-your-now
 
 Without the flag, the command resolves the project that contains your current directory, as before. An unregistered key fails with `Unknown project: <key>` instead of reporting the book as missing.
 
-## What drained means
+## What finished means
 
-A book is drained only when every item is terminal. For order-book progress, terminal means either:
+A book is finished only when it has at least one issue and every issue is terminal. For order-book progress, terminal means either:
 
 - the issue is closed; or
 - the issue carries the `parked` label.
 
-The server derives this result from canonical issue state. The orchestrator cannot declare a book drained through prose or a status message.
-
-The Progress view shows the book as drained once every item is terminal; there is no completion verb. Check it with:
-
-```bash
-pan orders show 2026-07-18-refactor-p3-remainder
-```
+The server derives this result from canonical issue state. The orchestrator cannot declare a book finished through prose or a status message. The page marks a finished book **Finished**, and `pan orders list` marks it `(finished)`.
 
 ## Reports and what comes next
 
 The flywheel loop writes its run report to `.pan/flywheel/report.md` when it stops (`pan flywheel stop`) or when asked (`pan flywheel report`), and records substrate fixes and learnings in `.pan/flywheel/state.md`. Both are committed; git history is the archive. See [docs/FLYWHEEL.md](https://github.com/eltmon/overdeck/blob/main/docs/FLYWHEEL.md).
 
-The first `ready` book in the queue is the active book: its issues count as released for pickup. A drained book stays `ready`, and nothing advances the queue on its own, so start the next book yourself with `pan orders start <id>`. If you do not want a queued book's issues picked up, leave it as a draft.
+The active book's issues count as released for pickup; queued books wait their turn. A finished book stays active, and nothing advances the queue on its own, so archive it (**Archive and move on**, or `pan orders archive <id>`) to let the next queued book become active. If you do not want a book's issues picked up, keep it as a draft.
 
 ## Related
 
