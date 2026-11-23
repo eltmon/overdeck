@@ -19,6 +19,7 @@ import { promisify } from 'node:util';
 import { parseArtifactRef, type ForgeType } from '../forge.js';
 import { inferProjectForge, normalizeForge, resolveConfiguredRepos } from '../project-repos.js';
 import { findProjectByPath, getProjectSync, resolveProjectFromIssueSync, type ProjectConfig } from '../projects.js';
+import { readGitHubMemberPrFacts } from './github-member-pr-facts.js';
 import { readGitLabMrFacts, type PrFacts } from './pr-facts.js';
 
 const execFileAsync = promisify(execFile);
@@ -111,16 +112,19 @@ export async function resolveReviewArtifactTargets(
 }
 
 /**
- * The facts of one member repo's GitLab merge request, read from the URL its
- * discovery returned. `getPrFacts` answers for one MR per issue; a polyrepo
- * verdict reads each member's own MR so it can approve every one of them.
+ * The facts of one member repo's merge request or pull request, read from the
+ * URL its discovery returned. `getPrFacts` answers for one artifact per issue
+ * and cannot see a GitHub member of a GitLab project at all; a polyrepo verdict
+ * reads each member on its own so it can post on every one (PAN-5614, PAN-5638).
  */
 export async function readMemberMrFacts(
   issueId: string,
   sourceBranch: string,
   url: string,
   readFacts: typeof readGitLabMrFacts = readGitLabMrFacts,
+  readGitHubFacts: typeof readGitHubMemberPrFacts = readGitHubMemberPrFacts,
 ): Promise<PrFacts> {
-  const iid = parseArtifactRef(url)?.number;
-  return readFacts(issueId, { iid, web_url: url, source_branch: sourceBranch, state: 'opened' });
+  const ref = parseArtifactRef(url);
+  if (ref?.forge === 'github') return readGitHubFacts(issueId, url);
+  return readFacts(issueId, { iid: ref?.number, web_url: url, source_branch: sourceBranch, state: 'opened' });
 }

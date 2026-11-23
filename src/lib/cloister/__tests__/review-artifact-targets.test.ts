@@ -94,4 +94,16 @@ describe('readMemberMrFacts', () => {
       iid: 19, web_url: url, source_branch: 'feature/min-1144', state: 'opened',
     });
   });
+
+  it('reads a GitHub member PR through the GitHub reader', async () => {
+    const url = 'https://github.com/mindyournow/myn-skills/pull/4';
+    const readFacts = vi.fn(async () => ({ approved: false }) as never);
+    const readGitHubFacts = vi.fn(async () => ({ approved: true }) as never);
+
+    const facts = await readMemberMrFacts('MIN-1142', 'feature/min-1142', url, readFacts, readGitHubFacts);
+
+    expect(readGitHubFacts).toHaveBeenCalledWith('MIN-1142', url);
+    expect(readFacts).not.toHaveBeenCalled();
+    expect(facts).toEqual({ approved: true });
+  });
 });
