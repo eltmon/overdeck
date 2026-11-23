@@ -28,6 +28,7 @@ import type { AgentState } from '../../../../lib/agents/agent-state.js';
 import { operatorInterventionEvent } from '../../../../lib/operator-interventions.js';
 import { assessCpuPressure, type CpuPressureVerdict } from '../../../../lib/cloister/cpu-pressure.js';
 import { CodexAuthCheckError, checkCodexAuthStatus } from '../../../../lib/codex-auth.js';
+import { scanCodexAuthFailures } from '../../../../lib/codex/auth-failure-scan.js';
 import { canUseHarness } from '../../../../lib/harness-policy.js';
 import { emitActivityEntry } from '../../../../lib/activity-logger.js';
 import { extractPrefix, parseIssueId } from '../../../../lib/issue-id.js';
@@ -452,7 +453,8 @@ export const spawnIssueAgentForRoute = (input: { body: unknown; internalRequest:
     const providerAuthMode = yield* Effect.promise(() => getProviderAuthMode(spawnModel));
     if (providerAuthMode === 'subscription') {
       const codexAuth = yield* Effect.tryPromise({
-        try: () => checkCodexAuthStatus(),
+        // PAN-5633: a live Codex session that failed a turn on sign-in marks the token family burned.
+        try: async () => checkCodexAuthStatus({ authFailures: await scanCodexAuthFailures() }),
         catch: (cause) => new CodexAuthCheckError({
           message: cause instanceof Error ? cause.message : String(cause),
           cause,

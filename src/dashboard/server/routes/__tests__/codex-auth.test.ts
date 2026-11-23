@@ -35,8 +35,10 @@ vi.mock('../../../../lib/cliproxy.js', async () => {
   };
 });
 
-vi.mock('../../../../lib/agents/queries.js', () => ({
-  listAgentStates: () => [],
+// PAN-5633: the burned signal comes from the live-session scan; each test sets its failures.
+const scan = vi.hoisted(() => ({ failures: [] as Array<{ id: string; at: string; message: string }> }));
+vi.mock('../../../../lib/codex/auth-failure-scan.js', () => ({
+  scanCodexAuthFailures: async () => scan.failures,
 }));
 
 import { codexAuthRouteLayer } from '../codex-auth.js';
@@ -67,6 +69,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   vi.useRealTimers();
+  scan.failures = [];
   mockCliproxy.bridge.mockReset();
   mockCliproxy.bridge.mockImplementation(async () => false);
   await rm(tmpRoot, { recursive: true, force: true });
@@ -199,5 +202,28 @@ describe('GET /api/settings/codex-auth', () => {
     expect(mockCliproxy.bridge).toHaveBeenCalledTimes(1);
     expect(result.status).toBe(200);
     expect(result.body).toMatchObject({ status: 'valid', email: EMAIL });
+  });
+
+  it('returns burned with affectedAgents when a session failed after the last login', async () => {
+    // The last login (auth.json write) was a minute before the failed turn.
+    await writeNativeAuth('2026-06-02T03:34:00Z');
+    scan.failures = [{ id: 'conv-20261118-427e', at: '2026-06-02T03:35:00.000Z', message: 'refresh token was already used' }];
+
+    const result = await getCodexAuth();
+
+    expect(result.status).toBe(200);
+    expect(result.body).toMatchObject({ status: 'burned', source: 'native', email: EMAIL, affectedAgents: ['conv-20261118-427e'] });
+  });
+
+  it('returns valid once auth.json is newer than the failure', async () => {
+    // `codex login` rewrote auth.json after the failed turn: the failure is healed.
+    await writeNativeAuth('2026-06-02T03:36:00Z');
+    scan.failures = [{ id: 'conv-20261118-427e', at: '2026-06-02T03:35:00.000Z', message: 'refresh token was already used' }];
+
+    const result = await getCodexAuth();
+
+    expect(result.status).toBe(200);
+    expect(result.body).toMatchObject({ status: 'valid', source: 'native', email: EMAIL });
+    expect(result.body).not.toHaveProperty('affectedAgents');
   });
 });
