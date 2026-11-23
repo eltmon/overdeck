@@ -115,24 +115,20 @@ type PolyrepoPostOutcome =
   | { ok: false; url: string; reason: string };
 
 /**
- * PAN-5614: post a review verdict on every member MR of a polyrepo issue. Each
- * MR's facts are read first, so a GitHub member PR (which this path cannot
- * approve) fails before anything is posted. An MR that is already approved is
+ * PAN-5614, PAN-5638: post a review verdict on every member PR/MR of a
+ * polyrepo issue. Every member's facts are read first, so nothing is posted
+ * unless all of them could be read. A member that is already approved is
  * skipped on a pass, so a re-run or a deferred replay never approves twice.
+ * On a GitHub member PR the operator opened, GitHub refuses a self-review
+ * and `postReviewVerdict` posts an `overdeck-verdict` marker comment
+ * instead; polyrepo markers carry no `sha=` because a polyrepo run id is a
+ * composite anchor, not a commit.
  */
 async function postPolyrepoReviewVerdict(
   issueId: string,
   found: ReadonlyArray<{ target: ReviewArtifactTarget; artifact: { url: string } }>,
   input: { verdict: 'approve' | 'request-changes'; body: string; reviewedHead: string | null | undefined },
 ): Promise<PolyrepoPostOutcome> {
-  const github = found.find((entry) => entry.target.forge !== 'gitlab');
-  if (github) {
-    return {
-      ok: false,
-      url: github.artifact.url,
-      reason: `${github.target.repoKey} is a GitHub member of a polyrepo project; record its verdict there by hand`,
-    };
-  }
   const members: Array<{ url: string; facts: PrFacts }> = [];
   for (const { target, artifact } of found) {
     const facts = await readMemberMrFacts(issueId, target.sourceBranch, artifact.url);
@@ -143,7 +139,7 @@ async function postPolyrepoReviewVerdict(
   for (const { url, facts } of members) {
     if (input.verdict === 'approve' && facts.approved) {
       console.log(chalk.dim(`${url} is already approved; leaving it as it is.`));
-      last ??= { posted: true, forge: 'gitlab', url, verdict: 'approve' };
+      last ??= { posted: true, forge: facts.forge === 'github' ? 'github' : 'gitlab', url, verdict: 'approve' };
       continue;
     }
     const result = await postReviewVerdict({
