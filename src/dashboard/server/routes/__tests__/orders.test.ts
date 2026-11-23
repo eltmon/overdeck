@@ -18,13 +18,23 @@ const {
   mockListProjectsSync,
   mockGetProjectPanPaths,
   mockStartFlywheelRun,
+  mockBackfillUnknownOrderIssues,
 } = vi.hoisted(() => ({
   mockGetProjectSync: vi.fn(),
   mockFindProjectByPathSync: vi.fn(),
   mockListProjectsSync: vi.fn(),
   mockGetProjectPanPaths: vi.fn(),
   mockStartFlywheelRun: vi.fn(),
+  mockBackfillUnknownOrderIssues: vi.fn(async () => {}),
 }));
+
+vi.mock('../../../../lib/orders/resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../lib/orders/resolver.js')>();
+  return {
+    ...actual,
+    backfillUnknownOrderIssues: mockBackfillUnknownOrderIssues,
+  };
+});
 
 vi.mock('../../../../lib/projects.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../lib/projects.js')>();
@@ -178,6 +188,7 @@ beforeEach(() => {
   roots.push(defaultPanHome);
   mockGetProjectPanPaths.mockReset().mockReturnValue(panPaths(defaultPanHome));
   mockStartFlywheelRun.mockReset();
+  mockBackfillUnknownOrderIssues.mockReset().mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -347,6 +358,66 @@ describe('/api/orders routes', () => {
       status: 200,
       body: { id: '2026-07-18-second', phase: 'queued', queuePosition: 2, finished: false },
     });
+  });
+
+  it('skips a finished first ready book: it is queued, finished and unnumbered, and the next ready book is active', async () => {
+    const root = gitFixture();
+    const states = new Map<string, OrderIssueState>([
+      ['PAN-1', { issue: 'PAN-1', open: false, parked: false }],
+      ['PAN-2', { issue: 'PAN-2', open: true, parked: false }],
+    ]);
+    const layer = makeOrdersRouteLayer({ stateRoot: () => root, issueLookup: issueLookup(states), hasPrd: () => true });
+    for (const [id, issue] of [['2026-07-18-first', 'PAN-1'], ['2026-07-18-second', 'PAN-2']] as const) {
+      await requestOrdersRoute(layer, '/api/orders', mutation('POST', { id, name: id }));
+      await requestOrdersRoute(layer, `/api/orders/${id}/items`, mutation('POST', { items: [{ issue, lane: 'A' }] }));
+      await setStatus(root, id, 'ready');
+    }
+
+    await expect(requestOrdersRoute(layer, '/api/orders')).resolves.toMatchObject({
+      status: 200,
+      body: { books: [
+        { id: '2026-07-18-first', phase: 'queued', queuePosition: null, finished: true },
+        { id: '2026-07-18-second', phase: 'active', queuePosition: 1, finished: false },
+      ] },
+    });
+  });
+
+  it('awaits an injected backfillIssues with every book in index order before the response', async () => {
+    const root = gitFixture();
+    const states = new Map<string, OrderIssueState>([
+      ['PAN-1', { issue: 'PAN-1', open: true, parked: false }],
+      ['PAN-2', { issue: 'PAN-2', open: true, parked: false }],
+    ]);
+    const backfillIssues = vi.fn(async () => {});
+    const layer = makeOrdersRouteLayer({
+      stateRoot: () => root,
+      issueLookup: issueLookup(states),
+      hasPrd: () => true,
+      backfillIssues,
+    });
+    for (const [id, issue] of [['2026-07-18-first', 'PAN-1'], ['2026-07-18-second', 'PAN-2']] as const) {
+      await requestOrdersRoute(layer, '/api/orders', mutation('POST', { id, name: id }));
+      await requestOrdersRoute(layer, `/api/orders/${id}/items`, mutation('POST', { items: [{ issue, lane: 'A' }] }));
+    }
+    backfillIssues.mockClear();
+
+    await expect(requestOrdersRoute(layer, '/api/orders')).resolves.toMatchObject({ status: 200 });
+
+    expect(backfillIssues).toHaveBeenCalledOnce();
+    expect(backfillIssues.mock.calls[0]![0]).toMatchObject([
+      { id: '2026-07-18-first' },
+      { id: '2026-07-18-second' },
+    ]);
+    expect(mockBackfillUnknownOrderIssues).not.toHaveBeenCalled();
+  });
+
+  it('attempts no live backfill when a test injects issueLookup without backfillIssues', async () => {
+    const root = gitFixture();
+    const layer = makeOrdersRouteLayer({ stateRoot: () => root, issueLookup: () => new Map(), hasPrd: () => true });
+
+    await expect(requestOrdersRoute(layer, '/api/orders')).resolves.toMatchObject({ status: 200 });
+
+    expect(mockBackfillUnknownOrderIssues).not.toHaveBeenCalled();
   });
 
   describe('status transitions', () => {

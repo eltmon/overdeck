@@ -8,7 +8,7 @@ import type {
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
-import { backlogCandidates, computeBookProgress, getBookAsync, listBooks, liveOrderIssueLookup, normalizeOrderIssueId } from '../../../lib/orders/resolver.js';
+import { backfillUnknownOrderIssues, backlogCandidates, computeBookProgress, getBookAsync, listBooks, liveOrderIssueLookup, normalizeOrderIssueId } from '../../../lib/orders/resolver.js';
 import { deriveBookPhases, type OrderBookPhaseView } from '../../../lib/orders/phase.js';
 import type { OrderIssueLookup, OrderIssueState } from '../../../lib/orders/types.js';
 import { createOrderPrdLookup, hasOrderIssuePrd, validateBookForStart } from '../../../lib/orders/validate.js';
@@ -46,6 +46,7 @@ export interface OrdersRouteDeps {
   now?: () => Date;
   actor?: () => string;
   startOrderBook?: (book: OrderBook) => Promise<StartOrderBookResult>;
+  backfillIssues?: (books: readonly OrderBook[]) => Promise<void>;
 }
 
 interface OrdersReadSnapshot {
@@ -232,6 +233,15 @@ function bookPhases(books: readonly OrderBook[], issueLookup?: OrderIssueLookup)
   return deriveBookPhases(books, (candidate) => computeBookProgress(candidate, issueLookup));
 }
 
+/**
+ * Ask the tracker for ready/running books' uncached issues before phases are derived (PAN-5599 D5),
+ * so a book whose issues closed outside the closed window still reads as finished. A test that
+ * injects `issueLookup` gets its own evidence and no live backfill.
+ */
+function backfillFor(deps: OrdersRouteDeps): (books: readonly OrderBook[]) => Promise<void> {
+  return deps.backfillIssues ?? (deps.issueLookup ? async () => {} : backfillUnknownOrderIssues);
+}
+
 /** Used only when the book is missing from the list it was derived from (a concurrent write raced the read). */
 function fallbackPhase(book: OrderBook): OrderBookPhaseView {
   return {
@@ -335,6 +345,8 @@ async function defaultStartOrderBook(book: OrderBook, project: ProjectConfig): P
 
 export async function getOrdersPayload(deps: OrdersRouteDeps = {}, projectKey?: string): Promise<RouteResult> {
   return routeResult(async () => {
+    const { stateRoot } = resolveOrdersStateRoot(deps, projectKey);
+    await backfillFor(deps)(listBooks(stateRoot));
     const snapshot = buildOrdersReadSnapshot(deps, projectKey);
     const phases = bookPhases(snapshot.books, snapshot.issueLookup);
     return {
@@ -368,7 +380,10 @@ export async function getOrderPayload(
   return routeResult(async () => {
     const primary = resolveOrdersStateRoot(deps, projectKey);
     const book = await getBookAsync(primary.stateRoot, bookId);
-    if (book) return enrichedBook(book, deps, undefined, projectKey);
+    if (book) {
+      await backfillFor(deps)(listBooks(primary.stateRoot));
+      return enrichedBook(book, deps, undefined, projectKey);
+    }
     if (deps.stateRoot || projectKey !== undefined) {
       throw new Error(`Order book not found: ${bookId}`);
     }
