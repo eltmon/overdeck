@@ -15,7 +15,7 @@ import { scanPendingInputs } from '../agent-enrichment.js';
 import { withConcurrencyLimit } from '../concurrency.js';
 import { getConversationsAutoSettleIdleDays } from './control-settings.js';
 import { isAgentConversationName, listConversations, type LegacyConversation } from './conversations.js';
-import { listIdleClocks, settleIdleConversation, type IdleClock } from './conversation-triage-store.js';
+import { listIdleClocks, resurfaceIdleSettledConversation, settleIdleConversation, type IdleClock } from './conversation-triage-store.js';
 
 export const DAY_MS = 86_400_000;
 
@@ -37,34 +37,44 @@ export function displayParentIdOf(row: GroupableRow, ids: ReadonlySet<number>): 
   return null;
 }
 
+/** The display root row for `row` among `byId` (mirrors groupByDisplayRoot's root walk). A cycle or a chain longer than 64 makes the row its own root. */
+export function displayRootOf<T extends GroupableRow>(row: T, byId: ReadonlyMap<number, T>): T {
+  const ids = new Set(byId.keys());
+  const seen = new Set<number>([row.id]);
+  let current = row;
+  for (let hops = 0; hops < MAX_PARENT_HOPS; hops++) {
+    const parentId = displayParentIdOf(current, ids);
+    if (parentId === null) return current;
+    if (seen.has(parentId)) return row;
+    seen.add(parentId);
+    current = byId.get(parentId)!;
+  }
+  return row;
+}
+
 /** Root id → members (root first). A parent chain longer than 64 or a cycle makes the row its own root. */
 export function groupByDisplayRoot<T extends GroupableRow>(rows: readonly T[]): Map<number, T[]> {
   const byId = new Map<number, T>();
   for (const row of rows) if (!byId.has(row.id)) byId.set(row.id, row);
-  const ids = new Set(byId.keys());
-
-  const rootOf = (row: T): number => {
-    const seen = new Set<number>([row.id]);
-    let current = row;
-    for (let hops = 0; hops < MAX_PARENT_HOPS; hops++) {
-      const parentId = displayParentIdOf(current, ids);
-      if (parentId === null) return current.id;
-      if (seen.has(parentId)) return row.id;
-      seen.add(parentId);
-      current = byId.get(parentId)!;
-    }
-    return row.id;
-  };
 
   const groups = new Map<number, T[]>();
   for (const row of byId.values()) {
-    const rootId = rootOf(row);
-    const members = groups.get(rootId) ?? [];
-    if (rootId === row.id) members.unshift(row);
+    const root = displayRootOf(row, byId);
+    const members = groups.get(root.id) ?? [];
+    if (root.id === row.id) members.unshift(row);
     else members.push(row);
-    groups.set(rootId, members);
+    groups.set(root.id, members);
   }
   return groups;
+}
+
+/** PAN-5611 D1: the display root's name for `name` among `rows`, or `name` when it is not listed. */
+export function displayRootNameOf(name: string, rows: readonly LegacyConversation[]): string {
+  const byId = new Map<number, LegacyConversation>();
+  for (const row of rows) if (!byId.has(row.id)) byId.set(row.id, row);
+  const row = rows.find((r) => r.name === name);
+  if (!row) return name;
+  return displayRootOf(row, byId).name;
 }
 
 /**
@@ -170,4 +180,59 @@ export async function sweepIdleConversations(deps: IdleSettleDeps): Promise<stri
     TRANSCRIPT_READ_CONCURRENCY,
   );
   return settled;
+}
+
+export interface IdleResurfaceDeps {
+  now?: () => number;
+  listRows?: () => LegacyConversation[];
+  listIdleClocks?: () => Map<string, IdleClock>;
+  /** Live terminal session names; null when the backend did not answer. */
+  listLiveSessions: () => Promise<ReadonlySet<string> | null>;
+  resolveTranscript: (conv: LegacyConversation) => Promise<string | null>;
+  lastActivityMs?: (path: string, sinceMs: number) => Promise<number | null>;
+  resurface?: (name: string, settledAtMs: number, nowMs: number) => boolean;
+  log?: (line: string) => void;
+}
+
+/** PAN-5611 FR-2: one pass. Ends 'idle' settles whose group has transcript activity after settled_at. Returns the names it resurfaced. */
+export async function resurfaceActiveIdleSettles(deps: IdleResurfaceDeps): Promise<string[]> {
+  const log = deps.log ?? ((line: string) => console.log(line));
+  const nowMs = (deps.now ?? Date.now)();
+
+  const rows = (deps.listRows ?? (() => listConversations()))();
+  const clocks = (deps.listIdleClocks ?? listIdleClocks)();
+  const candidates = [...groupByDisplayRoot(rows).values()].filter((members) => {
+    const clock = clocks.get(members[0]!.name);
+    return clock !== undefined && clock.settledAtMs !== null && clock.settleReason === 'idle';
+  });
+  if (candidates.length === 0) return [];
+
+  const live = await deps.listLiveSessions();
+  if (live === null) {
+    log('[idle-settle] terminal sessions could not be listed; skipping resurface');
+    return [];
+  }
+  const liveGroups = candidates.filter((members) => members.some((member) => live.has(member.tmuxSession)));
+
+  const lastActivityMs = deps.lastActivityMs ?? readTranscriptLastActivityMs;
+  const resurface = deps.resurface ?? ((name: string, settledAtMs: number, atMs: number) => resurfaceIdleSettledConversation(name, atMs, settledAtMs));
+  const resurfaced: string[] = [];
+
+  await withConcurrencyLimit(
+    liveGroups.map((members) => async () => {
+      const root = members[0]!;
+      const settledAtMs = clocks.get(root.name)!.settledAtMs!;
+      for (const member of members) {
+        const path = await deps.resolveTranscript(member);
+        if (path === null) continue;
+        const activity = await lastActivityMs(path, settledAtMs);
+        if (activity !== null && activity > settledAtMs) {
+          if (resurface(root.name, settledAtMs, nowMs)) resurfaced.push(root.name);
+          return;
+        }
+      }
+    }),
+    TRANSCRIPT_READ_CONCURRENCY,
+  );
+  return resurfaced;
 }

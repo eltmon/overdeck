@@ -120,23 +120,49 @@ export function clearConversationTriage(name: string, nowMs: number = Date.now()
   return result.changes > 0;
 }
 
+/**
+ * PAN-5611: ends an 'idle' settle (and any snooze) and restarts the idle clock.
+ * Manual, merge and unknown-reason settles stay. With settledAtMs, clears only
+ * that exact settle, so a settle written after the caller read the row wins.
+ */
+export function resurfaceIdleSettledConversation(name: string, nowMs: number = Date.now(), settledAtMs?: number): boolean {
+  const guard = settledAtMs === undefined ? '' : ' AND settled_at = ?';
+  const params = settledAtMs === undefined ? [nowMs, name] : [nowMs, name, settledAtMs];
+  const result = getOverdeckDatabase()
+    .prepare(
+      `UPDATE conversations
+       SET settled_at = NULL, settle_reason = NULL, snoozed_until = NULL, idle_reset_at = ?
+       WHERE name = ? AND settled_at IS NOT NULL AND settle_reason = 'idle'${guard}`,
+    )
+    .run(...params);
+  return result.changes > 0;
+}
+
 export interface IdleClock {
   settledAtMs: number | null;
   snoozedUntilMs: number | null;
   idleResetAtMs: number | null;
+  settleReason: SettleReason | null;
 }
 
 /** PAN-4655: idle-clock inputs for every unarchived conversation, one query. */
 export function listIdleClocks(): Map<string, IdleClock> {
   const rows = getOverdeckDatabase()
-    .prepare('SELECT name, settled_at, snoozed_until, idle_reset_at FROM conversations WHERE archived_at IS NULL')
-    .all<{ name: string; settled_at: number | null; snoozed_until: number | null; idle_reset_at: number | null }>();
+    .prepare('SELECT name, settled_at, snoozed_until, idle_reset_at, settle_reason FROM conversations WHERE archived_at IS NULL')
+    .all<{
+      name: string;
+      settled_at: number | null;
+      snoozed_until: number | null;
+      idle_reset_at: number | null;
+      settle_reason: string | null;
+    }>();
   const byName = new Map<string, IdleClock>();
   for (const row of rows) {
     byName.set(row.name, {
       settledAtMs: row.settled_at,
       snoozedUntilMs: row.snoozed_until,
       idleResetAtMs: row.idle_reset_at,
+      settleReason: row.settled_at !== null ? (isSettleReason(row.settle_reason) ? row.settle_reason : 'manual') : null,
     });
   }
   return byName;

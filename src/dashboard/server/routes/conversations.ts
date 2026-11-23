@@ -15,6 +15,7 @@ import { validateOrigin, validateOriginHeaders, getHeaderFromMap, type HeaderMap
 import * as self from './conversations.js';
 import { crossSiteWriteRefusal } from '../linked-conversation-proxy.js';
 import { withConversationMessageReceipt } from '../services/conversation-message-receipts.js';
+import { resurfaceIdleSettleAfterMessage } from '../services/conversation-idle-resurface.js';
 import {
   backfillConversationModels,
   conversationRuntimeRootPids,
@@ -623,8 +624,11 @@ const postConversationMessageRoute = HttpRouter.add(
     const body = yield* readJsonBody;
     return yield* Effect.promise(async () => {
       try {
-        return await withConversationMessageReceipt(name, body, (deliveryGate) =>
-          handleConversationMessage(name, body, { ...conversationMessageDependencies, deliveryGate }));
+        return await withConversationMessageReceipt(name, body, async (deliveryGate) => {
+          const response = await handleConversationMessage(name, body, { ...conversationMessageDependencies, deliveryGate });
+          resurfaceIdleSettleAfterMessage(name, response.status); // PAN-5611 FR-1
+          return response;
+        });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         // Include the stack so failures are diagnosable after the fact (PAN-1552).

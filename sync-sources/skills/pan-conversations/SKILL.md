@@ -101,7 +101,9 @@ pan conversations enrich [ids...] [--tier <n>] [--deep] [--full] [--upgrade] [--
   primary dashboard settles an operator conversation (reason `idle`) after that
   many days with no transcript activity, operator message or resume; never
   agent conversations, snoozed ones, or ones waiting on you. Unsettling
-  restarts the clock. Works with the dashboard down.
+  restarts the clock. An idle settle ends by itself when the conversation is
+  used again (a message, or new transcript activity while it runs); manual
+  and merge settles stay. Works with the dashboard down.
 - **`schedule`** (PAN-4640) runs a prompt in a conversation on a recurring
   schedule. `<conv>` accepts `self` (also `.`, `current`, `me`) for the
   conversation you are running in, a conversation number, a name, or a unique

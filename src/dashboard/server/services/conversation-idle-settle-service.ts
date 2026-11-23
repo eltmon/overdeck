@@ -9,27 +9,40 @@
  */
 import { isPeerDashboardProcess } from '../../../lib/boot-gates.js';
 import { isDeaconGloballyPaused } from '../../../lib/overdeck/control-settings.js';
-import { sweepIdleConversations } from '../../../lib/overdeck/conversation-idle-settle.js';
+import { resurfaceActiveIdleSettles, sweepIdleConversations } from '../../../lib/overdeck/conversation-idle-settle.js';
 import { invalidateConversationListEnrichmentCache } from '../../../lib/overdeck/conversation-list.js';
 import { listLiveConversationSessions } from '../../../lib/overdeck/conversation-liveness.js';
 import { getConversationsPendingInputFeed, resolveSessionFile } from '../../../lib/overdeck/conversation-reads.js';
+import { emitConversationSchedulesChanged } from '../../../lib/overdeck/conversation-schedules.js';
 
 export const IDLE_SETTLE_BOOT_DELAY_MS = 120_000;
 export const IDLE_SETTLE_INTERVAL_MS = 900_000;
 
+/** PAN-5611 D12: one sweep's outcome. */
+export interface IdleSweepOutcome {
+  settled: string[];
+  resurfaced: string[];
+}
+
 export interface IdleSettlePatrolDeps {
   /** One sweep; a test seam. */
-  sweep?: () => Promise<string[]>;
+  sweep?: () => Promise<IdleSweepOutcome>;
   /** True while the Deacon is frozen; a test seam. */
   isFrozen?: () => boolean;
-  /** Drops the conversation-list cache after a settle; a test seam. */
+  /** Drops the conversation-list cache after a settle or resurface; a test seam. */
   invalidate?: () => void;
+  /** PAN-5611: notified once per resurfaced conversation; a test seam. */
+  emitChanged?: (name: string) => void;
   log?: (line: string) => void;
 }
 
 /** The sweep with the dashboard's real liveness, feed, and transcript doors. */
-function sweepWithRealDeps(): Promise<string[]> {
-  return sweepIdleConversations({
+async function sweepWithRealDeps(): Promise<IdleSweepOutcome> {
+  const resurfaced = await resurfaceActiveIdleSettles({
+    listLiveSessions: () => listLiveConversationSessions(),
+    resolveTranscript: resolveSessionFile,
+  });
+  const settled = await sweepIdleConversations({
     listLiveSessions: () => listLiveConversationSessions(),
     listWaitingNames: async (live) => {
       const result = await getConversationsPendingInputFeed({ resolveSessionFile, listSessionNames: async () => [...live] });
@@ -38,6 +51,7 @@ function sweepWithRealDeps(): Promise<string[]> {
     },
     resolveTranscript: resolveSessionFile,
   });
+  return { settled, resurfaced };
 }
 
 let bootTimer: ReturnType<typeof setTimeout> | null = null;
@@ -52,10 +66,15 @@ function runSweep(deps: IdleSettlePatrolDeps): void {
     return;
   }
 
-  activeSweep = (deps.sweep ?? sweepWithRealDeps)().then((names) => {
-    if (names.length === 0) return;
+  activeSweep = (deps.sweep ?? sweepWithRealDeps)().then(({ settled, resurfaced }) => {
+    if (settled.length === 0 && resurfaced.length === 0) return;
     (deps.invalidate ?? invalidateConversationListEnrichmentCache)();
-    log(`[idle-settle] settled ${names.length} idle conversation(s): ${names.join(', ')}`);
+    if (settled.length > 0) log(`[idle-settle] settled ${settled.length} idle conversation(s): ${settled.join(', ')}`);
+    if (resurfaced.length > 0) {
+      const emitChanged = deps.emitChanged ?? emitConversationSchedulesChanged;
+      for (const name of resurfaced) emitChanged(name);
+      log(`[idle-settle] resurfaced ${resurfaced.length} conversation(s) with new activity: ${resurfaced.join(', ')}`);
+    }
   }).catch((error) => {
     console.warn('[idle-settle] sweep failed:', error);
   }).finally(() => {

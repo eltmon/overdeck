@@ -1,0 +1,167 @@
+{
+  "version": "1",
+  "issueId": "PAN-5611",
+  "created": "2026-11-23T06:14:33.904Z",
+  "updated": "2026-11-23T10:50:40.729Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "store-resurface-door": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5611",
+      "claimedAt": "2026-11-23T06:14:33.904Z",
+      "doneAt": "2026-11-23T09:35:32.238Z"
+    },
+    "store-resurface-door.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:35:32.238Z"
+    },
+    "store-resurface-door.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:35:32.238Z"
+    },
+    "store-resurface-door.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:35:32.238Z"
+    },
+    "store-resurface-door.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:35:32.238Z"
+    },
+    "store-idle-clock-reason": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5611",
+      "claimedAt": "2026-11-23T09:35:38.941Z",
+      "doneAt": "2026-11-23T09:55:13.741Z"
+    },
+    "store-idle-clock-reason.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:55:13.741Z"
+    },
+    "store-idle-clock-reason.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:55:13.741Z"
+    },
+    "display-root-helper": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5611",
+      "claimedAt": "2026-11-23T09:55:18.887Z",
+      "doneAt": "2026-11-23T10:07:56.268Z"
+    },
+    "display-root-helper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T10:07:56.268Z"
+    },
+    "display-root-helper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T10:07:56.268Z"
+    },
+    "display-root-helper.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T10:07:56.268Z"
+    },
+    "display-root-helper.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T10:07:56.268Z"
+    },
+    "message-route-resurface": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5611",
+      "claimedAt": "2026-11-23T10:08:00.621Z",
+      "doneAt": "2026-11-23T10:17:52.375Z"
+    },
+    "message-route-resurface.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T10:17:52.375Z"
+    },
+    "message-route-resurface.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T10:17:52.375Z"
+    },
+    "message-route-resurface.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T10:17:52.375Z"
+    },
+    "message-route-resurface.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T10:17:52.375Z"
+    },
+    "message-route-resurface.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-23T10:17:52.375Z"
+    },
+    "sweep-resurface-pass": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5611",
+      "claimedAt": "2026-11-23T10:17:56.897Z",
+      "doneAt": "2026-11-23T10:29:11.817Z"
+    },
+    "sweep-resurface-pass.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T10:29:11.817Z"
+    },
+    "sweep-resurface-pass.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T10:29:11.817Z"
+    },
+    "sweep-resurface-pass.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T10:29:11.817Z"
+    },
+    "sweep-resurface-pass.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T10:29:11.817Z"
+    },
+    "sweep-resurface-pass.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-23T10:29:11.817Z"
+    },
+    "idle-service-resurface": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5611",
+      "claimedAt": "2026-11-23T10:29:16.162Z",
+      "doneAt": "2026-11-23T10:42:36.719Z"
+    },
+    "idle-service-resurface.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T10:42:36.719Z"
+    },
+    "idle-service-resurface.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T10:42:36.719Z"
+    },
+    "idle-service-resurface.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T10:42:36.719Z"
+    },
+    "docs-and-changelog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5611",
+      "claimedAt": "2026-11-23T10:42:41.261Z",
+      "doneAt": "2026-11-23T10:44:06.579Z"
+    },
+    "docs-and-changelog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T10:44:06.579Z"
+    },
+    "docs-and-changelog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T10:44:06.579Z"
+    },
+    "docs-and-changelog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T10:44:06.579Z"
+    },
+    "docs-and-changelog.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T10:44:06.579Z"
+    },
+    "message-route-resurface.ac6": {
+      "status": "completed",
+      "doneAt": "2026-11-23T10:50:40.729Z"
+    }
+  }
+}

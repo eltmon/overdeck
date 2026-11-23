@@ -466,18 +466,84 @@ describe('conversation triage store', () => {
     });
 
     it('listIdleClocks returns unarchived rows with their clock columns and omits archived rows', async () => {
-      const { listIdleClocks, settleConversation } = await import('../conversation-triage-store.js');
+      const { listIdleClocks, settleConversation, settleIdleConversation } = await import('../conversation-triage-store.js');
       await create('idle-j');
       await create('idle-k');
       await create('idle-l');
+      await create('idle-j2');
       settleConversation('idle-j', 'manual', 1_000);
       await setColumn('idle-k', 'snoozed_until', 2_000);
       await setColumn('idle-k', 'idle_reset_at', 3_000);
       await setColumn('idle-l', 'archived_at', NOW);
+      settleIdleConversation('idle-j2', CUTOFF, 4_000);
       const clocks = listIdleClocks();
-      expect(clocks.get('idle-j')).toEqual({ settledAtMs: 1_000, snoozedUntilMs: null, idleResetAtMs: null });
-      expect(clocks.get('idle-k')).toEqual({ settledAtMs: null, snoozedUntilMs: 2_000, idleResetAtMs: 3_000 });
+      expect(clocks.get('idle-j')).toEqual({ settledAtMs: 1_000, snoozedUntilMs: null, idleResetAtMs: null, settleReason: 'manual' });
+      expect(clocks.get('idle-k')).toEqual({ settledAtMs: null, snoozedUntilMs: 2_000, idleResetAtMs: 3_000, settleReason: null });
       expect(clocks.has('idle-l')).toBe(false);
+      expect(clocks.get('idle-j2')).toEqual({ settledAtMs: 4_000, snoozedUntilMs: null, idleResetAtMs: null, settleReason: 'idle' });
+    });
+
+    it('listIdleClocks reports settleReason manual for a settled row with a NULL stored reason, matching getConversationTriage', async () => {
+      const { listIdleClocks, getConversationTriage } = await import('../conversation-triage-store.js');
+      await create('idle-j3');
+      await setColumn('idle-j3', 'settled_at', 5_000);
+      const clocks = listIdleClocks();
+      expect(clocks.get('idle-j3')?.settleReason).toBe('manual');
+      expect(getConversationTriage('idle-j3')?.settleReason).toBe('manual');
+    });
+
+    describe('resurfaceIdleSettledConversation (PAN-5611)', () => {
+      it('clears an idle settle and restarts the idle clock', async () => {
+        const { resurfaceIdleSettledConversation, settleIdleConversation, getConversationTriage, EMPTY_CONVERSATION_TRIAGE } =
+          await import('../conversation-triage-store.js');
+        await create('idle-m');
+        expect(settleIdleConversation('idle-m', CUTOFF, 1_000)).toBe(true);
+        expect(resurfaceIdleSettledConversation('idle-m', 9_000)).toBe(true);
+        expect(getConversationTriage('idle-m')).toEqual(EMPTY_CONVERSATION_TRIAGE);
+        expect(await idleResetAt('idle-m')).toBe(9_000);
+      });
+
+      it('leaves manual and merge settles', async () => {
+        const { resurfaceIdleSettledConversation, settleConversation, getConversationTriage } = await import(
+          '../conversation-triage-store.js'
+        );
+        await create('idle-n');
+        await create('idle-o');
+        settleConversation('idle-n', 'manual', 1_000);
+        settleConversation('idle-o', 'merge', 1_000);
+        expect(resurfaceIdleSettledConversation('idle-n', 9_000)).toBe(false);
+        expect(resurfaceIdleSettledConversation('idle-o', 9_000)).toBe(false);
+        expect(getConversationTriage('idle-n')?.settleReason).toBe('manual');
+        expect(getConversationTriage('idle-o')?.settleReason).toBe('merge');
+        expect(await idleResetAt('idle-n')).toBeNull();
+        expect(await idleResetAt('idle-o')).toBeNull();
+      });
+
+      it('leaves a settled row with a NULL reason', async () => {
+        const { resurfaceIdleSettledConversation } = await import('../conversation-triage-store.js');
+        await create('idle-p');
+        await setColumn('idle-p', 'settled_at', 1_000);
+        expect(resurfaceIdleSettledConversation('idle-p', 9_000)).toBe(false);
+      });
+
+      it('with settledAtMs leaves a different settle but clears the matching one', async () => {
+        const { resurfaceIdleSettledConversation, settleIdleConversation, getConversationTriage } = await import(
+          '../conversation-triage-store.js'
+        );
+        await create('idle-q');
+        expect(settleIdleConversation('idle-q', CUTOFF, 1_000)).toBe(true);
+        expect(resurfaceIdleSettledConversation('idle-q', 9_000, 2_000)).toBe(false);
+        expect(getConversationTriage('idle-q')?.settleReason).toBe('idle');
+        expect(resurfaceIdleSettledConversation('idle-q', 9_000, 1_000)).toBe(true);
+        expect(getConversationTriage('idle-q')?.settleReason).toBeNull();
+      });
+
+      it('returns false for an unsettled row and for a missing name', async () => {
+        const { resurfaceIdleSettledConversation } = await import('../conversation-triage-store.js');
+        await create('idle-r');
+        expect(resurfaceIdleSettledConversation('idle-r', 9_000)).toBe(false);
+        expect(resurfaceIdleSettledConversation('does-not-exist', 9_000)).toBe(false);
+      });
     });
   });
 });
