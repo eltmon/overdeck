@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5638",
   "created": "2026-11-23T19:38:42.567Z",
-  "updated": "2026-11-23T20:16:16.469Z",
+  "updated": "2026-11-23T20:23:26.563Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,9 +50,26 @@
       "doneAt": "2026-11-23T20:16:09.626Z"
     },
     "wi3-polyrepo-verdict-post": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5638",
-      "claimedAt": "2026-11-23T20:16:16.469Z"
+      "claimedAt": "2026-11-23T20:16:16.469Z",
+      "doneAt": "2026-11-23T20:23:26.562Z"
+    },
+    "wi3-polyrepo-verdict-post.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:23:26.562Z"
+    },
+    "wi3-polyrepo-verdict-post.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:23:26.562Z"
+    },
+    "wi3-polyrepo-verdict-post.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:23:26.562Z"
+    },
+    "wi3-polyrepo-verdict-post.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:23:26.562Z"
     }
   }
 }
