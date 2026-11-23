@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5610",
   "created": "2026-11-23T06:10:56.307Z",
-  "updated": "2026-11-23T06:22:31.667Z",
+  "updated": "2026-11-23T06:22:33.255Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -40,6 +40,11 @@
     "heal-origin.ac2": {
       "status": "completed",
       "doneAt": "2026-11-23T06:22:31.666Z"
+    },
+    "pull-requests-origin": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5610",
+      "claimedAt": "2026-11-23T06:22:33.255Z"
     }
   }
 }
