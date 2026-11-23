@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5637",
   "created": "2026-11-23T19:37:34.841Z",
-  "updated": "2026-11-23T20:34:50.355Z",
+  "updated": "2026-11-23T20:34:58.391Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -98,6 +98,11 @@
     "board-ci-waiver.ac2": {
       "status": "completed",
       "doneAt": "2026-11-23T20:34:50.354Z"
+    },
+    "docs-ci-none": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5637",
+      "claimedAt": "2026-11-23T20:34:58.391Z"
     }
   }
 }
