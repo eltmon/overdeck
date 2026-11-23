@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5250",
   "created": "2026-11-23T23:10:09.644Z",
-  "updated": "2026-11-23T23:16:57.142Z",
+  "updated": "2026-11-23T23:18:46.153Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -88,9 +88,26 @@
       "doneAt": "2026-11-23T23:16:53.267Z"
     },
     "wi4-restore-wake": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5250",
-      "claimedAt": "2026-11-23T23:16:57.142Z"
+      "claimedAt": "2026-11-23T23:16:57.142Z",
+      "doneAt": "2026-11-23T23:18:46.153Z"
+    },
+    "wi4-restore-wake.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:18:46.153Z"
+    },
+    "wi4-restore-wake.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:18:46.153Z"
+    },
+    "wi4-restore-wake.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:18:46.153Z"
+    },
+    "wi4-restore-wake.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:18:46.153Z"
     }
   }
 }
