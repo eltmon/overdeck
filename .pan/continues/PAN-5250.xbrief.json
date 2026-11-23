@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5250",
   "created": "2026-11-23T23:10:09.644Z",
-  "updated": "2026-11-23T23:18:46.153Z",
+  "updated": "2026-11-23T23:18:50.172Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -108,6 +108,11 @@
     "wi4-restore-wake.ac4": {
       "status": "completed",
       "doneAt": "2026-11-23T23:18:46.153Z"
+    },
+    "wi5-reclaim-service-reasons": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5250",
+      "claimedAt": "2026-11-23T23:18:50.172Z"
     }
   }
 }
