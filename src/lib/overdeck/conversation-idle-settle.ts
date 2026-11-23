@@ -37,34 +37,44 @@ export function displayParentIdOf(row: GroupableRow, ids: ReadonlySet<number>): 
   return null;
 }
 
+/** The display root row for `row` among `byId` (mirrors groupByDisplayRoot's root walk). A cycle or a chain longer than 64 makes the row its own root. */
+export function displayRootOf<T extends GroupableRow>(row: T, byId: ReadonlyMap<number, T>): T {
+  const ids = new Set(byId.keys());
+  const seen = new Set<number>([row.id]);
+  let current = row;
+  for (let hops = 0; hops < MAX_PARENT_HOPS; hops++) {
+    const parentId = displayParentIdOf(current, ids);
+    if (parentId === null) return current;
+    if (seen.has(parentId)) return row;
+    seen.add(parentId);
+    current = byId.get(parentId)!;
+  }
+  return row;
+}
+
 /** Root id → members (root first). A parent chain longer than 64 or a cycle makes the row its own root. */
 export function groupByDisplayRoot<T extends GroupableRow>(rows: readonly T[]): Map<number, T[]> {
   const byId = new Map<number, T>();
   for (const row of rows) if (!byId.has(row.id)) byId.set(row.id, row);
-  const ids = new Set(byId.keys());
-
-  const rootOf = (row: T): number => {
-    const seen = new Set<number>([row.id]);
-    let current = row;
-    for (let hops = 0; hops < MAX_PARENT_HOPS; hops++) {
-      const parentId = displayParentIdOf(current, ids);
-      if (parentId === null) return current.id;
-      if (seen.has(parentId)) return row.id;
-      seen.add(parentId);
-      current = byId.get(parentId)!;
-    }
-    return row.id;
-  };
 
   const groups = new Map<number, T[]>();
   for (const row of byId.values()) {
-    const rootId = rootOf(row);
-    const members = groups.get(rootId) ?? [];
-    if (rootId === row.id) members.unshift(row);
+    const root = displayRootOf(row, byId);
+    const members = groups.get(root.id) ?? [];
+    if (root.id === row.id) members.unshift(row);
     else members.push(row);
-    groups.set(rootId, members);
+    groups.set(root.id, members);
   }
   return groups;
+}
+
+/** PAN-5611 D1: the display root's name for `name` among `rows`, or `name` when it is not listed. */
+export function displayRootNameOf(name: string, rows: readonly LegacyConversation[]): string {
+  const byId = new Map<number, LegacyConversation>();
+  for (const row of rows) if (!byId.has(row.id)) byId.set(row.id, row);
+  const row = rows.find((r) => r.name === name);
+  if (!row) return name;
+  return displayRootOf(row, byId).name;
 }
 
 /**

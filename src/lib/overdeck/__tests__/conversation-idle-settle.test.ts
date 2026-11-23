@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IdleSettleDeps } from '../conversation-idle-settle.js';
+import type { LegacyConversation } from '../conversations.js';
 
 const DAY = 86_400_000;
 const HOUR = 3_600_000;
@@ -259,6 +260,45 @@ describe('groupByDisplayRoot', () => {
       { id: 2, parentConversationId: 1, criticOfConversationId: null },
     ]);
     expect([...groups.keys()].sort()).toEqual([1, 2]);
+  });
+});
+
+describe('displayRootNameOf', () => {
+  function conv(overrides: Partial<LegacyConversation> & { id: number; name: string }): LegacyConversation {
+    return { parentConversationId: null, criticOfConversationId: null, ...overrides } as LegacyConversation;
+  }
+
+  it('returns the parent name for a lane under a parent', async () => {
+    const { displayRootNameOf } = await import('../conversation-idle-settle.js');
+    const rows = [conv({ id: 1, name: 'root' }), conv({ id: 2, name: 'lane-a', parentConversationId: 1 })];
+    expect(displayRootNameOf('lane-a', rows)).toBe('root');
+  });
+
+  it('returns the top root name for a successor two levels down', async () => {
+    const { displayRootNameOf } = await import('../conversation-idle-settle.js');
+    const rows = [
+      conv({ id: 1, name: 'root' }),
+      conv({ id: 2, name: 'handoff-1', parentConversationId: 1 }),
+      conv({ id: 3, name: 'handoff-2', parentConversationId: 2 }),
+    ];
+    expect(displayRootNameOf('handoff-2', rows)).toBe('root');
+  });
+
+  it("returns the builder's root name for a critic", async () => {
+    const { displayRootNameOf } = await import('../conversation-idle-settle.js');
+    const rows = [
+      conv({ id: 1, name: 'builder-root' }),
+      conv({ id: 2, name: 'builder', parentConversationId: 1 }),
+      conv({ id: 3, name: 'critic', criticOfConversationId: 2 }),
+    ];
+    expect(displayRootNameOf('critic', rows)).toBe('builder-root');
+  });
+
+  it('returns the name unchanged when the parent is not listed or the name is unknown', async () => {
+    const { displayRootNameOf } = await import('../conversation-idle-settle.js');
+    const rows = [conv({ id: 2, name: 'orphan', parentConversationId: 99 })];
+    expect(displayRootNameOf('orphan', rows)).toBe('orphan');
+    expect(displayRootNameOf('does-not-exist', rows)).toBe('does-not-exist');
   });
 });
 
