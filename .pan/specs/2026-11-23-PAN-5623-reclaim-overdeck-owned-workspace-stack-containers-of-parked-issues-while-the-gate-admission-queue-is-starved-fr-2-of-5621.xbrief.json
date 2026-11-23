@@ -1,0 +1,1203 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-23T20:00:07Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5623: Reclaim Overdeck-owned workspace stack containers of parked issues while the gate admission queue is starved (FR-2 of #5621)",
+    "updated": "2026-11-23T20:18:44.692Z"
+  },
+  "plan": {
+    "id": "pan-5623",
+    "title": "Reclaim Overdeck-owned workspace stack containers of parked issues while the gate admission queue is starved (FR-2 of #5621)",
+    "status": "proposed",
+    "uid": "7f69ad24-0bc5-4ff3-af02-7e890d96b9e2",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-23T20:00:07Z",
+    "updated": "2026-11-23T20:18:44.692Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5623",
+        "label": "PAN-5623",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5621",
+        "label": "PAN-5621 (dependency)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5623.md",
+        "label": "PRD",
+        "type": "document"
+      }
+    ],
+    "tags": [
+      "memory-governor",
+      "quality-gates",
+      "workspace-stack",
+      "docker",
+      "pipeline-journal"
+    ],
+    "metadata": {
+      "sizeJustification": "The plan touches 30 files across 6 subsystems (src/lib, src/dashboard, src/cli, tests/unit, docs/PIPELINE-GATES.md, changelog.d/pan-5623.md). Stopping stacks, journaling the stop, making the journal-tail readers skip the new entries and starting the stacks again are inseparable: a reclaim without the restore path strands stopped containers under live agents, a restore path with nothing reclaiming is dead code, and the new journal entries without the tail-reader skip would hide blocked.declared and failed-dispatch tails from the board and deacon recoveries. 11 of the 30 files are tests, and PAN-5621 already took the separable detection half.",
+      "canonicalFilename": "2026-11-23-PAN-5623-reclaim-overdeck-owned-workspace-stack-containers-of-parked-issues-while-the-gate-admission-queue-is-starved-fr-2-of-5621.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "While the quality-gate admission queue is starved on memory (PAN-5621 detects and reports it), parked issues' workspace stacks (api/fe/frontend/server containers) keep holding memory while their agents only wait. On 2026-11-23 the Flywheel had to stop four MYN containers by hand before the head gate could run. Nothing frees that memory automatically, and nothing would start a stopped stack again when its issue needs it: a parked agent woken by a message is not respawned, and stopped containers read as STACK BROKEN.",
+      "Proposal": "A primary-dashboard service (src/dashboard/server/services/stack-reclaim-service.ts) polls every 30 s. While PAN-5621's starvation episode is open and the head still cannot fit alone, it picks at most one parked issue per poll (deny-by-default closed candidate list: compose-label ownership, no gate/verification activity, only idle work panes at a turn boundary, unresolved blocker or merge-gate ready), largest container memory first and at most once per episode, journals stack.reclaimed with the exact names, then docker-stops only api/fe/frontend/server. A plain-lib restore door (src/lib/workspace/stack-restore.ts) docker-starts exactly the journaled names and journals stack.restored; it runs when an issue pane starts a turn (5 s poll with a journal-seeded index), in the spawn gate before its health read, and when a verification run starts. Journal tail readers skip stack.* housekeeping entries. Display-only health reads (pan status, workspace-data) treat a journaled reclaim as stopped on purpose; gating reads stay strict.",
+      "NonGoals": "- No dashboard UI (card, badge or button) for reclaimed stacks.\n- No restart when the operator opens the workspace's app in a browser (PAN-5250 owns that); the activity entry prints the manual docker start command.\n- No pan workspace up verb.\n- No new config key and no per-project service list.\n- No change to the idle-stack reaper (idle-stack-reaper.ts) and no reuse of its listComposeContainers.\n- No reclaim outside an open PAN-5621 starvation episode; no bulk restore when the episode ends.\n- Never stop dev, database, cache or any service outside api/fe/frontend/server, or any container outside the issue's compose project; no docker rm, docker compose down or volume removal.\n- No change to admission decisions, to PAN-5621's detection/announcement logic or to the starvation record format; do not copy or edit PAN-5621 source files (gate-starvation.ts, gate-starvation-service.ts, quality-gate-memory.ts, quality-gate-admission.ts); wi15 does edit PAN-5621's sentence in docs/PIPELINE-GATES.md.\n- No use of rebuildWorkspaceStack (up -d --build) by reclaim or restore code.\n- Gating health reads (spawn gate, spawn-issue route, summary-fork handoff source check) never pass reclaimAware; the spawn gate's only health change is a fresh listing after a restore."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Approved issues held for operator UAT are reclaimable when the merge gate says ready",
+        "rationale": "The incident's containers (MIN-1144, MIN-1146) were exactly such issues and the Flywheel stopped them by hand to unstick the queue; operator-open restart is PAN-5250's scope and the activity entry prints the manual docker start command."
+      },
+      {
+        "summary": "Reclaimable services are the closed constant api, fe, frontend, server",
+        "rationale": "The issue names this allow-list; docker ps on this host (2026-11-23) shows these plus dev/postgres/redis, which must never stop."
+      },
+      {
+        "summary": "Journal stack.reclaimed before running docker stop",
+        "rationale": "A crash between the two then leaves a record naming running containers (a later restore is a no-op), never stopped containers with no record that nothing would restart."
+      },
+      {
+        "summary": "This issue owns the restart path; PAN-5250 reuses restoreReclaimedStack",
+        "rationale": "The issue says whichever lands first owns it, and PAN-5250 has no workspace or branch."
+      },
+      {
+        "summary": "'Approved, waiting on merge' means evaluateIssueMergeGate(...).ready, checked only for the top 3 candidates by memory",
+        "rationale": "The merge gate is the authority (approval at head, green checks, mergeability, CI test job, UAT policy); running it last keeps forge reads to a few per poll."
+      },
+      {
+        "summary": "Container memory comes from a one-shot docker stats --no-stream on candidate names",
+        "rationale": "DockerStatsCollector starts lazily only when a route asks for it, so the service cannot rely on it."
+      },
+      {
+        "summary": "Reclaimed-as-stopped leniency applies only to display reads (pan status, workspace-data)",
+        "rationale": "The spawn route calls the spawn gate only when health is unhealthy and summary-fork trusts healthy, so a lenient gating read could let a spawn proceed against stopped containers after a failed restore."
+      },
+      {
+        "summary": "At most one reclaim per issue per starvation episode",
+        "rationale": "Prevents flapping when a woken agent's stack is restored and the agent returns to a turn boundary in the same episode."
+      },
+      {
+        "summary": "Live review panes do not block a reclaim or trigger a restore",
+        "rationale": "Verified 2026-11-23: MIN-1144 and MIN-1146 (the incident issues, both merge-gate ready) each keep a finished review pane alive beside an idle work pane; requiring work-only panes would never have fired on the motivating case, and review never needs the stack (PAN-4690)."
+      },
+      {
+        "summary": "No new config key",
+        "rationale": "The reclaim acts only inside a starvation episode, whose threshold is already configurable (resources.quality_gate_starvation_minutes); the issue does not ask for a switch."
+      }
+    ],
+    "items": [
+      {
+        "id": "wi1-journal-types-skip",
+        "title": "Add stack.reclaimed/stack.restored journal types with a housekeeping skip in lastPipelineEntry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T20:00:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5623",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/pipeline-journal.ts",
+            "src/lib/flywheel/board.ts",
+            "src/lib/cloister/__tests__/pipeline-journal.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/pipeline-journal.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "pipeline-journal.test.ts passes including the new housekeeping cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ],
+          "foundationFor": [
+            "wi2-open-reclaim-reader",
+            "wi3-tail-readers-skip",
+            "wi5-restore-door",
+            "wi12-reclaim-poll"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In pipeline-journal.ts add `| 'stack.reclaimed' | 'stack.restored'` to PipelineJournalEntryType; add exported isHousekeepingEntry(entry) (type starts with 'stack.') and lastPipelineStep(entries) (last non-housekeeping entry or null) after isReviewInFlightEntry; change lastPipelineEntry so that WITHOUT a prefix it skips housekeeping entries and WITH a prefix behaves exactly as before. In board.ts JOURNAL_ACTIVITY_LABELS add 'stack.reclaimed': 'stack stopped to free memory' and 'stack.restored': 'stack started again'. Add the four tests listed in PRD WI-1 step 5."
+        },
+        "items": [
+          {
+            "id": "wi1-journal-types-skip.ac1",
+            "title": "Given a journal [blocked.declared, stack.reclaimed], lastPipelineEntry(ws) returns the blocked.declared entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-journal-types-skip.ac2",
+            "title": "Given the same journal, lastPipelineEntry(ws, 'stack.') returns the stack.reclaimed entry, and a journal holding only stack.* entries returns null without a prefix",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-journal-types-skip.ac3",
+            "title": "Given entries ending in stack.restored, lastPipelineStep returns the entry before it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-journal-types-skip.ac4",
+            "title": "npm run typecheck exits 0 with JOURNAL_ACTIVITY_LABELS containing both new types",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi2-open-reclaim-reader",
+        "title": "Add openStackReclaim and reclaimedInEpisode journal readers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T20:00:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5623",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/pipeline-journal.ts",
+            "src/lib/cloister/__tests__/pipeline-journal.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/pipeline-journal.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "pipeline-journal.test.ts passes including openStackReclaim and reclaimedInEpisode cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Add OpenStackReclaim, openStackReclaim(entries) and reclaimedInEpisode(entries, episodeSince) to pipeline-journal.ts exactly as in the PRD snippet: openStackReclaim scans from the end, ignores non-housekeeping entries, returns null when the newest stack.* entry is not stack.reclaimed or names no string containers, else { at, containers, composeProject }. Add the PRD WI-2 tests."
+        },
+        "items": [
+          {
+            "id": "wi2-open-reclaim-reader.ac1",
+            "title": "Given [stack.reclaimed{containers:[a,b]}, verification.started], openStackReclaim returns containers [a,b]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-open-reclaim-reader.ac2",
+            "title": "Given [stack.reclaimed, stack.restored], openStackReclaim returns null; given [stack.restored, stack.reclaimed] it returns the second entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-open-reclaim-reader.ac3",
+            "title": "Given a stack.reclaimed whose containers is [] or holds only non-strings, openStackReclaim returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-open-reclaim-reader.ac4",
+            "title": "reclaimedInEpisode returns true only when a stack.reclaimed entry carries data.episodeSince equal to the argument",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi3-tail-readers-skip",
+        "title": "Make the three journal-tail readers skip housekeeping entries",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T20:00:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5623",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/stale-approval-rereview.ts",
+            "src/dashboard/server/services/__tests__/stale-approval-rereview.test.ts",
+            "src/lib/cloister/deacon-lite.ts",
+            "tests/unit/lib/cloister/deacon-lite.test.ts",
+            "src/lib/flywheel/derive-status.ts",
+            "tests/unit/lib/flywheel/derive-status.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/stale-approval-rereview.test.ts tests/unit/lib/cloister/deacon-lite.test.ts tests/unit/lib/flywheel/derive-status.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "the three test files pass including the new trailing stack.reclaimed cases",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. stale-approval-rereview.ts line ~98: replace `entries.at(-1) ?? null` with `lastPipelineStep(entries)`. deacon-lite.ts failedDispatchRetryReason line ~334: replace `entries[entries.length - 1]` with `lastPipelineStep(entries)`. derive-status.ts: filter `.filter((entry) => !isHousekeepingEntry(entry))` where the row's journal is assembled (line ~626, `const journal = candidate.workspacePath ? await attempt(() => journalTail(...)) : []`), so injected journalTail/lastJournal deps are filtered too; static import of isHousekeepingEntry (dynamic fallback if lint:circular flags a cycle). Add one test per site with a trailing stack.reclaimed entry, as PRD WI-3 step 4 describes."
+        },
+        "items": [
+          {
+            "id": "wi3-tail-readers-skip.ac1",
+            "title": "Given a journal [review.requested, stack.reclaimed], the stale-approval re-review returns the 'a review is already running' skip reason",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-tail-readers-skip.ac2",
+            "title": "Given a journal [review.dispatch-failed (source request-review), stack.reclaimed], deacon-lite's stalled-review recovery still returns the one-time retry reason",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-tail-readers-skip.ac3",
+            "title": "Given an injected journalTail returning [..., blocked.declared, stack.reclaimed], the derived row's lastJournal.type is blocked.declared and its blocker kind is declared-blocked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi4-docker-helpers",
+        "title": "Add stack-reclaim-docker.ts with label-based compose listing, memory read, stop and start",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T20:00:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5623",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/docker-stats.ts",
+            "src/lib/workspace/stack-reclaim-docker.ts",
+            "src/lib/workspace/__tests__/stack-reclaim-docker.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/workspace/__tests__/stack-reclaim-docker.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "stack-reclaim-docker.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-5",
+            "NFR-2",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Export parseMemUsage from docker-stats.ts (one word). Create src/lib/workspace/stack-reclaim-docker.ts with RECLAIMABLE_STACK_SERVICES = {api, fe, frontend, server}, CONTAINER_NAME_RE, ComposeContainer, COMPOSE_PS_FORMAT, parseComposePs, listComposeContainers({all}), parseStatsMemory, readContainerMemoryBytes(names), stopContainer(name), startContainer(name) using promisified execFile with argument arrays and resolveHostTool('docker'); never execSync; never a shell string. Invalid names are refused without spawning. Do not import or modify idle-stack-reaper.ts. Tests per PRD WI-4 step 3."
+        },
+        "items": [
+          {
+            "id": "wi4-docker-helpers.ac1",
+            "title": "Given the verified docker ps sample, parseComposePs returns the api, postgres and open-design compose rows and drops the row with an empty project label",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-docker-helpers.ac2",
+            "title": "parseStatsMemory returns 1.2 * 1024**3 bytes for 'myn-feature-min-1142-api-1\\t1.2GiB / 62GiB'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-docker-helpers.ac3",
+            "title": "stopContainer('a;rm -rf /') returns { ok: false } and execFile is never called; a rejected execFile makes listComposeContainers return null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-docker-helpers.ac4",
+            "title": "Given a valid name, stopContainer passes ['stop', name] and startContainer passes ['start', name] to execFile as an argument array with the resolved docker path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi5-restore-door",
+        "title": "Add restoreReclaimedStack, the never-throwing restore door",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T20:00:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5623",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspace/stack-restore.ts",
+            "src/lib/workspace/__tests__/stack-restore.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/workspace/__tests__/stack-restore.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "stack-restore.test.ts passes",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-3",
+            "NFR-6",
+            "NFR-7"
+          ],
+          "foundationFor": [
+            "wi6-spawn-gate-restore",
+            "wi7-verification-restore",
+            "wi13-restore-poll"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5 / D9. Create src/lib/workspace/stack-restore.ts exporting StackRestoreTrigger, StackRestoreResult, STACK_LOCK_FILE, STACK_LOCK_STALE_MS, stackLockPath, StackRestoreDeps, restoreReclaimedStack({ issueId, workspacePath?, trigger }, deps?) and restoreReclaimedStackForSpawn(issueId, workspacePath?, deps?). Resolve the path, do a cheap unlocked openStackReclaim check, then inside withFileLock(<workspace>/.overdeck/stack-reclaim.lock, staleMs 300_000, retryMs 250, timeoutMs 300_000) re-read the reclaim, recompute tryComposeProjectNameForWorkspace, list containers with all:true, classify refused (bad name, null project, foreign project label, non-reclaimable service) / missing / alreadyRunning / to-start, start each; any start failure returns failed and journals nothing; success appends stack.restored (data per D4 incl. refused, source `stack-restore:<trigger>`) and emits the D14 'stack-restored' info activity when something started. restoreReclaimedStackForSpawn returns a fresh recorded collectDockerContainerLifecycleSnapshot() listing only when something started. Wrap everything in try/catch returning failed. Import nothing from src/dashboard. Tests per PRD WI-5."
+        },
+        "items": [
+          {
+            "id": "wi5-restore-door.ac1",
+            "title": "Given no open reclaim, restoreReclaimedStack returns { kind: 'none' } and startContainer is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-restore-door.ac2",
+            "title": "Given an open reclaim naming one exited and one running container, only the exited one is started and a stack.restored entry is appended with started, alreadyRunning, trigger and reclaimedAt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-restore-door.ac3",
+            "title": "Given a journaled name absent from the docker listing, the result is restored with that name in missing, and given a startContainer failure the result is { kind: 'failed' } with no stack.restored entry appended",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-restore-door.ac4",
+            "title": "Given a journaled postgres container, a container labeled with another compose project, or a name 'x;y', restoreReclaimedStack refuses it, never passes it to startContainer, and lists it in refused",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-restore-door.ac5",
+            "title": "Given a withLock mock, the journal re-read, the container listing, every startContainer call and the stack.restored append all run inside the lock callback, and restoreReclaimedStackForSpawn returns the recorded fresh listing only when something started",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi6-spawn-gate-restore",
+        "title": "Restore a reclaimed stack in the spawn gate and spawn route before their health reads",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T20:00:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5623",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/workspace-stack-spawn-gate.ts",
+            "src/dashboard/server/routes/agents/spawn-issue.ts",
+            "src/lib/agents/__tests__/spawn-gate-stack-restore.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/spawn-gate-stack-restore.test.ts src/lib/agents/__tests__/spawn-prep-disk-hold.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors",
+            "lint-file-size.sh passes with spawn-issue.ts at most 1000 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6 / D10. In assertWorkspaceStackHealthyForSpawn, after `if (role === 'review') return;`, call `const containers = await restoreReclaimedStackForSpawn(issueId, workspacePath);` and pass `containers` (when defined) to getWorkspaceStackHealth. In spawn-issue.ts (line ~507-508), before the first `getWorkspaceStackHealth(issueId, { projectConfig, workspacePath })`, call restoreReclaimedStackForSpawn via Effect.promise and pass its listing as containers, so the disk-floor hold inside `if (!stackHealth.healthy && !allowHost)` only runs when the stack is still unhealthy. spawn-issue.ts must stay <= 1000 lines. Leave every other branch unchanged. New test file mocks stack-restore, stack-health and docker-stats like spawn-prep-disk-hold.test.ts."
+        },
+        "items": [
+          {
+            "id": "wi6-spawn-gate-restore.ac1",
+            "title": "Given role work and restoreReclaimedStackForSpawn returning a listing, getWorkspaceStackHealth receives that listing as containers; given undefined, it is called without a containers option",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-spawn-gate-restore.ac2",
+            "title": "spawn-issue.ts calls restoreReclaimedStackForSpawn before its first getWorkspaceStackHealth read and passes the returned listing, ahead of the resolveIssueStackDiskHold call (visible in the diff)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-spawn-gate-restore.ac3",
+            "title": "Given role review or plan, restoreReclaimedStack is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-spawn-gate-restore.ac4",
+            "title": "Given a restore result failed and an unhealthy stack, the gate continues to its existing rebuild path (rebuildWorkspaceStack mock called)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi7-verification-restore",
+        "title": "Call the restore door when a verification run starts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T20:00:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5623",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/verification-runner.ts",
+            "tests/unit/lib/cloister/verification-runner-stack-restore.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/verification-runner-stack-restore.test.ts tests/unit/lib/cloister/verification-runner-merged.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7 / D11. In runVerificationForIssueInProcess, right after the appendPipelineEntry for verification.started, add `await restoreReclaimedStack({ issueId, workspacePath, trigger: 'verification' });` and ignore the result. New test follows verification-runner-merged.test.ts mocking."
+        },
+        "items": [
+          {
+            "id": "wi7-verification-restore.ac1",
+            "title": "Given a verification run, the restore mock is called exactly once with trigger 'verification' after verification.started is journaled and before the first gate command runs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-verification-restore.ac2",
+            "title": "Given the restore mock resolves { kind: 'failed' }, the run outcome equals the outcome without the restore call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-verification-restore.ac3",
+            "title": "Given the circuit breaker skips the run, the restore mock is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi8-health-reclaim-aware",
+        "title": "Add opt-in reclaimAware stack health that lists reclaimed containers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T20:00:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5623",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspace/stack-health.ts",
+            "src/lib/workspace/__tests__/stack-health.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/workspace/__tests__/stack-health.test.ts src/lib/workspace/__tests__/stack-health-pan-1872.test.ts tests/unit/lib/workspace/stack-health-compose-name.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "the three stack-health test files pass",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8 / D12. Add reclaimed?: string[] to WorkspaceStackHealth, reclaimAware?: boolean to WorkspaceStackHealthOptions, expectedStopped?: ReadonlySet<string> to evaluateWorkspaceStackHealth options (an exited non-one-shot container in the set adds no reason and is listed in reclaimed). getWorkspaceStackHealth builds the set from openStackReclaim(readPipelineJournal(workspacePath)) only when reclaimAware is true. stack-health.ts must not import stack-restore or stack-reclaim modules. Default (reclaimAware unset) behavior is unchanged."
+        },
+        "items": [
+          {
+            "id": "wi8-health-reclaim-aware.ac1",
+            "title": "Given an exited myn-feature-min-1144-api-1 in expectedStopped, evaluateWorkspaceStackHealth returns healthy with reclaimed ['myn-feature-min-1144-api-1']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-health-reclaim-aware.ac2",
+            "title": "Given an exited container not in expectedStopped, the result stays unhealthy with the 'service exited' reason",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-health-reclaim-aware.ac3",
+            "title": "Given an open reclaim in the workspace journal, getWorkspaceStackHealth without reclaimAware returns unhealthy and with reclaimAware: true returns healthy",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi9-status-reclaim-line",
+        "title": "Print 'stopped to free memory' in pan status for a reclaimed stack",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T20:00:07Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-5623",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/status.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/cli/restart-gate-status-line.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "restart-gate-status-line.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9 / D13. status.ts line ~195: add reclaimAware: true to the getWorkspaceStackHealth options. After the per-agent STACK BROKEN block add the yellow 'stopped to free memory' line listing stackHealth.reclaimed, exactly as in the PRD snippet."
+        },
+        "items": [
+          {
+            "id": "wi9-status-reclaim-line.ac1",
+            "title": "The status.ts health read passes reclaimAware: true (visible in the diff at the getWorkspaceStackHealth call)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-status-reclaim-line.ac2",
+            "title": "status.ts contains the literal 'stopped to free memory' inside a branch on stackHealth?.reclaimed?.length that prints the reclaimed names joined by ', ' (visible in the diff)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi10-workspace-data-reclaim-aware",
+        "title": "Read reclaim-aware health in both workspace-data routes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T20:00:07Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-5623",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/workspaces/workspace-data.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. Add reclaimAware: true to the getWorkspaceStackHealth options at workspace-data.ts line ~438 (batch route) and line ~604 (emitTransitionActivity: true). Nothing else changes."
+        },
+        "items": [
+          {
+            "id": "wi10-workspace-data-reclaim-aware.ac1",
+            "title": "Both getWorkspaceStackHealth calls in workspace-data.ts pass reclaimAware: true (git diff shows exactly two option additions)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi10-workspace-data-reclaim-aware.ac2",
+            "title": "Given a journaled reclaim whose containers are exited, the line-604 read returns healthy, so recordWorkspaceStackHealthTransition emits no workspace-stack-unhealthy activity",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi11-candidate-rules",
+        "title": "Add pure deny-by-default reclaim candidate rules in stack-reclaim.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T20:00:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5623",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspace/stack-reclaim.ts",
+            "src/lib/workspace/__tests__/stack-reclaim.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/workspace/__tests__/stack-reclaim.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "stack-reclaim.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ],
+          "foundationFor": [
+            "wi12-reclaim-poll",
+            "wi13-restore-poll"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11. Create src/lib/workspace/stack-reclaim.ts with pure functions only: TurnState, isInsidePath, issuePanes (match by issue token case-insensitive, agentId via hasIssueToken, or cwd inside the workspace), panesAllowReclaim (ignore role review panes; every other pane role work, has agentId, state not working, turn state boundary; zero panes ok), panesNeedStack (any non-review pane working or in-turn), issueInGateQueue (owner or waiter by issueId or by workspacePath inside the workspace), reclaimableContainers (running, exact project, service in RECLAIMABLE_STACK_SERVICES), ReclaimCandidate and rankCandidates (sum memory per issue, desc, tie issueId asc). No I/O and no src/dashboard imports."
+        },
+        "items": [
+          {
+            "id": "wi11-candidate-rules.ac1",
+            "title": "Given panes for several issues, issuePanes returns a pane matched by issue token, by agentId token or by cwd inside the workspace, and never returns agent-pan-12 for PAN-1234",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-candidate-rules.ac2",
+            "title": "panesAllowReclaim allows an idle work pane at boundary plus a finished review pane, rejects a test pane, a pane without agentId, a working pane, an in-turn pane and an unknown turn state, and accepts an empty pane list; panesNeedStack is false for an in-turn review pane and true for an in-turn work pane",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-candidate-rules.ac3",
+            "title": "issueInGateQueue returns true for a waiter with no issueId whose workspacePath lies inside the workspace",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-candidate-rules.ac4",
+            "title": "Given dev, postgres, redis, an exited api and an api from another compose project, reclaimableContainers returns none of them",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-candidate-rules.ac5",
+            "title": "rankCandidates returns candidates ordered by summed container memory descending with issue id ascending as the tie-break",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi12-reclaim-poll",
+        "title": "Add the 30 s reclaim poll in stack-reclaim-service.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T20:00:07Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5623",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/stack-reclaim-service.ts",
+            "src/dashboard/server/services/__tests__/stack-reclaim-service.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/stack-reclaim-service.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "stack-reclaim-service.test.ts passes with fake timers",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-3",
+            "NFR-4"
+          ],
+          "parallelSafeReason": "It owns two new files (the service and its test) that no other item touches except wi13, which a blocks edge serializes after it; its inputs (wi2, wi4, wi11) are merged before it dispatches.",
+          "acJustification": "Six criteria: the reclaim poll is the one item whose safety rules (trigger, candidate exclusions, re-check, confirmed journal write, stop by id, error isolation) each need their own observable check."
+        },
+        "narrative": {
+          "Action": "PRD WI-12. PRECONDITION: run `git show origin/main:src/lib/cloister/gate-starvation.ts > /dev/null`; if it fails, run `pan task block pan-5623 wi12-reclaim-poll --on PAN-5621`, do the other items, and `pan sync-main` once PAN-5621 merges. Never copy PAN-5621 code. Create the service modeled on gate-starvation-service.ts with the Deps listed in the PRD and runStackReclaimPoll implementing steps 1-8 in order (record open, no close reason, head still blocked via fitsAloneAboveHardReserve, docker/pane reads non-null, FR-2 rules 1-7, memory read, rank, parked check on the top 3 with pendingDeclarations before mergeReady, then inside withFileLock(<workspace>/.overdeck/stack-reclaim.lock, timeoutMs 5_000; timeout = idle 'lock-busy') re-check from fresh reads the open episode, close reason, blocked head, rules 4, 5 and 7, and every target container's id/running state/project/service (any failure: idle 'changed-before-stop'), append stack.reclaimed (names + verified ids) BEFORE stopping, read it back with openStackReclaim (mismatch: idle 'journal-unwritable', no stop), then stopContainer(id) for each verified id, emit the D14 activity, add to the restore index). startStackReclaimService/stopStackReclaimService own both timers (restore tick a no-op until wi13), each with an in-flight guard and a catch that logs and never rethrows. Tests per PRD WI-12, all with vi.useFakeTimers()."
+        },
+        "items": [
+          {
+            "id": "wi12-reclaim-poll.ac1",
+            "title": "Given no starvation record or a closing record, a poll returns idle and never calls listRunningContainers or stopContainer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi12-reclaim-poll.ac2",
+            "title": "Given an open episode, a still-blocked head and two parked candidates of 1.2 GiB and 2.4 GiB, one poll stops only the 2.4 GiB issue's containers and appends stack.reclaimed before the first stopContainer call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi12-reclaim-poll.ac3",
+            "title": "Given postgres, redis, dev and open-design containers, none of them is ever passed to stopContainer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi12-reclaim-poll.ac4",
+            "title": "Given a candidate with a gate waiter on its workspace, an active verification, a test pane, an in-turn work pane or an earlier reclaim in this episode, the poll skips it; a candidate with an idle work pane plus a finished review pane is reclaimed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi12-reclaim-poll.ac5",
+            "title": "Given a verification that starts, a gate admitted, or a target container id that changes during the merge-gate wait, the poll returns idle 'changed-before-stop' and appends no journal entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi12-reclaim-poll.ac6",
+            "title": "Given a journal append that does not land (read-back lacks the entry), the poll returns idle 'journal-unwritable' and never calls stopContainer; otherwise stopContainer receives container ids, and a thrown dep is logged as '[stack-reclaim] poll failed:' while the next 30 s interval still runs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi13-restore-poll",
+        "title": "Add the 5 s restore-on-turn poll with a journal-seeded index",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T20:00:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5623",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/stack-reclaim-service.ts",
+            "src/dashboard/server/services/__tests__/stack-reclaim-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/stack-reclaim-service.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "stack-reclaim-service.test.ts passes with fake timers",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-7",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-13 / D15. Implement runStackRestorePoll: first tick seeds Map<issueIdUpper, workspacePath> from listWorkspaces() journals with an open reclaim; each tick drops entries whose path is gone or whose openStackReclaim is null, skips entries in retry backoff, reads panes only when the index is non-empty (null panes skip the tick), and calls restore({ trigger: 'turn' }) when panesNeedStack is true (review panes ignored); restored drops the entry; failed sets retry to now + STACK_RESTORE_RETRY_MS (60_000). Tests per PRD WI-13 with fake timers."
+        },
+        "items": [
+          {
+            "id": "wi13-restore-poll.ac1",
+            "title": "Given two workspaces, one with an open reclaim and one already restored, the first tick indexes only the open one (survives a dashboard restart)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi13-restore-poll.ac2",
+            "title": "Given an indexed issue whose pane is in-turn, the tick calls restore with trigger 'turn' and drops the issue after a restored result",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi13-restore-poll.ac3",
+            "title": "Given a failed restore, no retry happens after 30 s and a retry happens after 61 s",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi13-restore-poll.ac4",
+            "title": "Given an empty index, a tick never calls listPanes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi14-main-wiring",
+        "title": "Start and stop the stack-reclaim service in the primary dashboard",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T20:00:07Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-5623",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/main.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint-file-size.sh passes with main.ts at most 1000 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-14. Add exactly one line after the `if (!isPeerDashboard) { ... }` block that starts the disk-alert service, following the dynamic-import pattern at main.ts:222: `if (!isPeerDashboard) (await import('./services/stack-reclaim-service.js')).startStackReclaimService(); // PAN-5623`. No shutdown call (timers are unref'd). Do not edit gate-starvation-service.ts."
+        },
+        "items": [
+          {
+            "id": "wi14-main-wiring.ac1",
+            "title": "git diff origin/main -- src/dashboard/server/main.ts contains exactly one added line, which dynamically imports stack-reclaim-service.js and calls startStackReclaimService() when !isPeerDashboard",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi14-main-wiring.ac2",
+            "title": "wc -l src/dashboard/server/main.ts prints 1000 or fewer lines and bash scripts/lint-file-size.sh exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi15-docs-changelog",
+        "title": "Document stack reclaim in PIPELINE-GATES.md and add the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T20:00:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5623",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md",
+            "changelog.d/pan-5623.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-15. Add the `- **Stack reclaim (PAN-5623).**` bullet after PAN-5621's Starvation bullet (or after 'Admitted alone (PAN-5285)' if PAN-5621 is not on main) with every fact listed in PRD WI-15 step 1; replace PAN-5621's 'tracked in PAN-5623' sentence with a pointer to it; append PAN-5623 to the heading. Add stack.reclaimed and stack.restored rows to the pipeline journal table and the housekeeping sentence under the contract. Create changelog.d/pan-5623.md with the exact PRD text."
+        },
+        "items": [
+          {
+            "id": "wi15-docs-changelog.ac1",
+            "title": "docs/PIPELINE-GATES.md contains a 'Stack reclaim (PAN-5623)' bullet that names the services api, fe, frontend and server and the three restore triggers turn, spawn and verification",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi15-docs-changelog.ac2",
+            "title": "The pipeline journal table in docs/PIPELINE-GATES.md contains rows for stack.reclaimed and stack.restored naming their writers, and the contract text says lastPipelineEntry without a prefix skips stack.* entries",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi15-docs-changelog.ac3",
+            "title": "changelog.d/pan-5623.md exists under an '#### Improved' heading and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wi1-journal-types-skip",
+        "to": "wi2-open-reclaim-reader",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-journal-types-skip",
+        "to": "wi3-tail-readers-skip",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-open-reclaim-reader",
+        "to": "wi5-restore-door",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4-docker-helpers",
+        "to": "wi5-restore-door",
+        "type": "blocks"
+      },
+      {
+        "from": "wi5-restore-door",
+        "to": "wi6-spawn-gate-restore",
+        "type": "blocks"
+      },
+      {
+        "from": "wi5-restore-door",
+        "to": "wi7-verification-restore",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-open-reclaim-reader",
+        "to": "wi8-health-reclaim-aware",
+        "type": "blocks"
+      },
+      {
+        "from": "wi8-health-reclaim-aware",
+        "to": "wi9-status-reclaim-line",
+        "type": "blocks"
+      },
+      {
+        "from": "wi8-health-reclaim-aware",
+        "to": "wi10-workspace-data-reclaim-aware",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4-docker-helpers",
+        "to": "wi11-candidate-rules",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-open-reclaim-reader",
+        "to": "wi12-reclaim-poll",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4-docker-helpers",
+        "to": "wi12-reclaim-poll",
+        "type": "blocks"
+      },
+      {
+        "from": "wi11-candidate-rules",
+        "to": "wi12-reclaim-poll",
+        "type": "blocks"
+      },
+      {
+        "from": "wi12-reclaim-poll",
+        "to": "wi13-restore-poll",
+        "type": "blocks"
+      },
+      {
+        "from": "wi5-restore-door",
+        "to": "wi12-reclaim-poll",
+        "type": "blocks"
+      },
+      {
+        "from": "wi5-restore-door",
+        "to": "wi13-restore-poll",
+        "type": "blocks"
+      },
+      {
+        "from": "wi12-reclaim-poll",
+        "to": "wi14-main-wiring",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
