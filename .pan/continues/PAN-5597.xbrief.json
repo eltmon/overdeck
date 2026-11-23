@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5597",
   "created": "2026-11-23T02:38:35.270Z",
-  "updated": "2026-11-23T02:53:29.827Z",
+  "updated": "2026-11-23T02:53:32.566Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -160,6 +160,11 @@
     "flywheel-summary-active.ac2": {
       "status": "completed",
       "doneAt": "2026-11-23T02:53:29.827Z"
+    },
+    "flywheel-skill-active-book": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5597",
+      "claimedAt": "2026-11-23T02:53:32.566Z"
     }
   }
 }
