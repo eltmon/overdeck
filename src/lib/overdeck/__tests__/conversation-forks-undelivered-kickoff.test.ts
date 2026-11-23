@@ -57,6 +57,19 @@ describe('deliverForkSeed holds a refused kickoff (PAN-4242)', () => {
     await expect(forksModule.injectForkSummary(conv, 'kickoff', 'test')).rejects.toBeInstanceOf(ForkDeliveryRefusedError);
   });
 
+  it('treats a Herdr refusal after the paste as a plain failure (the text is in the composer)', async () => {
+    const conv = seedConversation('after-paste');
+    const before = delivery.result;
+    delivery.result = { ok: false, path: 'herdr', failure: 'refused: agent_blocked_after_paste — a dialog appeared after the text was pasted' };
+    try {
+      const failure = await forksModule.injectForkSummary(conv, 'kickoff', 'test').catch((error: unknown) => error);
+      expect(failure).toBeInstanceOf(Error);
+      expect(failure).not.toBeInstanceOf(ForkDeliveryRefusedError);
+    } finally {
+      delivery.result = before;
+    }
+  });
+
   it('holds the seed and rethrows on a refusal', async () => {
     const conv = seedConversation('refused');
     vi.spyOn(forksModule, 'injectForkSummary').mockRejectedValue(new ForkDeliveryRefusedError('refused: agent_blocked'));

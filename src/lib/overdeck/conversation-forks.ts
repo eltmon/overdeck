@@ -71,6 +71,7 @@ import { activeComposerRegion } from '../pane-composer.js';
 import { capturePane, capturePaneViewport, deliveryVerifyLine, sendKeysAsync, sessionExists } from '../tmux.js';
 import { Effect } from 'effect';
 import type { DeliveryResult } from '../agents/delivery.js';
+import { refusedBeforeTyping } from '../terminal-backends/agent-pane-io.js';
 import { conversationHarnessAlive, conversationSessionAlive } from './conversation-liveness.js';
 import { writeConversationPaneRole } from './conversation-pane-role.js';
 import { getIssueWorkspacePath } from './issue-projects.js';
@@ -255,8 +256,9 @@ export async function ensureForkSessionReady(
  * a failed fork without re-delivering duplicate text.
  */
 /**
- * PAN-4242: a delivery refused before any byte was typed (Herdr's
- * `agent_blocked`, the tmux guard). Re-sending its text later cannot duplicate it.
+ * PAN-4242: a delivery refused before any byte was typed (Herdr's pre-paste
+ * `agent_blocked`, the prompt guard). Re-sending its text later cannot
+ * duplicate it. A Herdr refusal after the paste is a plain Error.
  */
 export class ForkDeliveryRefusedError extends Error {}
 
@@ -264,7 +266,7 @@ export class ForkDeliveryRefusedError extends Error {}
 function assertForkDelivered(conv: Conversation, caller: string, delivery: DeliveryResult): void {
   if (delivery.ok) return;
   const message = `[${caller}] fork summary not delivered to ${conv.name}: ${delivery.failure ?? delivery.path}`;
-  throw delivery.failure?.startsWith('refused:') ? new ForkDeliveryRefusedError(message) : new Error(message);
+  throw refusedBeforeTyping(delivery.failure) ? new ForkDeliveryRefusedError(message) : new Error(message);
 }
 
 async function tmuxSessionPresent(sessionName: string): Promise<boolean> {

@@ -14,7 +14,7 @@
  */
 import type { deliverAgentMessage } from '../agents.js';
 import { claimHeldKickoff, forkRequestedHold, restoreHeldKickoff } from './conversation-kickoff-store.js';
-import { getConversationByName, type LegacyConversation as Conversation } from './conversations.js';
+import { getConversationByName, updateForkStatus, type LegacyConversation as Conversation } from './conversations.js';
 import { deliverResumeContractUnlessGated, type ResumeContractDeliveryResult } from './resume-contract-delivery.js';
 
 /** Delivers a fork kickoff to a running conversation; throws when it was not delivered. */
@@ -39,8 +39,13 @@ export async function deliverResumeNoticeOrKickoff(
       await deliverKickoff(current, kickoff, 'conversation-resume-kickoff');
       return 'delivered';
     } catch (error) {
+      // As the Start door does: restore the hold AND mark the fork failed. The
+      // delivery set forkStatus 'injecting', which left alone hides the composer
+      // and the held-handoff view behind a fork spinner that never ends.
+      const message = error instanceof Error ? error.message : String(error);
       restoreHeldKickoff(conv.name, kickoff);
-      console.error(`[conversations] undelivered kickoff for ${conv.name} still not delivered on resume:`, error instanceof Error ? error.message : String(error));
+      updateForkStatus(conv.name, 'failed', message);
+      console.error(`[conversations] undelivered kickoff for ${conv.name} still not delivered on resume:`, message);
       return 'failed';
     }
   }

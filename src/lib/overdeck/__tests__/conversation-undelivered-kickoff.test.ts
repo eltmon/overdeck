@@ -16,7 +16,7 @@ vi.mock('../resume-contract-delivery.js', async (importOriginal) => ({
 }));
 
 const { deliverResumeNoticeOrKickoff } = await import('../conversation-undelivered-kickoff.js');
-const { createConversation, getConversationByName, setForkRequest } = await import('../conversations.js');
+const { createConversation, getConversationByName, setForkRequest, updateForkStatus } = await import('../conversations.js');
 const { forkRequestedHold, holdKickoff, readHeldKickoff } = await import('../conversation-kickoff-store.js');
 
 let testHome: string;
@@ -65,14 +65,21 @@ describe('deliverResumeNoticeOrKickoff (PAN-4242)', () => {
     expect(readHeldKickoff('undelivered')).toBeNull();
   });
 
-  it('restores the kickoff when its delivery fails', async () => {
+  it('restores the kickoff and marks the fork failed when its delivery fails', async () => {
     const conv = seedConversation('refused-again', {}, 'the kickoff');
-    const deliverKickoff = vi.fn(async () => { throw new Error('refused: agent_blocked'); });
+    // The real deliverer (deliverForkSeed) sets 'injecting' before it can throw.
+    const deliverKickoff = vi.fn(async () => {
+      updateForkStatus('refused-again', 'injecting');
+      throw new Error('refused: agent_blocked');
+    });
 
     const result = await deliverResumeNoticeOrKickoff(conv, NOTICE, deliverKickoff);
 
     expect(result).toBe('failed');
     expect(readHeldKickoff('refused-again')).toBe('the kickoff');
+    const after = getConversationByName('refused-again')!;
+    expect(after.forkStatus).toBe('failed');
+    expect(after.forkError).toBe('refused: agent_blocked');
     expect(notice.deliver).not.toHaveBeenCalled();
   });
 

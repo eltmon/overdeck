@@ -19,6 +19,13 @@ import { toWellFormedText } from '../well-formed-text.js';
 import { herdrPaneReadText } from './herdr-pane-read.js';
 import { STEER_HERDR_KEYS, type SubmitMode } from './steer-keys.js';
 
+/**
+ * PAN-4242: the refusal reason when the agent turned blocked, or a menu
+ * appeared, AFTER the text was pasted. The text is in the composer, unsent.
+ * `agent_blocked` stays the pre-paste refusal, which typed nothing.
+ */
+export const HERDR_BLOCKED_AFTER_PASTE = 'agent_blocked_after_paste';
+
 /** Structural, like steer-keys.ts: importing herdr-api here would close an import cycle through types.ts. */
 export interface HerdrSubmitApi { call(method: string, params: Record<string, unknown>): Promise<unknown> }
 export interface HerdrSubmitDeps { readonly sleep?: (ms: number) => Promise<void>; readonly now?: () => number }
