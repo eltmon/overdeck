@@ -74,7 +74,8 @@ else
   for lane in "${LANES[@]}"; do
     label=${lane%%:*}
     tsconfig=${lane#*:}
-    # PAN-5248: one gate admission per lane (CPU and memory).
+    # PAN-5248/PAN-5617: npm run lint:effect-diagnostics admits the whole loop once
+    # (scripts/gate-admitted.mjs); run directly, each lane admits itself.
     if output=$(node scripts/tsc-admitted.mjs --noEmit -p "$tsconfig" 2>&1); then
       tsc_status=0
     else

@@ -38,4 +38,15 @@ describe('admitted chains (PAN-5617)', () => {
       expect(script!.startsWith('node scripts/tsc-admitted.mjs') || script!.startsWith('bash scripts/lint-')).toBe(true);
     }
   });
+
+  it('routes npm run lint:effect-diagnostics through the chain wrapper', () => {
+    expect(packageJson.scripts['lint:effect-diagnostics']).toBe(
+      'node scripts/gate-admitted.mjs chain:lint:effect-diagnostics -- bash scripts/lint-effect-diagnostics.sh',
+    );
+  });
+
+  it('keeps npm run lint:effect-diagnostics as a step of npm run lint', () => {
+    const steps = packageJson.scripts.lint!.split('&&').map((step) => step.trim());
+    expect(steps).toContain('npm run lint:effect-diagnostics');
+  });
 });
