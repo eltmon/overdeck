@@ -1,11 +1,10 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-23T20:27:21Z · model: claude-opus-5-5 · open: 955_
+_Last sequenced: 2026-11-23T20:52:59Z · model: claude-opus-5-5 · open: 954_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
-| 1 | PAN-5621 | M | critical | ok |  |  | Gate admission queue starves while MemAvailable < hard reserve + footprint; parked workspace stacks never reclaimed, no gate runs. |
 | 1 | PAN-5637 | S | critical | ok |  |  | In pipeline. Merge train never admits polyrepo issues touching CI-less member repos; add ci: none per repo so MYN infra/docs MRs merge |
 | 1 | PAN-5638 | M | critical | ok |  |  | In pipeline. Polyrepo review verdicts refuse GitHub member PRs and the ready set ignores verdict markers; MIN-1142 can't merge |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
@@ -92,7 +91,6 @@ _Last sequenced: 2026-11-23T20:27:21Z · model: claude-opus-5-5 · open: 955_
 | 75 | PAN-3605 | XS | high | ok |  |  | Supply chain: lint-effect-diagnostics npx fell back to the registry and ran a squatted unscoped package; pin the scoped local bin. |
 | 76 | PAN-5133 | M | high | ok |  |  | pan pause cannot hold a planned issue whose deferred work-agent start is retried; no operator door to stop it. |
 | 77 | PAN-4792 | S | high | ok |  |  | Paste guard only knows numbered menus; a failed paste presses Enter into unnumbered selects, silently setting defaultMode=auto. |
-| 77 | PAN-5604 | S | high | ok |  |  | Stale cached snapshot fires a waiting-on-you toast for answered questions; toasts never close. Small fix in two hooks. |
 | 78 | PAN-3557 | S | critical | ok |  |  | Post-merge label writes have no retry; a 403 hides a merged issue from the verify-on-main sweep while lifecycle reports success. |
 | 79 | PAN-3543 | S | critical | ok |  |  | Completed-handoff agents are unstartable: start, --fresh and reset-session all refuse while the refusal itself recommends --fresh. |
 | 80 | PAN-3522 | S | critical | ok |  |  | Supervisor watchdog restart-churns under CPU storm because the probe timeout budget ignores the boot warm phase. |
@@ -960,12 +958,9 @@ _Last sequenced: 2026-11-23T20:27:21Z · model: claude-opus-5-5 · open: 955_
 | 903 | PAN-5444 | XS | low | ok |  |  | Two Minor CodeRabbit findings left on merged PR #5443: semgrep repo rules resolve from event cwd; hook tests not isolated from Docker. |
 | 904 | PAN-5405 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5403: changes-query refetch after turns, Send menu keyboard/scheduling guard, tab-menu focus. |
 | 905 | PAN-2423 | XS | low | stale |  |  | Likely fixed: rebuild now uses the PAN-3049 resolver (docker.ts:181) and reap has no hardcoded prefix; confirm and close. |
+| 906 | PAN-5621 | M | low | ok |  |  | Fix merged and closed out (verifying on main); issue awaits closure. Nothing left to pick up. |
 
 ## Rationale detail
-
-### PAN-5621 (rank 1)
-
-New substrate-improvement bug already in the pipeline, pinned at rank 1 per the in-pipeline rule. It is critical because a starved admission queue stops every agent quality gate: on 2026-11-23 no gate ran while 7 waiters queued and the PAN-5601 and PAN-5614 substrate fixes sat behind it. FR-1..FR-3 are concrete (starvation detection, reclaiming idle Overdeck-owned stack containers, fake-timer tests); it shares the admission queue with PAN-5617.
 
 ### PAN-5637 (rank 1)
 
@@ -1283,6 +1278,10 @@ New issue from the Deft adoption PRD. Its dependency PAN-3308 has closed. The ma
 
 Found cutting v0.65.0: CI was green but the local release check failed on two host-dependent tests. XS fix that removes false reds from the release verb, so it sits above routine medium work.
 
+### PAN-4566 (rank 71)
+
+Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback this fix routes failures to is on main and work can start.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1290,24 +1289,11 @@ Found cutting v0.65.0: CI was green but the local release check failed on two ho
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-23T20:27:21Z",
+  "generatedAt": "2026-11-23T20:52:59Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 955,
+  "openCount": 954,
   "nodes": [
-    {
-      "issue": "PAN-5621",
-      "rank": 1,
-      "size": "M",
-      "importance": "critical",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Gate admission queue starves while MemAvailable < hard reserve + footprint; parked workspace stacks never reclaimed, no gate runs.",
-      "rationale": "New substrate-improvement bug already in the pipeline, pinned at rank 1 per the in-pipeline rule. It is critical because a starved admission queue stops every agent quality gate: on 2026-11-23 no gate ran while 7 waiters queued and the PAN-5601 and PAN-5614 substrate fixes sat behind it. FR-1..FR-3 are concrete (starvation detection, reclaiming idle Overdeck-owned stack containers, fake-timer tests); it shares the admission queue with PAN-5617.",
-      "gate": "auto",
-      "planning": "auto"
-    },
     {
       "issue": "PAN-5637",
       "rank": 1,
@@ -2432,19 +2418,6 @@ Found cutting v0.65.0: CI was green but the local release check failed on two ho
       "dependsOn": [],
       "why": "Paste guard only knows numbered menus; a failed paste presses Enter into unnumbered selects, silently setting defaultMode=auto.",
       "rationale": "New bug found while planning PAN-4738: the tmux paste guard misses Claude Code's unnumbered select dialogs, so a failed paste's fallback Enter can answer them, including a silent permission-mode change. PAN-4738 removes the one known trigger on Fly, so it ranks with the high-tier delivery bugs rather than the top tier.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5604",
-      "rank": 77,
-      "size": "S",
-      "importance": "high",
-      "score": 74,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Stale cached snapshot fires a waiting-on-you toast for answered questions; toasts never close. Small fix in two hooks.",
-      "rationale": "New substrate-improvement bug with a verified root cause and exact fix; a false needs-you prompt misleads the operator, so it ranks with other high substrate bugs.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13240,6 +13213,19 @@ Found cutting v0.65.0: CI was green but the local release check failed on two ho
       "rationale": "Demoted: a 2026-11-23 comment and a code check show both the rebuild and reap hardcodes are gone, so only an operator close remains.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-5621",
+      "rank": 906,
+      "size": "M",
+      "importance": "low",
+      "score": 5,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Fix merged and closed out (verifying on main); issue awaits closure. Nothing left to pick up.",
+      "rationale": "Rank dropped from 1: the fix merged and the issue now carries closed-out, so it left the pipeline and has no remaining work.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -14579,13 +14565,6 @@ Found cutting v0.65.0: CI was green but the local release check failed on two ho
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
-    },
-    {
-      "from": "PAN-5604",
-      "to": "PAN-5642",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
     },
     {
       "from": "PAN-5621",
