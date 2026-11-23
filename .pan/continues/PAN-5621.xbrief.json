@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5621",
   "created": "2026-11-23T18:11:42.737Z",
-  "updated": "2026-11-23T19:28:05.494Z",
+  "updated": "2026-11-23T19:28:13.207Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -104,6 +104,11 @@
     "wi4-starvation-service.ac5": {
       "status": "completed",
       "doneAt": "2026-11-23T19:28:05.494Z"
+    },
+    "wi5-status-line": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5621",
+      "claimedAt": "2026-11-23T19:28:13.207Z"
     }
   }
 }
