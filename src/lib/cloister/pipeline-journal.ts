@@ -45,7 +45,8 @@ export type PipelineJournalEntryType =
   | 'blocked.declared' | 'blocked.woken'
   | 'handoff.requested' | 'handoff.deferred' | 'handoff.retried' | 'handoff.started' | 'handoff.abandoned'
   | 'workspace.adopted' | 'workspace.adoption-failed' | 'workspace.synced-to-pr-head'
-  | 'operator.decision-requested' | 'operator.decision-answered' | 'operator.decision-withdrawn';
+  | 'operator.decision-requested' | 'operator.decision-answered' | 'operator.decision-withdrawn'
+  | 'stack.reclaimed' | 'stack.restored';
 
 export interface PipelineJournalEntry {
   /** ISO timestamp, stamped at append time. */
@@ -158,7 +159,20 @@ export function isReviewInFlightEntry(entry: Pick<PipelineJournalEntry, 'type'> 
   return entry?.type === 'review.requested' || entry?.type === 'review.dispatched' || entry?.type === 'review.redispatched';
 }
 
-/** The last entry, or the last whose type starts with `prefix`. */
+/** PAN-5623: a `stack.*` entry records what Overdeck did to an issue's containers, not a pipeline step. */
+export function isHousekeepingEntry(entry: Pick<PipelineJournalEntry, 'type'>): boolean {
+  return entry.type.startsWith('stack.');
+}
+
+/** The last entry that is a pipeline step (housekeeping entries skipped), or null. */
+export function lastPipelineStep(entries: readonly PipelineJournalEntry[]): PipelineJournalEntry | null {
+  for (let index = entries.length - 1; index >= 0; index -= 1) {
+    if (!isHousekeepingEntry(entries[index])) return entries[index];
+  }
+  return null;
+}
+
+/** The last pipeline step (housekeeping entries skipped), or the last entry whose type starts with `prefix`. */
 export function lastPipelineEntry(
   workspacePath: string,
   prefix?: string,
@@ -166,7 +180,7 @@ export function lastPipelineEntry(
   const entries = readPipelineJournal(workspacePath);
   for (let index = entries.length - 1; index >= 0; index -= 1) {
     const entry = entries[index];
-    if (!prefix || entry.type.startsWith(prefix)) return entry;
+    if (prefix ? entry.type.startsWith(prefix) : !isHousekeepingEntry(entry)) return entry;
   }
   return null;
 }

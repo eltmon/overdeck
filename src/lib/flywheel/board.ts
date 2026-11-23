@@ -76,6 +76,8 @@ export const JOURNAL_ACTIVITY_LABELS: Record<PipelineJournalEntryType, string> =
   'operator.decision-requested': 'asked you a question',
   'operator.decision-answered': 'your answer received',
   'operator.decision-withdrawn': 'question withdrawn',
+  'stack.reclaimed': 'stack stopped to free memory',
+  'stack.restored': 'stack started again',
 };
 
 /** The journal entry as a plain-text activity; an unknown type is de-dotted, never shown raw. */
