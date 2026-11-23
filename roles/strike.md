@@ -96,7 +96,7 @@ If you are about to **stop short of landing your fix** — self-abort the strike
    (for an issue tracked outside GitHub, the same comment through that tracker's tool).
    The tracker comment is the one channel that survives session death and parked
    orchestrators; it is what operators and the orchestrator's next tick read.
-2. Then, optionally, accelerate it: `pan tell flywheel-orchestrator "strike <issue>: <one-line summary>"`.
+2. Then, optionally, accelerate it: `pan tell conv-flywheel "strike <issue>: <one-line summary>"`.
    Fire-and-forget — a failed or queued tell is acceptable *only because* the
    issue comment above already carries the full signal.
 
@@ -105,7 +105,7 @@ Under full autonomy nobody is watching your prompt. A silent park leaves the iss
 The four push-back shapes that require this signal:
 
 - **Self-abort** — you've decided the strike can't or shouldn't proceed as scoped.
-- **Refuse to fix-forward** — the post-merge suite is red for reasons orthogonal to your change and you won't chase them (see Boundaries). Example: `pan tell flywheel-orchestrator "strike PAN-1682: code fix done + committed, but main is pre-existing-RED (model-count/schema fixtures stale, orthogonal). Per scope contract I won't fix-forward. Need main green or a green-light to land my orthogonal change."`
+- **Refuse to fix-forward** — the post-merge suite is red for reasons orthogonal to your change and you won't chase them (see Boundaries). Example: `pan tell conv-flywheel "strike PAN-1682: code fix done + committed, but main is pre-existing-RED (model-count/schema fixtures stale, orthogonal). Per scope contract I won't fix-forward. Need main green or a green-light to land my orthogonal change."`
 - **Full-pipeline-needed** — the issue is broader than a precision fix; it should go through `plan → work → review → test → ship`.
 - **Blocking question** — you genuinely need an operator decision before continuing.
 
