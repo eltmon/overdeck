@@ -2,6 +2,7 @@ import { EventEmitter } from 'node:events'
 import { describe, expect, it, vi } from 'vitest'
 
 import {
+  CHAIN_MAX_WAIT_MS,
   runAdmittedCommand,
   shouldBypassAdmission,
   tscFootprintKey,
@@ -124,6 +125,9 @@ describe('runAdmittedCommand (PAN-5248)', () => {
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('[gate-admission] proceeding without admission:'))
     expect(deps.spawn).toHaveBeenCalledTimes(1)
     expect(deps.startSampler).not.toHaveBeenCalled()
+    expect(deps.spawn).toHaveBeenCalledWith(input.command, input.args, expect.objectContaining({
+      env: expect.objectContaining({ OVERDECK_GATE_ADMISSION: '0' }),
+    }))
   })
 
   it('refuses to start after a memory timeout and never spawns', async () => {
@@ -186,5 +190,114 @@ describe('runAdmittedCommand (PAN-5248)', () => {
     await expect(runAdmittedCommand(input, deps)).resolves.toBe(1)
     expect(handle.release).toHaveBeenCalledTimes(1)
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('could not start'))
+  })
+})
+
+describe('admitted chains (PAN-5617)', () => {
+  it('a chain of 12 lanes enters the admission queue once', async () => {
+    const acquire = vi.fn(async () => fakeHandle())
+    const innerSpawn = fakeSpawn(0)
+    const chainSpawn = vi.fn((_command: string, _args: string[], options: { env: NodeJS.ProcessEnv }) => {
+      const child = Object.assign(new EventEmitter(), { pid: 1111, kill: vi.fn() })
+      void (async () => {
+        for (let lane = 0; lane < 12; lane++) {
+          await runAdmittedCommand(
+            { footprintKey: `tsc:lane-${lane}`, command: 'tsc', args: ['--noEmit'], cwd: '/repo' },
+            { env: options.env, acquire, spawn: innerSpawn as unknown as RunAdmittedDeps['spawn'], warn: vi.fn() },
+          )
+        }
+        child.emit('exit', 0, null)
+      })()
+      return child
+    })
+    const result = await runAdmittedCommand(
+      { footprintKey: 'chain:typecheck', command: 'npm', args: ['run', 'typecheck:lanes'], cwd: '/repo' },
+      { env: {}, acquire, spawn: chainSpawn as unknown as RunAdmittedDeps['spawn'], startSampler: vi.fn(() => ({ stop: vi.fn(async () => null) })), warn: vi.fn() },
+    )
+    expect(result).toBe(0)
+    expect(acquire).toHaveBeenCalledTimes(1)
+    expect(acquire).toHaveBeenCalledWith(
+      expect.objectContaining({ footprintKey: 'chain:typecheck' }),
+      expect.anything(),
+    )
+    expect(innerSpawn).toHaveBeenCalledTimes(12)
+    for (const call of innerSpawn.mock.calls) {
+      expect((call[2] as { env: NodeJS.ProcessEnv }).env.OVERDECK_GATE_ADMITTED).toBe('1')
+    }
+  })
+
+  it('a lone lane enters the admission queue once', async () => {
+    const { deps } = setup()
+    await runAdmittedCommand(input, deps)
+    expect(deps.acquire).toHaveBeenCalledTimes(1)
+    expect(deps.acquire).toHaveBeenCalledWith(
+      expect.objectContaining({ footprintKey: 'tsc:tsconfig.json' }),
+      expect.anything(),
+    )
+  })
+
+  it('after an admission setup failure the chain runs with OVERDECK_GATE_ADMISSION=0 and its lanes do not queue', async () => {
+    const acquire = vi.fn(async () => { throw new Error('EACCES: admission root') })
+    const innerSpawn = fakeSpawn(0)
+    const chainSpawn = vi.fn((_command: string, _args: string[], options: { env: NodeJS.ProcessEnv }) => {
+      const child = Object.assign(new EventEmitter(), { pid: 2222, kill: vi.fn() })
+      void (async () => {
+        for (let lane = 0; lane < 2; lane++) {
+          await runAdmittedCommand(
+            { footprintKey: `tsc:lane-${lane}`, command: 'tsc', args: ['--noEmit'], cwd: '/repo' },
+            { env: options.env, acquire, spawn: innerSpawn as unknown as RunAdmittedDeps['spawn'], warn: vi.fn() },
+          )
+        }
+        child.emit('exit', 0, null)
+      })()
+      return child
+    })
+    const result = await runAdmittedCommand(
+      { footprintKey: 'chain:typecheck', command: 'npm', args: ['run', 'typecheck:lanes'], cwd: '/repo' },
+      { env: {}, acquire, failClosedOnTimeout: true, spawn: chainSpawn as unknown as RunAdmittedDeps['spawn'], warn: vi.fn() },
+    )
+    expect(result).toBe(0)
+    expect(chainSpawn).toHaveBeenCalledWith('npm', ['run', 'typecheck:lanes'], expect.objectContaining({
+      env: expect.objectContaining({ OVERDECK_GATE_ADMISSION: '0' }),
+    }))
+    const chainSpawnEnv = (chainSpawn.mock.calls[0]![2] as { env: NodeJS.ProcessEnv }).env
+    expect(chainSpawnEnv.OVERDECK_GATE_ADMITTED).toBeUndefined()
+    expect(innerSpawn).toHaveBeenCalledTimes(2)
+    expect(acquire).toHaveBeenCalledTimes(1)
+  })
+
+  it('passes maxWaitMs through to acquire and names it in the memory refusal', async () => {
+    const memory = { kind: 'memory' as const, memAvailableBytes: 13 * GiB, reservationsBytes: 2.4 * GiB, footprintBytes: 2.5 * GiB, softReserveBytes: 12 * GiB }
+    const { deps, warn } = setup({
+      maxWaitMs: CHAIN_MAX_WAIT_MS,
+      acquire: vi.fn(async () => { throw new QualityGateAdmissionTimeoutError(CHAIN_MAX_WAIT_MS, 'memory', memory) }),
+    })
+    await expect(runAdmittedCommand(input, deps)).resolves.toBe(75)
+    expect(deps.acquire).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ maxWaitMs: CHAIN_MAX_WAIT_MS }),
+    )
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('waited 60 minutes for memory'))
+  })
+
+  it.each(['queue', 'slots', 'cpu'] as const)('a chain refuses to start after a %s timeout', async (kind) => {
+    const { deps, warn } = setup({
+      failClosedOnTimeout: true,
+      maxWaitMs: CHAIN_MAX_WAIT_MS,
+      acquire: vi.fn(async () => { throw new QualityGateAdmissionTimeoutError(CHAIN_MAX_WAIT_MS, kind) }),
+    })
+    await expect(runAdmittedCommand(input, deps)).resolves.toBe(75)
+    expect(deps.spawn).not.toHaveBeenCalled()
+    expect(warn).toHaveBeenCalledWith(
+      `[gate-admission] refusing to start tsc:tsconfig.json: waited 60 minutes for admission (last waiting on ${kind})`,
+    )
+  })
+
+  it('a lone lane still proceeds after a queue timeout', async () => {
+    const { deps } = setup({
+      acquire: vi.fn(async () => { throw new QualityGateAdmissionTimeoutError(1_000, 'queue') }),
+    })
+    await expect(runAdmittedCommand(input, deps)).resolves.toBe(0)
+    expect(deps.spawn).toHaveBeenCalledTimes(1)
   })
 })
