@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5250",
   "created": "2026-11-23T23:10:09.644Z",
-  "updated": "2026-11-23T23:16:53.267Z",
+  "updated": "2026-11-23T23:16:57.142Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -86,6 +86,11 @@
     "wi3-usage-probe.ac6": {
       "status": "completed",
       "doneAt": "2026-11-23T23:16:53.267Z"
+    },
+    "wi4-restore-wake": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5250",
+      "claimedAt": "2026-11-23T23:16:57.142Z"
     }
   }
 }
