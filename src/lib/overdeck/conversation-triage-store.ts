@@ -142,19 +142,27 @@ export interface IdleClock {
   settledAtMs: number | null;
   snoozedUntilMs: number | null;
   idleResetAtMs: number | null;
+  settleReason: SettleReason | null;
 }
 
 /** PAN-4655: idle-clock inputs for every unarchived conversation, one query. */
 export function listIdleClocks(): Map<string, IdleClock> {
   const rows = getOverdeckDatabase()
-    .prepare('SELECT name, settled_at, snoozed_until, idle_reset_at FROM conversations WHERE archived_at IS NULL')
-    .all<{ name: string; settled_at: number | null; snoozed_until: number | null; idle_reset_at: number | null }>();
+    .prepare('SELECT name, settled_at, snoozed_until, idle_reset_at, settle_reason FROM conversations WHERE archived_at IS NULL')
+    .all<{
+      name: string;
+      settled_at: number | null;
+      snoozed_until: number | null;
+      idle_reset_at: number | null;
+      settle_reason: string | null;
+    }>();
   const byName = new Map<string, IdleClock>();
   for (const row of rows) {
     byName.set(row.name, {
       settledAtMs: row.settled_at,
       snoozedUntilMs: row.snoozed_until,
       idleResetAtMs: row.idle_reset_at,
+      settleReason: row.settled_at !== null ? (isSettleReason(row.settle_reason) ? row.settle_reason : 'manual') : null,
     });
   }
   return byName;

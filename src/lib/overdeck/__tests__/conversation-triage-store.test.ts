@@ -466,18 +466,30 @@ describe('conversation triage store', () => {
     });
 
     it('listIdleClocks returns unarchived rows with their clock columns and omits archived rows', async () => {
-      const { listIdleClocks, settleConversation } = await import('../conversation-triage-store.js');
+      const { listIdleClocks, settleConversation, settleIdleConversation } = await import('../conversation-triage-store.js');
       await create('idle-j');
       await create('idle-k');
       await create('idle-l');
+      await create('idle-j2');
       settleConversation('idle-j', 'manual', 1_000);
       await setColumn('idle-k', 'snoozed_until', 2_000);
       await setColumn('idle-k', 'idle_reset_at', 3_000);
       await setColumn('idle-l', 'archived_at', NOW);
+      settleIdleConversation('idle-j2', CUTOFF, 4_000);
       const clocks = listIdleClocks();
-      expect(clocks.get('idle-j')).toEqual({ settledAtMs: 1_000, snoozedUntilMs: null, idleResetAtMs: null });
-      expect(clocks.get('idle-k')).toEqual({ settledAtMs: null, snoozedUntilMs: 2_000, idleResetAtMs: 3_000 });
+      expect(clocks.get('idle-j')).toEqual({ settledAtMs: 1_000, snoozedUntilMs: null, idleResetAtMs: null, settleReason: 'manual' });
+      expect(clocks.get('idle-k')).toEqual({ settledAtMs: null, snoozedUntilMs: 2_000, idleResetAtMs: 3_000, settleReason: null });
       expect(clocks.has('idle-l')).toBe(false);
+      expect(clocks.get('idle-j2')).toEqual({ settledAtMs: 4_000, snoozedUntilMs: null, idleResetAtMs: null, settleReason: 'idle' });
+    });
+
+    it('listIdleClocks reports settleReason manual for a settled row with a NULL stored reason, matching getConversationTriage', async () => {
+      const { listIdleClocks, getConversationTriage } = await import('../conversation-triage-store.js');
+      await create('idle-j3');
+      await setColumn('idle-j3', 'settled_at', 5_000);
+      const clocks = listIdleClocks();
+      expect(clocks.get('idle-j3')?.settleReason).toBe('manual');
+      expect(getConversationTriage('idle-j3')?.settleReason).toBe('manual');
     });
 
     describe('resurfaceIdleSettledConversation (PAN-5611)', () => {
