@@ -24,7 +24,9 @@
  *     branch protection is usually off, by its own facts
  *     (`readGitHubMemberReadyFacts`: a forge decision, a trusted dated
  *     marker, or a standing review at head), cached per PR head for a
- *     minute (PAN-5638).
+ *     minute (PAN-5638). A member that declares `ci: none` (PAN-5637) has
+ *     its MRs' `none` checks counted as passing; `red` and `pending` still
+ *     block.
  *
  * A GitLab or polyrepo read that fails throws {@link ReadySetUnavailableError}.
  * It never reads as "not ready": the reconciler treats an empty ready set as
@@ -32,6 +34,7 @@
  * tick instead, and the queue route reports the project's error.
  */
 import type { PrFacts } from '../cloister/pr-facts.js';
+import { checksPass } from '../cloister/member-ci.js';
 import { createSettledTtlPromiseCache } from '../concurrency.js';
 import type { ForgeType } from '../forge.js';
 import { resolveConfiguredRepos } from '../project-repos.js';
@@ -69,6 +72,8 @@ export interface ReadySetRepo {
   readonly forge: ForgeType;
   /** The repo's issue-branch prefix (`feature/`). */
   readonly branchPrefix: string;
+  /** PAN-5637: the member declares `ci: none`; an MR here with no pipeline passes (`checksPass`). */
+  readonly ciNone?: boolean;
 }
 
 export interface ReadySetDeps {
@@ -138,6 +143,7 @@ export function memberReposForProject(projectPath: string, config: ProjectConfig
       repoPath: repo.repoPath,
       forge: repo.forge,
       branchPrefix: repo.sourceBranch.slice(0, -BRANCH_SENTINEL.length),
+      ...(repo.ciNone ? { ciNone: true } : {}),
     }));
 }
 
@@ -200,7 +206,8 @@ async function gitlabRows(repo: ReadySetRepo, deps: ReadySetDeps): Promise<Issue
       const facts = await gitlabMrFactsCache(key, () => readFacts(issueId, row));
       // An unread approval is never an approval (C3): the set is unknown.
       if (facts.error) throw new ReadySetUnavailableError(repo.repoPath, facts.error);
-      return facts.open && !facts.draft && facts.approved && facts.checks === 'green' && facts.mergeable === true;
+      return facts.open && !facts.draft && facts.approved
+        && checksPass({ checks: facts.checks, ciNone: repo.ciNone }) && facts.mergeable === true;
     };
     return [{ issueId, title: row.title ?? null, number: row.iid, merged: state === 'merged', ready }];
   });

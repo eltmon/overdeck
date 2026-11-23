@@ -67,7 +67,13 @@ answers for three project shapes (PAN-4753 WI-4, PAN-3657):
 | --- | --- | --- |
 | GitHub monorepo | the cached open `gh pr list` rows | the row's review decision is approved, its checks are green and it is mergeable |
 | GitLab monorepo | the cached MR listing: every page of open MRs plus the newest 100 merged | the MR is open, not a draft and has no conflicts on the listing, and its own facts (`readGitLabMrFacts`: `glab mr view` plus the approvals endpoint) show a named approver, a green pipeline and mergeability |
-| Polyrepo | every writable member repo, each with its own forge and branch prefix (`memberReposForProject`) | every open PR/MR for the issue, across the member repos, is ready by its forge's rule; a GitHub member PR with no forge review decision is judged by its own facts (`readGitHubMemberReadyFacts`: a trusted `overdeck-verdict: APPROVED` marker no older than the head commit, or a trusted standing review of the head) |
+| Polyrepo | every writable member repo, each with its own forge and branch prefix (`memberReposForProject`) | every open PR/MR for the issue, across the member repos, is ready by its forge's rule; a GitHub member PR with no forge review decision is judged by its own facts (`readGitHubMemberReadyFacts`: a trusted `overdeck-verdict: APPROVED` marker no older than the head commit, or a trusted standing review of the head); a GitLab member that declares `ci: none` in `projects.yaml` has its MRs' `none` checks counted as passing (`checksPass`, `src/lib/cloister/member-ci.ts`, PAN-5637); `red` and `pending` still block |
+
+The merge gate (`evaluateMergeReadiness`, `src/lib/cloister/pr-facts.ts`) applies
+the same `ci: none` waiver to facts read from such a member, so the ready set
+and the gate agree. Admission to the ready set is not the same as merging: a
+polyrepo issue's batch promote still reads MRs at the polyrepo root, where
+`glab` fails, which is tracked separately as PAN-5640.
 
 GitLab's list endpoint carries no `approved` and no `head_pipeline`, so a
 GitLab row is never ready from the listing alone. Each MR's facts are cached

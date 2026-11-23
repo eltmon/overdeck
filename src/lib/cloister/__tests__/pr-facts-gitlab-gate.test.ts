@@ -22,6 +22,7 @@ const APPROVED: GitLabMrApprovals = {
 function deps(
   view: () => Promise<GitLabMrView>,
   approvals: () => Promise<GitLabMrApprovals> = async () => APPROVED,
+  repo: { ciNone?: boolean } = {},
 ): PrFactsDeps {
   return {
     fetchGitHubPr: async (issueId) => ({ issueId, pr: null }),
@@ -30,6 +31,7 @@ function deps(
       required: true,
       repoPath: '/repos/frontend',
       sourceBranch: 'feature/min-77',
+      ...repo,
     }] as never,
     listGitLabMrs: async () => [{ iid: 77, source_branch: 'feature/min-77', web_url: WEB_URL, state: 'opened' }] as never,
     viewGitLabMr: view,
@@ -45,6 +47,15 @@ const MERGEABLE_VIEW: GitLabMrView = {
   source_branch: 'feature/min-77',
   detailed_merge_status: 'mergeable',
   head_pipeline: { status: 'success' },
+};
+
+const NO_PIPELINE_VIEW: GitLabMrView = {
+  iid: 77,
+  state: 'opened',
+  web_url: WEB_URL,
+  sha: 'f00d',
+  source_branch: 'feature/min-77',
+  detailed_merge_status: 'mergeable',
 };
 
 describe('GitLab MR through the merge gate', () => {
@@ -96,6 +107,29 @@ describe('GitLab MR through the merge gate', () => {
     const readiness = evaluateMergeReadiness(facts);
     expect(readiness.ready).toBe(false);
     expect(readiness.reason).toBe('GitLab MR view failed for !77: glab: 502 Bad Gateway');
+  });
+});
+
+describe('ci: none member CI waiver (PAN-5637)', () => {
+  it('an infra-only MR in a ci: none member reads ciNone and the gate answers ready', async () => {
+    resetPrFactsCache();
+    const facts = await getPrFacts('MIN-77', deps(async () => NO_PIPELINE_VIEW, undefined, { ciNone: true }));
+    expect(facts.checks).toBe('none');
+    expect(facts.ciNone).toBe(true);
+    expect(evaluateMergeReadiness(facts)).toEqual({ ready: true });
+  });
+
+  it('the same MR without ci: none is refused for no CI checks', async () => {
+    resetPrFactsCache();
+    const facts = await getPrFacts('MIN-77', deps(async () => NO_PIPELINE_VIEW));
+    expect(facts.ciNone).toBeUndefined();
+    expect(evaluateMergeReadiness(facts).reason).toMatch(/no CI checks reported/);
+  });
+
+  it('a ci: none member MR with a failed pipeline is still refused as failing', async () => {
+    resetPrFactsCache();
+    const facts = await getPrFacts('MIN-77', deps(async () => ({ ...MERGEABLE_VIEW, head_pipeline: { status: 'failed' } }), undefined, { ciNone: true }));
+    expect(evaluateMergeReadiness(facts).reason).toMatch(/CI checks failing/);
   });
 });
 

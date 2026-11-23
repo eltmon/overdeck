@@ -1,0 +1,125 @@
+{
+  "version": "1",
+  "issueId": "PAN-5637",
+  "created": "2026-11-23T19:37:34.841Z",
+  "updated": "2026-11-23T20:35:43.673Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "repo-ci-config": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5637",
+      "claimedAt": "2026-11-23T19:37:34.841Z",
+      "doneAt": "2026-11-23T19:55:42.726Z"
+    },
+    "repo-ci-config.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:55:42.726Z"
+    },
+    "repo-ci-config.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:55:42.726Z"
+    },
+    "ci-waiver-predicate": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5637",
+      "claimedAt": "2026-11-23T19:55:47.694Z",
+      "doneAt": "2026-11-23T20:08:03.165Z"
+    },
+    "ci-waiver-predicate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:08:03.165Z"
+    },
+    "ci-waiver-predicate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:08:03.165Z"
+    },
+    "ci-waiver-predicate.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:08:03.165Z"
+    },
+    "ready-set-ci-waiver": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5637",
+      "claimedAt": "2026-11-23T20:08:07.592Z",
+      "doneAt": "2026-11-23T20:22:03.827Z"
+    },
+    "ready-set-ci-waiver.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:22:03.827Z"
+    },
+    "ready-set-ci-waiver.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:22:03.827Z"
+    },
+    "ready-set-ci-waiver.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:22:03.827Z"
+    },
+    "ready-set-ci-waiver.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:22:03.827Z"
+    },
+    "merge-gate-ci-waiver": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5637",
+      "claimedAt": "2026-11-23T20:22:10.889Z",
+      "doneAt": "2026-11-23T20:27:54.558Z"
+    },
+    "merge-gate-ci-waiver.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:27:54.558Z"
+    },
+    "merge-gate-ci-waiver.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:27:54.558Z"
+    },
+    "merge-gate-ci-waiver.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:27:54.558Z"
+    },
+    "merge-gate-ci-waiver.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:27:54.558Z"
+    },
+    "board-ci-waiver": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5637",
+      "claimedAt": "2026-11-23T20:28:00.032Z",
+      "doneAt": "2026-11-23T20:34:50.354Z"
+    },
+    "board-ci-waiver.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:34:50.354Z"
+    },
+    "board-ci-waiver.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:34:50.354Z"
+    },
+    "docs-ci-none": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5637",
+      "claimedAt": "2026-11-23T20:34:58.391Z",
+      "doneAt": "2026-11-23T20:35:43.672Z"
+    },
+    "docs-ci-none.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:35:43.672Z"
+    },
+    "docs-ci-none.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:35:43.672Z"
+    },
+    "docs-ci-none.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:35:43.672Z"
+    },
+    "docs-ci-none.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:35:43.672Z"
+    }
+  }
+}
