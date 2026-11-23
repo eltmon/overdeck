@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5597",
   "created": "2026-11-23T02:38:35.270Z",
-  "updated": "2026-11-23T02:52:08.360Z",
+  "updated": "2026-11-23T02:52:12.103Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -146,6 +146,11 @@
     "cli-list-phase.ac3": {
       "status": "completed",
       "doneAt": "2026-11-23T02:52:08.360Z"
+    },
+    "flywheel-summary-active": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5597",
+      "claimedAt": "2026-11-23T02:52:12.103Z"
     }
   }
 }
