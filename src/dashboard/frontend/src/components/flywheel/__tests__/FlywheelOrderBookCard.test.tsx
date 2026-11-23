@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { cleanup, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { FlywheelOrderBookCard } from '../FlywheelOrderBookCard';
@@ -25,6 +25,21 @@ describe('FlywheelOrderBookCard (PAN-3964 FR-12, PAN-5597)', () => {
     expect(screen.getByRole('region', { name: 'Parallel lane' })).toBeInTheDocument();
     expect(document.querySelector('[data-issue="PAN-1"]')).not.toBeNull();
     expect(screen.queryByRole('button', { name: /Remove/ })).toBeNull();
+  });
+
+  it('labels an eligible row by whether the Flywheel is running', async () => {
+    let run = 'stopped';
+    stubFetch((url) => {
+      if (url === '/api/orders') return Response.json({ project: 'p1', books: [book('b1', 'ready', 'active', ['PAN-1'])] });
+      if (url === '/api/flywheel/status') return Response.json({ run });
+      return undefined;
+    });
+    renderWithQuery(<FlywheelOrderBookCard />);
+    expect(await screen.findByText('Ready, Flywheel is stopped')).toBeInTheDocument();
+    run = 'running';
+    cleanup();
+    renderWithQuery(<FlywheelOrderBookCard />);
+    expect(await screen.findByText('Starts next')).toBeInTheDocument();
   });
 
   it('links to the book with project and book parameters', async () => {

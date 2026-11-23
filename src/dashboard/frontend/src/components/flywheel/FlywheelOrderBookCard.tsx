@@ -6,6 +6,7 @@
  */
 import { useQuery } from '@tanstack/react-query';
 
+import { useFlywheelRunning } from '../../lib/flywheelApi';
 import { BookIssueList } from '../orders/BookIssueList';
 import type { OrderBookView } from '../orders/types';
 import { RailCard } from './primitives';
@@ -23,6 +24,7 @@ async function fetchOrders(): Promise<OrdersPayload> {
 
 export function FlywheelOrderBookCard({ bookId }: { bookId?: string | null }) {
   const { data } = useQuery({ queryKey: ['flywheel', 'orders'], queryFn: fetchOrders, refetchInterval: 15_000 });
+  const flywheelRunning = useFlywheelRunning();
   const books = data?.books ?? [];
   const book = (bookId ? books.find((b) => b.id === bookId) : undefined) ?? books.find((b) => b.phase === 'active');
   if (!book) return null;
@@ -36,7 +38,7 @@ export function FlywheelOrderBookCard({ bookId }: { bookId?: string | null }) {
       ariaLabel="Active order book"
       actions={<a href={`/orders?${params.toString()}`} className="text-[11px] text-primary hover:underline">Open in Order books</a>}
     >
-      <BookIssueList book={book} readOnly flywheelRunning />
+      <BookIssueList book={book} readOnly flywheelRunning={flywheelRunning} />
     </RailCard>
   );
 }
