@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5486",
   "created": "2026-11-23T03:25:55.145Z",
-  "updated": "2026-11-23T03:27:58.332Z",
+  "updated": "2026-11-23T03:28:10.113Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,6 +34,11 @@
     "core-pin-script.ac5": {
       "status": "completed",
       "doneAt": "2026-11-23T03:27:58.332Z"
+    },
+    "core-pin-stamp": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5486",
+      "claimedAt": "2026-11-23T03:28:10.113Z"
     }
   }
 }
