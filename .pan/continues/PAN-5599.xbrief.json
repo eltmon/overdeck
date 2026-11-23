@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5599",
   "created": "2026-11-23T05:24:22.748Z",
-  "updated": "2026-11-23T05:24:22.748Z",
+  "updated": "2026-11-23T05:34:57.132Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,30 @@
   "sessionHistory": [],
   "items": {
     "phase-finished-rule": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5599",
-      "claimedAt": "2026-11-23T05:24:22.748Z"
+      "claimedAt": "2026-11-23T05:24:22.748Z",
+      "doneAt": "2026-11-23T05:34:57.132Z"
+    },
+    "phase-finished-rule.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T05:34:57.132Z"
+    },
+    "phase-finished-rule.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T05:34:57.132Z"
+    },
+    "phase-finished-rule.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T05:34:57.132Z"
+    },
+    "phase-finished-rule.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T05:34:57.132Z"
+    },
+    "phase-finished-rule.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-23T05:34:57.132Z"
     }
   }
 }
