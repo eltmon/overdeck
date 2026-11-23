@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5617",
   "created": "2026-11-23T18:07:48.377Z",
-  "updated": "2026-11-23T18:16:53.832Z",
+  "updated": "2026-11-23T18:18:52.607Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -77,6 +77,11 @@
       "status": "in_progress",
       "claimedBy": "agent-pan-5617",
       "claimedAt": "2026-11-23T18:16:53.832Z"
+    },
+    "board-chain-label": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5617",
+      "claimedAt": "2026-11-23T18:18:52.607Z"
     }
   }
 }
