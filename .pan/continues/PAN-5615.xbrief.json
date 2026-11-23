@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5615",
   "created": "2026-11-23T18:07:00.473Z",
-  "updated": "2026-11-23T18:26:02.488Z",
+  "updated": "2026-11-23T18:26:07.163Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -180,6 +180,11 @@
     "escalation-target-guard-test.ac5": {
       "status": "completed",
       "doneAt": "2026-11-23T18:26:02.487Z"
+    },
+    "flywheel-escalation-docs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5615",
+      "claimedAt": "2026-11-23T18:26:07.162Z"
     }
   }
 }
