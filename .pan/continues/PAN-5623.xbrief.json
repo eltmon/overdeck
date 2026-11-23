@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5623",
   "created": "2026-11-23T20:20:25.006Z",
-  "updated": "2026-11-23T20:32:40.516Z",
+  "updated": "2026-11-23T20:37:49.815Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -54,9 +54,22 @@
       "doneAt": "2026-11-23T20:32:35.048Z"
     },
     "wi3-tail-readers-skip": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5623",
-      "claimedAt": "2026-11-23T20:32:40.515Z"
+      "claimedAt": "2026-11-23T20:32:40.515Z",
+      "doneAt": "2026-11-23T20:37:49.815Z"
+    },
+    "wi3-tail-readers-skip.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:37:49.815Z"
+    },
+    "wi3-tail-readers-skip.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:37:49.815Z"
+    },
+    "wi3-tail-readers-skip.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:37:49.815Z"
     }
   }
 }
