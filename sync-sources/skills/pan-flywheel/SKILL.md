@@ -110,7 +110,10 @@ section is how they reach the loop. They bind every tick.
 2. Read `.pan/backlog/sequence.md` for the operator-set pickup order.
 3. If a book is active (`pan orders list` shows one book with phase `active`),
    read it with `pan orders show <book-id>`: its Lane A/B items and prereqs
-   take priority over the general backlog.
+   take priority over the general backlog. A
+   `/pan-flywheel <book-id> --project <key>` message that arrives while the
+   loop is running binds that book: read it with
+   `pan orders show <book-id> --project <key>` and work it from the next tick.
 4. List in-flight work: `gh pr list --search "is:open"` for this repo,
    `pan status` for live sessions, and every issue with a workspace, branch,
    agent or PR (`GET /api/issues/resource-allocated` on the dashboard, the

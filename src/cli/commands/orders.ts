@@ -30,6 +30,7 @@ import {
   requireBook,
   resolveOrdersProject,
 } from './orders-shared.js';
+import type { FlywheelRunResult } from './flywheel.js';
 import { registerOrdersEditCommands } from './orders-edit.js';
 
 export type { OrdersCommandDeps } from './orders-shared.js';
@@ -113,7 +114,7 @@ export function formatBookList(books: readonly OrderBook[], phases: ReadonlyMap<
   ].join('\n');
 }
 
-async function defaultStartOrderBook(bookId: string, project?: ProjectConfig): Promise<{ runId: string }> {
+async function defaultStartOrderBook(bookId: string, project?: ProjectConfig): Promise<FlywheelRunResult> {
   const { startFlywheelRun } = await import('./flywheel.js');
   return startFlywheelRun({ cwd: project ? resolveProjectPath(project) : undefined, orders: bookId });
 }
@@ -229,7 +230,7 @@ export async function runOrdersMove(
   return moved;
 }
 
-export async function runOrdersStart(bookId: string, deps: OrdersCommandDeps = {}): Promise<{ runId: string }> {
+export async function runOrdersStart(bookId: string, deps: OrdersCommandDeps = {}): Promise<FlywheelRunResult> {
   const resolved = resolveOrdersProject(deps);
   await requireBook(resolved.panDir, bookId);
   return (deps.startOrderBook ?? ((id: string) => defaultStartOrderBook(id, resolved.projectConfig)))(bookId);
@@ -381,6 +382,10 @@ export function createOrdersCommand(): Command {
     .option('--project <key>', 'Resolve the order book in another registered project')
     .action((id: string, options: { project?: string }) => commandAction(async () => {
       const result = await runOrdersStart(id, { projectKey: options.project });
+      if (result.delivered === 'running-conversation') {
+        console.log(`Flywheel already running; sent order book ${id} to conversation ${result.runId}`);
+        return;
+      }
       console.log(`Flywheel started: ${result.runId}`);
       console.log(`Order book: ${id}`);
     }));

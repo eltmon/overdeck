@@ -371,6 +371,42 @@ describe('pan orders commands', () => {
       .resolves.toEqual({ runId: 'RUN-CLI-CROSS' });
     expect(mockStartFlywheelRun).toHaveBeenCalledWith({ cwd: '/fake/other-project', orders: created.id });
   });
+
+  // PAN-5601: a running flywheel gets the book, and the CLI says so instead of "Flywheel started".
+  it('prints the delivery when the book went to an already-running flywheel', async () => {
+    const otherRoot = gitFixture();
+    mockGetProjectSync.mockImplementation((key: string) => (key === 'other-project' ? { path: '/fake/other-project' } as ProjectConfig : null));
+    mockGetProjectPanPaths.mockImplementation(() => ({ panDir: otherRoot }));
+    mockStartFlywheelRun.mockResolvedValue({ runId: 'conv-flywheel', delivered: 'running-conversation' });
+    const created = await runOrdersCreate('Running Start', { projectKey: 'other-project', now: () => new Date(at) });
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await createOrdersCommand().parseAsync(['start', created.id, '--project', 'other-project'], { from: 'user' });
+
+    expect(logSpy.mock.calls.map((call) => String(call[0]))).toEqual([
+      `Flywheel already running; sent order book ${created.id} to conversation conv-flywheel`,
+    ]);
+    logSpy.mockRestore();
+  });
+
+  it('exits non-zero when the book cannot be delivered to the running flywheel', async () => {
+    const otherRoot = gitFixture();
+    mockGetProjectSync.mockImplementation((key: string) => (key === 'other-project' ? { path: '/fake/other-project' } as ProjectConfig : null));
+    mockGetProjectPanPaths.mockImplementation(() => ({ panDir: otherRoot }));
+    mockStartFlywheelRun.mockRejectedValue(new Error('Flywheel message not delivered (pan orders start): pane gone'));
+    const created = await runOrdersCreate('Dropped Start', { projectKey: 'other-project', now: () => new Date(at) });
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await createOrdersCommand().parseAsync(['start', created.id, '--project', 'other-project'], { from: 'user' });
+
+    expect(process.exitCode).toBe(1);
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('pane gone'));
+    expect(logSpy).not.toHaveBeenCalledWith(expect.stringContaining('Flywheel started'));
+    logSpy.mockRestore();
+    errorSpy.mockRestore();
+    process.exitCode = undefined;
+  });
 });
 
 /**

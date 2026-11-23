@@ -14,6 +14,7 @@ import {
   requestFlywheelReport,
   resolveFlywheelLaunch,
   resumeFlywheel,
+  sendOrderBookToFlywheel,
   startFlywheel,
   stopFlywheel,
   type FlywheelActionDeps,
@@ -189,6 +190,26 @@ describe('pause / abort / resume (D4)', () => {
     const { deps, calls } = depsFor('paused', { resumeConversation: async () => ({ status: 500, error: 'spawn failed' }) });
     await expect(resumeFlywheel(deps)).rejects.toThrow('spawn failed');
     expect(calls.sendMessage).not.toHaveBeenCalled();
+  });
+});
+
+describe('sendOrderBookToFlywheel (PAN-5601)', () => {
+  it('sends the book and project key to the running conversation', async () => {
+    const { deps, calls } = depsFor('running');
+    await expect(sendOrderBookToFlywheel('book-1', 'myn', deps))
+      .resolves.toEqual({ session: 'conv-flywheel', prompt: '/pan-flywheel book-1 --project myn' });
+    expect(calls.sendMessage.mock.calls).toEqual([['conv-flywheel', '/pan-flywheel book-1 --project myn', 'pan orders start']]);
+  });
+
+  it('refuses when no flywheel is running', async () => {
+    const { deps, calls } = depsFor('idle');
+    await expect(sendOrderBookToFlywheel('book-1', 'myn', deps)).rejects.toBeInstanceOf(FlywheelNotRunning);
+    expect(calls.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('surfaces a delivery failure', async () => {
+    const { deps } = depsFor('running', { sendMessage: async () => { throw new Error('Flywheel message not delivered'); } });
+    await expect(sendOrderBookToFlywheel('book-1', 'myn', deps)).rejects.toThrow('Flywheel message not delivered');
   });
 });
 

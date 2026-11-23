@@ -14,6 +14,7 @@ import { commitPlanArtifacts, pushPlanArtifacts } from '../../lib/overdeck/plan-
 import { surfacePlanArtifactPush } from '../../lib/overdeck/plan-artifact-push-report.js';
 import { getProjectPanPaths } from '../../lib/pan-dir/paths.js';
 import { findProjectByPath, getProjectSync, resolveProjectPath, type ProjectConfig } from '../../lib/projects.js';
+import type { FlywheelRunResult } from './flywheel.js';
 
 export interface OrdersCommandDeps {
   cwd?: string;
@@ -21,7 +22,7 @@ export interface OrdersCommandDeps {
   projectKey?: string;
   now?: () => Date;
   actor?: string;
-  startOrderBook?: (bookId: string) => Promise<{ runId: string }>;
+  startOrderBook?: (bookId: string) => Promise<FlywheelRunResult>;
   issueLookup?: OrderIssueLookup;
 }
 
