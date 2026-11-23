@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-23T11:35:07Z · model: claude-opus-5-5 · open: 958_
+_Last sequenced: 2026-11-23T16:21:52Z · model: claude-opus-5-5 · open: 957_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -18,7 +18,6 @@ _Last sequenced: 2026-11-23T11:35:07Z · model: claude-opus-5-5 · open: 958_
 | 7 | PAN-5566 | M | high | ok |  |  | UI/help text says Auto blocks destructive calls but the hook approves all; repo .pan.yaml can set bypass mode. |
 | 8 | PAN-5385 | S | critical | ok |  |  | Anywhere remote access is down for trickle clients: machine drops ICE candidates sent before session registers; small server fix |
 | 8 | PAN-5623 | L | critical | ok |  | PAN-5621 | While gate admission is starved, stop Overdeck-owned stack containers of parked issues and restart them on demand (FR-2 of PAN-5621). |
-| 9 | PAN-5601 | S | high | ok |  |  | pan orders start and the dashboard Start swallow FlywheelAlreadyRunning and drop the book; deliver it to the live conv. Needs handoff |
 | 10 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 10 | PAN-5523 | S | high | ok |  |  | pan conversations move/heal send raw fetch with no token, so routes refuse with Missing origin; same fix pattern as in-pipeline PAN-5516. |
 | 10 | PAN-5625 | M | critical | ok |  |  | Approved green PR for new standalone project BT-1 sits 'held'; train never batches and per-PR scheduler defers forever. |
@@ -99,7 +98,7 @@ _Last sequenced: 2026-11-23T11:35:07Z · model: claude-opus-5-5 · open: 958_
 | 80 | PAN-3522 | S | critical | ok |  |  | Supervisor watchdog restart-churns under CPU storm because the probe timeout budget ignores the boot warm phase. |
 | 81 | PAN-3314 | M | critical | ok |  |  | One cgroup holds every agent pane, so a single hungry agent inflates the unit and oomd kills the whole fleet — twice now. |
 | 82 | PAN-3278 | S | critical | needs-refinement |  |  | A finished work agent with an open PR sat two hours because review was never dispatched and auto-requeue fired none of 25 attempts. |
-| 83 | PAN-5609 | M | medium | ok |  |  | Top-bar indicator for conversation-search indexing (all three paths), with hover/click details. Operator request; in pipeline. |
+| 83 | PAN-5609 | M | medium | ok |  |  | Top-bar indicator for conversation-search indexing with hover/click details. Merged; awaiting on-main verification. |
 | 84 | PAN-3234 | S | critical | needs-refinement |  |  | Agents freeze indefinitely on blocking choice menus and no health surface notices; the detector is wired only to delivery refusal. |
 | 84 | PAN-5467 | XL | high | ok | ✓ |  | Epic: docs overhaul, 16 page issues, 6 accuracy audits (PAN-5499..5504) and an intro rewrite (PAN-5505); order book drives pickup. |
 | 85 | PAN-3205 | S | critical | ok |  |  | The deployment gate promises the queued deploy will fire at the next verification boundary; that trigger does not exist. |
@@ -1018,10 +1017,6 @@ New issue. Phones (iOS, Android) and the connector cannot reach the machine at a
 
 New substrate issue split from in-pipeline PAN-5621: detection alone does not end a starvation, reclaiming parked stacks does (the Flywheel did it by hand on 2026-11-23). The body is a verified, deny-by-default spec, so it ranks right behind its parent among the critical gate-throughput fixes; it overlaps PAN-5250's restart-on-demand path.
 
-### PAN-5601 (rank 9)
-
-New substrate bug: starting an order book while a Flywheel conversation runs prints success but never reaches the loop, so operator-queued work silently stalls (seen on the MYN money book 2026-11-23). Root cause and wanted behavior are pinned in the body; TENET-10 means it must run as a supervised handoff, not Flywheel self-work.
-
 ### PAN-4636 (rank 10)
 
 New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.
@@ -1286,6 +1281,10 @@ New pipeline bug placed in a freed critical-tier slot. Reviews whose reviewers d
 
 New issue from the Deft adoption PRD. Its dependency PAN-3308 has closed. The main-push guard exists only in the overdeck repo, so agents in other registered projects can still push to main, which is the PAN-2204 hazard class.
 
+### PAN-4550 (rank 70)
+
+Found cutting v0.65.0: CI was green but the local release check failed on two host-dependent tests. XS fix that removes false reds from the release verb, so it sits above routine medium work.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1293,10 +1292,10 @@ New issue from the Deft adoption PRD. Its dependency PAN-3308 has closed. The ma
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-23T11:35:07Z",
+  "generatedAt": "2026-11-23T16:21:52Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 958,
+  "openCount": 957,
   "nodes": [
     {
       "issue": "PAN-5611",
@@ -1466,19 +1465,6 @@ New issue from the Deft adoption PRD. Its dependency PAN-3308 has closed. The ma
       ],
       "why": "While gate admission is starved, stop Overdeck-owned stack containers of parked issues and restart them on demand (FR-2 of PAN-5621).",
       "rationale": "New substrate issue split from in-pipeline PAN-5621: detection alone does not end a starvation, reclaiming parked stacks does (the Flywheel did it by hand on 2026-11-23). The body is a verified, deny-by-default spec, so it ranks right behind its parent among the critical gate-throughput fixes; it overlaps PAN-5250's restart-on-demand path.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5601",
-      "rank": 9,
-      "size": "S",
-      "importance": "high",
-      "score": 78,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan orders start and the dashboard Start swallow FlywheelAlreadyRunning and drop the book; deliver it to the live conv. Needs handoff",
-      "rationale": "New substrate bug: starting an order book while a Flywheel conversation runs prints success but never reaches the loop, so operator-queued work silently stalls (seen on the MYN money book 2026-11-23). Root cause and wanted behavior are pinned in the body; TENET-10 means it must run as a supervised handoff, not Flywheel self-work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2532,8 +2518,8 @@ New issue from the Deft adoption PRD. Its dependency PAN-3308 has closed. The ma
       "score": 58,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Top-bar indicator for conversation-search indexing (all three paths), with hover/click details. Operator request; in pipeline.",
-      "rationale": "New operator-requested discoverability feature already in the pipeline (planned); pinned at the free rank 83 slot per the in-pipeline rule.",
+      "why": "Top-bar indicator for conversation-search indexing with hover/click details. Merged; awaiting on-main verification.",
+      "rationale": "PR merged and the issue is labeled verifying-on-main, so it left the pipeline; rank 83 kept because only on-main verification remains, with no new pickup work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -14639,22 +14625,8 @@ New issue from the Deft adoption PRD. Its dependency PAN-3308 has closed. The ma
       "confidence": 0.9
     },
     {
-      "from": "PAN-5601",
-      "to": "PAN-5624",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.9
-    },
-    {
       "from": "PAN-5614",
       "to": "PAN-2954",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
-      "from": "PAN-5617",
-      "to": "PAN-5601",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
@@ -14679,20 +14651,6 @@ New issue from the Deft adoption PRD. Its dependency PAN-3308 has closed. The ma
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
-    },
-    {
-      "from": "PAN-5619",
-      "to": "PAN-5601",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
-      "from": "PAN-5621",
-      "to": "PAN-5601",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
     },
     {
       "from": "PAN-5621",
