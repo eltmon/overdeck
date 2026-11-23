@@ -10,11 +10,16 @@
  * Every step after a cheap unlocked journal read runs inside the per-workspace
  * stack lock, so a restore never interleaves with a stop sequence (D5). A
  * journaled name is started only when its listed container still carries the
- * issue's compose project label and a reclaimable service; anything else is
+ * issue's compose project label and a restorable service (reclaimable, or the
+ * service its reclaim entry recorded, PAN-5250 FR-9); anything else is
  * refused (D9). The door never throws: a failure returns `{ kind: 'failed' }`
  * and the caller continues on its existing path (NFR-3). It is plain
  * `src/lib` code because the spawn gate runs in CLI processes and
  * verification runs in a detached worker process.
+ *
+ * PAN-5250 adds the wake door (`wakeWorkspaceStack`, D11) behind
+ * `pan workspace up`: the restore, then every other exited container of the
+ * compose project whose service is wakeable.
  */
 import { existsSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
@@ -45,8 +50,9 @@ import {
   tryComposeProjectNameForWorkspace,
   type DockerContainerLifecycle,
 } from './stack-health.js';
+import { wakeableServicesForIssue } from './stack-idle-config.js';
 
-export type StackRestoreTrigger = 'turn' | 'spawn' | 'verification';
+export type StackRestoreTrigger = 'turn' | 'spawn' | 'verification' | 'operator';
 
 export type StackRestoreResult =
   | { kind: 'none' }
@@ -92,6 +98,8 @@ export interface StackRestoreDeps {
   appendEntry: typeof appendPipelineEntry;
   emitActivity: typeof emitActivityEntry;
   withLock: <T>(lockPath: string, fn: () => Promise<T>) => Promise<T>;
+  /** PAN-5250 D11: services the wake door may start; never read by the restore door. */
+  wakeableServices: (issueId: string) => ReadonlySet<string>;
 }
 
 function resolveDeps(deps: Partial<StackRestoreDeps> = {}): StackRestoreDeps {
@@ -104,6 +112,7 @@ function resolveDeps(deps: Partial<StackRestoreDeps> = {}): StackRestoreDeps {
     appendEntry: deps.appendEntry ?? appendPipelineEntry,
     emitActivity: deps.emitActivity ?? emitActivityEntry,
     withLock: deps.withLock ?? ((lockPath, fn) => withStackLock(lockPath, fn, RESTORE_LOCK_TIMEOUT_MS)),
+    wakeableServices: deps.wakeableServices ?? wakeableServicesForIssue,
   };
 }
 
@@ -154,7 +163,9 @@ export async function restoreReclaimedStack(
           missing.push(name);
           continue;
         }
-        if (container.composeProject !== composeProject || !RECLAIMABLE_STACK_SERVICES.has(container.composeService)) {
+        const recorded = open.recordedServices[name];
+        if (container.composeProject !== composeProject
+          || !(RECLAIMABLE_STACK_SERVICES.has(container.composeService) || recorded === container.composeService)) {
           refused.push(name);
           continue;
         }
@@ -191,12 +202,77 @@ export async function restoreReclaimedStack(
         });
       }
       if (refused.length > 0) {
-        console.warn(`[stack-restore] ${issueId}: refused to start ${refused.join(', ')} (not in compose project ${composeProject ?? 'unknown'} or not a reclaimable service)`);
+        console.warn(`[stack-restore] ${issueId}: refused to start ${refused.join(', ')} (not in compose project ${composeProject ?? 'unknown'} or not a restorable service)`);
       }
       return { kind: 'restored', started, alreadyRunning, missing, refused };
     });
   } catch (err) {
     return { kind: 'failed', failed: [], error: String(err) };
+  }
+}
+
+export type StackWakeResult =
+  | { kind: 'no-stack'; reason: 'no-workspace' | 'no-compose-project' }
+  | { kind: 'woken'; restored: StackRestoreResult; started: string[]; alreadyRunning: string[] }
+  | { kind: 'failed'; error: string; failed: string[] };
+
+/**
+ * PAN-5250 D11: restore the open reclaim, then start every exited container of the
+ * workspace's compose project whose service is wakeable. Never throws.
+ */
+export async function wakeWorkspaceStack(
+  input: { issueId: string; workspacePath?: string | null; trigger: StackRestoreTrigger },
+  deps?: Partial<StackRestoreDeps>,
+): Promise<StackWakeResult> {
+  try {
+    const d = resolveDeps(deps);
+    const { issueId, trigger } = input;
+    const workspacePath = resolveWorkspacePath(issueId, input.workspacePath);
+    if (!workspacePath || !d.pathExists(workspacePath)) return { kind: 'no-stack', reason: 'no-workspace' };
+    const composeProject = d.composeProjectFor(workspacePath, issueId);
+    if (composeProject === null) return { kind: 'no-stack', reason: 'no-compose-project' };
+
+    const restored = await restoreReclaimedStack({ issueId, workspacePath, trigger }, deps);
+    if (restored.kind === 'failed') return { kind: 'failed', error: restored.error, failed: restored.failed };
+
+    const wakeable = d.wakeableServices(issueId);
+    return await d.withLock(stackLockPath(workspacePath), async (): Promise<StackWakeResult> => {
+      const listed = await d.listContainers();
+      if (listed === null) return { kind: 'failed', error: 'docker listing unavailable', failed: [] };
+      const started: string[] = [];
+      const alreadyRunning: string[] = [];
+      const failed: string[] = [];
+      const errors: string[] = [];
+      for (const container of listed) {
+        if (container.composeProject !== composeProject || !wakeable.has(container.composeService)) continue;
+        if (!CONTAINER_NAME_RE.test(container.name)) continue;
+        if (container.state === 'running') {
+          alreadyRunning.push(container.name);
+          continue;
+        }
+        if (container.state !== 'exited') continue;
+        const result = await d.startContainer(container.name);
+        if (result.ok) {
+          started.push(container.name);
+        } else {
+          failed.push(container.name);
+          errors.push(`${container.name}: ${result.error}`);
+        }
+      }
+      if (started.length > 0) {
+        d.emitActivity({
+          source: 'cloister',
+          level: 'info',
+          issueId,
+          message: `stack-woken: ${issueId}`,
+          details: `Started ${started.join(', ')} (${trigger}).`,
+        });
+      }
+      if (failed.length > 0) return { kind: 'failed', error: errors.join('; '), failed };
+      return { kind: 'woken', restored, started, alreadyRunning };
+    });
+  } catch (err) {
+    return { kind: 'failed', error: String(err), failed: [] };
   }
 }
 
