@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5597",
   "created": "2026-11-23T02:38:35.270Z",
-  "updated": "2026-11-23T03:12:06.851Z",
+  "updated": "2026-11-23T03:12:11.981Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -232,6 +232,11 @@
     "item-status.ac4": {
       "status": "completed",
       "doneAt": "2026-11-23T03:12:06.850Z"
+    },
+    "more-settings": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5597",
+      "claimedAt": "2026-11-23T03:12:11.980Z"
     }
   }
 }
