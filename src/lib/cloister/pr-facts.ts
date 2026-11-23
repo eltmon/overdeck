@@ -533,10 +533,14 @@ function gitLabFacts(
   };
 }
 
-function primaryGitLabRepo(repos: readonly ResolvedProjectRepo[]): ResolvedProjectRepo | null {
-  return repos.find((repo) => repo.forge === 'gitlab' && repo.required)
-    ?? repos.find((repo) => repo.forge === 'gitlab')
-    ?? null;
+/**
+ * The GitLab repos an issue's MR may live in, writable members first. PAN-5614:
+ * a polyrepo issue opens an MR only in the repos it changed (MIN-1144: api and
+ * infra, not frontend), so the reader tries each in turn instead of the first.
+ */
+function gitLabReposInOrder(repos: readonly ResolvedProjectRepo[]): ResolvedProjectRepo[] {
+  const gitlab = repos.filter((repo) => repo.forge === 'gitlab');
+  return [...gitlab.filter((repo) => repo.required), ...gitlab.filter((repo) => !repo.required)];
 }
 
 /**
@@ -665,24 +669,25 @@ async function readPrFacts(issueId: string, deps: PrFactsDeps, options: PrFactsO
   }
 
   const resolveRepos = deps.resolveRepos ?? resolveProjectReposForIssue;
-  let repo: ResolvedProjectRepo | null = null;
+  let repos: ResolvedProjectRepo[] = [];
   try {
-    repo = primaryGitLabRepo(resolveRepos(issueId) ?? []);
+    repos = gitLabReposInOrder(resolveRepos(issueId) ?? []);
   } catch {
-    repo = null;
+    repos = [];
   }
-  if (!repo) return emptyPrFacts(issueId);
 
   const listGitLabMrs = deps.listGitLabMrs ?? listOpenGitLabMergeRequests;
-  try {
-    const rows = await listGitLabMrs(repo.repoPath);
-    const branch = repo.sourceBranch;
-    const row = rows.find((candidate) => candidate.source_branch === branch);
-    if (!row?.iid) return emptyPrFacts(issueId);
-    return await readGitLabMrFacts(issueId, row, deps);
-  } catch (cause) {
-    return emptyPrFacts(issueId, `GitLab MR lookup failed: ${cause instanceof Error ? cause.message : String(cause)}`);
+  for (const repo of repos) {
+    try {
+      const rows = await listGitLabMrs(repo.repoPath);
+      const branch = repo.sourceBranch;
+      const row = rows.find((candidate) => candidate.source_branch === branch);
+      if (row?.iid) return await readGitLabMrFacts(issueId, row, deps);
+    } catch (cause) {
+      return emptyPrFacts(issueId, `GitLab MR lookup failed: ${cause instanceof Error ? cause.message : String(cause)}`);
+    }
   }
+  return emptyPrFacts(issueId);
 }
 
 /** One GitLab MR's facts from its listing row: its view, then its approvals (PAN-4753 WI-4). */

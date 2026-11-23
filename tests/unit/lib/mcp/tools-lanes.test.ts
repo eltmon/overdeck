@@ -30,9 +30,9 @@ describe('MCP lane tools (PAN-4938 W-DEL1)', () => {
     }
   });
 
-  it('a read:state-only non-agent token still lists only list_machines', async () => {
+  it('a read:state-only non-agent token still lists list_machines and the order-book read tools, no lane tools', async () => {
     const client = await connectClient(fakeApi({}), ['read:state']);
-    expect((await client.listTools()).tools.map((tool) => tool.name)).toEqual(['list_machines']);
+    expect((await client.listTools()).tools.map((tool) => tool.name)).toEqual(['list_machines', 'list_order_books', 'get_order_book', 'list_order_book_candidates', 'preview_order_book_brief']);
   });
 
   it('each lane tool\'s scope equals its route\'s', () => {

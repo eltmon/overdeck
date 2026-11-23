@@ -6,6 +6,7 @@ import type { MachineLink } from '../../../lib/anywhere/link-store.js';
 import { fleetCaller, type FleetCaller, type FleetIssueStartDeps, type FleetWorkerDeps, handleFleetIssueStart, handleFleetWorker, handleFleetWorkerStop } from '../routes/fleet-work.js';
 import { jsonResponse } from '../http-helpers.js';
 import { readJsonResponse } from '../routes/machines-work.js';
+import { WorkspaceCreateError } from '../services/typed-errors.js';
 import type { FleetTarget } from '../services/fleet-target.js';
 
 const DESK = { id: 'link-desk', environmentId: 'env-desk', label: 'desk', revokedAt: null } as MachineLink;
@@ -107,6 +108,33 @@ describe('POST /api/fleet/workers (D-4651-5)', () => {
     const refused = vi.fn(() => Effect.succeed(jsonResponse({ error: 'PAN-9 is not planned' }, { status: 422 })));
     const passed = readJsonResponse(await startIssue('PAN-9', {}, { actor: 'operator', viaToken: true }, issueStartDeps(deps(SELF), refused)));
     expect(passed).toEqual({ status: 422, body: { error: 'PAN-9 is not planned' } });
+  });
+
+  it('a dying spawn resolves to a logged 500 with its message (PAN-5489)', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const SELF: FleetTarget = { ok: true, self: true, environmentId: 'env-laptop', label: 'laptop', reason: null };
+      const dies = () => Effect.die(new Error('workspace boom'));
+      const answer = readJsonResponse(await startIssue('PAN-9', {}, { actor: 'operator', viaToken: true }, issueStartDeps(deps(SELF), dies)));
+      expect(answer).toEqual({ status: 500, body: { error: 'workspace boom' } });
+      expect(errorSpy.mock.calls.some((call) => String(call[0]).includes('workspace boom'))).toBe(true);
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it('a WorkspaceCreateError from spawn resolves to a logged 500 naming the failed step (PAN-5489)', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const SELF: FleetTarget = { ok: true, self: true, environmentId: 'env-laptop', label: 'laptop', reason: null };
+      const fails = () => Effect.fail(new WorkspaceCreateError({ id: 'PAN-9', message: 'Hume EVI config setup failed: x' }));
+      const answer = readJsonResponse(await startIssue('PAN-9', {}, { actor: 'operator', viaToken: true }, issueStartDeps(deps(SELF), fails)));
+      expect(answer.status).toBe(500);
+      expect((answer.body as { error: string }).error).toContain('Hume EVI config setup failed: x');
+      expect(errorSpy.mock.calls.some((call) => String(call[0]).includes('Hume EVI config setup failed: x'))).toBe(true);
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 
   it('ac4 (PAN-4743): resolveTarget receives no spawn argument for machine: fly', async () => {

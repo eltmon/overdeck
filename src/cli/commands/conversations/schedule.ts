@@ -62,7 +62,8 @@ async function viaDashboard<T>(path: string, init: RequestInit, offline: () => A
   try {
     const response = await fetch(`${getDashboardApiUrl()}${path}`, {
       ...init,
-      headers: { 'Content-Type': 'application/json', ...(init.headers ?? {}) },
+      // Every caller writes to a route that runs validateOrigin (PAN-5610).
+      headers: { 'Content-Type': 'application/json', ...(init.headers ?? {}), Origin: getDashboardApiUrl() },
     });
     const body = await response.json() as T | { error: string; code?: string };
     return { ok: response.ok, status: response.status, body };

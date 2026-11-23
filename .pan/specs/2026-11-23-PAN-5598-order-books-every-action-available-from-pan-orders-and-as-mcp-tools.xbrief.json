@@ -1,0 +1,862 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-23T02:51:58Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5598: Order books: every action available from pan orders and as MCP tools",
+    "updated": "2026-11-23T02:55:44.603Z"
+  },
+  "plan": {
+    "id": "pan-5598",
+    "title": "Order books: every action available from pan orders and as MCP tools",
+    "status": "running",
+    "uid": "687d1581-9f6d-46a1-b56c-c2e1d495d754",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-23T02:51:58Z",
+    "updated": "2026-11-23T02:55:44.603Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5598",
+        "label": "PAN-5598",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5598/.pan/drafts/pan-5598.md",
+        "label": "PRD draft (.pan/drafts/pan-5598.md)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "orders",
+      "mcp",
+      "cli",
+      "route-scopes",
+      "telemetry",
+      "docs"
+    ],
+    "metadata": {
+      "sizeJustification": "Parity across three surfaces is one feature, and repo sync tests force co-change across subsystems: every ROUTE_SCOPES path must appear in packages/contracts telemetry and docs/TELEMETRY.md (route-scopes.test.ts, telemetry-docs.test.ts), and every MCP tool name must appear in the telemetry domain (mcp-domains.test.ts). The plan stays at 25 files and its items are small vertical slices; splitting into sibling issues would leave each sibling red on those sync tests or ship a half-parity surface.",
+      "canonicalFilename": "2026-11-23-PAN-5598-order-books-every-action-available-from-pan-orders-and-as-mcp-tools.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The Order books dashboard page can rename a book, set its parallel limit and extra-instructions file, pause or resume pickup, edit an issue's options, show blocking problems, preview the brief and list backlog candidates. pan orders can do none of these, the Overdeck MCP server has no order-book tools, and the /api/orders* routes have no ROUTE_SCOPES rows, so an agent token (never admin) cannot call them. Even with a scope row, an MCP DELETE fails the route's Content-Type check because both MCP clients omit the header on DELETE.",
+      "Proposal": "Add ROUTE_SCOPES rows for all ten /api/orders routes (reads read:state, writes operate) and their telemetry client-route paths. Make both MCP clients send JSON on a DELETE that carries a body. Add ten MCP tools in src/lib/mcp/tools-orders.ts that proxy the existing routes, with a route-coverage test. Add pan orders rename, set, pause, resume, item, preview, candidates and check in a new src/cli/commands/orders-edit.ts (check reads validation through callDashboard with the CLI-resolved project key), plus --prereqs/--plan-at-pickup on add and --json on list/show. Move previewBrief to src/lib/orders/brief.ts so the CLI and route share it. Document every verb and tool and add a three-way parity table.",
+      "NonGoals": "- No new HTTP routes and no no-loss-matrix rows.\n- No change to rejectUnsafeDashboardMutationRequest or any other auth helper.\n- No pan orders unqueue, archive or unarchive (PAN-5597 owns them).\n- No change to which book dispatch treats as active (PAN-5599).\n- pan orders queue and pan orders start do not gain validation.\n- Route writes (dashboard page and MCP tools) stay uncommitted; no commit logic is added to the routes.\n- The route's laneAConcurrency validation is not narrowed to 1-8.\n- No public-MCP or connector allowlist changes; the token's scope decides, as for start_issue.\n- No edits to PAN-5597-owned paragraphs in configuration/order-books.mdx beyond the two sentence fixes and the new section."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fix MCP DELETE by sending JSON and Content-Type when a DELETE carries a body, in both MCP clients; remove_order_book_issue passes {}.",
+        "rationale": "Keeps the auth helper and every existing bodyless DELETE tool unchanged, and makes the remove tool work over /mcp, pan mcp serve and the connector."
+      },
+      {
+        "summary": "pan orders check calls GET /api/orders/:id through callDashboard with ?project=<key> resolved on the CLI side.",
+        "rationale": "callDashboard carries the internal token; without the key the route resolves the dashboard process's cwd project rather than the operator's."
+      },
+      {
+        "summary": "Order-book MCP tools are audience any, and visible through the public funnel and the connector by scope like start_issue.",
+        "rationale": "The route-scope table is the one authority (PAN-4649 D-21); no special casing is needed."
+      },
+      {
+        "summary": "Parallel limit is validated as 1 to 8 in the MCP tool and the CLI; the route is not changed.",
+        "rationale": "Matches the dashboard stepper (LANE_A_MAX = 8) without changing route semantics PAN-5597 also edits."
+      },
+      {
+        "summary": "update_order_book passes status ready/draft/complete through to the route (PRD D5), and the docs parity table uses checkpoint CP-2 wording when PAN-5597 has not merged.",
+        "rationale": "The route decides what is allowed; the docs stay true whichever branch merges first."
+      },
+      {
+        "summary": "All new CLI verbs live in src/cli/commands/orders-edit.ts with one test file, built serially across three items.",
+        "rationale": "Keeps the PAN-5597 overlap in orders.ts to one import and one call, and stays within the 25-file plan limit."
+      }
+    ],
+    "items": [
+      {
+        "id": "route-scopes-orders",
+        "title": "Scope rows and telemetry client routes for every /api/orders route",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T02:51:58Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-5598",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "mcp-order-read-tools",
+            "mcp-order-write-tools"
+          ],
+          "files_scope": [
+            "src/dashboard/server/route-scopes.ts",
+            "packages/contracts/src/telemetry.ts",
+            "docs/TELEMETRY.md",
+            "src/dashboard/server/__tests__/route-scopes-orders.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/route-scopes-orders.test.ts src/dashboard/server/__tests__/route-scopes.test.ts tests/unit/telemetry-docs.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "route-scopes-orders.test.ts, route-scopes.test.ts and telemetry-docs.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Add the ten PAN-5598 rows to ROUTE_SCOPES in the PRD's order (backlog-candidates before the :id rows), just before the PAN-5321 closing comment. Regenerate TELEMETRY_CLIENT_ROUTES with the command in its comment (seven new paths) and insert the same paths into the client_route row of docs/TELEMETRY.md. Add route-scopes-orders.test.ts with the scope cases and the rejectUnsafeDashboardMutationRequest DELETE case modeled on dashboard-auth-phone.test.ts."
+        },
+        "items": [
+          {
+            "id": "route-scopes-orders.ac1",
+            "title": "Given a read:state-only token, requiredScopeFor('GET','/api/orders') returns read:state and requiredScopeFor('PATCH','/api/orders/b') returns operate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-scopes-orders.ac2",
+            "title": "ROUTE_SCOPES.find for GET /api/orders/backlog-candidates returns the row whose path is /api/orders/backlog-candidates, not the :id row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-scopes-orders.ac3",
+            "title": "rejectUnsafeDashboardMutationRequest returns null for DELETE /api/orders/b/items/PAN-1 with an operate token and JSON content type, and returns 403 with missingScope operate for a read:state-only token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-scopes-orders.ac4",
+            "title": "route-scopes.test.ts 'lists every scoped path as a telemetry client route' and telemetry-docs.test.ts pass with the seven new /api/orders paths present in TELEMETRY_CLIENT_ROUTES and docs/TELEMETRY.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mcp-delete-body",
+        "title": "MCP clients send JSON and Content-Type on a DELETE that carries a body",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T02:51:58Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5598",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/mcp/dashboard-api.ts",
+            "src/lib/mcp/connector/channel-api.ts",
+            "tests/unit/lib/mcp/dashboard-api.test.ts",
+            "tests/unit/lib/mcp/connector/channel-api.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/mcp/dashboard-api.test.ts tests/unit/lib/mcp/connector/channel-api.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "dashboard-api.test.ts and channel-api.test.ts pass, including the existing 'DELETE sends no body and no Content-Type' case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Change the one condition in createFetchDashboardApi (dashboard-api.ts line 39) and in createConnectorDashboardApi (channel-api.ts line 270) so a DELETE whose body argument is not undefined sends the JSON body with Content-Type application/json; a DELETE with no body is unchanged. Update the createFetchDashboardApi header comment. Add one test per client."
+        },
+        "items": [
+          {
+            "id": "mcp-delete-body.ac1",
+            "title": "createFetchDashboardApi request('DELETE','/x',{}) sends body '{}' with Content-Type application/json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-delete-body.ac2",
+            "title": "createFetchDashboardApi request('DELETE','/x') still sends no body and no Content-Type",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-delete-body.ac3",
+            "title": "createConnectorDashboardApi passes body {} to linkFetch for a DELETE with {} and passes no body for a DELETE without one",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mcp-order-read-tools",
+        "title": "Four order-book MCP read tools in tools-orders.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T02:51:58Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5598",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "mcp-order-write-tools"
+          ],
+          "files_scope": [
+            "src/lib/mcp/tools-orders.ts",
+            "src/lib/mcp/server.ts",
+            "packages/contracts/src/telemetry.ts",
+            "docs/TELEMETRY.md",
+            "tests/unit/lib/mcp/tools-orders.test.ts",
+            "tests/unit/lib/mcp/visibility.test.ts",
+            "tests/unit/lib/mcp/tools-lanes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/mcp/tools-orders.test.ts tests/unit/lib/mcp/visibility.test.ts tests/unit/lib/mcp/tools-lanes.test.ts tests/unit/lib/telemetry/mcp-domains.test.ts tests/unit/telemetry-docs.test.ts tests/unit/lib/mcp/tools-read.test.ts tests/unit/lib/mcp/connector/serve.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all seven test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Create src/lib/mcp/tools-orders.ts exporting ORDER_TOOLS with list_order_books, get_order_book, list_order_book_candidates and preview_order_book_brief (scope read:state, audience any, the PRD's descriptions, optional project appended as ?project= or &project=, encodeURIComponent on book). Append ...ORDER_TOOLS at the end of ALL_TOOLS in server.ts. Add the four names to TELEMETRY_MCP_TOOLS and the mcp_tool row of docs/TELEMETRY.md in sorted order. Update the read:state-only expectations in visibility.test.ts and tools-lanes.test.ts to list_machines plus the four tools in ALL_TOOLS order. Add tools-orders.test.ts with the PRD's read-tool cases."
+        },
+        "items": [
+          {
+            "id": "mcp-order-read-tools.ac1",
+            "title": "Given a client with only read:state, listTools returns exactly list_machines, list_order_books, get_order_book, list_order_book_candidates, preview_order_book_brief",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-order-read-tools.ac2",
+            "title": "When list_order_books runs with project 'my proj', then it sends GET /api/orders?project=my%20proj; when list_order_book_candidates runs with limit 5 and project p, then it sends GET /api/orders/backlog-candidates?limit=5&project=p",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-order-read-tools.ac3",
+            "title": "When list_order_book_candidates runs with limit 101, or get_order_book runs without book, then the tool returns an error result and sends no API call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-order-read-tools.ac4",
+            "title": "Given the four tool names in TELEMETRY_MCP_TOOLS and the mcp_tool row of docs/TELEMETRY.md, mcp-domains.test.ts and telemetry-docs.test.ts each passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mcp-order-write-tools",
+        "title": "Six order-book MCP write tools and the route-coverage test",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T02:51:58Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5598",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/mcp/tools-orders.ts",
+            "packages/contracts/src/telemetry.ts",
+            "docs/TELEMETRY.md",
+            "tests/unit/lib/mcp/tools-orders.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/mcp/tools-orders.test.ts tests/unit/lib/mcp/visibility.test.ts tests/unit/lib/telemetry/mcp-domains.test.ts tests/unit/telemetry-docs.test.ts tests/unit/lib/mcp/connector/serve.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all five test files pass, including 'the tool set covers every /api/orders route'",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Add create_order_book, update_order_book, add_order_book_issues, update_order_book_issue, remove_order_book_issue (DELETE with body {}) and start_order_book to ORDER_TOOLS with scope operate, the PRD's argument mapping, validation and descriptions. start_order_book on 422 returns an error listing each finding as BLOCK <issue> <message>. Add the six names to TELEMETRY_MCP_TOOLS and docs/TELEMETRY.md sorted. Extend tools-orders.test.ts with the ROUTES table, the route-coverage test against ROUTE_SCOPES rows under /api/orders, and the PRD's mapping and refusal cases."
+        },
+        "items": [
+          {
+            "id": "mcp-order-write-tools.ac1",
+            "title": "Given an operate token, listTools includes all ten order tool names",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-order-write-tools.ac2",
+            "title": "update_order_book with pickup paused and pickupReason x sends PATCH /api/orders/<book> with body { settings: { posture: 'drain', postureReason: 'x' } }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-order-write-tools.ac3",
+            "title": "update_order_book with nothing to change, or with parallelLimit 9, returns an error result and records no API call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-order-write-tools.ac4",
+            "title": "remove_order_book_issue sends DELETE /api/orders/<book>/items/<issue> with body {}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-order-write-tools.ac5",
+            "title": "The route-coverage test fails when a ROUTE_SCOPES /api/orders row has no tool in the ROUTES table, and passes with the ten tools",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "orders-brief-extract",
+        "title": "Move previewBrief into src/lib/orders/brief.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T02:51:58Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "refactor",
+          "issueLabel": "pan-5598",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/orders/brief.ts",
+            "src/dashboard/server/routes/orders.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/orders.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "orders.test.ts passes unchanged",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ],
+          "acJustification": "A pure move; two observable checks cover it."
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Move the previewBrief function (search anchor: 'function previewBrief(book: OrderBook): string {') from src/dashboard/server/routes/orders.ts to a new src/lib/orders/brief.ts as an export, body unchanged, and import it in the route from ../../../lib/orders/brief.js. Change nothing else in the route file (PAN-5597 edits it)."
+        },
+        "items": [
+          {
+            "id": "orders-brief-extract.ac1",
+            "title": "src/lib/orders/brief.ts exports previewBrief and src/dashboard/server/routes/orders.ts imports it and no longer defines it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "orders-brief-extract.ac2",
+            "title": "GET /api/orders/:id/preview-brief returns the same brief text, shown by routes/__tests__/orders.test.ts passing unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-orders-add-list-options",
+        "title": "pan orders add --prereqs/--plan-at-pickup, list/show --json, and helper exports",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T02:51:58Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5598",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/orders.ts",
+            "tests/unit/cli/orders.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/orders.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "orders.test.ts passes including the two new cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. In src/cli/commands/orders.ts export OrdersCommandDeps, resolveOrdersProject, panDirFor, commitOrders, requireBook and commandAction. Add --prereqs <issues> and --plan-at-pickup to add (prereqs split on commas, trimmed, empties dropped, upper-cased; planAtPickup true only when given). Add --json to list (prints JSON.stringify(books, null, 2)) and to show (no output change). Touch no other lines (PAN-5597 edits this file)."
+        },
+        "items": [
+          {
+            "id": "cli-orders-add-list-options.ac1",
+            "title": "runOrdersAdd with prereqs 'pan-1, PAN-3' and planAtPickup true persists prereqs ['PAN-1','PAN-3'] and planAtPickup true on the new item",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-orders-add-list-options.ac2",
+            "title": "pan orders list --json prints output that JSON.parse returns as an array of the books",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-orders-add-list-options.ac3",
+            "title": "pan orders add without the new flags still persists prereqs [] and no planAtPickup, so existing orders.test.ts cases pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-orders-settings-verbs",
+        "title": "pan orders rename, set, pause and resume in orders-edit.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T02:51:58Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5598",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "cli-orders-item-verb",
+            "cli-orders-read-verbs"
+          ],
+          "files_scope": [
+            "src/cli/commands/orders-edit.ts",
+            "src/cli/commands/orders.ts",
+            "tests/unit/cli/orders-edit.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/orders-edit.test.ts tests/unit/cli/orders.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "orders-edit.test.ts and orders.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Create src/cli/commands/orders-edit.ts with registerOrdersEditCommands(orders) and exported runOrdersRename, runOrdersSet, runOrdersPause, runOrdersResume taking OrdersCommandDeps. Each write calls the writer, commitOrders with the PRD's subject, and prints formatBook. Apply the PRD's rules: set needs a flag, --parallel 1 to 8, --brief must end in .md, --no-brief writes '', pause/resume default reasons 'Operator paused new pickup.' / 'Operator reopened pickup.', postureSetAt from deps.now, postureSetBy 'cli'. In orders.ts add the import and call registerOrdersEditCommands(orders) just before the final return orders. Add orders-edit.test.ts modeled on orders.test.ts with the PRD's seven cases."
+        },
+        "items": [
+          {
+            "id": "cli-orders-settings-verbs.ac1",
+            "title": "runOrdersRename writes the new name and the fixture's git log shows 'chore(orders): rename order book <id>'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-orders-settings-verbs.ac2",
+            "title": "set --parallel 3 persists laneAConcurrency 3; set --parallel 9 and set with no flag reject with the PRD's messages and leave the book unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-orders-settings-verbs.ac3",
+            "title": "set --no-brief persists briefOverlay ''",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-orders-settings-verbs.ac4",
+            "title": "pause --reason x persists posture drain, postureReason x, postureSetBy cli and the injected time; resume with no reason persists posture open and postureReason 'Operator reopened pickup.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-orders-item-verb",
+        "title": "pan orders item changes an issue's options",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T02:51:58Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5598",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/orders-edit.ts",
+            "tests/unit/cli/orders-edit.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/orders-edit.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "orders-edit.test.ts passes including the four item cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. Add item <id> <issue> with --prereqs, --reverify/--no-reverify, --plan-at-pickup/--no-plan-at-pickup to orders-edit.ts. Call setItemRequirements with only the given fields, commit 'chore(orders): update <ISSUE> in <id>', print the book. --prereqs '' clears the list; no flag fails with the PRD's message."
+        },
+        "items": [
+          {
+            "id": "cli-orders-item-verb.ac1",
+            "title": "item <id> PAN-2 --prereqs PAN-1 persists prereqs ['PAN-1'] and preserves the item's reVerify value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-orders-item-verb.ac2",
+            "title": "item --no-reverify persists reVerify false, and item --prereqs '' persists prereqs []",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-orders-item-verb.ac3",
+            "title": "item with no flag rejects with '--prereqs, --reverify, --no-reverify, --plan-at-pickup or --no-plan-at-pickup is required' and writes nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-orders-read-verbs",
+        "title": "pan orders preview, candidates and check",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T02:51:58Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5598",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/orders-edit.ts",
+            "tests/unit/cli/orders-edit.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/orders-edit.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "orders-edit.test.ts passes including the five read-verb cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. Add preview (prints previewBrief from src/lib/orders/brief.ts), candidates (--limit 1-100 default 10; '<rank>  <issue>  <why>' per line; 'No backlog candidates.' when empty) and check to orders-edit.ts. check resolves the project key on the CLI side (--project, else the registered project containing the cwd), calls callDashboard('/api/orders/<id>?project=<key>', { method: 'GET' }) through an injectable OrdersCheckDeps.callDashboard defined in orders-edit.ts, prints BLOCK/WARN lines or 'No problems.', sets process.exitCode 1 on any block, and on DashboardUnreachableError fails with 'The dashboard is not reachable. Start it with pan up, then retry.'"
+        },
+        "items": [
+          {
+            "id": "cli-orders-read-verbs.ac1",
+            "title": "preview <id> prints text beginning '# Special orders: <name>'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-orders-read-verbs.ac2",
+            "title": "Given a backlog sequence fixture, candidates prints one '<rank>  <issue>  <why>' line per issue that is in no book",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-orders-read-verbs.ac3",
+            "title": "Given an injected dashboard answer with one block and one warn, check prints 'BLOCK <issue> <message>' and 'WARN <issue> <message>' and sets process.exitCode 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-orders-read-verbs.ac4",
+            "title": "check requests a path containing ?project=<resolved key>, and reports 'The dashboard is not reachable. Start it with pan up, then retry.' when the caller throws DashboardUnreachableError",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-mcp-orders",
+        "title": "Document the order-book MCP tools in configuration/mcp.mdx and the codebase map",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T02:51:58Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5598",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/mcp.mdx",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -c 'order_book' configuration/mcp.mdx"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "grep reports at least 10 lines naming order-book tools"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10 steps 1 and 6. In configuration/mcp.mdx add ten rows for the order-book tools after start_issue (name, what it does with its arguments, scope), replace 'so a `read:state` token sees only `list_machines`' with the PRD's wording, and add the sentence that route writes are not committed. In .overdeck/context/codebase/architecture.md add 'and order-book tools (`tools-orders.ts`)' to the ALL_TOOLS family list; leave the last-verified line unchanged."
+        },
+        "items": [
+          {
+            "id": "docs-mcp-orders.ac1",
+            "title": "configuration/mcp.mdx renders a Tools table row for each of the ten order-book tool names with its scope",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-mcp-orders.ac2",
+            "title": "configuration/mcp.mdx contains the sentence that a read:state token sees list_machines and the four order-book read tools, and no longer contains 'sees only `list_machines`.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-mcp-orders.ac3",
+            "title": "architecture.md's ALL_TOOLS description names tools-orders.ts and its last-verified line is unchanged; npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-cli-orders",
+        "title": "Document the new pan orders verbs, the parity table and the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T02:51:58Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5598",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/order-books.mdx",
+            "cli/pipeline-commands.mdx",
+            "sync-sources/skills/pan-orders/SKILL.md",
+            "changelog.d/pan-5598.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n 'Every action, three ways' configuration/order-books.mdx"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "grep prints the section heading line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10 steps 2 to 5. Add rows for rename, set, pause, resume, item, check, preview, candidates and the new add/list/show options to the pan orders table in cli/pipeline-commands.mdx. In configuration/order-books.mdx make the two sentence replacements the PRD names and add '### Every action, three ways' with the fifteen-row table after 'Work on another project's books', applying checkpoint CP-2 to the Queue row. Add one usage line per new verb to sync-sources/skills/pan-orders/SKILL.md. Create changelog.d/pan-5598.md with the PRD's #### New block."
+        },
+        "items": [
+          {
+            "id": "docs-cli-orders.ac1",
+            "title": "configuration/order-books.mdx contains '### Every action, three ways' followed by a table with fifteen action rows, and no longer says 'The dashboard is the complete editor'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-cli-orders.ac2",
+            "title": "cli/pipeline-commands.mdx contains a pan orders table row for each of rename, set, pause, resume, item, check, preview and candidates",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-cli-orders.ac3",
+            "title": "sync-sources/skills/pan-orders/SKILL.md shows a usage line for each new verb",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-cli-orders.ac4",
+            "title": "changelog.d/pan-5598.md exists with a '#### New' heading and two bullets, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "route-scopes-orders",
+        "to": "mcp-order-read-tools",
+        "type": "blocks"
+      },
+      {
+        "from": "mcp-order-read-tools",
+        "to": "mcp-order-write-tools",
+        "type": "blocks"
+      },
+      {
+        "from": "mcp-delete-body",
+        "to": "mcp-order-write-tools",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-orders-add-list-options",
+        "to": "cli-orders-settings-verbs",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-orders-settings-verbs",
+        "to": "cli-orders-item-verb",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-orders-item-verb",
+        "to": "cli-orders-read-verbs",
+        "type": "blocks"
+      },
+      {
+        "from": "orders-brief-extract",
+        "to": "cli-orders-read-verbs",
+        "type": "blocks"
+      },
+      {
+        "from": "route-scopes-orders",
+        "to": "mcp-order-write-tools",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-orders-settings-verbs",
+        "to": "cli-orders-read-verbs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

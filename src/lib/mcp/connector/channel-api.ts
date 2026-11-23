@@ -267,7 +267,7 @@ export function createConnectorDashboardApi(link: ConnectorLink, deps: { linkFet
       try {
         answer = await fetchOverLink(link.environmentId, path, {
           method,
-          ...(method === 'GET' || method === 'DELETE' ? {} : { body: body ?? {} }),
+          ...(method === 'GET' || (method === 'DELETE' && body === undefined) ? {} : { body: body ?? {} }),
           ...(init?.signal ? { signal: init.signal } : {}),
           routeSource: link,
         });

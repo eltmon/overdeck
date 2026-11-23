@@ -1,0 +1,133 @@
+{
+  "version": "1",
+  "issueId": "PAN-5489",
+  "created": "2026-11-23T06:59:21.851Z",
+  "updated": "2026-11-23T08:15:33.489Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "hume-key-resolver": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5489",
+      "claimedAt": "2026-11-23T06:59:21.851Z",
+      "doneAt": "2026-11-23T07:35:41.160Z"
+    },
+    "hume-key-resolver.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T07:35:41.160Z"
+    },
+    "hume-key-resolver.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T07:35:41.160Z"
+    },
+    "hume-key-resolver.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T07:35:41.160Z"
+    },
+    "hume-key-resolver.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T07:35:41.160Z"
+    },
+    "hume-step-error-text": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5489",
+      "claimedAt": "2026-11-23T07:35:45.459Z",
+      "doneAt": "2026-11-23T07:40:34.271Z"
+    },
+    "hume-step-error-text.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T07:40:34.271Z"
+    },
+    "hume-step-error-text.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T07:40:34.271Z"
+    },
+    "hume-step-error-text.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T07:40:34.271Z"
+    },
+    "hume-retry-keeps-marker": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5489",
+      "claimedAt": "2026-11-23T07:40:39.889Z",
+      "doneAt": "2026-11-23T07:49:16.752Z"
+    },
+    "hume-retry-keeps-marker.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T07:49:16.752Z"
+    },
+    "hume-retry-keeps-marker.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T07:49:16.752Z"
+    },
+    "hume-retry-keeps-marker.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T07:49:16.752Z"
+    },
+    "hume-retry-keeps-marker.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T07:49:16.752Z"
+    },
+    "spawn-workspace-create-error": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5489",
+      "claimedAt": "2026-11-23T07:49:22.197Z",
+      "doneAt": "2026-11-23T08:10:31.938Z"
+    },
+    "spawn-workspace-create-error.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T08:10:31.938Z"
+    },
+    "spawn-workspace-create-error.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T08:10:31.938Z"
+    },
+    "spawn-workspace-create-error.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T08:10:31.938Z"
+    },
+    "issue-start-routes-errors": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5489",
+      "claimedAt": "2026-11-23T08:10:32.990Z",
+      "doneAt": "2026-11-23T08:14:53.643Z"
+    },
+    "issue-start-routes-errors.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T08:14:53.643Z"
+    },
+    "issue-start-routes-errors.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T08:14:53.643Z"
+    },
+    "issue-start-routes-errors.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T08:14:53.643Z"
+    },
+    "issue-start-routes-errors.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T08:14:53.643Z"
+    },
+    "docs-and-changelog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5489",
+      "claimedAt": "2026-11-23T08:14:54.835Z",
+      "doneAt": "2026-11-23T08:15:33.489Z"
+    },
+    "docs-and-changelog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T08:15:33.489Z"
+    },
+    "docs-and-changelog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T08:15:33.489Z"
+    },
+    "docs-and-changelog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T08:15:33.489Z"
+    }
+  }
+}

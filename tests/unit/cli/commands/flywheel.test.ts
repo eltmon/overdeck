@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => ({
   abortFlywheel: vi.fn(),
   resumeFlywheel: vi.fn(),
   requestFlywheelReport: vi.fn(),
+  sendOrderBookToFlywheel: vi.fn(),
+  resolveProjectKeyForCwdAsync: vi.fn(),
   deriveFlywheelStatus: vi.fn(),
   readFlywheelRun: vi.fn(),
   resolveFlywheelProjectRoot: vi.fn(),
@@ -23,7 +25,9 @@ vi.mock('../../../../src/lib/flywheel/actions.js', () => ({
   abortFlywheel: mocks.abortFlywheel,
   resumeFlywheel: mocks.resumeFlywheel,
   requestFlywheelReport: mocks.requestFlywheelReport,
+  sendOrderBookToFlywheel: mocks.sendOrderBookToFlywheel,
 }));
+vi.mock('../../../../src/lib/projects.js', () => ({ resolveProjectKeyForCwdAsync: mocks.resolveProjectKeyForCwdAsync }));
 vi.mock('../../../../src/lib/flywheel/derive-status.js', () => ({
   deriveFlywheelStatus: mocks.deriveFlywheelStatus,
   readFlywheelRun: mocks.readFlywheelRun,
@@ -219,8 +223,42 @@ describe('pan flywheel verbs (PAN-3964 FR-6)', () => {
     expect(JSON.parse(log.mock.calls[0]![0] as string)).toEqual({ window: { days: 7 } });
   });
 
-  it('startFlywheelRun treats an already-running flywheel as started', async () => {
+  // PAN-5601: a book started against a running flywheel is sent to it, never dropped.
+  it('startFlywheelRun sends the book to an already-running flywheel conversation', async () => {
     mocks.startFlywheel.mockRejectedValue(new FlywheelAlreadyRunning());
-    await expect(startFlywheelRun({ orders: 'b1' })).resolves.toEqual({ runId: 'conv-flywheel' });
+    mocks.resolveProjectKeyForCwdAsync.mockResolvedValue('myn');
+    mocks.sendOrderBookToFlywheel.mockResolvedValue({ session: 'conv-flywheel', prompt: '/pan-flywheel b1 --project myn' });
+    await expect(startFlywheelRun({ cwd: '/repos/myn', orders: 'b1' }))
+      .resolves.toEqual({ runId: 'conv-flywheel', delivered: 'running-conversation' });
+    expect(mocks.resolveProjectKeyForCwdAsync).toHaveBeenCalledWith('/repos/myn');
+    expect(mocks.sendOrderBookToFlywheel).toHaveBeenCalledWith('b1', 'myn');
+  });
+
+  it('startFlywheelRun fails loudly when the book cannot be delivered', async () => {
+    mocks.startFlywheel.mockRejectedValue(new FlywheelAlreadyRunning());
+    mocks.resolveProjectKeyForCwdAsync.mockResolvedValue('myn');
+    mocks.sendOrderBookToFlywheel.mockRejectedValue(new Error('Flywheel message not delivered (pan orders start): pane gone'));
+    await expect(startFlywheelRun({ cwd: '/repos/myn', orders: 'b1' })).rejects.toThrow('pane gone');
+  });
+
+  it('startFlywheelRun fails loudly when no project contains the cwd', async () => {
+    mocks.startFlywheel.mockRejectedValue(new FlywheelAlreadyRunning());
+    mocks.resolveProjectKeyForCwdAsync.mockResolvedValue(null);
+    await expect(startFlywheelRun({ cwd: '/elsewhere', orders: 'b1' })).rejects.toThrow('order book b1 was not sent');
+    expect(mocks.sendOrderBookToFlywheel).not.toHaveBeenCalled();
+  });
+
+  it('startFlywheelRun starts a new flywheel without touching delivery when none is running', async () => {
+    mocks.startFlywheel.mockResolvedValue({ session: 'conv-flywheel' });
+    await expect(startFlywheelRun({ cwd: '/repos/myn', orders: 'b1' }))
+      .resolves.toEqual({ runId: 'conv-flywheel', delivered: 'started' });
+    expect(mocks.startFlywheel).toHaveBeenCalledWith({ cwd: '/repos/myn', orders: 'b1' });
+    expect(mocks.sendOrderBookToFlywheel).not.toHaveBeenCalled();
+  });
+
+  it('startFlywheelRun without a book leaves a running flywheel alone', async () => {
+    mocks.startFlywheel.mockRejectedValue(new FlywheelAlreadyRunning());
+    await expect(startFlywheelRun({})).resolves.toEqual({ runId: 'conv-flywheel' });
+    expect(mocks.sendOrderBookToFlywheel).not.toHaveBeenCalled();
   });
 });

@@ -21,7 +21,8 @@ export async function healAction(query: string): Promise<void> {
   try {
     const response = await fetch(
       `${getDashboardApiUrl()}/api/conversations/${encodeURIComponent(conversation.name)}/clear-fork-state`,
-      { method: 'POST' },
+      // The route runs validateOrigin, which refuses a write with no Origin (PAN-5610).
+      { method: 'POST', headers: { Origin: getDashboardApiUrl() } },
     );
     const result = await response.json() as { error?: string };
     if (!response.ok) {

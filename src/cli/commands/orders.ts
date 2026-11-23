@@ -1,7 +1,5 @@
 import type { OrderBook, OrderBookLane } from '@overdeck/contracts';
-import chalk from 'chalk';
 import { Command, InvalidArgumentError } from 'commander';
-import { dirname, join } from 'node:path';
 
 import { deriveBookPhases, type OrderBookPhase, type OrderBookPhaseView } from '../../lib/orders/phase.js';
 import {
@@ -22,28 +20,23 @@ import {
   setStatus,
   type NewOrderBookItem,
 } from '../../lib/orders/writer.js';
-import { findProjectByPath, getProjectSync, listProjectsSync, resolveProjectPath, type ProjectConfig } from '../../lib/projects.js';
-import { getProjectPanPaths } from '../../lib/pan-dir/paths.js';
 import { getDashboardApiUrl } from '../../lib/config.js';
-import { commitPlanArtifacts, pushPlanArtifacts } from '../../lib/overdeck/plan-artifact-commit.js';
-import { surfacePlanArtifactPush } from '../../lib/overdeck/plan-artifact-push-report.js';
+import { listProjectsSync, resolveProjectPath, type ProjectConfig } from '../../lib/projects.js';
+import {
+  commandAction,
+  commitOrders,
+  formatBook,
+  type OrdersCommandDeps,
+  panDirFor,
+  requireBook,
+  resolveOrdersProject,
+  type ServerOrdersListing,
+} from './orders-shared.js';
+import type { FlywheelRunResult } from './flywheel.js';
+import { registerOrdersEditCommands } from './orders-edit.js';
 
-export interface ServerOrdersListing {
-  bookIds: string[];
-  phases: Map<string, OrderBookPhaseView>;
-}
-
-interface OrdersCommandDeps {
-  cwd?: string;
-  panDir?: string;
-  projectKey?: string;
-  now?: () => Date;
-  actor?: string;
-  startOrderBook?: (bookId: string) => Promise<{ runId: string }>;
-  issueLookup?: OrderIssueLookup;
-  /** Test seam over `fetchDashboardOrderPhases` (PAN-5599 D6). */
-  fetchServerPhases?: (projectKey: string | undefined) => Promise<ServerOrdersListing | null>;
-}
+export type { OrdersCommandDeps, ServerOrdersListing } from './orders-shared.js';
+export { commandAction, commitOrders, formatBook, panDirFor, requireBook, resolveOrdersProject } from './orders-shared.js';
 
 export interface OrdersListing {
   books: OrderBook[];
@@ -55,58 +48,14 @@ interface OrdersAddOptions {
   after?: string;
   reverify?: boolean;
   project?: string;
+  prereqs?: string;
+  planAtPickup?: boolean;
 }
 
 interface OrdersMoveOptions {
   lane?: OrderBookLane;
   order?: number;
   project?: string;
-}
-
-interface OrdersProjectResolution {
-  /** `<planHome>/.pan` — order books are project-level artifacts on `main`. */
-  panDir: string;
-  projectConfig?: ProjectConfig;
-}
-
-function resolveOrdersProject(deps: OrdersCommandDeps = {}): OrdersProjectResolution {
-  if (deps.panDir) return { panDir: deps.panDir };
-  if (deps.projectKey !== undefined) {
-    const project = getProjectSync(deps.projectKey);
-    if (!project) throw new Error(`Unknown project: ${deps.projectKey}`);
-    return { panDir: getProjectPanPaths(resolveProjectPath(project)).panDir, projectConfig: project };
-  }
-  const cwd = deps.cwd ?? process.cwd();
-  const project = findProjectByPath(cwd);
-  if (!project) throw new Error(`No configured project contains ${cwd}`);
-  return { panDir: getProjectPanPaths(resolveProjectPath(project)).panDir, projectConfig: project };
-}
-
-function panDirFor(deps: OrdersCommandDeps = {}): string {
-  return resolveOrdersProject(deps).panDir;
-}
-
-/**
- * Order books live in `<planHome>/.pan/orders/` on `main`, and the verb that
- * writes one commits it (PAN-3917: no daemon commits .pan/ behind your back)
- * and pushes it, so the plan home does not drift ahead of origin (#4108).
- */
-async function commitOrders(panDir: string, subject: string): Promise<void> {
-  const planHome = dirname(panDir);
-  const commit = await commitPlanArtifacts({ cwd: planHome, paths: [join(panDir, 'orders')], message: subject });
-  if (!commit.committed && commit.reason !== 'nothing to commit') {
-    console.error(chalk.yellow(`⚠ Could not commit the order book: ${commit.reason}`));
-    return;
-  }
-  const push = await pushPlanArtifacts(planHome);
-  const description = await surfacePlanArtifactPush(push, { planHome, command: 'pan orders' });
-  if (description) console.error(chalk.yellow(`⚠ Order book push: ${description.message}`));
-}
-
-async function requireBook(panDir: string, bookId: string): Promise<OrderBook> {
-  const book = await getBookAsync(panDir, bookId);
-  if (!book) throw new Error(`Order book not found: ${bookId}`);
-  return book;
 }
 
 function slugify(value: string): string {
@@ -135,10 +84,6 @@ function parsePositiveInteger(value: string): number {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed < 1) throw new InvalidArgumentError('must be a positive integer');
   return parsed;
-}
-
-export function formatBook(book: OrderBook): string {
-  return JSON.stringify(book, null, 2);
 }
 
 /** `active`, `queued #<n>`, `draft` or `archived`, with ` (finished)` when every issue is terminal. */
@@ -171,7 +116,7 @@ export function formatBookList(books: readonly OrderBook[], phases: ReadonlyMap<
   ].join('\n');
 }
 
-async function defaultStartOrderBook(bookId: string, project?: ProjectConfig): Promise<{ runId: string }> {
+async function defaultStartOrderBook(bookId: string, project?: ProjectConfig): Promise<FlywheelRunResult> {
   const { startFlywheelRun } = await import('./flywheel.js');
   return startFlywheelRun({ cwd: project ? resolveProjectPath(project) : undefined, orders: bookId });
 }
@@ -305,12 +250,18 @@ export async function runOrdersAdd(
     targetOrder = anchor.order + 1;
   }
 
+  const prereqs = (options.prereqs ?? '')
+    .split(',')
+    .map((prereq) => prereq.trim())
+    .filter((prereq) => prereq.length > 0)
+    .map((prereq) => prereq.toUpperCase());
   const additions: NewOrderBookItem[] = issueIds.map((issue, index) => ({
     issue: issue.toUpperCase(),
     lane: targetLane,
     order: targetOrder + index,
-    prereqs: [],
+    prereqs,
     reVerify: options.reverify ?? false,
+    ...(options.planAtPickup ? { planAtPickup: true } : {}),
   }));
   let updated = await addItems(panDir, bookId, additions, actor);
   if (options.after) {
@@ -357,7 +308,7 @@ export async function runOrdersMove(
   return moved;
 }
 
-export async function runOrdersStart(bookId: string, deps: OrdersCommandDeps = {}): Promise<{ runId: string }> {
+export async function runOrdersStart(bookId: string, deps: OrdersCommandDeps = {}): Promise<FlywheelRunResult> {
   const resolved = resolveOrdersProject(deps);
   await requireBook(resolved.panDir, bookId);
   return (deps.startOrderBook ?? ((id: string) => defaultStartOrderBook(id, resolved.projectConfig)))(bookId);
@@ -402,15 +353,6 @@ export async function runOrdersUnarchive(bookId: string, deps: OrdersCommandDeps
   return restored;
 }
 
-async function commandAction(action: () => Promise<void>): Promise<void> {
-  try {
-    await action();
-  } catch (error) {
-    console.error(chalk.red(error instanceof Error ? error.message : String(error)));
-    process.exitCode = 1;
-  }
-}
-
 export function createOrdersCommand(): Command {
   const orders = new Command('orders')
     .description('Create and manage Flywheel order books');
@@ -427,11 +369,12 @@ export function createOrdersCommand(): Command {
     .command('list')
     .description('List order books')
     .option('--project <key>', 'Resolve the order book in another registered project')
-    .action((options: { project?: string }) => commandAction(async () => {
+    .option('--json', 'Print the books as JSON')
+    .action((options: { project?: string; json?: boolean }) => commandAction(async () => {
       // Prefer the running dashboard's phases (it backfills the issue cache); fall back
       // to a local derivation, which starts the shared issue cache only then.
       const { books, phases } = await runOrdersListPreferServer({ projectKey: options.project });
-      console.log(formatBookList(books, phases));
+      console.log(options.json ? JSON.stringify(books, null, 2) : formatBookList(books, phases));
       // Starting the issue service schedules background refresh work that would keep this
       // one-shot read alive for seconds after the list is printed.
       process.exit(0);
@@ -441,7 +384,8 @@ export function createOrdersCommand(): Command {
     .command('show <id>')
     .description('Show an order book')
     .option('--project <key>', 'Resolve the order book in another registered project')
-    .action((id: string, options: { project?: string }) => commandAction(async () => {
+    .option('--json', 'Print JSON (the default)')
+    .action((id: string, options: { project?: string; json?: boolean }) => commandAction(async () => {
       console.log(formatBook(await runOrdersShow(id, { projectKey: options.project })));
     }));
 
@@ -451,6 +395,8 @@ export function createOrdersCommand(): Command {
     .option('--lane <lane>', 'Target lane: A or B', parseLane, 'A')
     .option('--after <issue>', 'Insert after an issue in the target lane')
     .option('--reverify', 'Require PRD re-verification before pickup')
+    .option('--prereqs <issues>', 'Comma-separated issues that must land first')
+    .option('--plan-at-pickup', 'Write the plan when the issue starts')
     .option('--project <key>', 'Resolve the order book in another registered project')
     .action((id: string, issues: string[], options: OrdersAddOptions) => commandAction(async () => {
       console.log(formatBook(await runOrdersAdd(id, issues, options, { projectKey: options.project })));
@@ -512,9 +458,15 @@ export function createOrdersCommand(): Command {
     .option('--project <key>', 'Resolve the order book in another registered project')
     .action((id: string, options: { project?: string }) => commandAction(async () => {
       const result = await runOrdersStart(id, { projectKey: options.project });
+      if (result.delivered === 'running-conversation') {
+        console.log(`Flywheel already running; sent order book ${id} to conversation ${result.runId}`);
+        return;
+      }
       console.log(`Flywheel started: ${result.runId}`);
       console.log(`Order book: ${id}`);
     }));
+
+  registerOrdersEditCommands(orders);
 
   return orders;
 }

@@ -1,0 +1,352 @@
+{
+  "version": "1",
+  "issueId": "PAN-5598",
+  "created": "2026-11-23T02:56:35.201Z",
+  "updated": "2026-11-23T05:25:27.327Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-23T04:50Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-23T04:50:02.145Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-23T04:57Z] ci-monitor → FAILED — seq 2",
+      "timestamp": "2026-11-23T04:57:07.209Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-23T04:58Z] ci-monitor → FAILED — seq 3",
+      "timestamp": "2026-11-23T04:58:40.186Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-23T05:01Z] review-agent → CHANGES-REQUESTED — seq 4",
+      "timestamp": "2026-11-23T05:01:53.351Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-23T05:09Z] verification-gate → FAILED — seq 5",
+      "timestamp": "2026-11-23T05:09:57.093Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-23T05:20:31.802Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-23T05:21Z] coderabbit → FINDINGS — seq 6",
+      "timestamp": "2026-11-23T05:21:09.113Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-23T05:21Z] ci-monitor → FAILED — seq 7",
+      "timestamp": "2026-11-23T05:21:37.381Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-23T05:22Z] review-agent → CHANGES-REQUESTED — seq 8",
+      "timestamp": "2026-11-23T05:22:53.558Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-23T05:25Z] ci-monitor → FAILED — seq 9",
+      "timestamp": "2026-11-23T05:25:27.327Z"
+    }
+  ],
+  "items": {
+    "route-scopes-orders": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5598",
+      "claimedAt": "2026-11-23T02:56:35.201Z",
+      "doneAt": "2026-11-23T03:04:37.111Z"
+    },
+    "route-scopes-orders.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:04:37.111Z"
+    },
+    "route-scopes-orders.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:04:37.111Z"
+    },
+    "route-scopes-orders.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:04:37.111Z"
+    },
+    "route-scopes-orders.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:04:37.111Z"
+    },
+    "mcp-delete-body": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5598",
+      "claimedAt": "2026-11-23T03:04:45.672Z",
+      "doneAt": "2026-11-23T03:08:46.327Z"
+    },
+    "mcp-delete-body.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:08:46.327Z"
+    },
+    "mcp-delete-body.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:08:46.327Z"
+    },
+    "mcp-delete-body.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:08:46.327Z"
+    },
+    "mcp-order-read-tools": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5598",
+      "claimedAt": "2026-11-23T03:08:54.084Z",
+      "doneAt": "2026-11-23T03:35:46.960Z"
+    },
+    "mcp-order-read-tools.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:35:46.960Z"
+    },
+    "mcp-order-read-tools.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:35:46.960Z"
+    },
+    "mcp-order-read-tools.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:35:46.960Z"
+    },
+    "mcp-order-read-tools.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:35:46.960Z"
+    },
+    "mcp-order-write-tools": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5598",
+      "claimedAt": "2026-11-23T03:35:55.146Z",
+      "doneAt": "2026-11-23T04:04:25.236Z"
+    },
+    "mcp-order-write-tools.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:04:25.236Z"
+    },
+    "mcp-order-write-tools.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:04:25.236Z"
+    },
+    "mcp-order-write-tools.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:04:25.236Z"
+    },
+    "mcp-order-write-tools.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:04:25.236Z"
+    },
+    "mcp-order-write-tools.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:04:25.236Z"
+    },
+    "orders-brief-extract": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5598",
+      "claimedAt": "2026-11-23T04:04:32.872Z",
+      "doneAt": "2026-11-23T04:12:25.677Z"
+    },
+    "orders-brief-extract.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:12:25.677Z"
+    },
+    "orders-brief-extract.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:12:25.677Z"
+    },
+    "cli-orders-add-list-options": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5598",
+      "claimedAt": "2026-11-23T04:12:35.163Z",
+      "doneAt": "2026-11-23T04:17:23.721Z"
+    },
+    "cli-orders-add-list-options.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:17:23.721Z"
+    },
+    "cli-orders-add-list-options.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:17:23.721Z"
+    },
+    "cli-orders-add-list-options.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:17:23.721Z"
+    },
+    "cli-orders-settings-verbs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5598",
+      "claimedAt": "2026-11-23T04:17:32.596Z",
+      "doneAt": "2026-11-23T04:23:08.417Z"
+    },
+    "cli-orders-settings-verbs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:23:08.417Z"
+    },
+    "cli-orders-settings-verbs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:23:08.417Z"
+    },
+    "cli-orders-settings-verbs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:23:08.417Z"
+    },
+    "cli-orders-settings-verbs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:23:08.417Z"
+    },
+    "cli-orders-item-verb": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5598",
+      "claimedAt": "2026-11-23T04:23:15.934Z",
+      "doneAt": "2026-11-23T04:26:37.995Z"
+    },
+    "cli-orders-item-verb.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:26:37.995Z"
+    },
+    "cli-orders-item-verb.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:26:37.995Z"
+    },
+    "cli-orders-item-verb.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:26:37.995Z"
+    },
+    "cli-orders-read-verbs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5598",
+      "claimedAt": "2026-11-23T04:26:44.600Z",
+      "doneAt": "2026-11-23T04:32:19.370Z"
+    },
+    "cli-orders-read-verbs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:32:19.370Z"
+    },
+    "cli-orders-read-verbs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:32:19.370Z"
+    },
+    "cli-orders-read-verbs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:32:19.370Z"
+    },
+    "cli-orders-read-verbs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:32:19.370Z"
+    },
+    "docs-mcp-orders": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5598",
+      "claimedAt": "2026-11-23T04:32:26.576Z",
+      "doneAt": "2026-11-23T04:35:19.947Z"
+    },
+    "docs-mcp-orders.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:35:19.947Z"
+    },
+    "docs-mcp-orders.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:35:19.947Z"
+    },
+    "docs-mcp-orders.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:35:19.947Z"
+    },
+    "docs-cli-orders": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5598",
+      "claimedAt": "2026-11-23T04:35:27.262Z",
+      "doneAt": "2026-11-23T04:38:45.161Z"
+    },
+    "docs-cli-orders.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:38:45.161Z"
+    },
+    "docs-cli-orders.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:38:45.161Z"
+    },
+    "docs-cli-orders.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:38:45.161Z"
+    },
+    "docs-cli-orders.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:38:45.161Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-23T04:50:02Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5598\n\nPull request: https://github.com/eltmon/overdeck/pull/5607 (head `cd972599`)\n\nSource: check_run:lint-group (core)\n\n## Failing checks (1)\n\n### lint-group (core)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/137492028660/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/45113843600/job/137492028660  \n```\n[],\"aliases\":[],\"category\":\"CLI\"},\n   {\"id\":\"pan-models-preset-list\",\"path\":[\"models\",\"preset\",\"list\"],\"display\":\"/pan models preset list\",\"description\":\"List presets, their versions and what was last applied\",\"args\":[],\"options\":[{\"flags\":\"--json\",\"description\":\"Print JSON\",\"required\":false,\"valueHint\":null}],\"aliases\":[],\"category\":\"CLI\"},\n##[error]Process completed with exit code 1.\nPost job cleanup.\n[command]/usr/bin/git version\ngit version 2.56.1\nTemporarily overriding HOME='/home/runner/work/_temp/06caee43-56a0-41c2-b582-ce26090059ec' before making global git config changes\nAdding repository directory to the temporary git global config as a safe directory\n[command]/usr/bin/git config --global --add safe.directory /home/runner/work/overdeck/overdeck\n[command]/usr/bin/git config --local --name-only --get-regexp core\\.sshCommand\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'core\\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp http\\.https\\:\\/\\/github\\.com\\/\\.extraheader\nhttp.https://github.com/.extraheader\n[command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'http\\.https\\:\\/\\/github\\.com\\/\\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\\.gitdir:\n[command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url\nCleaning up orphan processes\n##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    },
+    {
+      "seq": 2,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-23T04:57:07Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5598\n\nPull request: https://github.com/eltmon/overdeck/pull/5607 (head `b1f735d5`)\n\nSource: check_run:lint-group (core)\n\n## Failing checks (1)\n\n### lint-group (core)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/137493487514/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/45114273460/job/137493487514  \n```\nck/core@0.90.1 lint:circular\n> bash scripts/lint-circular-deps.sh\n\n✖ new circular dependencies found — these must be removed, not baselined:\n    src/cli/commands/orders-edit.ts > src/cli/commands/orders.ts\n\ncircular-dependency guard failed. Break the cycle, or manually edit the baseline in an issue-referenced commit to accept audited growth.\n##[error]Process completed with exit code 1.\nPost job cleanup.\n[command]/usr/bin/git version\ngit version 2.56.1\nTemporarily overriding HOME='/home/runner/work/_temp/a95176d9-b4e6-43eb-b42f-f8aa57e8ab6a' before making global git config changes\nAdding repository directory to the temporary git global config as a safe directory\n[command]/usr/bin/git config --global --add safe.directory /home/runner/work/overdeck/overdeck\n[command]/usr/bin/git config --local --name-only --get-regexp core\\.sshCommand\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'core\\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp http\\.https\\:\\/\\/github\\.com\\/\\.extraheader\nhttp.https://github.com/.extraheader\n[command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'http\\.https\\:\\/\\/github\\.com\\/\\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\\.gitdir:\n[command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url\nCleaning up orphan processes\n##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    },
+    {
+      "seq": 3,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-23T04:58:40Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5598\n\nPull request: https://github.com/eltmon/overdeck/pull/5607 (head `b1f735d5`)\n\nSource: check_run:test-shard (1/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (2)\n\n### lint-group (core)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/137493487514/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/45114273460/job/137493487514  \n```\nck/core@0.90.1 lint:circular\n> bash scripts/lint-circular-deps.sh\n\n✖ new circular dependencies found — these must be removed, not baselined:\n    src/cli/commands/orders-edit.ts > src/cli/commands/orders.ts\n\ncircular-dependency guard failed. Break the cycle, or manually edit the baseline in an issue-referenced commit to accept audited growth.\n##[error]Process completed with exit code 1.\nPost job cleanup.\n[command]/usr/bin/git version\ngit version 2.56.1\nTemporarily overriding HOME='/home/runner/work/_temp/a95176d9-b4e6-43eb-b42f-f8aa57e8ab6a' before making global git config changes\nAdding repository directory to the temporary git global config as a safe directory\n[command]/usr/bin/git config --global --add safe.directory /home/runner/work/overdeck/overdeck\n[command]/usr/bin/git config --local --name-only --get-regexp core\\.sshCommand\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'core\\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp http\\.https\\:\\/\\/github\\.com\\/\\.extraheader\nhttp.https://github.com/.extraheader\n[command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'http\\.https\\:\\/\\/github\\.com\\/\\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\\.gitdir:\n[command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url\nCleaning up orphan processes\n##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/\n```\n\n### test-shard (1/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/137493487252/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/45114273460/job/137493487252  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/cli/orders.test.ts\u001b[2m > \u001b[22mpan orders commands\u001b[2m > \u001b[22mregisters every documented verb and option in Commander help\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/cli/orders.test.ts\u001b[2m > \u001b[22mpan orders commands\u001b[2m > \u001b[22mregisters every documented verb and option in Commander help\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected [ 'create', 'list', 'show', …(13) ] to deeply equal [ 'create', 'list', 'show', …(9) ]\u001b[39m\n\n\u001b[32m- Expected\u001b[39m\n\u001b[31m+ Received\u001b[39m\n\n\u001b[33m@@ -9,6 +9,10 @@\u001b[39m\n\u001b[2m    \"start\",\u001b[22m\n\u001b[2m    \"rename\",\u001b[22m\n\u001b[2m    \"set\",\u001b[22m\n\u001b[2m    \"pause\",\u001b[22m\n\u001b[2m    \"resume\",\u001b[22m\n\u001b[31m+   \"item\",\u001b[39m\n\u001b[31m+   \"preview\",\u001b[39m\n\u001b[31m+   \"candidates\",\u001b[39m\n\u001b[31m+   \"check\",\u001b[39m\n\u001b[2m  ]\u001b[22m\n\n\u001b[36m \u001b[2m❯\u001b[22m tests/unit/cli/orders.test.ts:\u001b[2m144:59\u001b[22m\u001b[39m\n    \u001b[90m142|\u001b[39m   it('registers every documented verb and option in Commander help', (…\n    \u001b[90m143|\u001b[39m     \u001b[35mconst\u001b[39m command \u001b[33m=\u001b[39m \u001b[34mcreateOrdersCommand\u001b[39m()\u001b[33m;\u001b[39m\n    \u001b[90m144|\u001b[39m     \u001b[34mexpect\u001b[39m(command\u001b[33m.\u001b[39mcommands\u001b[33m.\u001b[39m\u001b[34mmap\u001b[39m((child) \u001b[33m=>\u001b[39m child\u001b[33m.\u001b[39m\u001b[34mname\u001b[39m()))\u001b[33m.\u001b[39m\u001b[34mtoEqual\u001b[39m([\n    \u001b[90m   |\u001b[39m                                                           \u001b[31m^\u001b[39m\n    \u001b[90m145|\u001b[39m       \u001b[32m'create'\u001b[39m\u001b[33m,\u001b[39m\n    \u001b[90m146|\u001b[39m       \u001b[32m'list'\u001b[39m\u001b[33m,\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\u001b[22m\u001b[39m\n\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m705 passed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[33m2 skipped\u001b[39m\u001b[90m (708)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    },
+    {
+      "seq": 4,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-11-23T05:01:53Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-5598\n\n# Review — PAN-5598\n## Verdict: CHANGES REQUESTED — new import cycle orders.ts ↔ orders-edit.ts fails CI lint, and `tests/unit/cli/orders.test.ts` fails on CI\n\n## Context\n- Run ID: agent-pan-5598-review-cd972599\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-5598/.pan/review/agent-pan-5598-review-cd972599/context.json\n- Branch / workspace: feature/pan-5598 / /home/eltmon/Projects/overdeck/workspaces/feature-pan-5598\n- PR: https://github.com/eltmon/overdeck/pull/5607\n- Dispatch HEAD: cd972599c55d1fc168de9637ac344ae898285e41\n- HEAD reviewed: b1f735d5b2ca69d42e4e1e3210d04715edb3a69e. This is the current PR head. The work agent pushed it during the review. It touches only `packages/contracts/src/composer-commands.generated.ts`. All local checks below ran on this tree, and the CI evidence cited is from the run on this SHA (run 45114273460).\n- Base: origin/main merge-base a8750cd1db1 (the local `main` ref is stale). No prior review cycle.\n\n## Blocking Findings\n\n### [correctness] New circular import between `orders.ts` and `orders-edit.ts` fails `lint:circular` — `src/cli/commands/orders.ts:19`\n- Severity: ! MUST\n- Classification / requirement scope: specification defect that the implementation followed; in_pr_scope (AC-9: `npm run lint` exits 0).\n- Trigger and changed-code connection: `orders.ts:19` imports `registerOrdersEditCommands` from `./orders-edit.js`. `orders-edit.ts:15` imports `commandAction, commitOrders, formatBook, panDirFor, requireBook` (and the `OrdersCommandDeps` type) from `./orders.js`. PRD WI-7 steps 1–2 asked for exactly this, so the cycle comes from the spec.\n- Expected / observed / impact: Expected: lint passes. Observed: CI `lint-group (core)` on b1f735d (job 137493487514) fails with `✖ new circular dependencies found — these must be removed, not baselined` (`src/cli/commands/orders-edit.ts > src/cli/commands/orders.ts`). The aggregate `lint` check is also red. The local `npm run lint:circular` reports the same. Runtime is unaffected, because the bindings are used only inside functions. The blocker is the required CI gate.\n- Evidence: the CI log above and a local reproduction.\n- Fix: break the cycle without growing the baseline. Option A (preferred): move only the helpers `orders-edit.ts` needs (`commandAction`, `commitOrders`, `panDirFor`/`resolveOrdersProject`, `requireBook`, `formatBook`, the `OrdersCommandDeps` type) into a leaf module such as `src/cli/commands/orders-shared.ts`. Then `orders.ts` and `orders-edit.ts` both import from it, and `orders.ts` re-exports the helpers so existing imports and tests keep working. Constraint from the PRD \"Working beside PAN-5597\" section: do not move or touch `formatBookList`, the `queue` command, or the list formatting that PAN-5597 edits. Keep the `orders.ts` change to the helper definitions and the import lines. Option B: drop the import from `orders.ts`, let `orders-edit.ts` export a wrapper that calls `createOrdersCommand()` and registers the edit verbs, and point `src/cli/command-groups.ts:127` and the slash-command generator at the wrapper. Rerun `npm run generate:slash-commands` if the registration point moves. Spec correction: WI-7 should have named a leaf helper module.\n\n### [requirements] `tests/unit/cli/orders.test.ts` \"registers every documented verb and option in Commander help\" fails — `tests/unit/cli/orders.test.ts:144`\n- Severity: ! MUST\n- Classification / requirement scope: implementation defect; in_pr_scope (AC-6: `npx vitest run tests/unit/cli/orders.test.ts` exits 0).\n- Trigger and changed-code connection: WI-7 (524527c0ece) updated the expected verb list to end at `resume`. WI-8 and WI-9 then registered `item`, `preview`, `candidates` and `check`, but nobody updated this expectation.\n- Expected / observed / impact: Expected: the test passes. Observed: the `toEqual` diff shows `\"item\", \"preview\", \"candidates\", \"check\"` missing from the expectation. CI `test-shard (1/4)` on b1f735d (job 137493487252) is red with exactly this failure (`1 failed | 705 passed`).\n- Evidence: the CI log above and a local `npx vitest run` (1 failed | 116 passed across 12 files; this test is the only failure).\n- Fix: append `'item', 'preview', 'candidates', 'check'` to the expected list at `tests/unit/cli/orders.test.ts:144`, in registration order. Then rerun `npx vitest run tests/unit/cli/orders.test.ts tests/unit/cli/orders-edit.test.ts`.\n\n## Non-blocking Findings\n\n### [correctness] The MCP `project` argument description promises a default the route does not provide — `src/lib/mcp/tools-orders.ts:20`\n- Severity: ~ SHOULD\n- Classification: implementation defect (misleading contract text); in_pr_scope. The PRD gave no wording for this property.\n- Trigger: `PROJECT_PROPERTY.description` says \"default this conversation's project.\" The tools send no project when the argument is absent. The route then uses `resolveOrdersStateRoot` → `findProjectByPath(process.cwd())` of the **dashboard process** (`src/dashboard/server/routes/orders.ts:89`). PRD D8 states this explicitly. The live dashboard's cwd is `/home/eltmon/Projects/overdeck` (checked via `/proc/<pid>/cwd`).\n- Impact: an agent in a non-Overdeck conversation (for example mind-your-now) that trusts the description and omits `project` reads Overdeck's books. `create_order_book` then creates an uncommitted book in Overdeck's primary checkout `.pan/orders/`. Write tools on an existing id from another project mostly answer 404.\n- Fix: change the text to the true behavior, for example: \"The registered project key. Omit it and the dashboard uses its own project, so pass it when you work in another project.\" Also note this in `configuration/mcp.mdx`. Fixing it in the same cycle as the blockers costs one line.\n\n### [requirements] Composer-command manifest was stale at the dispatch head — RESOLVED at b1f735d\n- At cd972599, CI `lint-group (core)` (run 45113843600) failed `lint:slash-commands` (\"composer-command manifest has drifted\"). Commit b1f735d regenerated it, and the local `npm run lint:slash-commands` now passes. No action needed beyond rerunning the generator if the cycle fix moves command registration.\n\n### [test-coverage] `check` exit code and output are not tested through Commander — `tests/unit/cli/orders-edit.test.ts:233`\n- Severity: ? MAY. The test named \"check prints blocks and sets exit code 1\" asserts only `runOrdersCheck`'s return value. The `BLOCK`/`WARN`/`No problems.` printing and `process.exitCode = 1` live in the Commander action (`src/cli/commands/orders-edit.ts:247-256`) and are not exercised. \"check sends the project key it resolved\" injects `projectKey`, so `resolveCheckProjectKey`'s cwd branch is not covered. Static reading shows the action is correct.\n\n### [correctness] Minor helper inconsistency — `src/lib/mcp/tools-orders.ts:44`\n- Severity: ? MAY. `optionalBoolean` and `optionalString` treat `null` as absent, but `optionalStringList` refuses `prereqs: null`. This is harmless but inconsistent.\n\n## Coverage\n\n### Changed-file ledger (merge-base a8750cd1db1 → b1f735d)\n| File | Status |\n| --- | --- |\n| src/dashboard/server/route-scopes.ts | reviewed. Ten rows; `backlog-candidates` sits before `:id`; segment-count matcher (`pathMatches`) keeps `:id` from capturing deeper paths. All 10 routes in `makeOrdersRouteLayer` are covered. |\n| src/dashboard/server/routes/orders.ts | reviewed. Only the `previewBrief` removal and the import. |\n| src/lib/orders/brief.ts | reviewed. Body identical to the removed function; no Effect wrapper or sync twin (`lint:effect-facades` passes). |\n| src/lib/mcp/dashboard-api.ts | reviewed. A DELETE with an explicit body sends JSON and Content-Type; a DELETE without a body is unchanged. |\n| src/lib/mcp/connector/channel-api.ts | reviewed. Matching condition. |\n| src/lib/mcp/server.ts | reviewed. `ORDER_TOOLS` appended last. |\n| src/lib/mcp/tools-orders.ts | reviewed. Ten tools; scopes equal `requiredScopeFor` (tested); path segments `encodeURIComponent`-encoded; update mapping per WI-4/D9; status passes through per D5; 422 findings rendered. One SHOULD finding. |\n| packages/contracts/src/telemetry.ts, docs/TELEMETRY.md | reviewed. Names and paths sorted and in step (telemetry-docs and mcp-domains tests pass). |\n| packages/contracts/src/composer-commands.generated.ts | reviewed (b1f735d). In step with the registry. |\n| src/cli/commands/orders.ts | reviewed. Only PRD-named lines changed. The import is the cycle (blocker). |\n| src/cli/commands/orders-edit.ts | reviewed. Validation messages per WI-7/8/9; `check` always sends `?project=` (D8); unreachable-dashboard message per spec. A scratchpad probe with bare Commander confirmed that the paired `--x`/`--no-x` options give `undefined` when absent and `false`/`true`/string when given, which is what the \"only given fields\" logic relies on. |\n| configuration/mcp.mdx | reviewed. Ten rows, read:state sentence fixed, no-commit sentence added. |\n| configuration/order-books.mdx | reviewed. Two sentence fixes plus a 15-row parity table; CP-2 applied correctly (`command('unqueue` absent on origin/main). |\n| cli/pipeline-commands.mdx, sync-sources/skills/pan-orders/SKILL.md, changelog.d/pan-5598.md | reviewed. |\n| .overdeck/context/codebase/architecture.md | reviewed. One-line change in the Agent MCP section, as specified. |\n| src/dashboard/server/__tests__/route-scopes-orders.test.ts | reviewed; passes. |\n| tests/unit/lib/mcp/tools-orders.test.ts | reviewed; passes; the NFR-2 coverage test compares against `ROUTE_SCOPES`. |\n| tests/unit/lib/mcp/{dashboard-api,connector/channel-api,visibility,tools-lanes}.test.ts | reviewed; pass. |\n| tests/unit/cli/orders-edit.test.ts | reviewed; passes (validation-gap advisory). |\n| tests/unit/cli/orders.test.ts | reviewed; **fails** (blocker). |\n| .pan/drafts/pan-5598.md, .pan/specs/…xbrief.json, .pan/continues/PAN-5598.xbrief.json | not applicable: planning artifacts. The PRD was read as the requirement source. |\n\n### Dimensions\n- **Correctness:** two blockers (cycle, stale test assertion), one resolved finding (manifest), one SHOULD (project default text).\n- **Security:** the new rows grant `read:state` reads and `operate` writes per D2/D3. `start_order_book` with `operate` matches `start_issue`. No auth helper changed. The PAN-5321 admin-only merge-train row is untouched. Book and issue ids are encoded and the route re-validates them. `briefFile` → `settings.briefOverlay` has no path check in the tool, but the route already accepted any string before this PR. In `src/`, `briefOverlay` is only stored by `src/lib/orders/writer.ts:73` and parsed by the route; no code reads a file from it, so there is no path-traversal exposure today. A future consumer should confine the path to the repo. No finding.\n- **Performance:** CLI-only `listProjectsSync`/`findProjectByPath`. Nothing new and sync on server paths (NFR-1 met). Each tool is one async proxy call. No finding.\n- **Requirements/UX:** see the AC matrix. Non-goals respected: no new routes or no-loss rows, no auth change, no unqueue/archive, queue/start unvalidated, no commit logic in routes, the route's laneAConcurrency check unchanged, no allowlist changes, PAN-5597 paragraphs untouched.\n\n### Acceptance criteria\n| AC | Status | Evidence |\n| --- | --- | --- |\n| AC-1 | met | route-scopes-orders, route-scopes and telemetry-docs tests pass |\n| AC-2 | met | dashboard-api and channel-api tests pass |\n| AC-3 | met | tools-orders, visibility, tools-lanes, mcp-domains, tools-read and connector/serve tests pass |\n| AC-4 | met | tools-orders tests (mapping, NFR-2 coverage) pass |\n| AC-5 | met | routes/__tests__/orders.test.ts passes; route no longer defines previewBrief |\n| AC-6 | **unmet** | `tests/unit/cli/orders.test.ts` fails locally and on CI test-shard (1/4) |\n| AC-7 | met | orders-edit tests pass; all 8 verbs registered (visible in the failing test's actual list) |\n| AC-8 | met | parity table has 15 rows; mcp.mdx updated; changelog exists; `npm run lint:docs` passes |\n| AC-9 | **unmet** | CI `lint-group (core)` / `lint` red at `lint:circular` on b1f735d |\n\n## Verification\n- CI on b1f735d (run 45114273460): `lint-group (core)` FAIL (lint:circular), `lint` FAIL (aggregate), `test-shard (1/4)` FAIL (orders.test.ts). Passing: shards 2/4 and 3/4, `build (22)`, `lint-group (effect|skills|state)`, server smoke, integrations. Shard 4/4, test-e2e and the bare-host jobs were pending at review time, so they are unverified.\n- CI on cd972599 (run 45113843600): `lint-group (core)` FAIL at `lint:slash-commands`, which b1f735d resolves.\n- Local `npx vitest run` on 14 touched or PRD-named test files: only `orders.test.ts` registration test fails; the rest pass (116+22 tests).\n- Local lints: `lint:circular` FAIL. PASS: `lint:slash-commands`, `lint:effect-diagnostics` (227 known, none new), `lint:docs`, `lint:skills`, `lint:last-verified`, `lint:effect-facades`, `lint:source-introspection`, `lint:file-size`, `lint:ratchet-audit`, `lint:quarantine-audit`, `lint:upstream-ports`, `lint:prompts`, and `eslint --no-inline-config` on the changed `src/` files.\n- Typecheck: reused the `overdeck/test` status for the PR head (\"Verification gate passed (typecheck+lint; tests run on CI)\"). That gate passed even though CI lint fails on `lint:circular`, so its lint coverage does not include the circular-dependency guard.\n- The full test suite was not run (per review policy).\n\n## Scope Note\nThe work agent's completion note says \"All tests, typecheck, and lint checks passing\", but CI lint and one CLI test fail on the PR head. The cycle comes from PRD WI-7's instructions. When a plan splits a command file into two, it should name a leaf module for the shared helpers.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-5598/.pan/review/agent-pan-5598-review-cd972599/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-5598 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 5,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-11-23T05:09:57Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-5598 (attempt 1/3):\n\nFailed check: sync-target-branch\n\nSync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - cli/pipeline-commands.mdx\n  - configuration/order-books.mdx\n  - src/cli/commands/orders.ts\n  - tests/unit/cli/orders.test.ts\n\n## REQUIRED: Resolve merge conflicts BEFORE resubmitting\n\n1. Run: `git fetch origin main && git merge origin/main`\n2. Resolve all conflicts in the listed files\n3. Run the project's build and tests to verify nothing broke\n4. Commit and push ALL changes\n\nAfter fixing:\n1. Run the project's build and tests\n2. Commit and push ALL changes\n3. ONLY THEN resubmit: pan review request PAN-5598 -m \"Fixed sync-target-branch\"\n\nDo NOT resubmit until all repos sync cleanly and tests pass."
+    },
+    {
+      "seq": 6,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-23T05:21:08Z",
+      "markdownBody": "# CodeRabbit findings for PAN-5598 (PR #5607)\n\nCodeRabbit posted 2 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4662086007 · src/cli/commands/orders-edit.ts:160 [Major]: `check --project` reads a different `.pan` root than local order commands for projects with an `issue_routing` default path.\n  https://github.com/eltmon/overdeck/pull/5607#discussion_r4662086007\n- Thread 4662086013 · src/lib/mcp/tools-orders.ts:174 [Major]: Do not expose status transitions that the route rejects.\n  https://github.com/eltmon/overdeck/pull/5607#discussion_r4662086013\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5607/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-5598 -m \"CodeRabbit <thread ids>: <what you changed>\"`.\n   If you only replied, you are done.\n5. If PR #5607 has already merged when you read this, stop: after the merge Overdeck files a follow-up issue\n   for every thread with no reply, no later commit to its file, and no re-review request naming its thread id."
+    },
+    {
+      "seq": 7,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-23T05:21:37Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5598\n\nPull request: https://github.com/eltmon/overdeck/pull/5607 (head `df2fdc46`)\n\nSource: check_run:lint-group (core)\n\n## Failing checks (1)\n\n### lint-group (core)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/137501761868/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/45116922397/job/137501761868  \n```\nto every issue's kickoff brief\",\"required\":true,\"valueHint\":\"path\"},{\"flags\":\"--no-brief\",\"description\":\"Clear the extra instructions file\",\"required\":false,\"valueHint\":null},{\"flags\":\"--project <key>\",\"description\":\"Resolve the order book in another registered project\",\"required\":true,\"valueHint\":\"key\"}],\"aliases\":[],\"category\":\"Flywheel\"},\n##[error]Process completed with exit code 1.\nPost job cleanup.\n[command]/usr/bin/git version\ngit version 2.56.1\nTemporarily overriding HOME='/home/runner/work/_temp/8e5cff81-a70a-4d1a-b22d-d9c2c5a8b787' before making global git config changes\nAdding repository directory to the temporary git global config as a safe directory\n[command]/usr/bin/git config --global --add safe.directory /home/runner/work/overdeck/overdeck\n[command]/usr/bin/git config --local --name-only --get-regexp core\\.sshCommand\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'core\\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp http\\.https\\:\\/\\/github\\.com\\/\\.extraheader\nhttp.https://github.com/.extraheader\n[command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'http\\.https\\:\\/\\/github\\.com\\/\\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\\.gitdir:\n[command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url\nCleaning up orphan processes\n##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    },
+    {
+      "seq": 8,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-11-23T05:22:53Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-5598\n\n# Review — PAN-5598\n## Verdict: CHANGES REQUESTED — the merge with main dropped PAN-5597's `unqueue`/`archive`/`unarchive` rows from the composer-command manifest; CI `lint-group (core)` is red\n\n## Context\n- Run ID: agent-pan-5598-review-df2fdc46\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-5598/.pan/review/agent-pan-5598-review-df2fdc46/context.json\n- Branch / workspace: feature/pan-5598 / /home/eltmon/Projects/overdeck/workspaces/feature-pan-5598\n- PR: https://github.com/eltmon/overdeck/pull/5607\n- HEAD reviewed: df2fdc46dc08063f0c405f9abc380ec0fcc1e067 (also the PR head)\n- Base: origin/main 768054d9928 (PAN-5597 #5606, merged into the branch by df2fdc46)\n- Prior cycle: agent-pan-5598-review-cd972599 (reviewed b1f735d). New since then: 648e32f8d80 (the fixes) and df2fdc46 (merge of origin/main).\n\n## Prior findings — verification\n| Prior finding | Status | Evidence |\n| --- | --- | --- |\n| Import cycle orders.ts ↔ orders-edit.ts | **fixed** | The helpers moved to the new leaf module `src/cli/commands/orders-shared.ts`, which imports neither file. `orders.ts` re-exports them. `formatBookList` and PAN-5597's queue/unqueue/archive code were not moved. Local `npm run lint:circular` passes. |\n| `orders.test.ts` verb list stale | **fixed** | The test now expects `item`, `preview`, `candidates` and `check`. The test passes. |\n| MCP `project` description (SHOULD) | **fixed** | `tools-orders.ts` now says the dashboard uses its own project when the argument is omitted, and `configuration/mcp.mdx` adds a matching paragraph. |\n\n## Blocking Findings\n\n### [requirements] Merge resolution dropped three main-owned rows from the composer-command manifest — `packages/contracts/src/composer-commands.generated.ts`\n- Severity: ! MUST\n- Classification / requirement scope: implementation defect (merge resolution), in_pr_scope (AC-9, CI lint gate). It also regresses PAN-5597's shipped behavior.\n- Trigger and changed-code connection: origin/main (768054d, PAN-5597) has `pan-orders-unqueue`, `pan-orders-archive` and `pan-orders-unarchive` in the manifest. The merge df2fdc46 kept the branch's copy of the generated file, so those three rows are gone. `git diff 768054d HEAD -- packages/contracts/src/composer-commands.generated.ts` shows three `-` lines for them, next to the eight new PAN-5598 rows. `src/cli/commands/orders.ts:355/363/371` still registers the three commands, so the manifest no longer matches the CLI registry.\n- Expected / observed / impact: Expected: the manifest matches the registry. Observed: CI `lint-group (core)` on the PR merge ref (job 137501761868, checkout `Merge df2fdc46… into 768054d…`) fails with `composer-command manifest has drifted from the CLI registry`, and the diff adds back the three rows. User impact if this merged: the dashboard composer's slash-command list would lose `/pan orders unqueue`, `/pan orders archive` and `/pan orders unarchive`, which PAN-5597 just shipped.\n- Evidence: the CI log above; `git show HEAD:…generated.ts | grep -c pan-orders-unqueue` → 0, and the same grep on `origin/main` → 1. Local `npm run lint:slash-commands` falsely passes in this workspace, because the script reads `dist/cli/index.js`, which was built at 23:59, before the merge. That is why the work agent's local check missed it.\n- Fix: `npm run build:cli && npm run generate:slash-commands`, then commit the regenerated manifest. Expect 11 `pan-orders-*` verb rows plus the existing ones (main's 3 + this PR's 8). Re-run `npm run lint:slash-commands` only after rebuilding `dist`.\n\n## Non-blocking Findings\n\n### [test-coverage] `check` printing and exit code are still exercised only through `runOrdersCheck` — `tests/unit/cli/orders-edit.test.ts:233`\n- Severity: ? MAY. Carried over from cycle 1 and unchanged. Static reading shows the Commander action is correct.\n\n### [correctness] `optionalStringList` refuses `null` while the sibling helpers accept it — `src/lib/mcp/tools-orders.ts`\n- Severity: ? MAY. Carried over and unchanged. Harmless.\n\n## Coverage\n\n### Changed-file ledger (768054d → df2fdc46)\n| File | Status |\n| --- | --- |\n| src/cli/commands/orders-shared.ts (new) | reviewed. Helpers moved verbatim; leaf module (imports only lib modules). |\n| src/cli/commands/orders.ts | reviewed. Merge resolution keeps PAN-5597's phase list, `ensureOrderIssueStore`, `process.exit(0)` and the unqueue/archive/unarchive commands; `--json` on `list` prints `books` from the new `{ books, phases }` listing; `--prereqs`/`--plan-at-pickup` intact; `registerOrdersEditCommands` called last. |\n| src/cli/commands/orders-edit.ts | reviewed. Imports changed to `orders-shared.js`; logic unchanged since cycle 1. |\n| packages/contracts/src/composer-commands.generated.ts | reviewed. **Blocker** (three main rows dropped). |\n| src/lib/mcp/tools-orders.ts | reviewed. Only the `project` description changed. `update_order_book`'s status pass-through (D5) now reaches PAN-5597's route, which accepts `ready`/`draft`/`complete` with transition checks (`routes/orders.ts:364-374`). |\n| src/dashboard/server/routes/orders.ts | reviewed. Against the new base the change is still only the `previewBrief` move. The route set after the merge is the same 10 routes, all in `ROUTE_SCOPES` and covered by the NFR-2 test. |\n| src/dashboard/server/route-scopes.ts, src/lib/mcp/{dashboard-api,connector/channel-api,server}.ts, src/lib/orders/brief.ts, packages/contracts/src/telemetry.ts, docs/TELEMETRY.md | reviewed. Unchanged since cycle 1 and still correct. |\n| configuration/mcp.mdx | reviewed. New `project` paragraph is accurate. |\n| configuration/order-books.mdx | reviewed. The \"Queue, move back to draft, archive\" row now names `unqueue`, `archive` and `unarchive` as commands, which is correct since PAN-5597 merged (CP-2). The diff against main is still +22/-2, so no PAN-5597 paragraph was lost. |\n| cli/pipeline-commands.mdx, sync-sources/skills/pan-orders/SKILL.md | reviewed. Diffs against main match cycle 1's shape (only additions plus the named line edits), so no PAN-5597 content was lost. |\n| changelog.d/pan-5598.md, .overdeck/context/codebase/architecture.md | reviewed. Unchanged. |\n| tests (route-scopes-orders, tools-orders, dashboard-api, channel-api, visibility, tools-lanes, orders, orders-edit) | reviewed. All pass. |\n| .pan/* planning artifacts | not applicable. |\n\n### Dimensions\n- **Correctness:** one blocker (manifest merge loss). The other fixes are verified.\n- **Security:** no change since cycle 1. Scope rows, auth helper untouched, and `briefOverlay` is not consumed by any file read. No finding.\n- **Performance:** no change. The CLI helper move adds no server-path work. No finding.\n- **Requirements/UX:** all functional ACs met; AC-9 unmet (CI lint). Non-goals still respected; PAN-5597-owned verbs are not reimplemented.\n\n### Acceptance criteria\n| AC | Status | Evidence |\n| --- | --- | --- |\n| AC-1 – AC-5 | met | focused tests pass (14 files, 151 tests) |\n| AC-6 | met | `tests/unit/cli/orders.test.ts` passes |\n| AC-7 | met | `tests/unit/cli/orders-edit.test.ts` passes; help lists all 8 verbs |\n| AC-8 | met | parity table 15 rows; `npm run lint:docs` passes |\n| AC-9 | **unmet** | CI `lint-group (core)` fails at `lint:slash-commands` |\n\n## Verification\n- Local `npx vitest run` on 14 touched/PRD-named test files: 14 passed, 151 tests passed.\n- Local lints: `lint:circular`, `lint:docs`, `lint:file-size`, `lint:effect-facades`, `lint:source-introspection`, `lint:ratchet-audit` and `eslint --no-inline-config` on the orders CLI files and `tools-orders.ts` all pass. Local `lint:slash-commands` passes, but that is not valid evidence, because `dist/cli/index.js` predates the merge.\n- CI on df2fdc46 (merge ref 49a37ff3bb): `lint-group (core)` FAIL (manifest drift). `lint-group (state)`, server smoke, integrations and `overdeck/test` pass. `build`, `lint-group (effect|skills)`, the test shards and e2e were pending at review time, so they are unverified.\n- The full test suite was not run (per policy).\n\n## Scope Note\nThis is the second cycle in a row where the generated manifest blocked CI. The local `lint:slash-commands` check reads `dist/`, so it reports green on a stale build. The work agent should rebuild the CLI before regenerating or checking the manifest after any merge that touches CLI registration.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-5598/.pan/review/agent-pan-5598-review-df2fdc46/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-5598 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 9,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-23T05:25:27Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5598\n\nPull request: https://github.com/eltmon/overdeck/pull/5607 (head `df2fdc46`)\n\nSource: check_run:test-shard (1/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (2)\n\n### lint-group (core)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/137501761868/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/45116922397/job/137501761868  \n```\nto every issue's kickoff brief\",\"required\":true,\"valueHint\":\"path\"},{\"flags\":\"--no-brief\",\"description\":\"Clear the extra instructions file\",\"required\":false,\"valueHint\":null},{\"flags\":\"--project <key>\",\"description\":\"Resolve the order book in another registered project\",\"required\":true,\"valueHint\":\"key\"}],\"aliases\":[],\"category\":\"Flywheel\"},\n##[error]Process completed with exit code 1.\nPost job cleanup.\n[command]/usr/bin/git version\ngit version 2.56.1\nTemporarily overriding HOME='/home/runner/work/_temp/8e5cff81-a70a-4d1a-b22d-d9c2c5a8b787' before making global git config changes\nAdding repository directory to the temporary git global config as a safe directory\n[command]/usr/bin/git config --global --add safe.directory /home/runner/work/overdeck/overdeck\n[command]/usr/bin/git config --local --name-only --get-regexp core\\.sshCommand\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'core\\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp http\\.https\\:\\/\\/github\\.com\\/\\.extraheader\nhttp.https://github.com/.extraheader\n[command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'http\\.https\\:\\/\\/github\\.com\\/\\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\\.gitdir:\n[command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url\nCleaning up orphan processes\n##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/\n```\n\n### test-shard (1/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/137501761861/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/45116922397/job/137501761861  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/__tests__/agent-text-cli-verbs.test.ts\u001b[2m > \u001b[22magent-facing text names only registered pan commands (PAN-3868, PAN-3934)\u001b[2m > \u001b[22mresolves every pan command in hooks, prompts, agents, rules, skills and CLI docs\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/__tests__/agent-text-cli-verbs.test.ts\u001b[2m > \u001b[22magent-facing text names only registered pan commands (PAN-3868, PAN-3934)\u001b[2m > \u001b[22mresolves every pan command in hooks, prompts, agents, rules, skills and CLI docs\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected [ …(6) ] to deeply equal []\u001b[39m\n\n\u001b[32m- Expected\u001b[39m\n\u001b[31m+ Received\u001b[39m\n\n\u001b[32m- []\u001b[39m\n\u001b[31m+ [\u001b[39m\n\u001b[31m+   \"sync-sources/skills/pan-orders/SKILL.md:32: pan orders unqueue\",\u001b[39m\n\u001b[31m+   \"sync-sources/skills/pan-orders/SKILL.md:33: pan orders archive\",\u001b[39m\n\u001b[31m+   \"sync-sources/skills/pan-orders/SKILL.md:34: pan orders unarchive\",\u001b[39m\n\u001b[31m+   \"cli/pipeline-commands.mdx:285: pan orders unqueue\",\u001b[39m\n\u001b[31m+   \"cli/pipeline-commands.mdx:286: pan orders archive\",\u001b[39m\n\u001b[31m+   \"cli/pipeline-commands.mdx:287: pan orders unarchive\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n\n\u001b[36m \u001b[2m❯\u001b[22m src/lib/__tests__/agent-text-cli-verbs.test.ts:\u001b[2m182:20\u001b[22m\u001b[39m\n    \u001b[90m180|\u001b[39m describe('agent-facing text names only registered pan commands (PAN-38…\n    \u001b[90m181|\u001b[39m   it('resolves every pan command in hooks, prompts, agents, rules, ski…\n    \u001b[90m182|\u001b[39m     \u001b[34mexpect\u001b[39m(\u001b[34mscan\u001b[39m())\u001b[33m.\u001b[39m\u001b[34mtoEqual\u001b[39m([])\u001b[33m;\u001b[39m\n    \u001b[90m   |\u001b[39m                    \u001b[31m^\u001b[39m\n    \u001b[90m183|\u001b[39m   })\u001b[33m;\u001b[39m\n    \u001b[90m184|\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\u001b[22m\u001b[39m\n\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m705 passed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[33m2 skipped\u001b[39m\u001b[90m (708)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ],
+  "agentModel": "claude-opus-5-5"
+}

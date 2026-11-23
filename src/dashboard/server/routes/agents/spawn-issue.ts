@@ -8,7 +8,7 @@
  * `spawnIssueAgentForRoute`.
  */
 import { existsSync } from 'node:fs';
-import { dirname, join, sep } from 'node:path';
+import { join, sep } from 'node:path';
 
 import { KNOWN_HARNESSES, type EffortLevel } from '@overdeck/contracts';
 import type { RuntimeName } from '../../../../lib/runtimes/types.js';
@@ -27,7 +27,6 @@ import { loadConfigSync } from '../../../../lib/config.js';
 import type { AgentState } from '../../../../lib/agents/agent-state.js';
 import { operatorInterventionEvent } from '../../../../lib/operator-interventions.js';
 import { assessCpuPressure, type CpuPressureVerdict } from '../../../../lib/cloister/cpu-pressure.js';
-import { buildChildEnvWithoutTmux } from '../../../../lib/child-env.js';
 import { CodexAuthCheckError, checkCodexAuthStatus } from '../../../../lib/codex-auth.js';
 import { canUseHarness } from '../../../../lib/harness-policy.js';
 import { emitActivityEntry } from '../../../../lib/activity-logger.js';
@@ -77,6 +76,7 @@ import {
   type AgentStartGateDecision,
 } from './shared.js';
 import { claimAgentStart, handleContainerOrchestration, handleRemoteAgentSpawn, releaseAgentStart } from './spawn-helpers.js';
+import { runSpawnWorkspaceCreate } from './spawn-workspace-create.js';
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /**
@@ -351,15 +351,10 @@ export const spawnIssueAgentForRoute = (input: { body: unknown; internalRequest:
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
     // PAN-4171: `pan workspace create` also resumes an unfinished setup.
     if (!remoteRequested && workspaceNeedsSetup(workspacePath)) {
-      try {
-        const nodeDir = dirname(process.execPath);
-        yield* Effect.promise(() => execAsync(
-          `pan workspace create ${issueId} --local`,
-          { cwd: projectPath, encoding: 'utf-8', timeout: 60000, env: buildChildEnvWithoutTmux(process.env, { PATH: `${nodeDir}:${process.env.PATH ?? ''}` }) }
-        ));
-      } catch (wsErr) {
+      const createError = yield* Effect.promise(() => runSpawnWorkspaceCreate(issueId, projectPath, execAsync));
+      if (createError !== null) {
         return jsonResponse({
-          error: `Failed to create workspace for ${issueId}: ${(wsErr as Error).message}`,
+          error: `Failed to create workspace for ${issueId}: ${createError}`,
           hint: 'Try creating the workspace manually: pan workspace create ' + issueId + ' --local',
         }, { status: 500 });
       }
