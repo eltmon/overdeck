@@ -120,7 +120,7 @@ target-branch sync, skipped when CI is already green on the exact tip commit
   bound counts once per pressure episode, so the next head does not wait it
   again (PAN-5588). A gate with a memory footprint also waits while starting
   it would push MemAvailable below `resources.governor_soft_reserve_gb`; see
-  [CPU and memory admission](#cpu-and-memory-admission-pan-4311-pan-4546-pan-5248-pan-5285-pan-5520-pan-5621).
+  [CPU and memory admission](#cpu-and-memory-admission-pan-4311-pan-4546-pan-5248-pan-5285-pan-5520-pan-5621-pan-5623).
 - **Agent shells share the queue.** Both `vitest.config.ts` and
   `src/dashboard/frontend/vitest.config.ts` load
   `tests/vitest-cpu-admission.ts` as `globalSetup`, which calls
@@ -497,7 +497,7 @@ Work agents run only the tests they touched (the work prompt names
 CI" only in a CI-mode project); reviewers never run the suite — they read the
 CI result on the head (`gh pr checks <pr>`) where tests run on CI.
 
-### CPU and memory admission (PAN-4311, PAN-4546, PAN-5248, PAN-5285, PAN-5520, PAN-5621)
+### CPU and memory admission (PAN-4311, PAN-4546, PAN-5248, PAN-5285, PAN-5520, PAN-5621, PAN-5623)
 
 Before each local gate starts, it waits in a machine-wide FIFO queue under
 `~/.overdeck/verification-workers/admission/`. Direct local Vitest runs and
@@ -623,9 +623,40 @@ already queued, without killing them:
   status` line, an activity entry linking to `/flywheel`, and a phone push
   tagged `gate-starvation:<since>` (best-effort: `pushNeedsYouEdge` gives no
   delivery guarantee). Detection never changes an admission decision — it only
-  reads the queue `fitsAloneAboveHardReserve` already computes. Automatically
-  reclaiming the memory a starved queue is waiting on (stopping idle parked
-  workspace stacks) is tracked separately in PAN-5623.
+  reads the queue `fitsAloneAboveHardReserve` already computes. Freeing the
+  memory a starved queue waits on is the stack reclaim below.
+- **Stack reclaim (PAN-5623).** While a starvation episode is open and its
+  head still cannot start alone above the hard reserve, the primary
+  dashboard's 30 s poll (`services/stack-reclaim-service.ts`) stops the
+  workspace stack containers of one parked issue. Only the services `api`,
+  `fe`, `frontend` and `server` are reclaimable; `dev`, databases and caches
+  are never stopped, and a container belongs to an issue only through its
+  exact `com.docker.compose.project` label. An issue is a candidate only when
+  all of these hold: a non-main workspace of a registered project whose
+  directory exists; at least one running reclaimable container in its compose
+  project; no gate-queue owner or waiter for the issue or its workspace path;
+  no active verification worker and no owed verification dispatch; not already
+  reclaimed in this episode; every live pane of the issue (review panes
+  ignored) is an idle `work` pane at a turn boundary; and the issue is parked,
+  meaning an unresolved `blocked.declared` or a merge gate that answers
+  `ready` (approval alone is not enough: green checks, mergeability and the
+  UAT policy must also pass). The poll stops at most one issue, the one with
+  the most container memory (ties by issue id), and at most once per issue per
+  episode. Inside the per-workspace stack lock
+  (`<workspace>/.overdeck/stack-reclaim.lock`) it re-checks every fact from
+  fresh reads, journals `stack.reclaimed` naming the containers and their ids,
+  reads the entry back, and only then runs `docker stop <id>`, so a crash
+  never leaves stopped containers with no record. The stack starts again
+  (`restoreReclaimedStack`, `workspace/stack-restore.ts`) when the issue next
+  needs it, through one of three triggers (`turn`, `spawn`, `verification`):
+  a non-review pane is working or mid-turn (the 5 s restore poll),
+  an agent is spawned for it (the spawn gate and the dashboard spawn route,
+  before their health reads), or its verification starts. A failed
+  `docker start` journals nothing, and the turn trigger retries it no sooner
+  than 60 s later. `pan status` prints "stopped to free memory" for such a
+  stack instead of STACK BROKEN, while gating health reads stay strict. To
+  start one by hand: `docker start <names>` (the activity entry prints the
+  exact command).
 - **Admitted past CPU pressure (PAN-5520, PAN-5588).** CPU contention slows a
   gate down but does not break it, so the CPU wait has a bound,
   `resources.quality_gate_cpu_bypass_minutes` (default 10, under 30 so the
@@ -2166,6 +2197,10 @@ One piece of stored pipeline state came back, and it is not a status.
   into a workspace that no longer exists.
 - **Never fatal.** A write failure is logged and swallowed: an unwritable
   journal must not break the action that produced it.
+- **Housekeeping entries.** `stack.*` entries record what Overdeck did to an
+  issue's containers, not a pipeline step: `lastPipelineEntry` without a
+  prefix, `lastPipelineStep`, and the Flywheel board's journal tail skip them,
+  so a reclaim never hides the pipeline step before it.
 
 **Entry types and who writes them**
 
@@ -2201,6 +2236,8 @@ One piece of stored pipeline state came back, and it is not a status.
 | `operator.decision-requested` | `pan ask` (`src/cli/commands/ask.ts`), when a work agent needs an operator decision |
 | `operator.decision-answered` | the dashboard answer route, a delivered dashboard message, or a delivered `pan tell` to the asking agent |
 | `operator.decision-withdrawn` | `pan ask --withdraw` |
+| `stack.reclaimed` | `services/stack-reclaim-service.ts`, just before it stops a parked issue's containers for a starved gate queue (source `stack-reclaim`; `data.containers`, `containerIds`, `services`, `composeProject`, `memoryBytes`, `reason: 'gate-starvation'`, `episodeSince`, `head { gateName, issueId? }`) (PAN-5623) |
+| `stack.restored` | `workspace/stack-restore.ts` `restoreReclaimedStack`, after it starts the reclaimed containers again (source `stack-restore:<trigger>`; trigger `turn` from the reclaim service, `spawn` from `workspace-stack-spawn-gate.ts` and the spawn route, `verification` from `verification-runner.ts`; `data.containers`, `started`, `alreadyRunning`, `missing`, `refused`, `trigger`, `reclaimedAt`) (PAN-5623) |
 | `workspace.adopted` | `cloister/pr-workspace-adoption.ts` `adoptPrWorkspace`, after it creates the pipeline workspace on an outside PR's head (`data.prNumber`, `headSha`, `repo`) |
 | `workspace.adoption-failed` | the same function, when a failure leaves a workspace behind; also `cloister/pr-adoption-review.ts` when the review does not start after a successful adoption (`data.reason`, `detail`, `fix`) |
 | `workspace.synced-to-pr-head` | `cloister/workspace-pr-head-sync.ts` `syncWorkspaceRootsToPrHead`, at the start of a verification run that moved a repo root to its PR head (`data.branch`, `from`, `to`, `mode` `fast-forward` or `reset`, and `repo` for a polyrepo root) |

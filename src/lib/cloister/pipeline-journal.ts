@@ -45,7 +45,8 @@ export type PipelineJournalEntryType =
   | 'blocked.declared' | 'blocked.woken'
   | 'handoff.requested' | 'handoff.deferred' | 'handoff.retried' | 'handoff.started' | 'handoff.abandoned'
   | 'workspace.adopted' | 'workspace.adoption-failed' | 'workspace.synced-to-pr-head'
-  | 'operator.decision-requested' | 'operator.decision-answered' | 'operator.decision-withdrawn';
+  | 'operator.decision-requested' | 'operator.decision-answered' | 'operator.decision-withdrawn'
+  | 'stack.reclaimed' | 'stack.restored';
 
 export interface PipelineJournalEntry {
   /** ISO timestamp, stamped at append time. */
@@ -158,7 +159,42 @@ export function isReviewInFlightEntry(entry: Pick<PipelineJournalEntry, 'type'> 
   return entry?.type === 'review.requested' || entry?.type === 'review.dispatched' || entry?.type === 'review.redispatched';
 }
 
-/** The last entry, or the last whose type starts with `prefix`. */
+/** PAN-5623: a `stack.*` entry records what Overdeck did to an issue's containers, not a pipeline step. */
+export function isHousekeepingEntry(entry: Pick<PipelineJournalEntry, 'type'>): boolean {
+  return entry.type.startsWith('stack.');
+}
+
+/** The last entry that is a pipeline step (housekeeping entries skipped), or null. */
+export function lastPipelineStep(entries: readonly PipelineJournalEntry[]): PipelineJournalEntry | null {
+  for (let index = entries.length - 1; index >= 0; index -= 1) {
+    if (!isHousekeepingEntry(entries[index])) return entries[index];
+  }
+  return null;
+}
+
+export interface OpenStackReclaim { at: string; containers: string[]; composeProject: string | null }
+
+/** PAN-5623: the newest `stack.*` entry when it is a reclaim with at least one container name; else null. */
+export function openStackReclaim(entries: readonly PipelineJournalEntry[]): OpenStackReclaim | null {
+  for (let index = entries.length - 1; index >= 0; index -= 1) {
+    const entry = entries[index];
+    if (!isHousekeepingEntry(entry)) continue;
+    if (entry.type !== 'stack.reclaimed') return null;
+    const raw = entry.data?.containers;
+    const containers = Array.isArray(raw) ? raw.filter((name): name is string => typeof name === 'string' && name.length > 0) : [];
+    if (containers.length === 0) return null;
+    const project = entry.data?.composeProject;
+    return { at: entry.at, containers, composeProject: typeof project === 'string' ? project : null };
+  }
+  return null;
+}
+
+/** PAN-5623 D8: whether this issue was already reclaimed in the episode that opened at `episodeSince`. */
+export function reclaimedInEpisode(entries: readonly PipelineJournalEntry[], episodeSince: string): boolean {
+  return entries.some((entry) => entry.type === 'stack.reclaimed' && entry.data?.episodeSince === episodeSince);
+}
+
+/** The last pipeline step (housekeeping entries skipped), or the last entry whose type starts with `prefix`. */
 export function lastPipelineEntry(
   workspacePath: string,
   prefix?: string,
@@ -166,7 +202,7 @@ export function lastPipelineEntry(
   const entries = readPipelineJournal(workspacePath);
   for (let index = entries.length - 1; index >= 0; index -= 1) {
     const entry = entries[index];
-    if (!prefix || entry.type.startsWith(prefix)) return entry;
+    if (prefix ? entry.type.startsWith(prefix) : !isHousekeepingEntry(entry)) return entry;
   }
   return null;
 }

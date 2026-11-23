@@ -2,6 +2,7 @@ import { existsSync } from 'fs';
 import { Effect } from 'effect';
 import { emitActivityEntry } from '../activity-logger.js';
 import { getWorkspaceStackHealth } from '../workspace/stack-health.js';
+import { restoreReclaimedStackForSpawn } from '../workspace/stack-restore.js';
 import { resolveIssueStackDiskHold } from '../workspace/disk-cost.js';
 import { getPrFacts } from '../cloister/pr-facts.js';
 import type { Role } from './role.js';
@@ -76,7 +77,9 @@ export async function assertWorkspaceStackHealthyForSpawn(
   // together, and the review was never dispatched. Run on the host at once.
   if (role === 'review') return;
 
-  const health = await Effect.runPromise(getWorkspaceStackHealth(issueId, { workspacePath }));
+  // PAN-5623: start a stack a memory reclaim stopped, then read health from a fresh listing.
+  const containers = await restoreReclaimedStackForSpawn(issueId, workspacePath);
+  const health = await Effect.runPromise(getWorkspaceStackHealth(issueId, { workspacePath, ...(containers ? { containers } : {}) }));
   if (health.healthy) {
     spawnStackRebuildState.delete(normalizedIssue);
     return;

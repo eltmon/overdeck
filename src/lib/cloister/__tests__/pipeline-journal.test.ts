@@ -18,6 +18,9 @@ vi.mock('../../pipeline-notifier.js', () => ({
 const {
   appendPipelineEntry,
   lastPipelineEntry,
+  lastPipelineStep,
+  openStackReclaim,
+  reclaimedInEpisode,
   pipelineJournalPath,
   readPipelineJournal,
 } = await import('../pipeline-journal.js');
@@ -134,5 +137,83 @@ describe('lastPipelineEntry', () => {
 
   it('is null for a workspace with no journal', () => {
     expect(lastPipelineEntry(workspace)).toBeNull();
+  });
+});
+
+describe('housekeeping entries (PAN-5623)', () => {
+  it('lastPipelineEntry without a prefix skips a trailing stack.reclaimed', () => {
+    appendPipelineEntry(workspace, { type: 'blocked.declared', issueId: 'PAN-1' });
+    appendPipelineEntry(workspace, { type: 'stack.reclaimed', issueId: 'PAN-1' });
+    expect(lastPipelineEntry(workspace)?.type).toBe('blocked.declared');
+  });
+
+  it('lastPipelineEntry with the stack. prefix still finds the reclaim', () => {
+    appendPipelineEntry(workspace, { type: 'blocked.declared', issueId: 'PAN-1' });
+    appendPipelineEntry(workspace, { type: 'stack.reclaimed', issueId: 'PAN-1' });
+    expect(lastPipelineEntry(workspace, 'stack.')?.type).toBe('stack.reclaimed');
+  });
+
+  it('lastPipelineEntry without a prefix is null when only stack.* entries exist', () => {
+    appendPipelineEntry(workspace, { type: 'stack.reclaimed', issueId: 'PAN-1' });
+    appendPipelineEntry(workspace, { type: 'stack.restored', issueId: 'PAN-1' });
+    expect(lastPipelineEntry(workspace)).toBeNull();
+  });
+
+  it('lastPipelineStep returns the entry before a trailing stack.restored', () => {
+    const entries = [
+      { at: '2026-11-23T00:00:00.000Z', type: 'review.requested' as const, issueId: 'PAN-1' },
+      { at: '2026-11-23T00:00:01.000Z', type: 'stack.reclaimed' as const, issueId: 'PAN-1' },
+      { at: '2026-11-23T00:00:02.000Z', type: 'stack.restored' as const, issueId: 'PAN-1' },
+    ];
+    expect(lastPipelineStep(entries)?.type).toBe('review.requested');
+    expect(lastPipelineStep(entries.slice(1))).toBeNull();
+  });
+});
+
+describe('openStackReclaim and reclaimedInEpisode (PAN-5623)', () => {
+  const at = (n: number) => `2026-11-23T00:00:0${n}.000Z`;
+  const reclaim = (n: number, data: Record<string, unknown>) =>
+    ({ at: at(n), type: 'stack.reclaimed' as const, issueId: 'PAN-1', data });
+
+  it('returns the reclaim when a pipeline step follows it', () => {
+    const entries = [
+      reclaim(0, { containers: ['myn-feature-min-1144-api-1', 'myn-feature-min-1144-fe-1'], composeProject: 'myn-feature-min-1144' }),
+      { at: at(1), type: 'verification.started' as const, issueId: 'PAN-1' },
+    ];
+    expect(openStackReclaim(entries)).toEqual({
+      at: at(0),
+      containers: ['myn-feature-min-1144-api-1', 'myn-feature-min-1144-fe-1'],
+      composeProject: 'myn-feature-min-1144',
+    });
+  });
+
+  it('is null when a restore follows the reclaim', () => {
+    const entries = [
+      reclaim(0, { containers: ['a-api-1'] }),
+      { at: at(1), type: 'stack.restored' as const, issueId: 'PAN-1' },
+    ];
+    expect(openStackReclaim(entries)).toBeNull();
+  });
+
+  it('returns the second reclaim when restored then reclaimed again', () => {
+    const entries = [
+      reclaim(0, { containers: ['a-api-1'] }),
+      { at: at(1), type: 'stack.restored' as const, issueId: 'PAN-1' },
+      reclaim(2, { containers: ['a-fe-1'] }),
+    ];
+    expect(openStackReclaim(entries)).toEqual({ at: at(2), containers: ['a-fe-1'], composeProject: null });
+  });
+
+  it('is null for a reclaim with no usable container names', () => {
+    expect(openStackReclaim([reclaim(0, { containers: [] })])).toBeNull();
+    expect(openStackReclaim([reclaim(0, { containers: [1, '', null] })])).toBeNull();
+    expect(openStackReclaim([reclaim(0, {})])).toBeNull();
+  });
+
+  it('reclaimedInEpisode matches only the same episodeSince', () => {
+    const entries = [reclaim(0, { containers: ['a-api-1'], episodeSince: '2026-11-23T00:00:00.000Z' })];
+    expect(reclaimedInEpisode(entries, '2026-11-23T00:00:00.000Z')).toBe(true);
+    expect(reclaimedInEpisode(entries, '2026-11-23T01:00:00.000Z')).toBe(false);
+    expect(reclaimedInEpisode([], '2026-11-23T00:00:00.000Z')).toBe(false);
   });
 });

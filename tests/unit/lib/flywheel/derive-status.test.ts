@@ -895,6 +895,23 @@ describe('board fields (PAN-5283 WI-5)', () => {
     expect(row.blocker?.kind).toBe('no-agent');
   });
 
+  it('a trailing stack.* housekeeping entry never becomes the journal tail (PAN-5623)', async () => {
+    const status = await deriveFlywheelStatus({
+      deps: baseDeps({
+        listWorkspaces: ws,
+        loadStates: working,
+        journalTail: () => [
+          { at: '2026-09-23T09:50:00.000Z', type: 'review.requested', issueId: 'PAN-1', source: 'pan-done' },
+          { at: '2026-09-23T09:55:00.000Z', type: 'blocked.declared', issueId: 'PAN-1', data: { blockers: ['PAN-2'] } },
+          { at: '2026-09-23T09:58:00.000Z', type: 'stack.reclaimed', issueId: 'PAN-1', source: 'stack-reclaim' },
+        ],
+      }),
+    });
+    const row = status.inFlight[0]!;
+    expect(row.lastJournal?.type).toBe('blocked.declared');
+    expect(row.blocker?.kind).toBe('declared-blocked');
+  });
+
   it('a pending auto-merge row puts the card in merge with its time', async () => {
     const status = await deriveFlywheelStatus({
       deps: baseDeps({

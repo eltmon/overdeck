@@ -1,0 +1,329 @@
+{
+  "version": "1",
+  "issueId": "PAN-5623",
+  "created": "2026-11-23T20:20:25.006Z",
+  "updated": "2026-11-23T21:39:18.310Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "wi1-journal-types-skip": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5623",
+      "claimedAt": "2026-11-23T20:20:25.006Z",
+      "doneAt": "2026-11-23T20:30:07.422Z"
+    },
+    "wi1-journal-types-skip.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:30:07.422Z"
+    },
+    "wi1-journal-types-skip.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:30:07.422Z"
+    },
+    "wi1-journal-types-skip.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:30:07.422Z"
+    },
+    "wi1-journal-types-skip.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:30:07.422Z"
+    },
+    "wi2-open-reclaim-reader": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5623",
+      "claimedAt": "2026-11-23T20:30:13.100Z",
+      "doneAt": "2026-11-23T20:32:35.048Z"
+    },
+    "wi2-open-reclaim-reader.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:32:35.048Z"
+    },
+    "wi2-open-reclaim-reader.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:32:35.048Z"
+    },
+    "wi2-open-reclaim-reader.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:32:35.048Z"
+    },
+    "wi2-open-reclaim-reader.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:32:35.048Z"
+    },
+    "wi3-tail-readers-skip": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5623",
+      "claimedAt": "2026-11-23T20:32:40.515Z",
+      "doneAt": "2026-11-23T20:37:49.815Z"
+    },
+    "wi3-tail-readers-skip.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:37:49.815Z"
+    },
+    "wi3-tail-readers-skip.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:37:49.815Z"
+    },
+    "wi3-tail-readers-skip.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:37:49.815Z"
+    },
+    "wi4-docker-helpers": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5623",
+      "claimedAt": "2026-11-23T20:37:54.923Z",
+      "doneAt": "2026-11-23T20:41:35.150Z"
+    },
+    "wi4-docker-helpers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:41:35.150Z"
+    },
+    "wi4-docker-helpers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:41:35.150Z"
+    },
+    "wi4-docker-helpers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:41:35.150Z"
+    },
+    "wi4-docker-helpers.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:41:35.150Z"
+    },
+    "wi5-restore-door": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5623",
+      "claimedAt": "2026-11-23T20:41:41.103Z",
+      "doneAt": "2026-11-23T20:53:03.574Z"
+    },
+    "wi5-restore-door.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:53:03.574Z"
+    },
+    "wi5-restore-door.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:53:03.574Z"
+    },
+    "wi5-restore-door.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:53:03.574Z"
+    },
+    "wi5-restore-door.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:53:03.574Z"
+    },
+    "wi5-restore-door.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:53:03.574Z"
+    },
+    "wi6-spawn-restore": {
+      "status": "cancelled",
+      "claimedBy": "agent-pan-5623",
+      "claimedAt": "2026-11-23T20:53:08.495Z"
+    },
+    "wi6-spawn-gate-restore": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5623",
+      "claimedAt": "2026-11-23T20:53:30.894Z",
+      "doneAt": "2026-11-23T20:53:59.760Z"
+    },
+    "wi6-spawn-gate-restore.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:53:59.760Z"
+    },
+    "wi6-spawn-gate-restore.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:53:59.760Z"
+    },
+    "wi6-spawn-gate-restore.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:53:59.760Z"
+    },
+    "wi6-spawn-gate-restore.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:53:59.760Z"
+    },
+    "wi8-health-reclaim-aware": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5623",
+      "claimedAt": "2026-11-23T20:54:10.547Z",
+      "doneAt": "2026-11-23T20:54:36.858Z"
+    },
+    "wi8-health-reclaim-aware.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:54:36.858Z"
+    },
+    "wi8-health-reclaim-aware.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:54:36.858Z"
+    },
+    "wi8-health-reclaim-aware.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:54:36.858Z"
+    },
+    "wi11-candidate-rules": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5623",
+      "claimedAt": "2026-11-23T20:54:41.227Z",
+      "doneAt": "2026-11-23T20:55:07.664Z"
+    },
+    "wi11-candidate-rules.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:55:07.664Z"
+    },
+    "wi11-candidate-rules.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:55:07.664Z"
+    },
+    "wi11-candidate-rules.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:55:07.664Z"
+    },
+    "wi11-candidate-rules.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:55:07.664Z"
+    },
+    "wi11-candidate-rules.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:55:07.664Z"
+    },
+    "wi9-status-reclaim-line": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5623",
+      "claimedAt": "2026-11-23T20:55:13.908Z",
+      "doneAt": "2026-11-23T20:55:42.533Z"
+    },
+    "wi9-status-reclaim-line.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:55:42.533Z"
+    },
+    "wi9-status-reclaim-line.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:55:42.533Z"
+    },
+    "wi10-workspace-data-reclaim-aware": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5623",
+      "claimedAt": "2026-11-23T20:55:43.618Z",
+      "doneAt": "2026-11-23T21:12:20.012Z"
+    },
+    "wi7-verification-restore": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5623",
+      "claimedAt": "2026-11-23T21:07:52.921Z",
+      "doneAt": "2026-11-23T21:08:14.083Z"
+    },
+    "wi7-verification-restore.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T21:08:14.083Z"
+    },
+    "wi7-verification-restore.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T21:08:14.083Z"
+    },
+    "wi7-verification-restore.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T21:08:14.083Z"
+    },
+    "wi10-workspace-data-reclaim-aware.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T21:12:20.012Z"
+    },
+    "wi10-workspace-data-reclaim-aware.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T21:12:20.012Z"
+    },
+    "wi12-reclaim-poll": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5623",
+      "claimedAt": "2026-11-23T21:12:39.458Z",
+      "doneAt": "2026-11-23T21:33:40.357Z"
+    },
+    "wi12-reclaim-poll.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T21:33:40.357Z"
+    },
+    "wi12-reclaim-poll.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T21:33:40.357Z"
+    },
+    "wi12-reclaim-poll.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T21:33:40.357Z"
+    },
+    "wi12-reclaim-poll.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T21:33:40.357Z"
+    },
+    "wi12-reclaim-poll.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-23T21:33:40.357Z"
+    },
+    "wi12-reclaim-poll.ac6": {
+      "status": "completed",
+      "doneAt": "2026-11-23T21:33:40.357Z"
+    },
+    "wi13-restore-poll": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5623",
+      "claimedAt": "2026-11-23T21:33:41.669Z",
+      "doneAt": "2026-11-23T21:34:53.515Z"
+    },
+    "wi13-restore-poll.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T21:34:53.515Z"
+    },
+    "wi13-restore-poll.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T21:34:53.515Z"
+    },
+    "wi13-restore-poll.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T21:34:53.515Z"
+    },
+    "wi13-restore-poll.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T21:34:53.515Z"
+    },
+    "wi14-main-start": {
+      "status": "cancelled",
+      "claimedBy": "agent-pan-5623",
+      "claimedAt": "2026-11-23T21:34:56.906Z"
+    },
+    "wi14-main-wiring": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5623",
+      "claimedAt": "2026-11-23T21:35:06.293Z",
+      "doneAt": "2026-11-23T21:38:46.652Z"
+    },
+    "wi14-main-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T21:38:46.652Z"
+    },
+    "wi14-main-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T21:38:46.652Z"
+    },
+    "wi15-docs-changelog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5623",
+      "claimedAt": "2026-11-23T21:38:48.045Z",
+      "doneAt": "2026-11-23T21:39:18.309Z"
+    },
+    "wi15-docs-changelog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T21:39:18.309Z"
+    },
+    "wi15-docs-changelog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T21:39:18.309Z"
+    },
+    "wi15-docs-changelog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T21:39:18.309Z"
+    }
+  }
+}

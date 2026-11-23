@@ -25,6 +25,7 @@ import type { PrFacts } from '../../../lib/cloister/pr-facts.js';
 import {
   appendPipelineEntry,
   isReviewInFlightEntry,
+  lastPipelineStep,
   readPipelineJournal,
   type PipelineJournalEntry,
 } from '../../../lib/cloister/pipeline-journal.js';
@@ -95,7 +96,7 @@ export async function rereviewStaleApproval(
   ))) {
     return `approval is stale at ${short}; review already re-requested for this head`;
   }
-  if (isReviewInFlightEntry(entries.at(-1) ?? null)) {
+  if (isReviewInFlightEntry(lastPipelineStep(entries))) {
     return `approval is stale at ${short}; a review is already running`;
   }
   const outcome = await (deps.requestReview ?? defaultRequestReview)(

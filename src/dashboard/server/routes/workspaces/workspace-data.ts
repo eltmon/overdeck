@@ -439,6 +439,7 @@ const getWorkspaceStackHealthBatchRoute = HttpRouter.add(
           projectConfig: { ...request.projectConfig, path: request.projectPath },
           workspacePath: request.workspacePath,
           containers,
+          reclaimAware: true,
         }));
 
         return [request.normalizedIssueId, {
@@ -601,7 +602,7 @@ const getWorkspaceRoute = HttpRouter.add(
           getGitStatusAsync(workspacePath),
           getRepoGitStatusAsync(workspacePath),
           hasDocker ? getContainerStatusAsync(issueId, projectPath) : Promise.resolve(null),
-          Effect.runPromise(getWorkspaceStackHealth(issueId, { projectConfig, emitTransitionActivity: true })),
+          Effect.runPromise(getWorkspaceStackHealth(issueId, { projectConfig, emitTransitionActivity: true, reclaimAware: true })),
           getMrUrlAsync(issueId, workspacePath),
         ]));
         // The issue-scoped DB read only runs when Git inspection actually

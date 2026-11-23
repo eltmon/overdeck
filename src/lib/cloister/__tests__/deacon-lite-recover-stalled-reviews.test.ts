@@ -173,6 +173,20 @@ describe('recoverStalledReviews', () => {
       expect(actions).toHaveLength(1);
     });
 
+    it('still retries a first pipeline failure followed by a stack.reclaimed housekeeping entry (PAN-5623)', async () => {
+      journal([{ type: 'review.requested', minutesAgo: 90 }]);
+      pipelineFailure(80, 'Command failed: git push origin feature/pan-3705');
+      journal([{ type: 'stack.reclaimed', minutesAgo: 70 }]);
+
+      const actions = await recoverStalledReviews(NOW);
+
+      expect(mocks.requestReviewThroughRoute).toHaveBeenCalledWith('PAN-3705', expect.objectContaining({
+        source: 'deacon-lite',
+        message: expect.stringContaining('retrying once'),
+      }));
+      expect(actions).toHaveLength(1);
+    });
+
     it('stops when the retry fails with the same error at the same head', async () => {
       const error = 'The required xBRIEF checklist for PAN-3705 is missing or unreadable. Run planning before spawning a work agent.';
       journal([{ type: 'review.requested', minutesAgo: 200 }]);

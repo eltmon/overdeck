@@ -20,6 +20,7 @@ import { promisify } from 'node:util';
 import { Effect } from 'effect';
 
 import { emitActivityEntry } from '../activity-logger.js';
+import { openStackReclaim, readPipelineJournal } from '../cloister/pipeline-journal.js';
 import {
   getCachedDockerContainerLifecycleObservedAt,
   getCachedDockerContainerLifecycleSnapshot,
@@ -198,6 +199,8 @@ export interface WorkspaceStackHealth {
    * Only set on the docker-workspace path; undefined for non-docker projects.
    */
   stackExpected?: boolean;
+  /** PAN-5623: exited containers a memory reclaim stopped on purpose; set only for `reclaimAware` reads. */
+  reclaimed?: string[];
 }
 
 export interface WorkspaceStackProject {
@@ -213,6 +216,11 @@ export interface WorkspaceStackHealthOptions {
   emitTransitionActivity?: boolean;
   workspacePath?: string;
   stackExpected?: boolean;
+  /**
+   * PAN-5623: ignore exited containers the open memory reclaim named and list
+   * them in `health.reclaimed`. Display surfaces only; gating reads never set it.
+   */
+  reclaimAware?: boolean;
 }
 
 interface DockerPsJson {
@@ -333,7 +341,14 @@ export function evaluateWorkspaceStackHealth(
   issueId: string,
   projectConfig: WorkspaceStackProject | null | undefined,
   containers: DockerContainerLifecycle[],
-  options: { now?: Date; stuckCreatedThresholdMs?: number; stackExpected?: boolean; composeProjectName?: string | null } = {},
+  options: {
+    now?: Date;
+    stuckCreatedThresholdMs?: number;
+    stackExpected?: boolean;
+    composeProjectName?: string | null;
+    /** PAN-5623: exited containers stopped on purpose by a memory reclaim. */
+    expectedStopped?: ReadonlySet<string>;
+  } = {},
 ): WorkspaceStackHealth {
   const now = options.now ?? new Date();
   const lastObserved = now.toISOString();
@@ -345,6 +360,7 @@ export function evaluateWorkspaceStackHealth(
   const stackContainers = containers.filter((container) => isStackContainer(container, issueId, options.composeProjectName));
   const stackExpected = options.stackExpected !== false;
   const reasons: string[] = [];
+  const reclaimed: string[] = [];
 
   if (stackContainers.length === 0 && stackExpected) {
     reasons.push(`No Docker containers found for workspace stack ${normalizeIssue(issueId)}`);
@@ -357,6 +373,8 @@ export function evaluateWorkspaceStackHealth(
         if (exitCode !== null && exitCode !== 0) {
           reasons.push(`${container.name} init exited non-zero (${exitCode})`);
         }
+      } else if (options.expectedStopped?.has(container.name)) {
+        reclaimed.push(container.name);
       } else {
         const exit = exitCode === null ? 'unknown' : String(exitCode);
         reasons.push(`${container.name} service exited (${exit})`);
@@ -373,7 +391,13 @@ export function evaluateWorkspaceStackHealth(
     }
   }
 
-  return { healthy: reasons.length === 0, reasons, lastObserved, stackExpected };
+  return {
+    healthy: reasons.length === 0,
+    reasons,
+    lastObserved,
+    stackExpected,
+    ...(reclaimed.length > 0 ? { reclaimed } : {}),
+  };
 }
 
 export const collectDockerContainerLifecycleSnapshot = (): Effect.Effect<
@@ -452,6 +476,9 @@ export const getWorkspaceStackHealth = (
       stuckCreatedThresholdMs: options.stuckCreatedThresholdMs,
       stackExpected: options.stackExpected ?? isWorkspaceStackExpected(issueId, projectConfig, options.workspacePath),
       composeProjectName: tryComposeProjectNameForWorkspace(workspacePath, issueId),
+      ...(options.reclaimAware && workspacePath
+        ? { expectedStopped: new Set(openStackReclaim(readPipelineJournal(workspacePath))?.containers ?? []) }
+        : {}),
     });
     const observedHealth = observedAt && !options.now
       ? { ...health, lastObserved: observedAt }

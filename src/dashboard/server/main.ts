@@ -294,6 +294,7 @@ if (!isPeerDashboard) {
   startHarnessAutoUpdateService(); // PAN-5108
   startLiveActivityService();
 }
+if (!isPeerDashboard) (await import('./services/stack-reclaim-service.js')).startStackReclaimService(); // PAN-5623
 
 // Enable demand-driven agent output capture. The poller starts only while an
 // RPC or public SSE subscriber has expressed output interest.

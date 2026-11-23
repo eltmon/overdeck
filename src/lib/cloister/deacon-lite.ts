@@ -35,7 +35,7 @@ import { readRecordedAgentStopAt } from '../overdeck/event-reads.js';
 import { listWorkspaces } from '../workspaces/resolver.js';
 import { reconcileClosedIssueAgents } from './closed-issue-reaper.js';
 import { checkApiErrorAgents } from './deacon-api-recovery.js';
-import { appendPipelineEntry, lastPipelineEntry, readPipelineJournal } from './pipeline-journal.js';
+import { appendPipelineEntry, lastPipelineEntry, lastPipelineStep, readPipelineJournal } from './pipeline-journal.js';
 import { isRepeatedPipelineFailure, REVIEW_PIPELINE_FAILURE_SOURCE } from './review-dispatch-failure.js';
 import { retryDeferredHandoffs } from './deferred-handoff.js';
 import { replayDeferredReviewVerdict } from './deferred-verdict-replay.js';
@@ -331,7 +331,7 @@ function stalledReviewReason(type: string, workspacePath: string): string | null
  */
 function failedDispatchRetryReason(workspacePath: string): string | null {
   const entries = readPipelineJournal(workspacePath);
-  const last = entries[entries.length - 1];
+  const last = lastPipelineStep(entries);
   if (!last || last.source !== REVIEW_PIPELINE_FAILURE_SOURCE) return null;
   if (isRepeatedPipelineFailure(entries, last)) return null;
   return `the review pipeline failed (${String(last.data?.['error'] ?? 'unknown error')}); retrying once`;
