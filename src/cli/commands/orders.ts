@@ -118,7 +118,9 @@ export function formatBookList(books: readonly OrderBook[], phases: ReadonlyMap<
 
 async function defaultStartOrderBook(bookId: string, project?: ProjectConfig): Promise<FlywheelRunResult> {
   const { startFlywheelRun } = await import('./flywheel.js');
-  return startFlywheelRun({ cwd: project ? resolveProjectPath(project) : undefined, orders: bookId });
+  return startFlywheelRun(project
+    ? { cwd: resolveProjectPath(project), orders: bookId, projectPath: project.path }
+    : { orders: bookId });
 }
 
 export async function runOrdersCreate(name: string, deps: OrdersCommandDeps = {}): Promise<OrderBook> {

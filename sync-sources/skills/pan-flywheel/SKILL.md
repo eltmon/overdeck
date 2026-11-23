@@ -112,8 +112,9 @@ section is how they reach the loop. They bind every tick.
    read it with `pan orders show <book-id>`: its Lane A/B items and prereqs
    take priority over the general backlog. A
    `/pan-flywheel <book-id> --project <key>` message that arrives while the
-   loop is running binds that book: read it with
-   `pan orders show <book-id> --project <key>` and work it from the next tick.
+   loop is running binds that book. On every later tick, read it with
+   `pan orders show <book-id> --project <key>` and work its lane items. Use the
+   unqualified `pan orders list` and `pan orders show` only when no book is bound.
 4. List in-flight work: `gh pr list --search "is:open"` for this repo,
    `pan status` for live sessions, and every issue with a workspace, branch,
    agent or PR (`GET /api/issues/resource-allocated` on the dashboard, the

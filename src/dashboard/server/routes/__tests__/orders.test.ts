@@ -722,7 +722,7 @@ describe('/api/orders routes', () => {
 
     await expect(requestOrdersRoute(layer, '/api/orders/2026-07-18-cross-start/start?project=other-project', mutation('POST')))
       .resolves.toEqual({ status: 200, body: { ok: true, runId: 'RUN-OTHER', warnings: [] } });
-    expect(mockStartFlywheelRun).toHaveBeenCalledWith({ cwd: '/fake/other-project', orders: '2026-07-18-cross-start' });
+    expect(mockStartFlywheelRun).toHaveBeenCalledWith({ cwd: '/fake/other-project', orders: '2026-07-18-cross-start', projectPath: '/fake/other-project' });
   });
 
   it('keeps starting from the default project root when the book lives there', async () => {
@@ -745,6 +745,6 @@ describe('/api/orders routes', () => {
 
     await expect(requestOrdersRoute(layer, '/api/orders/2026-07-18-default-start/start', mutation('POST')))
       .resolves.toEqual({ status: 200, body: { ok: true, runId: 'RUN-DEFAULT', warnings: [] } });
-    expect(mockStartFlywheelRun).toHaveBeenCalledWith({ cwd: defaultPanHome, orders: '2026-07-18-default-start' });
+    expect(mockStartFlywheelRun).toHaveBeenCalledWith({ cwd: defaultPanHome, orders: '2026-07-18-default-start', projectPath: defaultPanHome });
   });
 });
