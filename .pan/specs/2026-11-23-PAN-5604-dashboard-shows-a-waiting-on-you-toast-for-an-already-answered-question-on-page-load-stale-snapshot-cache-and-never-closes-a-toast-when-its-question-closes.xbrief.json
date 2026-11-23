@@ -4,17 +4,17 @@
     "created": "2026-11-23T05:38:13Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5604: Dashboard shows a 'waiting on you' toast for an already-answered question on page load (stale snapshot cache), and never closes a toast when its question closes",
-    "updated": "2026-11-23T18:13:16.093Z"
+    "updated": "2026-11-23T18:14:33.984Z"
   },
   "plan": {
     "id": "pan-5604",
     "title": "Dashboard shows a 'waiting on you' toast for an already-answered question on page load (stale snapshot cache), and never closes a toast when its question closes",
-    "status": "proposed",
+    "status": "running",
     "uid": "a076b080-3610-42b8-95c2-8a235cacdc3f",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-23T05:38:13Z",
-    "updated": "2026-11-23T18:13:16.093Z",
+    "updated": "2026-11-23T18:14:33.984Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5604",
@@ -563,5 +563,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
