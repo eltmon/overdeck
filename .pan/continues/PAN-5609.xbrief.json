@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5609",
   "created": "2026-11-23T06:08:07.057Z",
-  "updated": "2026-11-23T08:36:28.575Z",
+  "updated": "2026-11-23T08:36:35.359Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,11 @@
     "activity-tracker.ac5": {
       "status": "completed",
       "doneAt": "2026-11-23T08:36:28.574Z"
+    },
+    "watcher-activity": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5609",
+      "claimedAt": "2026-11-23T08:36:35.359Z"
     }
   }
 }
