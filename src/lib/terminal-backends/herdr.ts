@@ -806,11 +806,8 @@ export class HerdrBackend implements TerminalBackend {
         if (!info.agent?.pane_id) return unsupported('herdr steer needs a detected agent pane');
         if (info.agent.agent_status === 'blocked') return { refused: true, reason: 'agent_blocked' };
         const outcome = await pasteAndSubmitHerdrPane(this.api, info.agent.pane_id, text, options.submit ?? 'enter');
-        // PAN-4242: blocked after the paste — the text sits unsent in the composer, so this
-        // refusal is told apart from the pre-paste one above (re-sending it would duplicate it).
-        return outcome === 'blocked'
-          ? { refused: true, reason: HERDR_BLOCKED_AFTER_PASTE }
-          : { delivered: true, messageId: options.messageId };
+        // PAN-4242: blocked after the paste leaves the text unsent in the composer — not the pre-paste refusal above.
+        return outcome === 'blocked' ? { refused: true, reason: HERDR_BLOCKED_AFTER_PASTE } : { delivered: true, messageId: options.messageId };
       }
 
       const wait = options.wait
