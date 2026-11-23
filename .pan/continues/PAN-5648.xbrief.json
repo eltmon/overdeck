@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5648",
   "created": "2026-11-23T23:03:53.057Z",
-  "updated": "2026-11-23T23:14:59.757Z",
+  "updated": "2026-11-23T23:15:06.819Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -62,6 +62,11 @@
     "blocker-scan-all.ac2": {
       "status": "completed",
       "doneAt": "2026-11-23T23:14:59.757Z"
+    },
+    "retry-after-failure": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5648",
+      "claimedAt": "2026-11-23T23:15:06.819Z"
     }
   }
 }
