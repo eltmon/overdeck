@@ -4,17 +4,17 @@
     "created": "2026-11-23T06:00:44Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5611: Idle-settled conversations stay in Settled after the operator resumes them, hiding them from their project group",
-    "updated": "2026-11-23T06:12:23.732Z"
+    "updated": "2026-11-23T06:13:48.772Z"
   },
   "plan": {
     "id": "pan-5611",
     "title": "Idle-settled conversations stay in Settled after the operator resumes them, hiding them from their project group",
-    "status": "proposed",
+    "status": "running",
     "uid": "ffdb7803-7067-4262-8fbe-d4118e4ede73",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-23T06:00:44Z",
-    "updated": "2026-11-23T06:12:23.732Z",
+    "updated": "2026-11-23T06:13:48.772Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5611",
@@ -615,5 +615,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
