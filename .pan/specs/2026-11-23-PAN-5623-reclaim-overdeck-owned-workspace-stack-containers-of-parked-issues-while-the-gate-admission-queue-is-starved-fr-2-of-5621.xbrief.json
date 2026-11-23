@@ -4,17 +4,17 @@
     "created": "2026-11-23T20:00:07Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5623: Reclaim Overdeck-owned workspace stack containers of parked issues while the gate admission queue is starved (FR-2 of #5621)",
-    "updated": "2026-11-23T20:18:44.692Z"
+    "updated": "2026-11-23T20:20:10.009Z"
   },
   "plan": {
     "id": "pan-5623",
     "title": "Reclaim Overdeck-owned workspace stack containers of parked issues while the gate admission queue is starved (FR-2 of #5621)",
-    "status": "proposed",
+    "status": "running",
     "uid": "7f69ad24-0bc5-4ff3-af02-7e890d96b9e2",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-23T20:00:07Z",
-    "updated": "2026-11-23T20:18:44.692Z",
+    "updated": "2026-11-23T20:20:10.009Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5623",
@@ -1199,5 +1199,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
