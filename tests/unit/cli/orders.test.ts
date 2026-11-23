@@ -5,12 +5,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   createOrdersCommand,
+  fetchDashboardOrderPhases,
   formatBook,
   formatBookList,
   runOrdersAdd,
   runOrdersArchive,
   runOrdersCreate,
   runOrdersList,
+  runOrdersListPreferServer,
   runOrdersMove,
   runOrdersQueue,
   runOrdersRemove,
@@ -21,6 +23,12 @@ import {
 } from '../../../src/cli/commands/orders.js';
 import { addItems, createBook } from '../../../src/lib/orders/writer.js';
 import type { ProjectConfig } from '../../../src/lib/projects.js';
+
+// Mock config so fetchDashboardOrderPhases never reads a real dashboard config file.
+vi.mock('../../../src/lib/config.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/lib/config.js')>()),
+  getDashboardApiUrl: vi.fn(() => 'http://localhost:3011'),
+}));
 
 const { mockGetProjectSync, mockGetProjectPanPaths, mockStartFlywheelRun } = vi.hoisted(() => ({
   mockGetProjectSync: vi.fn(),
@@ -305,6 +313,86 @@ describe('pan orders commands', () => {
     const linesWithFirstFinished = listLines(['PAN-1']);
     expect(phaseOf(linesWithFirstFinished, ids[0]!)).toBe('queued (finished)');
     expect(phaseOf(linesWithFirstFinished, ids[1]!)).toBe('active');
+  });
+
+  describe('runOrdersListPreferServer', () => {
+    it('prints the server phases when the dashboard answers for the same books', async () => {
+      const otherRoot = gitFixture();
+      const otherProject = { path: '/fake/server-phases-project' } as ProjectConfig;
+      mockGetProjectSync.mockImplementation((key: string) => (key === 'server-phases-project' ? otherProject : null));
+      mockGetProjectPanPaths.mockImplementation(() => ({ panDir: otherRoot }));
+      const deps = { projectKey: 'server-phases-project', now: () => new Date(at) };
+      const ids: string[] = [];
+      for (const [name, issue] of [['First', 'PAN-1'], ['Second', 'PAN-2']] as const) {
+        const created = await runOrdersCreate(name, deps);
+        await runOrdersAdd(created.id, [issue], {}, deps);
+        ids.push(created.id);
+      }
+      const serverPhases = new Map<string, { phase: 'active' | 'queued'; queuePosition: number | null; finished: boolean }>([
+        [ids[0]!, { phase: 'queued', queuePosition: null, finished: true }],
+        [ids[1]!, { phase: 'active', queuePosition: 1, finished: false }],
+      ]);
+      const fetchServerPhases = vi.fn(async () => ({ bookIds: [...ids], phases: serverPhases }));
+
+      const { books, phases } = await runOrdersListPreferServer({ ...deps, fetchServerPhases });
+
+      expect(fetchServerPhases).toHaveBeenCalledOnce();
+      const lines = formatBookList(books, phases).split('\n');
+      expect(lines.find((line) => line.startsWith(ids[0]!))).toContain('queued (finished)');
+      expect(lines.find((line) => line.startsWith(ids[1]!))).toContain('active');
+    });
+
+    it('derives phases locally when the dashboard does not answer', async () => {
+      const panDir = gitFixture();
+      const deps = { panDir, now: () => new Date(at), issueLookup: () => new Map() };
+      const created = await runOrdersCreate('Solo', deps);
+      await runOrdersAdd(created.id, ['PAN-1'], {}, deps);
+      await runOrdersQueue(created.id, deps);
+      const fetchServerPhases = vi.fn(async () => null);
+
+      const { phases } = await runOrdersListPreferServer({ ...deps, fetchServerPhases });
+
+      expect(phases.get(created.id)).toMatchObject({ phase: 'active' });
+    });
+
+    it('derives phases locally when the server lists different book ids', async () => {
+      const panDir = gitFixture();
+      const deps = { panDir, now: () => new Date(at), issueLookup: () => new Map() };
+      const created = await runOrdersCreate('Solo', deps);
+      await runOrdersAdd(created.id, ['PAN-1'], {}, deps);
+      await runOrdersQueue(created.id, deps);
+      const fetchServerPhases = vi.fn(async () => ({ bookIds: ['not-this-book'], phases: new Map() }));
+
+      const { phases } = await runOrdersListPreferServer({ ...deps, fetchServerPhases });
+
+      expect(phases.get(created.id)).toMatchObject({ phase: 'active' });
+    });
+  });
+
+  describe('fetchDashboardOrderPhases', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('returns null after 3000ms when the fetch never settles until aborted', async () => {
+      const fetchImpl = vi.fn((_url: string, init?: { signal?: AbortSignal }) => new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+      })) as unknown as typeof fetch;
+
+      const resultPromise = fetchDashboardOrderPhases(undefined, { fetchImpl, timeoutMs: 3000 });
+      let settled = false;
+      resultPromise.then(() => { settled = true; });
+
+      await vi.advanceTimersByTimeAsync(2999);
+      expect(settled).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      await expect(resultPromise).resolves.toBeNull();
+      expect(settled).toBe(true);
+    });
   });
 
   it('queues a book in another registered project via --project from an unrelated cwd', async () => {
