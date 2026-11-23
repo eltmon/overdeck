@@ -27,6 +27,7 @@ import { Stream } from 'effect'
 import { loadSnapshotCacheEntry } from '../lib/snapshotCache'
 import { dispatchBackendReconnected, dispatchBackendReconnecting } from '../lib/backendConnectionEvents'
 import { probeServerHealth, useConnectionState } from '../lib/connectionState'
+import { holdAgentPendingInput, settleAgentPendingInput } from '../lib/agentPendingInputGate'
 
 const SNAPSHOT_FALLBACK_INTERVAL_MS = 2_000
 const STREAM_STALENESS_TIMEOUT_MS = 35_000
@@ -235,6 +236,9 @@ export function EventRouter() {
             }),
           ])
           if (gen !== generation) return null
+          // PAN-5604: agent pending input must not show a snapshot whose
+          // post-snapshot replay has not applied yet; settled below.
+          holdAgentPendingInput()
           syncSnapshot(snapshot)
           // Snapshot carries recent activity now; keep the HTTP backfill as a
           // non-fatal compatibility path for older cached/server payloads.
@@ -246,9 +250,13 @@ export function EventRouter() {
           const needsReplay = coordinator.completeSnapshotRecovery(snapshot.sequence)
           // A fresh snapshot already past the replay cap: fail this attempt so
           // the reconnect backoff paces the next one (PAN-4559).
-          if (needsReplay && (await replay(snapshot.sequence)) === 'too-far-behind') {
+          const replayOutcome = needsReplay ? await replay(snapshot.sequence) : 'caught-up'
+          if (replayOutcome === 'too-far-behind') {
             throw new Error('replay after snapshot is too far behind')
           }
+          // PAN-5604: a failed replay leaves the store frozen (coordinator not
+          // bootstrapped); the gate stays held until the next bootstrap.
+          if (replayOutcome === 'caught-up' && gen === generation) settleAgentPendingInput()
           if (reconnecting) {
             reconnecting = false
             reconnectAttempt = 0

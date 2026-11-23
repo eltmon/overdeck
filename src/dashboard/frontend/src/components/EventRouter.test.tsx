@@ -7,6 +7,7 @@ import { useDashboardStore } from '../lib/store'
 import { deriveConnectionPhase, useConnectionState } from '../lib/connectionState'
 import { installStrictFetchMock } from '../test-utils/strictFetchMock'
 import { BACKEND_RECONNECTED_EVENT, BACKEND_RECONNECTING_EVENT } from '../lib/backendConnectionEvents'
+import { NOTHING_SETTLED, useAgentPendingInputGate } from '../lib/agentPendingInputGate'
 
 const wsTransport = vi.hoisted(() => {
   const request = vi.fn()
@@ -145,6 +146,7 @@ describe('EventRouter memory updates', () => {
     document.body.innerHTML = ''
     resetDashboardStore()
     resetConnectionState()
+    useAgentPendingInputGate.setState({ held: NOTHING_SETTLED })
   })
 
   afterEach(async () => {
@@ -746,6 +748,7 @@ describe('EventRouter memory updates', () => {
 
     expect(request).toHaveBeenCalledTimes(2)
     expect(useConnectionState.getState().streamLive).toBe(false)
+    expect(useAgentPendingInputGate.getState().held).not.toBeNull()
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(2_500)
@@ -838,6 +841,91 @@ describe('EventRouter memory updates', () => {
     expect(request.mock.calls.length).toBeGreaterThan(callsAtThreeMinutes)
     expect(recoveryOverlay()).toBeNull()
     error.mockRestore()
+  })
+
+  it('keeps agent pending input held until the post-snapshot replay applies', async () => {
+    let resolveSnapshot: (value: DashboardSnapshot) => void = () => undefined
+    const snapshotPromise = new Promise<DashboardSnapshot>((resolve) => {
+      resolveSnapshot = resolve
+    })
+    let resolveReplay: (events: DomainEvent[]) => void = () => undefined
+    const replayPromise = new Promise<DomainEvent[]>((resolve) => {
+      resolveReplay = resolve
+    })
+    request.mockReturnValueOnce(snapshotPromise).mockReturnValueOnce(replayPromise)
+
+    render(<EventRouter />)
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(wsTransport.subscribed).not.toBeNull()
+
+    act(() => {
+      wsTransport.subscribed!(memoryObservationEvent(11))
+    })
+
+    await act(async () => {
+      resolveSnapshot({ ...snapshot, sequence: 10 })
+      await vi.advanceTimersByTimeAsync(0)
+    })
+
+    expect(useAgentPendingInputGate.getState().held).not.toBeNull()
+    expect(useConnectionState.getState().streamLive).toBe(true)
+
+    await act(async () => {
+      resolveReplay([memoryObservationEvent(11)])
+      await vi.advanceTimersByTimeAsync(0)
+    })
+
+    expect(useAgentPendingInputGate.getState().held).toBeNull()
+  })
+
+  it('leaves agent pending input held when the post-snapshot replay fails', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    let resolveSnapshot: (value: DashboardSnapshot) => void = () => undefined
+    const snapshotPromise = new Promise<DashboardSnapshot>((resolve) => {
+      resolveSnapshot = resolve
+    })
+    let rejectReplay: (err: Error) => void = () => undefined
+    const replayPromise = new Promise<DomainEvent[]>((_resolve, reject) => {
+      rejectReplay = reject
+    })
+    request.mockReturnValueOnce(snapshotPromise).mockReturnValueOnce(replayPromise)
+
+    render(<EventRouter />)
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(wsTransport.subscribed).not.toBeNull()
+
+    act(() => {
+      wsTransport.subscribed!(memoryObservationEvent(11))
+    })
+
+    await act(async () => {
+      resolveSnapshot({ ...snapshot, sequence: 10 })
+      await vi.advanceTimersByTimeAsync(0)
+    })
+
+    await act(async () => {
+      rejectReplay(new Error('replay offline'))
+      await vi.advanceTimersByTimeAsync(0)
+    })
+
+    expect(useAgentPendingInputGate.getState().held).not.toBeNull()
+    error.mockRestore()
+  })
+
+  it('settles agent pending input after a snapshot that needs no replay', async () => {
+    render(<EventRouter />)
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    expect(useAgentPendingInputGate.getState().held).toBeNull()
   })
 })
 
