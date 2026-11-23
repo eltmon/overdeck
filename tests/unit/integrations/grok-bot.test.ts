@@ -59,10 +59,14 @@ describe('integrations/grok-bot README', () => {
     expect(readme).toContain('examples/xai-api.py');
   });
 
-  it('leads with the one-paste flow and its Copy message', () => {
+  it('leads with Public MCP and keeps the connector flow under its own heading (PAN-5486)', () => {
     const readme = readFileSync(readmePath, 'utf-8');
 
-    expect(readme.match(/^## .*/m)?.[0]).toBe('## Connect in one paste');
+    expect(readme.match(/^## .*/m)?.[0]).toBe('## Before you start');
+    const publicMcp = readme.indexOf('## Grok Bot over Public MCP');
+    expect(publicMcp).toBeGreaterThan(-1);
+    expect(publicMcp).toBeLessThan(readme.indexOf("## The connector route (fails from Grok Bot's sandbox)"));
+    expect(readme).toContain('https://github.com/eltmon/overdeck/issues/5242');
     expect(readme).toContain(
       connectMessage({ platform: 'grok-bot', botName: defaultBotName('grok-bot'), machineLabel: '<machine>', version: '<version>', pairingString: '<pairing string>' }),
     );

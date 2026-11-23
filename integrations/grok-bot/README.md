@@ -1,82 +1,20 @@
 # Overdeck for Grok Bot and the xAI API
 
-This package lets Grok Bot reach your Overdeck machine through the Overdeck
-connector, and lets Grok Bot and the xAI Responses API reach it through the
-opt-in public MCP server: read conversations, see prompts that wait for you,
-and, with the access you grant, send messages and answer prompts.
+This package lets Grok Bot and the xAI Responses API reach your Overdeck
+machine through the opt-in public MCP server: read conversations, see prompts
+that wait for you, and, with the access you grant, send messages and answer
+prompts.
 
-## Connect in one paste
-
-In Overdeck, open Settings → Anywhere → Bots → Connect a bot, pick Grok Bot
-and its access, and click **Copy for Grok Bot**. Paste the copied message
-into Grok Bot's chat. It looks like this, with your machine, version and a
-one-time pairing string filled in:
-
-```text
-Please connect yourself to my Overdeck machine "<machine>" as "Grok Bot".
-
-Run this command in your shell. You can run it again at any time; each run continues where the last one stopped:
-
-npx -y @overdeck/core@<version> mcp connector connect '<pairing string>' --name 'Grok Bot' --platform grok-bot
-
-Then act on the last line it prints. That line starts with OVERDECK_CONNECT and holds JSON:
-- If "status" is "authorize", show me the "url" link. I will open it and click Authorize. When I tell you I did, run the same command again.
-- If "status" is "retry", do what "next" says, then run the same command again.
-- If "status" is "error", tell me the "code" and do what "next" says.
-- If "status" is "ready", register exactly the MCP server in "registration", call list_conversations once, and tell me the result.
-
-The pairing code in the command works once and expires soon. Do not save it anywhere. If it is refused, ask me to copy a new message from Overdeck.
-```
-
-Grok Bot runs the command and shows you one link. Open it, click
-**Authorize**, and tell Grok Bot you did. It runs the command again, pairs
-with your machine, and registers the connector. This package's `mcp.json`
-already holds that registration:
-
-```json
-{
-  "mcpServers": {
-    "overdeck": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@overdeck/core@0.90.1",
-        "mcp",
-        "connector",
-        "serve",
-        "--stdio"
-      ]
-    }
-  }
-}
-```
-
-If the command prints a newer version, use that one.
-
-The pairing code works once and expires within 30 minutes. If it is
-refused, click **Copy again** under Settings → Anywhere → Bots and paste
-the new message.
-
-## Status
-
-Version 0.1.0. Not published or listed in any catalog. What was checked
-before this release is recorded in [`docs/verification.md`](docs/verification.md).
-Live use from Grok Bot itself has not yet been verified.
-
-## What it includes
-
-- The plugin manifest (`.cursor-plugin/plugin.json`) and `mcp.json`, which
-  runs the Overdeck connector over stdio.
-- The shared `overdeck` skill (`skills/overdeck/SKILL.md`), a copy of
-  `integrations/shared/SKILL.md` — edit only the shared file, never this copy.
-- Runnable xAI API examples in `examples/`.
-
-No hooks and no credentials ship in this package.
+Grok Bot runs on xAI's servers. Use Public MCP for it: the connector route
+does not work from Grok Bot's sandbox, which has no WebRTC egress
+([PAN-5242](https://github.com/eltmon/overdeck/issues/5242)). Public MCP with
+Grok Bot has not been verified live yet; see
+[`docs/verification.md`](docs/verification.md).
 
 ## Before you start
 
-The Public MCP routes below (Grok Bot over Public MCP and the xAI API) need
-Public MCP switched on and published through Tailscale Funnel. See
+Both routes below (Grok Bot over Public MCP and the xAI API) need Public MCP
+switched on and published through Tailscale Funnel. See
 [Public MCP for hosted bots](https://overdeck.ai/configuration/mcp) and, in
 the dashboard, Settings → Anywhere → "Public MCP for hosted bots". The public
 URL has the shape `https://<machine>.<tailnet>.ts.net:8443/mcp`. The Connect a
@@ -169,6 +107,85 @@ matching OpenAI's Responses semantics, but whether xAI sends it bare or as
 [`docs/verification.md`](docs/verification.md) (check CP-8c). If Overdeck
 logs a 401 for the MCP call, change this field to `Bearer <token>` in both
 examples and in `botSnippets.xaiExample`, then re-run.
+
+## The connector route (fails from Grok Bot's sandbox)
+
+On 2026-11-14 Grok Bot ran the one-paste connect command three times and
+failed each time, because its sandbox has no WebRTC egress
+([PAN-5242](https://github.com/eltmon/overdeck/issues/5242)). Since 0.85.0
+the command reports this as `no-webrtc-egress`. The steps below stay for a
+Grok Bot environment that does have WebRTC egress, and this package's
+`mcp.json` still holds the connector registration.
+
+### Connect in one paste
+
+In Overdeck, open Settings → Anywhere → Bots → Connect a bot, pick Grok Bot,
+the **Overdeck connector** reach and its access, and click **Copy for Grok
+Bot**. Paste the copied message
+into Grok Bot's chat. It looks like this, with your machine, version and a
+one-time pairing string filled in:
+
+```text
+Please connect yourself to my Overdeck machine "<machine>" as "Grok Bot".
+
+Run this command in your shell. You can run it again at any time; each run continues where the last one stopped:
+
+npx -y @overdeck/core@<version> mcp connector connect '<pairing string>' --name 'Grok Bot' --platform grok-bot
+
+Then act on the last line it prints. That line starts with OVERDECK_CONNECT and holds JSON:
+- If "status" is "authorize", show me the "url" link. I will open it and click Authorize. When I tell you I did, run the same command again.
+- If "status" is "retry", do what "next" says, then run the same command again.
+- If "status" is "error", tell me the "code" and do what "next" says.
+- If "status" is "ready", register exactly the MCP server in "registration", call list_conversations once, and tell me the result.
+
+The pairing code in the command works once and expires soon. Do not save it anywhere. If it is refused, ask me to copy a new message from Overdeck.
+```
+
+Grok Bot runs the command and shows you one link. Open it, click
+**Authorize**, and tell Grok Bot you did. It runs the command again, pairs
+with your machine, and registers the connector. This package's `mcp.json`
+already holds that registration:
+
+```json
+{
+  "mcpServers": {
+    "overdeck": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@overdeck/core@0.90.1",
+        "mcp",
+        "connector",
+        "serve",
+        "--stdio"
+      ]
+    }
+  }
+}
+```
+
+If the command prints a newer version, use that one.
+
+The pairing code works once and expires within 30 minutes. If it is
+refused, click **Copy again** under Settings → Anywhere → Bots and paste
+the new message.
+
+## Status
+
+Version 0.1.0. Not published or listed in any catalog. What was checked
+before this release is recorded in [`docs/verification.md`](docs/verification.md).
+The connector route failed live from Grok Bot on 2026-11-14 (PAN-5242).
+Public MCP with Grok Bot has not been verified live yet.
+
+## What it includes
+
+- The plugin manifest (`.cursor-plugin/plugin.json`) and `mcp.json`, which
+  runs the Overdeck connector over stdio.
+- The shared `overdeck` skill (`skills/overdeck/SKILL.md`), a copy of
+  `integrations/shared/SKILL.md` — edit only the shared file, never this copy.
+- Runnable xAI API examples in `examples/`.
+
+No hooks and no credentials ship in this package.
 
 ## Access
 
