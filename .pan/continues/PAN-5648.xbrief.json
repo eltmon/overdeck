@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5648",
   "created": "2026-11-23T23:03:53.057Z",
-  "updated": "2026-11-23T23:36:16.324Z",
+  "updated": "2026-11-23T23:36:24.098Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -152,6 +152,11 @@
     "restore-refresh-snapshot.ac5": {
       "status": "completed",
       "doneAt": "2026-11-23T23:36:16.324Z"
+    },
+    "status-reclaimed-no-agent": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5648",
+      "claimedAt": "2026-11-23T23:36:24.098Z"
     }
   }
 }
