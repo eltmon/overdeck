@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5598",
   "created": "2026-11-23T02:56:35.201Z",
-  "updated": "2026-11-23T03:35:55.146Z",
+  "updated": "2026-11-23T04:04:25.236Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -72,9 +72,30 @@
       "doneAt": "2026-11-23T03:35:46.960Z"
     },
     "mcp-order-write-tools": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5598",
-      "claimedAt": "2026-11-23T03:35:55.146Z"
+      "claimedAt": "2026-11-23T03:35:55.146Z",
+      "doneAt": "2026-11-23T04:04:25.236Z"
+    },
+    "mcp-order-write-tools.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:04:25.236Z"
+    },
+    "mcp-order-write-tools.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:04:25.236Z"
+    },
+    "mcp-order-write-tools.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:04:25.236Z"
+    },
+    "mcp-order-write-tools.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:04:25.236Z"
+    },
+    "mcp-order-write-tools.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:04:25.236Z"
     }
   }
 }
