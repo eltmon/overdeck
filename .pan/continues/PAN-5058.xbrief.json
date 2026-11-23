@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5058",
   "created": "2026-11-23T02:58:48.676Z",
-  "updated": "2026-11-23T03:21:37.461Z",
+  "updated": "2026-11-23T03:21:50.041Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
     "w1-registration-audit.ac3": {
       "status": "completed",
       "doneAt": "2026-11-23T03:21:37.461Z"
+    },
+    "w1b-auth-scheme-audit": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5058",
+      "claimedAt": "2026-11-23T03:21:50.041Z"
     }
   }
 }
