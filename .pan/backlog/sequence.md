@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-22T06:01:38Z · model: claude-opus-5-5 · open: 941_
+_Last sequenced: 2026-11-23T02:21:36Z · model: claude-opus-5-5 · open: 942_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -282,6 +282,7 @@ _Last sequenced: 2026-11-22T06:01:38Z · model: claude-opus-5-5 · open: 941_
 | 264 | PAN-3533 | L | high | ok |  |  | No per-project resource partitioning, so one project's docker stacks and installs starve another project's pipeline and the dashboard. |
 | 265 | PAN-3107 | S | high | ok |  |  | OOM spikes are unattributable after the fact; productize the machine-local memory-attribution census stopgap. |
 | 266 | PAN-4512 | M | medium | needs-refinement |  |  | Tier escalation config is shown but nothing fires it since the Cut; choose a trigger, persist tierOverrides, re-dispatch |
+| 266 | PAN-5597 | M | medium | needs-refinement |  |  | Order books page rework: show the live book, simpler build/run. Body is a placeholder; PRD and mockup pending. |
 | 267 | PAN-1666 | XL | medium | ok | ✓ |  | Pipeline Throughput Hardening |
 | 268 | PAN-1556 | S | high | ok |  |  | Session/activity feed: coalesce review-spawn spam, supersede re-reviews per issue, keep active conversations most-recent |
 | 269 | PAN-4510 | S | medium | ok |  |  | Show effort on issue-view agent rows, conversation rows and Agents-page conversation entries; split from closed PAN-4259 |
@@ -1276,10 +1277,10 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-22T06:01:38Z",
+  "generatedAt": "2026-11-23T02:21:36Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 941,
+  "openCount": 942,
   "nodes": [
     {
       "issue": "PAN-5013",
@@ -4816,6 +4817,19 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "dependsOn": [],
       "why": "Tier escalation config is shown but nothing fires it since the Cut; choose a trigger, persist tierOverrides, re-dispatch",
       "rationale": "PAN-4257 (its blocker) closed, so the pure decideEscalation exists again. Trigger choice is still open in the body, so condition is needs-refinement; Settings currently implies escalation runs.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5597",
+      "rank": 266,
+      "size": "M",
+      "importance": "medium",
+      "score": 52,
+      "condition": "needs-refinement",
+      "dependsOn": [],
+      "why": "Order books page rework: show the live book, simpler build/run. Body is a placeholder; PRD and mockup pending.",
+      "rationale": "New issue. The body is still a placeholder awaiting its PRD, so it is needs-refinement; it ranks with other medium UI-discoverability work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13235,6 +13249,13 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-2424",
+      "to": "PAN-5597",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     },
     {
       "from": "PAN-2566",
