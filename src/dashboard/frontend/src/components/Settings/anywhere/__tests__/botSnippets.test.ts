@@ -2,6 +2,7 @@ import { buildConnectorPairLink } from '@overdeck/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
+  BOT_PLATFORMS,
   CONNECTOR_LOCAL_URL,
   PUBLIC_MCP_PLACEHOLDER_URL,
   XAI_ALLOWED_TOOLS,
@@ -21,6 +22,12 @@ import { connectMessage, connectMessageFor, connectPlatformFor, writeClipboard }
 
 const TAILSCALE_URL = 'https://box.tail1.ts.net/mcp';
 const TOKEN = 'odk_0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd';
+
+describe('BOT_PLATFORMS', () => {
+  it('lists Public MCP first for Grok Bot (PAN-5486)', () => {
+    expect(BOT_PLATFORMS.find((p) => p.id === 'grok-bot')?.reaches).toEqual(['public', 'connector']);
+  });
+});
 
 describe('hermesConfig', () => {
   it('connector reach carries the local URL and the connector bearer placeholder', () => {

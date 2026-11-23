@@ -1,0 +1,219 @@
+{
+  "version": "1",
+  "issueId": "PAN-5486",
+  "created": "2026-11-23T03:25:55.145Z",
+  "updated": "2026-11-23T04:07:25.149Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "core-pin-script": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5486",
+      "claimedAt": "2026-11-23T03:25:55.145Z",
+      "doneAt": "2026-11-23T03:27:58.332Z"
+    },
+    "core-pin-script.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:27:58.332Z"
+    },
+    "core-pin-script.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:27:58.332Z"
+    },
+    "core-pin-script.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:27:58.332Z"
+    },
+    "core-pin-script.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:27:58.332Z"
+    },
+    "core-pin-script.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:27:58.332Z"
+    },
+    "core-pin-stamp": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5486",
+      "claimedAt": "2026-11-23T03:28:10.113Z",
+      "doneAt": "2026-11-23T03:34:09.880Z"
+    },
+    "core-pin-stamp.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:34:09.880Z"
+    },
+    "core-pin-stamp.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:34:09.880Z"
+    },
+    "core-pin-stamp.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:34:09.880Z"
+    },
+    "core-pin-stamp.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:34:09.880Z"
+    },
+    "core-pin-release": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5486",
+      "claimedAt": "2026-11-23T03:34:11.440Z",
+      "doneAt": "2026-11-23T04:07:25.148Z"
+    },
+    "core-pin-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5486",
+      "claimedAt": "2026-11-23T03:47:16.087Z",
+      "doneAt": "2026-11-23T03:48:12.332Z"
+    },
+    "core-pin-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:48:12.332Z"
+    },
+    "core-pin-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:48:12.332Z"
+    },
+    "core-pin-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:48:12.332Z"
+    },
+    "core-pin-docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:48:12.332Z"
+    },
+    "grok-bot-dialog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5486",
+      "claimedAt": "2026-11-23T03:48:18.987Z",
+      "doneAt": "2026-11-23T03:51:48.095Z"
+    },
+    "grok-bot-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:51:48.095Z"
+    },
+    "grok-bot-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:51:48.095Z"
+    },
+    "grok-bot-dialog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:51:48.095Z"
+    },
+    "grok-bot-bots-mdx": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5486",
+      "claimedAt": "2026-11-23T03:51:50.655Z",
+      "doneAt": "2026-11-23T03:52:41.877Z"
+    },
+    "grok-bot-bots-mdx.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:52:41.877Z"
+    },
+    "grok-bot-bots-mdx.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:52:41.877Z"
+    },
+    "grok-bot-bots-mdx.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:52:41.877Z"
+    },
+    "grok-bot-mcp-mdx": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5486",
+      "claimedAt": "2026-11-23T03:52:43.334Z",
+      "doneAt": "2026-11-23T03:53:25.218Z"
+    },
+    "grok-bot-mcp-mdx.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:53:25.218Z"
+    },
+    "grok-bot-mcp-mdx.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:53:25.218Z"
+    },
+    "grok-bot-readme": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5486",
+      "claimedAt": "2026-11-23T03:53:26.965Z",
+      "doneAt": "2026-11-23T03:55:22.128Z"
+    },
+    "grok-bot-verification": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5486",
+      "claimedAt": "2026-11-23T03:54:50.583Z",
+      "doneAt": "2026-11-23T03:56:27.310Z"
+    },
+    "grok-bot-readme.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:55:22.128Z"
+    },
+    "grok-bot-readme.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:55:22.128Z"
+    },
+    "grok-bot-readme.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:55:22.128Z"
+    },
+    "grok-bot-verification.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:56:27.310Z"
+    },
+    "grok-bot-verification.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:56:27.310Z"
+    },
+    "grok-bot-verification.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:56:27.310Z"
+    },
+    "other-verification": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5486",
+      "claimedAt": "2026-11-23T03:56:29.388Z",
+      "doneAt": "2026-11-23T03:57:07.727Z"
+    },
+    "other-verification.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:57:07.727Z"
+    },
+    "other-verification.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:57:07.727Z"
+    },
+    "core-pin-ci-step": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5486",
+      "claimedAt": "2026-11-23T03:57:16.295Z",
+      "doneAt": "2026-11-23T03:58:21.609Z"
+    },
+    "core-pin-ci-step.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:58:21.609Z"
+    },
+    "core-pin-ci-step.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:58:21.609Z"
+    },
+    "core-pin-release.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:07:25.148Z"
+    },
+    "core-pin-release.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:07:25.148Z"
+    },
+    "core-pin-release.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:07:25.148Z"
+    },
+    "core-pin-release.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:07:25.148Z"
+    }
+  }
+}

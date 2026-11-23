@@ -108,9 +108,9 @@ section is how they reach the loop. They bind every tick.
    object) — never assume their defaults. Read `.pan/flywheel/state.md` for
    what earlier runs learned.
 2. Read `.pan/backlog/sequence.md` for the operator-set pickup order.
-3. If an order book is bound (started via `pan orders start`, or one is
-   `running`), read it with `pan orders show <book-id>` — its Lane A/B items
-   and prereqs take priority over the general backlog. A
+3. If a book is active (`pan orders list` shows one book with phase `active`),
+   read it with `pan orders show <book-id>`: its Lane A/B items and prereqs
+   take priority over the general backlog. A
    `/pan-flywheel <book-id> --project <key>` message that arrives while the
    loop is running binds that book: read it with
    `pan orders show <book-id> --project <key>` and work it from the next tick.
@@ -170,7 +170,7 @@ needed, park the item and ask the operator.
 
 ## Phase 2 — Pick the next item
 
-Walk the backlog sequence (or the bound order book's next lane item whose
+Walk the backlog sequence (or the active order book's next lane item whose
 prereqs are terminal) and pick the first issue that is not already in flight,
 not blocked, and not parked. "Parked" means the tracker issue carries the
 `parked` label or is listed in `.pan/parked.md` — skip it silently, it was

@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { _resetInternalTokenCacheForTests, INTERNAL_TOKEN_HEADER } from '../../../../lib/internal-token.js';
 import type { OrderIssueLookup, OrderIssueState } from '../../../../lib/orders/types.js';
+import { setStatus } from '../../../../lib/orders/writer.js';
 import type { ProjectConfig } from '../../../../lib/projects.js';
 import { makeOrdersRouteLayer } from '../orders.js';
 
@@ -312,6 +313,146 @@ describe('/api/orders routes', () => {
     expect(lookup).toHaveBeenCalledWith(['PAN-1', 'PAN-2']);
   });
 
+  it('returns phase active for the first ready book and queued with queuePosition 2 for the next', async () => {
+    const root = gitFixture();
+    const states = new Map<string, OrderIssueState>([
+      ['PAN-1', { issue: 'PAN-1', open: true, parked: false }],
+      ['PAN-2', { issue: 'PAN-2', open: true, parked: false }],
+      ['PAN-3', { issue: 'PAN-3', open: false, parked: false }],
+      ['PAN-4', { issue: 'PAN-4', open: false, parked: false }],
+    ]);
+    const layer = makeOrdersRouteLayer({ stateRoot: () => root, issueLookup: issueLookup(states), hasPrd: () => true });
+    const books = [
+      ['2026-07-18-first', 'PAN-1', 'ready'],
+      ['2026-07-18-second', 'PAN-2', 'ready'],
+      ['2026-07-18-draft', 'PAN-3', 'draft'],
+      ['2026-07-18-archived', 'PAN-4', 'complete'],
+    ] as const;
+    for (const [id, issue, status] of books) {
+      await requestOrdersRoute(layer, '/api/orders', mutation('POST', { id, name: id }));
+      await requestOrdersRoute(layer, `/api/orders/${id}/items`, mutation('POST', { items: [{ issue, lane: 'A' }] }));
+      if (status !== 'draft') await setStatus(root, id, status);
+    }
+
+    await expect(requestOrdersRoute(layer, '/api/orders')).resolves.toMatchObject({
+      status: 200,
+      body: { books: [
+        { id: '2026-07-18-first', phase: 'active', queuePosition: 1, finished: false },
+        { id: '2026-07-18-second', phase: 'queued', queuePosition: 2, finished: false },
+        { id: '2026-07-18-draft', phase: 'draft', queuePosition: null, finished: true },
+        { id: '2026-07-18-archived', phase: 'archived', queuePosition: null, finished: true },
+      ] },
+    });
+    await expect(requestOrdersRoute(layer, '/api/orders/2026-07-18-second')).resolves.toMatchObject({
+      status: 200,
+      body: { id: '2026-07-18-second', phase: 'queued', queuePosition: 2, finished: false },
+    });
+  });
+
+  describe('status transitions', () => {
+    const openStates = new Map<string, OrderIssueState>([
+      ['PAN-1', { issue: 'PAN-1', open: true, parked: false }],
+      ['PAN-2', { issue: 'PAN-2', open: true, parked: false }],
+    ]);
+
+    async function bookWith(layer: ReturnType<typeof makeOrdersRouteLayer>, id: string, issue: string, queue = true) {
+      await requestOrdersRoute(layer, '/api/orders', mutation('POST', { id, name: id }));
+      await requestOrdersRoute(layer, `/api/orders/${id}/items`, mutation('POST', { items: [{ issue, lane: 'A' }] }));
+      if (queue) await requestOrdersRoute(layer, `/api/orders/${id}`, mutation('PATCH', { status: 'ready' }));
+    }
+
+    it('moves a ready book back to draft', async () => {
+      const root = gitFixture();
+      const layer = makeOrdersRouteLayer({ stateRoot: () => root, issueLookup: issueLookup(openStates), hasPrd: () => true });
+      await bookWith(layer, '2026-07-18-first', 'PAN-1');
+
+      await expect(requestOrdersRoute(layer, '/api/orders/2026-07-18-first', mutation('PATCH', { status: 'draft' })))
+        .resolves.toMatchObject({ status: 200, body: { status: 'draft', phase: 'draft', queuePosition: null } });
+    });
+
+    it('archives a ready book and frees the active slot for the next ready book', async () => {
+      const root = gitFixture();
+      const layer = makeOrdersRouteLayer({ stateRoot: () => root, issueLookup: issueLookup(openStates), hasPrd: () => true });
+      await bookWith(layer, '2026-07-18-first', 'PAN-1');
+      await bookWith(layer, '2026-07-18-second', 'PAN-2');
+
+      await expect(requestOrdersRoute(layer, '/api/orders/2026-07-18-first', mutation('PATCH', { status: 'complete' })))
+        .resolves.toMatchObject({ status: 200, body: { status: 'complete', phase: 'archived' } });
+      await expect(requestOrdersRoute(layer, '/api/orders')).resolves.toMatchObject({
+        status: 200,
+        body: { books: [
+          { id: '2026-07-18-first', phase: 'archived' },
+          { id: '2026-07-18-second', phase: 'active', queuePosition: 1 },
+        ] },
+      });
+    });
+
+    it('restores an archived book as a draft', async () => {
+      const root = gitFixture();
+      const layer = makeOrdersRouteLayer({ stateRoot: () => root, issueLookup: issueLookup(openStates), hasPrd: () => true });
+      await bookWith(layer, '2026-07-18-first', 'PAN-1');
+      await requestOrdersRoute(layer, '/api/orders/2026-07-18-first', mutation('PATCH', { status: 'complete' }));
+
+      await expect(requestOrdersRoute(layer, '/api/orders/2026-07-18-first', mutation('PATCH', { status: 'draft' })))
+        .resolves.toMatchObject({ status: 200, body: { status: 'draft', phase: 'draft' } });
+    });
+
+    it('refuses to restore an archived book whose issue now belongs to another book with a 409', async () => {
+      const root = gitFixture();
+      const layer = makeOrdersRouteLayer({ stateRoot: () => root, issueLookup: issueLookup(openStates), hasPrd: () => true });
+      await bookWith(layer, '2026-07-18-old', 'PAN-1');
+      await requestOrdersRoute(layer, '/api/orders/2026-07-18-old', mutation('PATCH', { status: 'complete' }));
+      await bookWith(layer, '2026-07-18-new', 'PAN-1');
+
+      await expect(requestOrdersRoute(layer, '/api/orders/2026-07-18-old', mutation('PATCH', { status: 'draft' })))
+        .resolves.toEqual({
+          status: 409,
+          body: { error: 'Order book 2026-07-18-old cannot be restored: PAN-1 already belongs to order book 2026-07-18-new' },
+        });
+      await expect(requestOrdersRoute(layer, '/api/orders/2026-07-18-old'))
+        .resolves.toMatchObject({ status: 200, body: { status: 'complete' } });
+    });
+
+    it('refuses complete to ready with a 400', async () => {
+      const root = gitFixture();
+      const layer = makeOrdersRouteLayer({ stateRoot: () => root, issueLookup: issueLookup(openStates), hasPrd: () => true });
+      await bookWith(layer, '2026-07-18-first', 'PAN-1');
+      await requestOrdersRoute(layer, '/api/orders/2026-07-18-first', mutation('PATCH', { status: 'complete' }));
+
+      await expect(requestOrdersRoute(layer, '/api/orders/2026-07-18-first', mutation('PATCH', { status: 'ready' })))
+        .resolves.toEqual({
+          status: 400,
+          body: { error: 'Order book 2026-07-18-first must be draft before it can be queued' },
+        });
+      await expect(requestOrdersRoute(layer, '/api/orders/2026-07-18-first', mutation('PATCH', { status: 'running' })))
+        .resolves.toEqual({
+          status: 400,
+          body: { error: 'status may only transition to ready, draft, or complete through this route' },
+        });
+      await expect(requestOrdersRoute(layer, '/api/orders/2026-07-18-first'))
+        .resolves.toMatchObject({ status: 200, body: { status: 'complete' } });
+    });
+
+    it('starts a ready book whose landed issues are closed', async () => {
+      const root = gitFixture();
+      const states = new Map<string, OrderIssueState>([
+        ['PAN-1', { issue: 'PAN-1', open: false, parked: false }],
+        ['PAN-2', { issue: 'PAN-2', open: false, parked: false }],
+      ]);
+      const startOrderBook = vi.fn(async () => ({ runId: 'RUN-7' }));
+      const layer = makeOrdersRouteLayer({ stateRoot: () => root, issueLookup: issueLookup(states), hasPrd: () => true, startOrderBook });
+      await requestOrdersRoute(layer, '/api/orders', mutation('POST', { id: '2026-07-18-landed', name: 'Landed' }));
+      await requestOrdersRoute(layer, '/api/orders/2026-07-18-landed/items', mutation('POST', {
+        items: [{ issue: 'PAN-1', lane: 'A' }, { issue: 'PAN-2', lane: 'A' }],
+      }));
+      await setStatus(root, '2026-07-18-landed', 'ready');
+
+      await expect(requestOrdersRoute(layer, '/api/orders/2026-07-18-landed/start', mutation('POST')))
+        .resolves.toEqual({ status: 200, body: { ok: true, runId: 'RUN-7', warnings: [] } });
+      expect(startOrderBook).toHaveBeenCalledOnce();
+    });
+  });
+
   it('returns sequenced backlog candidates excluding every active-book member', async () => {
     const root = gitFixture();
     const layer = makeOrdersRouteLayer({ stateRoot: () => root });
@@ -452,7 +593,7 @@ describe('/api/orders routes', () => {
 
     await expect(requestOrdersRoute(layer, '/api/orders/2026-07-18-scanned')).resolves.toMatchObject({
       status: 200,
-      body: { id: '2026-07-18-scanned', project: 'other-project' },
+      body: { id: '2026-07-18-scanned', project: 'other-project', phase: 'draft', queuePosition: null },
     });
   });
 

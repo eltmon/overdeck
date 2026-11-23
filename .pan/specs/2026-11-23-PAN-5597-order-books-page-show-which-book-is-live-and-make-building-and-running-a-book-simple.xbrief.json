@@ -1,0 +1,1701 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-23T02:30:37Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5597: Order books page: show which book is live, and make building and running a book simple",
+    "updated": "2026-11-23T02:38:24.055Z"
+  },
+  "plan": {
+    "id": "pan-5597",
+    "title": "Order books page: show which book is live, and make building and running a book simple",
+    "status": "running",
+    "uid": "f29e5a31-ea5e-4bcb-b700-fbe85503251f",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-23T02:30:37Z",
+    "updated": "2026-11-23T02:38:24.055Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5597",
+        "label": "PAN-5597",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5597/.pan/drafts/pan-5597.md",
+        "label": "PRD draft (.pan/drafts/pan-5597.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "docs/design/mockups/order-books-rework-pan-5597.html",
+        "label": "Clickable mockup (visual spec)",
+        "type": "design"
+      }
+    ],
+    "tags": [
+      "orders",
+      "order-books",
+      "flywheel",
+      "dashboard",
+      "cli",
+      "ux"
+    ],
+    "metadata": {
+      "sizeJustification": "One page rework approved as one PRD and one mockup. The new page replaces nine components that the current page imports, so the page cannot ship half-replaced; the server phase field exists only for this page and the Flywheel card. A server/UI sibling split would still fail the lint, because the docs, scripts baselines, changelog and skill files each count as their own subsystem. Items are already decomposed into 22 independently verifiable slices with a staged DAG (foundations, additive components, swaps, one cleanup).",
+      "canonicalFilename": "2026-11-23-PAN-5597-order-books-page-show-which-book-is-live-and-make-building-and-running-a-book-simple.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The Order books page never says which book the Flywheel works from, draws three lifecycle steps nothing ever writes, offers no way to unqueue, archive or rename a book, reports every landed issue as a blocking error (so a partly landed book cannot start), truncates issue titles, splits one list into Setup and Progress views, uses jargon and wrong off-book copy, hides the main action at the bottom, and splits adding issues across two rails. The Flywheel skill also only reads a book that is 'bound' or 'running', and nothing ever writes 'running'.",
+      "Proposal": "Derive phase (draft/active/queued/archived), queue position and finished on the server from currentOrderBook (moved to src/lib/orders/phase.ts) and return them on every book. Extend PATCH /api/orders/:id with unqueue (ready->draft), archive (draft/ready->complete) and restore (complete->draft, refused 409 when an issue joined another live book). Stop counting landed issues as blockers in non-draft books. Add pan orders unqueue/archive/unarchive and a Phase column in pan orders list. Rebuild the page per the mockup: left book list grouped by phase, a header with one sentence and phase actions, notices, one issue list with two stacked lanes and plain waiting reasons, one Add issues panel. The Flywheel status, card and skill follow the active book. Docs, screenshots and changelog follow.",
+      "NonGoals": "- Changing which book dispatch treats as active (currentOrderBook keeps its rule), or auto-advancing the queue past a finished book.\n- Reordering the queue.\n- Deleting a book file.\n- Committing order-book writes made through the dashboard routes (the CLI commits; routes do not).\n- New HTTP routes, no-loss-matrix rows or route-scopes entries.\n- New stored state or changes to the OrderBook file shape or status literals.\n- The Backlog page's '+ Order book' action, BacklogSequencerPage's promotionTarget logic and its two generic /orders links, and the issue action menu's 'Add to order book' action.\n- Changing the off-book dispatch message in src/lib/orders/eligibility.ts.\n- Editing .claude/skills/ sync targets directly.\n- Raising or adding any react-compiler, manual-memo, file-size or allowlist row."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Keep PAN-5597 as one issue and set plan.metadata.sizeJustification instead of splitting into sibling issues.",
+        "rationale": "The operator approved one PRD and one mockup for one page; the page cannot be half-replaced, and a server/UI split still exceeds the subsystem limit because docs, scripts and skill files each count as a subsystem."
+      },
+      {
+        "summary": "Apply all three PRD-author amendments (conv-20261123-4045): restore refusal on duplicate membership (409), Flywheel skill reads the active book (WI-9), softer active-book sentence.",
+        "rationale": "They came from the PRD author mid-session and correct real defects: an unchecked restore would make membership() throw across the project's order routes; the skill text otherwise contradicts the page."
+      },
+      {
+        "summary": "Put the restore guard in one exported helper assertRestorable in src/lib/orders/writer.ts used by both the route and pan orders unarchive.",
+        "rationale": "One rule, one error text; writer.ts already imports listBooks and sits beside setStatus."
+      },
+      {
+        "summary": "Split the PRD's page tests by component (BookList.test.tsx, BookHeader.test.tsx, rewritten OrderBookPage.test.tsx) with test names unchanged.",
+        "rationale": "Each plan item then ships and verifies its own tests."
+      },
+      {
+        "summary": "Land new components additively, then swap the page and Flywheel card, then delete the old components and baseline rows in one cleanup item.",
+        "rationale": "The current page and card import every component being deleted; this order keeps the tree compiling after every item."
+      },
+      {
+        "summary": "Register new and rewritten frontend tests in scripts/frontend-test-subset.txt, not package.json.",
+        "rationale": "PAN-4697 moved the list to that file; the PRD's package.json reference had drifted. The existing order-book tests were never in the list, so CI never ran them."
+      },
+      {
+        "summary": "Produce screenshot fixture state with Playwright page.route interception in an isolated browser profile.",
+        "rationale": "Gives a deterministic active book with landed, working and waiting issues without tracker writes or shared browser state."
+      }
+    ],
+    "items": [
+      {
+        "id": "phase-lib",
+        "title": "Derive book phase, queue position and finished in src/lib/orders/phase.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T02:30:37Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5597",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/orders/phase.ts",
+            "src/lib/cloister/flywheel.ts",
+            "tests/unit/lib/cloister/flywheel-active-order-book.test.ts",
+            "tests/unit/lib/orders/orders-phase.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/orders/orders-phase.test.ts tests/unit/lib/cloister/flywheel-active-order-book.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ],
+          "foundationFor": [
+            "api-phase-fields",
+            "cli-list-phase",
+            "flywheel-summary-active"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Create src/lib/orders/phase.ts. Move currentOrderBook from src/lib/cloister/flywheel.ts into it unchanged (anchor: '/** The book in flight: the running one, or the next one queued up ready. */'); flywheel.ts imports it from '../orders/phase.js' and does not re-export it; the cloister test imports it from src/lib/orders/phase.js. Add OrderBookPhase ('draft'|'active'|'queued'|'archived'), OrderBookPhaseView {phase, queuePosition, finished} and deriveBookPhases(books, progressOf) returning Map<bookId, view>. Rules in order: complete -> archived, null position; draft -> draft, null position; otherwise active when the book is currentOrderBook(books), else queued; queuePosition = 1-based index in books.filter(status not draft/complete) with the active book moved to position 1; finished = progress.total > 0 && progress.drained for every phase. phase.ts imports only types from @overdeck/contracts: never from src/lib/cloister/ or src/lib/orders/resolver.ts (lint:circular). Tests named in PRD WI-1."
+        },
+        "items": [
+          {
+            "id": "phase-lib.ac1",
+            "title": "Given books in index order with statuses ready, ready, draft, when deriveBookPhases runs, then it returns active with queuePosition 1, queued with queuePosition 2, and draft with queuePosition null.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phase-lib.ac2",
+            "title": "Given an earlier ready book and a later running book, when deriveBookPhases runs, then the running book is active with queuePosition 1 and the ready book is queued with queuePosition 2.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phase-lib.ac3",
+            "title": "Given a book with zero items, when deriveBookPhases runs, then finished is false; given a non-empty book whose progress is drained, then finished is true in every phase including archived.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phase-lib.ac4",
+            "title": "Given the move, when tests/unit/lib/cloister/flywheel-active-order-book.test.ts imports currentOrderBook from src/lib/orders/phase.js, then its existing assertions still pass and src/lib/cloister/flywheel.ts no longer exports currentOrderBook.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "validate-landed",
+        "title": "Stop reporting landed issues as blocking findings in non-draft books",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T02:30:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5597",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/orders/validate.ts",
+            "tests/unit/lib/orders/orders-validate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/orders/orders-validate.test.ts"
+          ],
+          "expected_outputs": [
+            "orders-validate.test.ts passes including the three new tests"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2 step 3. In validateBookForStart (src/lib/orders/validate.ts, anchor 'if (!state?.open) {' before code 'issue-not-open'), skip an item when book.status !== 'draft' and state exists and state.open === false. Keep the block when state is undefined (unresolvable) and for every draft book. Tests: 'a closed issue blocks a draft book'; 'a closed issue does not block a ready book'; 'an unresolvable issue blocks a ready book'."
+        },
+        "items": [
+          {
+            "id": "validate-landed.ac1",
+            "title": "Given a draft book containing a closed issue, when validateBookForStart runs, then blocks contains an issue-not-open finding for it.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate-landed.ac2",
+            "title": "Given a ready book containing a closed issue, when validateBookForStart runs, then blocks contains no issue-not-open finding for it.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate-landed.ac3",
+            "title": "Given a ready book containing an issue the lookup cannot resolve, when validateBookForStart runs, then blocks still contains an issue-not-open finding with 'could not be resolved as an open issue'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "restore-guard",
+        "title": "Add assertRestorable to refuse restoring a book whose issue belongs to another live book",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T02:30:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5597",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/orders/writer.ts",
+            "tests/unit/lib/orders/orders-writer.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/orders/orders-writer.test.ts"
+          ],
+          "expected_outputs": [
+            "orders-writer.test.ts passes including the new assertRestorable tests"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-17"
+          ],
+          "foundationFor": [
+            "api-status-transitions",
+            "cli-verbs"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2 step 2 'Restore guard' (Amendment 1). Export assertRestorable(panDir, book) from src/lib/orders/writer.ts beside setStatus. It lists books with listBooks(panDir); for each item of the given book in item order (upper-cased issue id), if another book (id !== book.id) whose status is not 'complete' contains the issue, throw new Error(`Order book ${book.id} cannot be restored: ${ISSUE} already belongs to order book ${otherId}`) for the first conflict. Otherwise return. It does not write anything. Callers (route and CLI) call it only when the book's current status is 'complete' and the target is 'draft'."
+        },
+        "items": [
+          {
+            "id": "restore-guard.ac1",
+            "title": "Given an archived book whose issue PAN-1 is also in a ready book B, when assertRestorable runs, then it throws 'Order book <id> cannot be restored: PAN-1 already belongs to order book B'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "restore-guard.ac2",
+            "title": "Given an archived book whose issues appear only in other archived books, when assertRestorable runs, then it returns without throwing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "restore-guard.ac3",
+            "title": "Given any call, when assertRestorable runs, then no book file under the plan home changes (it performs no write).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "api-phase-fields",
+        "title": "Return phase, queuePosition and finished on every book from the orders API",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T02:30:37Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-5597",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/orders.ts",
+            "src/dashboard/server/routes/__tests__/orders.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/orders.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "orders route tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2 step 1. In enrichedBook (src/dashboard/server/routes/orders.ts) add phase, queuePosition and finished from deriveBookPhases(books, (b) => computeBookProgress(b, issueLookup)), books = snapshot?.books ?? listBooks(stateRoot). In getOrdersPayload compute the map once from the snapshot and pass it into enrichedBook so a list read does not recompute it per book. If the book is missing from the map (a write raced), fall back to {phase: complete->'archived', draft->'draft', else 'queued', queuePosition: null, finished: false}. getOrderPayload's cross-project scan path calls listBooks on the scanned project's panDir (CP-3). Test: 'returns phase active for the first ready book and queued with queuePosition 2 for the next'."
+        },
+        "items": [
+          {
+            "id": "api-phase-fields.ac1",
+            "title": "Given two ready books in index order, when the client sends GET /api/orders, then the first book returns phase 'active' with queuePosition 1 and the second returns phase 'queued' with queuePosition 2.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-phase-fields.ac2",
+            "title": "Given a draft book and a complete book, when the client sends GET /api/orders, then they return phase 'draft' and 'archived' with queuePosition null.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-phase-fields.ac3",
+            "title": "Given a single-book read, when the client sends GET /api/orders/:id, then the response includes phase, queuePosition and finished computed against the project's full book list.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "api-status-transitions",
+        "title": "Accept unqueue, archive and restore moves on PATCH /api/orders/:id",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T02:30:37Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-5597",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/orders.ts",
+            "src/dashboard/server/routes/__tests__/orders.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/orders.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "orders route tests pass including the transition, 409 restore and start tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-17"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2 step 2. Replace the status guard in patchOrderPayload (anchor \"status may only transition to ready through this route\"). Allowed: ready from draft (message unchanged); draft from ready or complete ('Order book <id> must be queued or archived before it can be moved back to draft'); complete from draft or ready ('Order book <id> must be draft or queued before it can be archived'). Other targets: 'status may only transition to ready, draft, or complete through this route'. Keep 'runId is server-controlled'. When the current status is complete and the target is draft, call assertRestorable(stateRoot, book) from src/lib/orders/writer.ts before writing (409 via the existing 'already belongs' errorResult pattern). Then setStatus(stateRoot, bookId, target). No new route, no no-loss-matrix row, no route-scopes entry. Tests (PRD WI-2): moves a ready book back to draft; archives a ready book and frees the active slot for the next ready book; restores an archived book as a draft; refuses to restore an archived book whose issue now belongs to another book with a 409; refuses complete to ready with a 400; starts a ready book whose landed issues are closed (POST /api/orders/:id/start returns 200, not 422)."
+        },
+        "items": [
+          {
+            "id": "api-status-transitions.ac1",
+            "title": "Given a ready book followed by another ready book, when the client sends PATCH /api/orders/:id {\"status\":\"complete\"} for the first, then the response is 200 with phase 'archived' and GET /api/orders returns the second book with phase 'active'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-status-transitions.ac2",
+            "title": "Given a complete book, when the client sends PATCH {\"status\":\"ready\"}, then the route returns 400 and the book stays complete.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-status-transitions.ac3",
+            "title": "Given an archived book whose issue now belongs to a queued book, when the client sends PATCH {\"status\":\"draft\"}, then the route returns 409 with 'cannot be restored: <ISSUE> already belongs to order book <otherId>' and the book stays complete.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-status-transitions.ac4",
+            "title": "Given a ready book whose issues are all closed, when the client sends POST /api/orders/:id/start, then the route returns 200 instead of 422.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-verbs",
+        "title": "Add pan orders unqueue, archive and unarchive",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T02:30:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5597",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/orders.ts",
+            "tests/unit/cli/orders.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/orders.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "CLI orders tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-17"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3 steps 1-2. Add runOrdersUnqueue, runOrdersArchive, runOrdersUnarchive next to runOrdersQueue (anchor 'export async function runOrdersQueue'), each following it exactly: load the book, check the source status (unqueue needs ready; archive needs draft or ready; unarchive needs complete), call setStatus, then commitOrders with subject 'chore(orders): unqueue order book <id>' / 'archive order book <id>' / 'unarchive order book <id>'. Unqueue and unarchive set draft; archive sets complete. runOrdersUnarchive calls assertRestorable(panDir, book) before setStatus. Register 'unqueue <id>', 'archive <id>', 'unarchive <id>' beside .command('queue <id>') with --project <key> and descriptions 'Move a queued order book back to draft', 'Archive an order book and free its issues', 'Restore an archived order book as a draft'. Tests: unqueue moves a ready book to draft and commits; archive refuses a book that is already archived; unarchive restores a complete book as draft; unarchive refuses when an issue belongs to another non-archived book."
+        },
+        "items": [
+          {
+            "id": "cli-verbs.ac1",
+            "title": "Given a ready book, when runOrdersUnqueue runs, then the book file has status draft and commitOrders receives 'chore(orders): unqueue order book <id>'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-verbs.ac2",
+            "title": "Given a complete book, when runOrdersArchive runs, then it rejects and the book file is unchanged.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-verbs.ac3",
+            "title": "Given a complete book whose issue belongs to another ready book, when runOrdersUnarchive runs, then it rejects with 'cannot be restored: <ISSUE> already belongs to order book <otherId>' and the book stays complete.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-verbs.ac4",
+            "title": "Given the registered program, when pan orders --help renders, then it lists unqueue, archive and unarchive with their descriptions.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-list-phase",
+        "title": "Show the derived phase in pan orders list",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T02:30:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5597",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/orders.ts",
+            "tests/unit/cli/orders.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/orders.test.ts"
+          ],
+          "expected_outputs": [
+            "CLI orders tests pass including 'list shows active, queued #2, draft and archived'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3 step 3. formatBookList (anchor \"const headers = ['ID', 'Status', 'Items', 'Name'];\"): replace the Status column with Phase. Values: 'active', 'queued #<n>', 'draft', 'archived', with ' (finished)' appended when finished. runOrdersList computes them with deriveBookPhases(books, (b) => computeBookProgress(b)) from src/lib/orders/phase.ts. formatBookList's signature gains the phase map (update its callers and tests)."
+        },
+        "items": [
+          {
+            "id": "cli-list-phase.ac1",
+            "title": "Given books with statuses ready, ready, draft and complete, when pan orders list prints, then the Phase column reads 'active', 'queued #2', 'draft' and 'archived'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-list-phase.ac2",
+            "title": "Given an active book whose issues are all closed, when pan orders list prints, then its Phase reads 'active (finished)'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-list-phase.ac3",
+            "title": "Given the list output, when it renders, then the header row contains 'Phase' and no 'Status' column.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "flywheel-summary-active",
+        "title": "Flywheel status summary reports the active book, not only a running one",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T02:30:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5597",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/flywheel/derive-status.ts",
+            "tests/unit/lib/flywheel/derive-status.test.ts",
+            "tests/unit/dashboard/server/routes/flywheel-status.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/flywheel/derive-status.test.ts tests/unit/dashboard/server/routes/flywheel-status.test.ts"
+          ],
+          "expected_outputs": [
+            "both test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 step 1. In defaultRunningBook (src/lib/flywheel/derive-status.ts, anchor \"books.find((b) => b.status === 'running')\") use currentOrderBook(books) from a dynamic import of '../orders/phase.js' (like the resolver import already in that function). Add a derive-status test: a single ready book with no running book is reported as the order book summary. Update flywheel-status.test.ts only if a fixture relies on the running-only rule."
+        },
+        "items": [
+          {
+            "id": "flywheel-summary-active.ac1",
+            "title": "Given one ready book and no running book, when defaultRunningBook runs, then it returns that book's id, name, landed and total.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "flywheel-summary-active.ac2",
+            "title": "Given only draft and complete books, when defaultRunningBook runs, then it returns null.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "flywheel-skill-active-book",
+        "title": "Flywheel skill reads the active book from pan orders list",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T02:30:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5597",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/pan-flywheel/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:prompt-trailer",
+            "grep -n \"phase\" sync-sources/skills/pan-flywheel/SKILL.md"
+          ],
+          "expected_outputs": [
+            "lint:prompt-trailer reports ok",
+            "grep shows the new Phase 1 step 3 text"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-16"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9 (Amendment 2). Edit sync-sources/skills/pan-flywheel/SKILL.md only, never .claude/skills/. Phase 1 step 3 (anchor 'If an order book is bound') becomes: '3. If a book is active (`pan orders list` shows one book with phase `active`), read it with `pan orders show <book-id>`: its Lane A/B items and prereqs take priority over the general backlog.' Phase 2 (anchor \"the bound order book's next lane item\") becomes 'the active order book's next lane item'. Leave the intro's pan orders start sentence and the 'Backlog and bound book both exhausted' stop condition. The commit must carry the trailer 'Prompt-Change: flywheel reads the active order book from pan orders list (PAN-5597)' because scripts/check-prompt-change-trailer.sh guards this file."
+        },
+        "items": [
+          {
+            "id": "flywheel-skill-active-book.ac1",
+            "title": "Given the edited skill, when Phase 1 step 3 is read, then it names the active book and `pan orders list` and no longer contains 'bound' or 'one is running'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "flywheel-skill-active-book.ac2",
+            "title": "Given the edited skill, when Phase 2 is read, then it says 'the active order book's next lane item'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "flywheel-skill-active-book.ac3",
+            "title": "Given the branch, when npm run lint:prompt-trailer runs, then it exits 0 because a commit carries a Prompt-Change: trailer.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-types",
+        "title": "Move order book view types to components/orders/types.ts and add phase fields",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T02:30:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5597",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/orders/types.ts",
+            "src/dashboard/frontend/src/components/orders/BookStrip.tsx",
+            "src/dashboard/frontend/src/components/orders/__tests__/LaneEditor.test.tsx",
+            "src/dashboard/frontend/src/components/orders/__tests__/ProgressPanel.test.tsx",
+            "src/dashboard/frontend/src/components/orders/__tests__/RunSettingsPanel.test.tsx",
+            "src/dashboard/frontend/src/components/orders/__tests__/AddIssuesRail.test.tsx",
+            "src/dashboard/frontend/src/components/orders/__tests__/BacklogCandidatesRail.test.tsx",
+            "src/dashboard/frontend/src/pages/__tests__/OrderBookPage.test.tsx",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelOrderBookCard.test.tsx",
+            "src/dashboard/frontend/src/pages/OrderBookPage.tsx",
+            "src/dashboard/frontend/src/components/flywheel/FlywheelOrderBookCard.tsx",
+            "src/dashboard/frontend/src/components/orders/LaneEditor.tsx",
+            "src/dashboard/frontend/src/components/orders/LaneItem.tsx",
+            "src/dashboard/frontend/src/components/orders/ProgressPanel.tsx",
+            "src/dashboard/frontend/src/components/orders/RunSettingsPanel.tsx",
+            "src/dashboard/frontend/src/components/orders/ValidationPanel.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run typecheck"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "frontend tsc completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ],
+          "foundationFor": [
+            "item-status",
+            "book-issue-list",
+            "more-settings",
+            "add-issues-panel",
+            "book-list",
+            "book-header",
+            "flywheel-card",
+            "page-shell"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5 step 1. Move OrderBookView, OrderBookProgressView, OrderBookProgressItemView and OrderBookFindingView from BookStrip.tsx to new components/orders/types.ts. Add to OrderBookView: phase: 'draft' | 'active' | 'queued' | 'archived'; queuePosition: number | null; finished: boolean. Re-point every importer (grep \"from './BookStrip'\" and \"from '../orders/BookStrip'\") to types.ts. BookStrip.tsx keeps rendering and imports its types from types.ts. No behavior change; no component is deleted here. Fix test fixtures that build OrderBookView objects so they typecheck (add phase/queuePosition/finished)."
+        },
+        "items": [
+          {
+            "id": "frontend-types.ac1",
+            "title": "Given the change, when grep -rn \"OrderBookView\" src/dashboard/frontend/src runs, then every import of the type resolves to components/orders/types.ts and BookStrip.tsx exports no type.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-types.ac2",
+            "title": "Given OrderBookView, when a fixture omits phase, queuePosition or finished, then the frontend typecheck rejects it.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-types.ac3",
+            "title": "Given the change, when the existing order-book component tests run, then they still render the same output.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "item-status",
+        "title": "Pure itemStatus function: one status and waiting reason per issue row",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T02:30:37Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5597",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/orders/itemStatus.ts",
+            "src/dashboard/frontend/src/components/orders/__tests__/itemStatus.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/orders/__tests__/itemStatus.test.ts"
+          ],
+          "expected_outputs": [
+            "itemStatus.test.ts passes with one test per table row"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6 step 1. Pure function itemStatus(input) -> {kind, label, tone}. Inputs: book (OrderBookView), item, DerivedIssueState | undefined, progress item, set of in-flight issue ids in this book, book.prerequisiteTerminal, flywheelRunning. Apply the first matching rule of the 14-row table in PRD WI-6 step 1 (Landed success; Parked; In review warning for in-review/changes-requested/ready; Working info; Not queued yet; Book is not active yet; Not started; Pickup paused; 'Waiting for <ids>'; 'PRD needs a re-check first'; 'Waiting its turn' (lane B); 'Waiting for a free slot (<n> of <limit> running)' (lane A); 'Starts next'; 'Ready, Flywheel is stopped'). Conditions 8-12 come from evaluateOrderDispatchEligibility in src/lib/orders/eligibility.ts, called the way ProgressPanel.tsx calls it (copy its progressItems, inFlight and prerequisiteTerminal construction; ProgressPanel stays until cleanup). Derived state names come from DerivedIssueStateName in src/dashboard/frontend/src/lib/pipeline-state.ts. No useMemo/useCallback/memo."
+        },
+        "items": [
+          {
+            "id": "item-status.ac1",
+            "title": "Given a progress item with closed true, when itemStatus runs, then it returns label 'Landed' with tone success.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "item-status.ac2",
+            "title": "Given an open lane-A item in an active book whose lane-slot condition is unmet with 2 in flight and a limit of 2, when itemStatus runs, then it returns 'Waiting for a free slot (2 of 2 running)'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "item-status.ac3",
+            "title": "Given an item whose prerequisite PAN-9 is not terminal in an active book, when itemStatus runs, then it returns 'Waiting for PAN-9' with a neutral tone.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "item-status.ac4",
+            "title": "Given an eligible item in an active book, when flywheelRunning is false, then itemStatus returns 'Ready, Flywheel is stopped', and when true it returns 'Starts next'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "book-issue-list",
+        "title": "One issue list per book: BookIssueList and IssueRow",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T02:30:37Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5597",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/orders/BookIssueList.tsx",
+            "src/dashboard/frontend/src/components/orders/IssueRow.tsx",
+            "src/dashboard/frontend/src/components/orders/__tests__/BookIssueList.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/orders/__tests__/BookIssueList.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "BookIssueList.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-10",
+            "FR-14"
+          ],
+          "parallelSafeReason": "Touches only its own new files (BookIssueList.tsx, IssueRow.tsx and their test); no other item edits them."
+        },
+        "narrative": {
+          "Action": "PRD WI-6 steps 2, 3 and 5. BookIssueList props: book, project?, onBookChange?, onError?, readOnly?. Props contract (shared by BookHeader, BookIssueList, AddIssuesPanel, MoreSettings): book: OrderBookView; project?: string (appended as ?project= to every request it sends); onBookChange?: (book: OrderBookView) => void (called with the server's returned book after a successful mutation); onError?: (message: string) => void (called with the response body's error text, or the HTTP status text when there is none, after a failed mutation). project, onBookChange and onError are optional so the read-only Flywheel card can omit them. Two stacked full-width sections: 'Parallel lane' with 'Up to [-] <n> [+] issues run at the same time.' (stepper saves {settings:{laneAConcurrency}} with a 500 ms debounce, range 1-8, tag 'Lane A'), and 'One-at-a-time lane' with 'Runs top to bottom, one issue at a time. Use it for work that would collide.' (tag 'Lane B'). Non-landed rows in order, then a footer '▸ Show <k> landed' / '▾ Hide <k> landed'; a lane with only landed rows shows them and no footer. Empty-lane texts as in the PRD. Keep LaneEditor's HTML5 drag/drop (PATCH .../items/:issue {lane, order}) and accept drops from the Add issues panel: a drop whose dataTransfer has type 'application/x-overdeck-order-issue' (value = upper-case issue id) posts {item:{issue, lane}} to POST .../items for that lane section; a drop without that type is an in-list move as today. IssueRow per PRD WI-6 step 3: grip, position (font-mono, no '· book'), issue id link via trackerIssueUrl (plain text when null, CP-2), full title with ellipsis and title attribute, hover/focus actions 'Run one at a time'/'Run in parallel', 'Options', 'Remove', status tag from itemStatus; muted second line only for 'after <ids>', 're-check PRD first', 'plan when it starts', 'no PRD'; Options inline block with the three fields and Save/Cancel saving prereqs/reVerify/planAtPickup. Left border colors per status; no 'PRD ✓' chip. readOnly renders no grips, actions, stepper buttons or drop targets. Do not carry over the posture banner, posture buttons, stale-reason flag or off-book block. Signal tints use the pattern border-info/[0.32] bg-info/[0.08] text-info-foreground; no opacity on var() tokens. Tests in PRD WI-6 (debounce test uses vi.useFakeTimers + advanceTimersByTimeAsync)."
+        },
+        "items": [
+          {
+            "id": "book-issue-list.ac1",
+            "title": "Given an active book with one working issue and five landed issues in lane A, when BookIssueList renders, then the working row shows its full title and a 'Working' tag, and the landed rows are hidden behind a 'Show 5 landed' button.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "book-issue-list.ac2",
+            "title": "Given a lane A row, when the operator clicks 'Run one at a time', then the component sends PATCH /api/orders/:id/items/:issue with lane 'B'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "book-issue-list.ac3",
+            "title": "Given the parallel stepper, when the operator clicks + twice within 500 ms, then exactly one PATCH with settings.laneAConcurrency is sent after the debounce elapses under fake timers.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "book-issue-list.ac4",
+            "title": "Given readOnly, when BookIssueList renders, then no Remove, Options or stepper button is present, and the text '· book' appears nowhere.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "more-settings",
+        "title": "More settings: extra instructions file and brief preview",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T02:30:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5597",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/orders/MoreSettings.tsx",
+            "src/dashboard/frontend/src/components/orders/__tests__/MoreSettings.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/orders/__tests__/MoreSettings.test.tsx"
+          ],
+          "expected_outputs": [
+            "MoreSettings.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6 step 4. Collapsed <details> titled 'More settings'. Field 'Extra instructions file' (the brief overlay): keep RunSettingsPanel.tsx's 550 ms debounce, .md check and per-field save state; status text 'Optional. A markdown file added to every issue's kickoff brief.' / 'Added to every issue's kickoff brief.' / 'Not a markdown file. Use a repo path that ends in .md.'. Button 'Preview what the Flywheel receives' loads GET /api/orders/:id/preview-brief (project-scoped) and shows the brief in a <pre>. No posture controls, no off-book block. Props contract (shared by BookHeader, BookIssueList, AddIssuesPanel, MoreSettings): book: OrderBookView; project?: string (appended as ?project= to every request it sends); onBookChange?: (book: OrderBookView) => void (called with the server's returned book after a successful mutation); onError?: (message: string) => void (called with the response body's error text, or the HTTP status text when there is none, after a failed mutation). project, onBookChange and onError are optional so the read-only Flywheel card can omit them. Tests: debounces the extra instructions save (fake timers); rejects a path that does not end in .md; previews the brief."
+        },
+        "items": [
+          {
+            "id": "more-settings.ac1",
+            "title": "Given the operator types a path ending in .md, when 550 ms elapse under fake timers, then one PATCH with settings.briefOverlay is sent.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "more-settings.ac2",
+            "title": "Given a path that does not end in .md, when it is typed, then no PATCH is sent and 'Not a markdown file. Use a repo path that ends in .md.' renders.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "more-settings.ac3",
+            "title": "Given the preview button, when it is clicked, then the brief text returned by /preview-brief renders inside a pre element.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "add-issues-panel",
+        "title": "One Add issues panel replaces the two rails",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T02:30:37Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5597",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/orders/AddIssuesPanel.tsx",
+            "src/dashboard/frontend/src/components/orders/__tests__/AddIssuesPanel.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/orders/__tests__/AddIssuesPanel.test.tsx"
+          ],
+          "expected_outputs": [
+            "AddIssuesPanel.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Right column 340 px with heading 'Add issues', close button ✕, 'Add to' two-option control 'Parallel' / 'One at a time' (default Parallel), search input placeholder 'Search by ID, title, or label', a list, and the note 'Adding an issue only changes the list. Work starts when the book is active.'. Empty query: eyebrow 'Top of your backlog', rows from GET /api/orders/backlog-candidates?limit=10 (project-scoped). With a query: eyebrow 'Open issues', up to 12 open issues from the dashboard store matching id, title or label (copy AddIssuesRail.tsx's filter). Row: title (from the store by identifier; fall back to the why text), second line id in font-mono plus 'backlog #<rank>' for backlog rows, why text in the title tooltip; an 'Add' button or a neutral tag 'In this book' / 'In <book name>' when a non-archived book owns the issue. Add posts {item:{issue, lane}} to POST /api/orders/:id/items. Rows are draggable: onDragStart sets dataTransfer type 'application/x-overdeck-order-issue' to the upper-case issue id (the contract BookIssueList reads). Root grid child has min-w-0. Old rails stay until cleanup. Props contract (shared by BookHeader, BookIssueList, AddIssuesPanel, MoreSettings): book: OrderBookView; project?: string (appended as ?project= to every request it sends); onBookChange?: (book: OrderBookView) => void (called with the server's returned book after a successful mutation); onError?: (message: string) => void (called with the response body's error text, or the HTTP status text when there is none, after a failed mutation). project, onBookChange and onError are optional so the read-only Flywheel card can omit them. Tests in PRD WI-7."
+        },
+        "items": [
+          {
+            "id": "add-issues-panel.ac1",
+            "title": "Given an empty search, when the panel opens, then it lists backlog candidates by title with 'backlog #<rank>' and one 'Add' button per row.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-issues-panel.ac2",
+            "title": "Given 'One at a time' is chosen in Add to, when the operator clicks Add on a row, then the panel posts {item:{issue, lane:'B'}} to /api/orders/:id/items.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-issues-panel.ac3",
+            "title": "Given an issue owned by another non-archived book, when it is listed, then the row shows 'In <book name>' and no Add button.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-issues-panel.ac4",
+            "title": "Given a query matching a label, when it is typed, then the eyebrow reads 'Open issues' and only matching open issues are listed.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "book-list",
+        "title": "BookList: left column grouped Active, Queued, Drafts, Archived",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T02:30:37Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5597",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/orders/BookList.tsx",
+            "src/dashboard/frontend/src/components/orders/__tests__/BookList.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/orders/__tests__/BookList.test.tsx"
+          ],
+          "expected_outputs": [
+            "BookList.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5 step 5. Left column, 250 px; stacks above the detail under 900 px. A dashed '+ New book' button that reveals the inline name form (props: onCreate(name)). Groups with eyebrow labels in order Active, Queued, Drafts, 'Archived (n)'; Archived collapsed by default; Queued and Drafts hidden when empty; under Active with no active book: 'No book is queued, so the Flywheel follows the backlog.'. Row meta lines from the PRD table (draft / finished / active / queued with #position / archived), 4 px progress bar for active and finished rows (emerald landed, blue in progress). Groups and meta come from the server's phase, queuePosition and finished; never re-derive phase from status. Use .list-row/.list-group-bar/.list-meta. Tests: groups books under Active, Queued, Drafts and a collapsed Archived; shows No book is queued when no book is active; shows the meta line for each phase."
+        },
+        "items": [
+          {
+            "id": "book-list.ac1",
+            "title": "Given books in every phase, when BookList renders, then group headings appear in the order Active, Queued, Drafts, Archived (n) and archived rows are hidden until the group is expanded.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "book-list.ac2",
+            "title": "Given no book with phase active, when BookList renders, then 'No book is queued, so the Flywheel follows the backlog.' appears under Active.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "book-list.ac3",
+            "title": "Given a queued book with queuePosition 2 and 4 issues, when BookList renders, then its row shows 'Queued · 4 issues' and '#2'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "book-header",
+        "title": "BookHeader: phase tag, one sentence, phase actions, rename, pause pickup",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T02:30:37Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5597",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/orders/BookHeader.tsx",
+            "src/dashboard/frontend/src/components/orders/__tests__/BookHeader.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/orders/__tests__/BookHeader.test.tsx"
+          ],
+          "expected_outputs": [
+            "BookHeader.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-14"
+          ],
+          "parallelSafeReason": "Touches only its own new files (BookHeader.tsx and its test); the page wires it in later."
+        },
+        "narrative": {
+          "Action": "PRD WI-5 steps 6-7. h2 book name; click turns it into an input; Enter or blur saves PATCH {name}; Escape cancels. Phase tag and one sentence and actions exactly per the PRD WI-5 step 6 table, with the Amendment 3 active sentence 'The Flywheel works from this book. Its issues are cleared to start, and pan start still works for anything else.' (pan start in font-mono). fw = useFlywheelRunning() from src/dashboard/frontend/src/lib/flywheelApi.ts. Queue book disabled with title 'Fix the problems below first' when blocks exist. The ⋯ menu uses MenuSurface and MenuItemButton from components/shared/ContextMenu.tsx: Rename, 'Copy book ID for the CLI' (clipboard), Archive (not for archived). Status actions send {status:'ready'|'draft'|'complete'}; Start Flywheel posts /api/orders/:id/start. Pause pickup opens the inline confirm (text, reason input prefilled 'Operator paused new pickup.', buttons) and sends {settings:{posture:'drain', postureReason}}; Resume pickup sends {settings:{posture:'open', postureReason:'Operator reopened pickup.'}}. It does not own the books query. Props contract (shared by BookHeader, BookIssueList, AddIssuesPanel, MoreSettings): book: OrderBookView; project?: string (appended as ?project= to every request it sends); onBookChange?: (book: OrderBookView) => void (called with the server's returned book after a successful mutation); onError?: (message: string) => void (called with the response body's error text, or the HTTP status text when there is none, after a failed mutation). project, onBookChange and onError are optional so the read-only Flywheel card can omit them. Tests named in PRD WI-5 for BookHeader.test.tsx."
+        },
+        "items": [
+          {
+            "id": "book-header.ac1",
+            "title": "Given a draft with blocking findings, when BookHeader renders, then 'Queue book' is disabled with title 'Fix the problems below first'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "book-header.ac2",
+            "title": "Given an active, unfinished book while the Flywheel is stopped, when BookHeader renders, then a 'Start Flywheel' button is present; while it runs, the button is absent and the Amendment 3 sentence renders.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "book-header.ac3",
+            "title": "Given the operator confirms Pause pickup with reason 'release freeze', when the request is sent, then its body is {settings:{posture:'drain', postureReason:'release freeze'}}.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "book-header.ac4",
+            "title": "Given the operator clicks the name, types a new name and presses Enter, when the request is sent, then its body is {name:<new name>}; Escape sends nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "issue-chip-link",
+        "title": "Issue chip links to its book and drops '· book'",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T02:30:37Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "frontend",
+          "issueLabel": "pan-5597",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/orders/OrderBookIssueChip.tsx",
+            "src/dashboard/frontend/src/components/orders/__tests__/OrderBookIssueChip.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/orders/__tests__/OrderBookIssueChip.test.tsx"
+          ],
+          "expected_outputs": [
+            "OrderBookIssueChip.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13",
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5 step 11. In OrderBookIssueChip.tsx change href=\"/orders\" to `/orders?book=${encodeURIComponent(book.id)}` and the visible text from `${lane}${order} · book` to `${lane}${order}`. Update its test. Leave BacklogSequencerPage.tsx's two generic /orders links unchanged."
+        },
+        "items": [
+          {
+            "id": "issue-chip-link.ac1",
+            "title": "Given an issue in book b1 at A3, when the chip renders, then its text is 'A3' and its href is '/orders?book=b1'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-chip-link.ac2",
+            "title": "Given the chip, when it renders, then the text '· book' is absent.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "flywheel-card",
+        "title": "Flywheel page card shows the active book with the read-only issue list",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T02:30:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5597",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/flywheel/FlywheelOrderBookCard.tsx",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelOrderBookCard.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/flywheel/__tests__/FlywheelOrderBookCard.test.tsx"
+          ],
+          "expected_outputs": [
+            "FlywheelOrderBookCard.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 step 2. Replace books.find((b) => b.status === 'running') with books.find((b) => b.phase === 'active') (keep the bookId override). Render <BookIssueList book={book} readOnly /> instead of <ProgressPanel book={book} />. Link to /orders?project=<key>&book=<id> (omit project when absent). ariaLabel 'Active order book'. Update the header comment. Tests: renders the active book when no book has status running; links to the book with project and book parameters."
+        },
+        "items": [
+          {
+            "id": "flywheel-card.ac1",
+            "title": "Given GET /api/orders returns one book with status ready and phase active, when the card renders, then it shows that book's name and its issue list.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "flywheel-card.ac2",
+            "title": "Given the payload names project p1 and the active book b1, when the card renders, then its link href is '/orders?project=p1&book=b1'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "flywheel-card.ac3",
+            "title": "Given no book with phase active, when the card renders, then it renders nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "page-shell",
+        "title": "Rewrite OrderBookPage: book list, header, notices, one issue list, Add issues panel",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T02:30:37Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5597",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/pages/OrderBookPage.tsx",
+            "src/dashboard/frontend/src/pages/__tests__/OrderBookPage.test.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/pages/__tests__/OrderBookPage.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "OrderBookPage.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-12",
+            "FR-13",
+            "FR-14",
+            "FR-17"
+          ],
+          "parallelSafeReason": "Only item that edits OrderBookPage.tsx and its test; every component it composes is a DAG predecessor."
+        },
+        "narrative": {
+          "Action": "PRD WI-5 steps 2-4 and 8-10a. Load books with useQuery({queryKey:['order-books','page',projectKey ?? null], queryFn, refetchInterval:15_000}) (never the key ['order-books'], which OrderBookIssueChip uses). After each successful mutation setQueryData the returned book then invalidateQueries the same key. Keep the project picker (name label, key value) and the stale-response guard. Selection: ?book=<id> if present, else active, else first queued, else first draft, else none; never archived by default; selecting writes book=<id> with history.replaceState. Header title 'Order books' and subtitle 'A book is a list of issues the Flywheel works through, in the order you set.'; no raw id, status badge, Setup/Progress toggle or x/y landed. Compose BookList, BookHeader, notices (finished-active with 'Archive and move on', pickup-paused with attribution and 'Resume pickup', problems box with Remove on issue-not-open/duplicate-membership lines), progress line, BookIssueList, MoreSettings and AddIssuesPanel (open by default for drafts; stacks under 900 px). Empty project state per step 10. Mutation errors: pass onError to BookHeader, BookIssueList, AddIssuesPanel and MoreSettings and pass onBookChange to all four; the page shows the latest onError message (and its own failures, e.g. create book) in one role=\"alert\" line under the header, cleared on the next onBookChange or selection change. After Archive select the new active book. Stop importing BookStrip, LifecycleStrip, ValidationPanel, LaneEditor, LaneItem, ProgressPanel, RunSettingsPanel, AddIssuesRail, BacklogCandidatesRail (they are deleted by frontend-cleanup). No useMemo/useCallback/memo. Tests: the OrderBookPage.test.tsx list in PRD WI-5 (TanStack setQueryData inside await act; interval test with fake timers)."
+        },
+        "items": [
+          {
+            "id": "page-shell.ac1",
+            "title": "Given books in every phase and no book parameter, when the page opens, then the active book is selected and the page shows no lifecycle strip and no Setup/Progress toggle.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-shell.ac2",
+            "title": "Given ?book=<draft id>, when the page opens, then that draft is selected and the Add issues panel is open.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-shell.ac3",
+            "title": "Given a finished active book followed by a queued book, when the operator clicks 'Archive and move on', then the page sends {status:'complete'} and, after refetch, selects the next book shown as Active.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-shell.ac4",
+            "title": "Given a PATCH that returns 409 with an error message, when the operator clicks 'Restore as draft', then that message renders in a role=\"alert\" line under the book header.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-shell.ac5",
+            "title": "Given the page is open, when 15 seconds elapse under fake timers, then GET /api/orders is requested again with the selected project.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-cleanup",
+        "title": "Delete the replaced order-book components, their tests and baseline rows; register new tests",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T02:30:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-5597",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/orders/BookStrip.tsx",
+            "src/dashboard/frontend/src/components/orders/LifecycleStrip.tsx",
+            "src/dashboard/frontend/src/components/orders/ValidationPanel.tsx",
+            "src/dashboard/frontend/src/components/orders/LaneEditor.tsx",
+            "src/dashboard/frontend/src/components/orders/LaneItem.tsx",
+            "src/dashboard/frontend/src/components/orders/ProgressPanel.tsx",
+            "src/dashboard/frontend/src/components/orders/RunSettingsPanel.tsx",
+            "src/dashboard/frontend/src/components/orders/AddIssuesRail.tsx",
+            "src/dashboard/frontend/src/components/orders/BacklogCandidatesRail.tsx",
+            "src/dashboard/frontend/src/components/orders/__tests__/AddIssuesRail.test.tsx",
+            "src/dashboard/frontend/src/components/orders/__tests__/BacklogCandidatesRail.test.tsx",
+            "src/dashboard/frontend/src/components/orders/__tests__/LaneEditor.test.tsx",
+            "src/dashboard/frontend/src/components/orders/__tests__/ProgressPanel.test.tsx",
+            "src/dashboard/frontend/src/components/orders/__tests__/RunSettingsPanel.test.tsx",
+            "src/dashboard/frontend/src/components/orders/__tests__/ValidationPanel.test.tsx",
+            "scripts/frontend-test-subset.txt",
+            "scripts/react-compiler-skip-baseline.txt",
+            "scripts/manual-memo-baseline.txt",
+            "eslint-react-compiler-allowlist.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "node scripts/run-frontend-test-subset.mjs --dry-run"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "dry run lists the new order-book test files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-1",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5/WI-6/WI-7 deletions and WI-8 step 8. Delete BookStrip.tsx, LifecycleStrip.tsx, ValidationPanel.tsx, LaneEditor.tsx, LaneItem.tsx, ProgressPanel.tsx, RunSettingsPanel.tsx, AddIssuesRail.tsx, BacklogCandidatesRail.tsx and, in the same commit, their tests (AddIssuesRail, BacklogCandidatesRail, LaneEditor, ProgressPanel, RunSettingsPanel, ValidationPanel .test.tsx). Remove their rows and the OrderBookPage.tsx rows from scripts/react-compiler-skip-baseline.txt, scripts/manual-memo-baseline.txt (run bash scripts/lint-manual-memo.sh --update) and eslint-react-compiler-allowlist.json; never add or raise a row. Add to scripts/frontend-test-subset.txt in sorted position (paths relative to src/dashboard/frontend): src/components/orders/__tests__/{AddIssuesPanel,BookHeader,BookIssueList,BookList,MoreSettings,OrderBookIssueChip}.test.tsx, src/components/orders/__tests__/itemStatus.test.ts, src/components/flywheel/__tests__/FlywheelOrderBookCard.test.tsx, src/pages/__tests__/OrderBookPage.test.tsx."
+        },
+        "items": [
+          {
+            "id": "frontend-cleanup.ac1",
+            "title": "Given the change, when grep -rln \"BookStrip\\|LifecycleStrip\\|ValidationPanel\\|LaneEditor\\|LaneItem\\|ProgressPanel\\|RunSettingsPanel\\|AddIssuesRail\\|BacklogCandidatesRail\" src/dashboard/frontend/src runs, then it returns no file.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-cleanup.ac2",
+            "title": "Given the three baseline files, when they are searched for components/orders/ and pages/OrderBookPage.tsx, then no row names a deleted file or OrderBookPage.tsx, and no row count was raised.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-cleanup.ac3",
+            "title": "Given node scripts/run-frontend-test-subset.mjs --dry-run, when it prints its args, then they include all nine order-book and flywheel-card test paths.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-cli-reference",
+        "title": "CLI reference, FLYWHEEL.md and pan-orders skill describe the new verbs and the active book",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T02:30:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5597",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/pipeline-commands.mdx",
+            "docs/FLYWHEEL.md",
+            "sync-sources/skills/pan-orders/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-15"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8 steps 3-5. cli/pipeline-commands.mdx '## pan orders' table: add rows for 'pan orders unqueue <id>' (Move a queued order book back to draft), 'pan orders archive <id>' (Archive an order book and free its issues), 'pan orders unarchive <id>' (Restore an archived order book as a draft; refused when an issue belongs to another live book); describe list's Phase column (active, queued #n, draft, archived, '(finished)'). docs/FLYWHEEL.md status table row 'Order book' (anchor 'The `running` book'): 'The active book (`currentOrderBook`)'. sync-sources/skills/pan-orders/SKILL.md: read it first, then add the three verbs in its existing format."
+        },
+        "items": [
+          {
+            "id": "docs-cli-reference.ac1",
+            "title": "Given cli/pipeline-commands.mdx, when its pan orders table is read, then it has rows for unqueue, archive and unarchive and says list shows a Phase column.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-cli-reference.ac2",
+            "title": "Given docs/FLYWHEEL.md, when the Order book status row is read, then it names the active book (currentOrderBook) and no longer says 'The `running` book'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-cli-reference.ac3",
+            "title": "Given sync-sources/skills/pan-orders/SKILL.md, when it is read, then it documents pan orders unqueue, archive and unarchive with their refusal rules.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-page-and-screenshots",
+        "title": "Order books docs page, screenshots, mockup sentence and changelog for the new page",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T02:30:37Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5597",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/order-books.mdx",
+            "images/order-books/page-light.png",
+            "images/order-books/page-dark.png",
+            "docs/design/mockups/order-books-rework-pan-5597.html",
+            "changelog.d/pan-5597.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors",
+            "two new PNGs at 1440x900 exist under images/order-books/"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14",
+            "FR-15",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8 steps 1, 2, 6, 7 and AC-9 layout checks. Rewrite configuration/order-books.mdx 'Build a book' and 'Read the page' with the new labels; replace the draft -> ready block with the four phases and the moves between them; state that a finished book holds the active slot until archived; add unqueue/archive/unarchive to 'Use the CLI' (and that unarchive is refused when an issue joined another live book); replace 'The first `ready` book in the queue is the active book…' with the Active/Queued wording; remove posture-attribution and stale-reason sentences. In 'Order books and the backlog' do not say off-book issues are blocked: with flywheel.auto_pickup_backlog=false an off-book issue still needs the released label, and a manual pan start works for any issue (Amendment 3). Use the Amendment 3 active-book sentence. Replace the active-book sentence in docs/design/mockups/order-books-rework-pan-5597.html (anchor 'The Flywheel starts work from this book.'). Screenshots: build the branch (npm run build), run the dashboard from the workspace on a free port in an isolated Playwright browser profile, and produce an active book with landed, working and waiting issues by intercepting GET /api/orders with page.route fixture JSON (no real tracker writes); capture 1440x900 light and dark, inspect them yourself, replace both PNGs and update alt text. Also capture a 390 px wide screenshot and check document.documentElement.scrollWidth <= 390. changelog.d/pan-5597.md: '#### Improved' (reworked page: which book is active, one issue list, plain labels; archive and move back to draft) and '#### Fixed' (a book with landed issues can be started and no longer shows landed issues as errors), format per changelog.d/README.md."
+        },
+        "items": [
+          {
+            "id": "docs-page-and-screenshots.ac1",
+            "title": "Given configuration/order-books.mdx, when it is read, then it names the phases Draft, Queued, Active and Archived, the verbs unqueue, archive and unarchive, and says an off-book issue needs the released label when auto_pickup_backlog is false instead of saying it is blocked.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-page-and-screenshots.ac2",
+            "title": "Given images/order-books/page-light.png and page-dark.png, when opened, then each is 1440x900 and shows the left book list, an Active tag and the one issue list with a 'Show n landed' footer.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-page-and-screenshots.ac3",
+            "title": "Given the page at 390 px width in Playwright, when it renders, then document.documentElement.scrollWidth is at most 390.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-page-and-screenshots.ac4",
+            "title": "Given changelog.d/pan-5597.md, when npm run lint:docs runs, then it exits 0 with #### Improved and #### Fixed sections present.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-page-and-screenshots.ac5",
+            "title": "Given the mockup file, when it is searched, then it contains 'The Flywheel works from this book.' and not 'The Flywheel starts work from this book.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "phase-lib",
+        "to": "api-phase-fields",
+        "type": "blocks"
+      },
+      {
+        "from": "phase-lib",
+        "to": "cli-list-phase",
+        "type": "blocks"
+      },
+      {
+        "from": "phase-lib",
+        "to": "flywheel-summary-active",
+        "type": "blocks"
+      },
+      {
+        "from": "api-phase-fields",
+        "to": "api-status-transitions",
+        "type": "blocks"
+      },
+      {
+        "from": "restore-guard",
+        "to": "api-status-transitions",
+        "type": "blocks"
+      },
+      {
+        "from": "validate-landed",
+        "to": "api-status-transitions",
+        "type": "blocks"
+      },
+      {
+        "from": "restore-guard",
+        "to": "cli-verbs",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-verbs",
+        "to": "cli-list-phase",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-types",
+        "to": "item-status",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-types",
+        "to": "book-issue-list",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-types",
+        "to": "more-settings",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-types",
+        "to": "add-issues-panel",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-types",
+        "to": "book-list",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-types",
+        "to": "book-header",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-types",
+        "to": "flywheel-card",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-types",
+        "to": "page-shell",
+        "type": "blocks"
+      },
+      {
+        "from": "item-status",
+        "to": "book-issue-list",
+        "type": "blocks"
+      },
+      {
+        "from": "book-issue-list",
+        "to": "flywheel-card",
+        "type": "blocks"
+      },
+      {
+        "from": "book-issue-list",
+        "to": "page-shell",
+        "type": "blocks"
+      },
+      {
+        "from": "more-settings",
+        "to": "page-shell",
+        "type": "blocks"
+      },
+      {
+        "from": "add-issues-panel",
+        "to": "page-shell",
+        "type": "blocks"
+      },
+      {
+        "from": "book-list",
+        "to": "page-shell",
+        "type": "blocks"
+      },
+      {
+        "from": "book-header",
+        "to": "page-shell",
+        "type": "blocks"
+      },
+      {
+        "from": "page-shell",
+        "to": "frontend-cleanup",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-types",
+        "to": "frontend-cleanup",
+        "type": "blocks"
+      },
+      {
+        "from": "flywheel-card",
+        "to": "frontend-cleanup",
+        "type": "blocks"
+      },
+      {
+        "from": "issue-chip-link",
+        "to": "frontend-cleanup",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-list-phase",
+        "to": "docs-cli-reference",
+        "type": "blocks"
+      },
+      {
+        "from": "flywheel-summary-active",
+        "to": "docs-cli-reference",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-cleanup",
+        "to": "docs-page-and-screenshots",
+        "type": "blocks"
+      },
+      {
+        "from": "api-status-transitions",
+        "to": "docs-page-and-screenshots",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-list-phase",
+        "to": "docs-page-and-screenshots",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

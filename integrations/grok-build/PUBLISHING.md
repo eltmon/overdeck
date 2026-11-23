@@ -6,10 +6,10 @@ Publishing is a separate step the operator approves (PAN-4927 D-5).
 
 - `grok plugin validate integrations/grok-build` must print
   `Plugin manifest is valid.`.
-- `npm view @overdeck/core@<pin> version` must print the pin. If it does
-  not — the pin in `scripts/run-mcp.sh` named no published version yet —
-  bump `OVERDECK_CORE_VERSION` in `scripts/run-mcp.sh`, in `README.md`, and
-  in `CHANGELOG.md` together.
+- `npm view @overdeck/core@<pin> version` must print the pin in
+  `scripts/run-mcp.sh`. `pan release` stamps that pin; if it names no
+  published version yet, wait for the release to publish rather than editing
+  it by hand.
 - The live checks in [`docs/verification.md`](docs/verification.md) must
   pass.
 - Tag the release: `grok plugin tag integrations/grok-build [--push]`.

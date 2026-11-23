@@ -15,14 +15,17 @@ bot integration; this page covers MCP clients only.
 There are two ways in, and both keep the traffic encrypted until it reaches
 hardware you control:
 
-- **A bot with a shell** (Hermes, OpenClaw, Grok Build, Grok Bot) runs the
+- **A bot with a shell** (Hermes, OpenClaw, Grok Build) runs the
   Overdeck connector next to it. The connector pairs with one machine and
   reaches it over an end-to-end encrypted channel, directly or through the
   relay. You can use Tailscale instead.
-- **The xAI API** cannot run a process near you, so it signs in with OAuth
-  through [Public MCP](/configuration/mcp#public-mcp-for-hosted-bots), which
-  Tailscale Funnel publishes from this machine. Grok Bot can use Public MCP
-  too, as an alternative to the connector.
+- **A hosted bot** (Grok Bot, the xAI API) runs on servers you do not
+  control, so it signs in with OAuth through
+  [Public MCP](/configuration/mcp#public-mcp-for-hosted-bots), which
+  Tailscale Funnel publishes from this machine. Grok Bot's sandbox cannot
+  run the connector: it has no WebRTC egress
+  ([PAN-5242](https://github.com/eltmon/overdeck/issues/5242)). Public MCP
+  with Grok Bot has not been verified live yet.
 
 Nothing on overdeck.ai ever sees a tool call in plain text.
 
@@ -73,7 +76,7 @@ The dialog picks a reach by platform:
 | --- | --- |
 | Hermes, OpenClaw | Overdeck connector (default), Tailscale |
 | Grok Build | This computer (default), Overdeck connector, Tailscale |
-| Grok Bot | Overdeck connector (default), Public MCP |
+| Grok Bot | Public MCP (default), Overdeck connector (fails from Grok Bot's sandbox) |
 | xAI API | Public MCP |
 
 Access defaults to `read:state`, `read:conversations` and `tell`; `read:state`
@@ -176,13 +179,9 @@ plugin's own `overdeck` server also loads into those sessions.
 
 ### Grok Bot
 
-Pick **Grok Bot** in Connect a bot and click **Copy for Grok Bot**; see
-[Connect in one paste](#connect-in-one-paste). Paste the message into Grok
-Bot's chat; it runs `pan mcp connector connect` itself, shows you a link to
-click and **Authorize**, then reports it is ready.
-
-Grok Bot can use [Public MCP](/configuration/mcp#public-mcp-for-hosted-bots)
-instead: pick the Public MCP reach, then install the
+Grok Bot runs on xAI's servers, so use
+[Public MCP](/configuration/mcp#public-mcp-for-hosted-bots). Pick **Grok Bot**
+in Connect a bot; Public MCP is its default reach. Install the
 [Grok Bot plugin](https://github.com/eltmon/overdeck/tree/main/integrations/grok-bot)
 and replace its `mcp.json`, which runs the connector, with your public URL
 (`https://<machine>.<tailnet>.ts.net:8443/mcp`). On first use Grok Bot opens
@@ -190,6 +189,18 @@ an Overdeck sign-in page that shows an approval code. Approve it in your
 dashboard's Needs-you card, or run
 `pan mcp oauth approve <code> --level read`, and choose the access level there
 (see [Sign in with OAuth](/configuration/mcp#sign-in-with-oauth)).
+
+Public MCP with Grok Bot has not been verified live yet; no live run is
+recorded in
+[`integrations/grok-bot/docs/verification.md`](https://github.com/eltmon/overdeck/blob/main/integrations/grok-bot/docs/verification.md).
+
+The connector route does not work from Grok Bot's sandbox. On 2026-11-14
+Grok Bot ran the one-paste connect command three times and failed each
+time, because its sandbox has no WebRTC egress
+([PAN-5242](https://github.com/eltmon/overdeck/issues/5242)). Since 0.85.0
+the command reports this as [`no-webrtc-egress`](#no-webrtc-egress). The
+**Overdeck connector** reach stays in the dialog for a Grok Bot environment
+that does have WebRTC egress.
 
 ### xAI API
 

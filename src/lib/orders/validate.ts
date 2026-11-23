@@ -144,6 +144,9 @@ export function validateBookForStart(
     for (const item of book.items) {
       const issue = item.issue.toUpperCase();
       const state = issueState.get(issue);
+      // A landed issue is normal in a queued or active book; only a draft is
+      // still being assembled, so only a draft is blocked by a closed issue.
+      if (state && !state.open && book.status !== 'draft') continue;
       if (!state?.open) {
         blocks.push({
           code: 'issue-not-open',

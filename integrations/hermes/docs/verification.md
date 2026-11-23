@@ -16,6 +16,15 @@ Python 3.14, against this machine's dashboard `/mcp` with short-lived
 | CP-9g approve scope required | Passed: with a token lacking `approve`, Hermes does not register `mcp__overdeck__answer_question` (Overdeck hides it from `tools/list`), and the call ends in `OverdeckCallError: Unknown tool answer_question`, so `/overdeck answer` replies `Overdeck refused the answer: Unknown tool answer_question`. The missing-`approve` text from the server is not shown on this path. |
 | CP-9h ntfy | Passed at source level only: Hermes's ntfy adapter takes the body as the chat text (`plugins/platforms/ntfy/adapter.py`), and Overdeck's ntfy provider sends the public title as the body (`src/lib/push/ntfy-provider.ts`). Not run live: this machine has no `push.ntfy` configured. |
 
+## Changes since 2026-11-04
+
+Recorded 2026-11-22 (PAN-5486). Only a dated live run counts as a result.
+
+| Change | Check | Result |
+| --- | --- | --- |
+| `mcp connector connect` (PAN-5069, v0.75.0) | Hermes runs the command and pairs | Not run. |
+| One-paste connect: **Copy for Hermes** in Connect a bot (PAN-5070, v0.78.0) | Hermes runs the copied message end to end and calls list_conversations | Not run. |
+
 ## Running the live checks
 
 1. Make a throwaway Hermes; never use `~/.hermes` or the `hermes` on `PATH`.

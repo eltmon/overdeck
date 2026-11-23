@@ -210,6 +210,12 @@ function ConnectBotDialogBody({ onClose }: { onClose: () => void }) {
                 </label>
               ))}
             </div>
+            {platform === 'grok-bot' && reach === 'connector' && (
+              <p className={formStyles.hint}>Grok Bot's sandbox cannot run the connector (no WebRTC egress). Use Public MCP.</p>
+            )}
+            {platform === 'grok-bot' && reach === 'public' && (
+              <p className={formStyles.hint}>Public MCP with Grok Bot has not been verified live yet.</p>
+            )}
           </div>
 
           <div className={formStyles.field}>

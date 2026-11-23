@@ -1,0 +1,445 @@
+{
+  "version": "1",
+  "issueId": "PAN-5597",
+  "created": "2026-11-23T02:38:35.270Z",
+  "updated": "2026-11-23T04:13:25.544Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "phase-lib": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5597",
+      "claimedAt": "2026-11-23T02:38:35.269Z",
+      "doneAt": "2026-11-23T02:39:41.656Z"
+    },
+    "phase-lib.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T02:39:41.656Z"
+    },
+    "phase-lib.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T02:39:41.656Z"
+    },
+    "phase-lib.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T02:39:41.656Z"
+    },
+    "phase-lib.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T02:39:41.656Z"
+    },
+    "validate-landed": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5597",
+      "claimedAt": "2026-11-23T02:39:57.014Z",
+      "doneAt": "2026-11-23T02:40:44.843Z"
+    },
+    "validate-landed.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T02:40:44.843Z"
+    },
+    "validate-landed.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T02:40:44.843Z"
+    },
+    "validate-landed.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T02:40:44.843Z"
+    },
+    "restore-guard": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5597",
+      "claimedAt": "2026-11-23T02:40:46.031Z",
+      "doneAt": "2026-11-23T02:41:29.721Z"
+    },
+    "restore-guard.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T02:41:29.721Z"
+    },
+    "restore-guard.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T02:41:29.721Z"
+    },
+    "restore-guard.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T02:41:29.721Z"
+    },
+    "api-phase-fields": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5597",
+      "claimedAt": "2026-11-23T02:41:34.048Z",
+      "doneAt": "2026-11-23T02:46:57.499Z"
+    },
+    "api-phase-fields.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T02:46:57.499Z"
+    },
+    "api-phase-fields.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T02:46:57.499Z"
+    },
+    "api-phase-fields.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T02:46:57.499Z"
+    },
+    "api-status-transitions": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5597",
+      "claimedAt": "2026-11-23T02:47:02.264Z",
+      "doneAt": "2026-11-23T02:48:58.763Z"
+    },
+    "api-status-transitions.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T02:48:58.763Z"
+    },
+    "api-status-transitions.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T02:48:58.763Z"
+    },
+    "api-status-transitions.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T02:48:58.763Z"
+    },
+    "api-status-transitions.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T02:48:58.763Z"
+    },
+    "cli-verbs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5597",
+      "claimedAt": "2026-11-23T02:49:02.067Z",
+      "doneAt": "2026-11-23T02:50:25.607Z"
+    },
+    "cli-verbs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T02:50:25.607Z"
+    },
+    "cli-verbs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T02:50:25.607Z"
+    },
+    "cli-verbs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T02:50:25.607Z"
+    },
+    "cli-verbs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T02:50:25.607Z"
+    },
+    "cli-list-phase": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5597",
+      "claimedAt": "2026-11-23T02:50:26.798Z",
+      "doneAt": "2026-11-23T02:52:08.360Z"
+    },
+    "cli-list-phase.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T02:52:08.360Z"
+    },
+    "cli-list-phase.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T02:52:08.360Z"
+    },
+    "cli-list-phase.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T02:52:08.360Z"
+    },
+    "flywheel-summary-active": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5597",
+      "claimedAt": "2026-11-23T02:52:12.103Z",
+      "doneAt": "2026-11-23T02:53:29.827Z"
+    },
+    "flywheel-summary-active.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T02:53:29.827Z"
+    },
+    "flywheel-summary-active.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T02:53:29.827Z"
+    },
+    "flywheel-skill-active-book": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5597",
+      "claimedAt": "2026-11-23T02:53:32.566Z",
+      "doneAt": "2026-11-23T02:54:04.384Z"
+    },
+    "flywheel-skill-active-book.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T02:54:04.384Z"
+    },
+    "flywheel-skill-active-book.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T02:54:04.384Z"
+    },
+    "flywheel-skill-active-book.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T02:54:04.384Z"
+    },
+    "frontend-types": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5597",
+      "claimedAt": "2026-11-23T02:54:09.136Z",
+      "doneAt": "2026-11-23T02:55:45.056Z"
+    },
+    "frontend-types.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T02:55:45.056Z"
+    },
+    "frontend-types.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T02:55:45.056Z"
+    },
+    "frontend-types.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T02:55:45.056Z"
+    },
+    "issue-chip-link": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5597",
+      "claimedAt": "2026-11-23T02:56:02.547Z",
+      "doneAt": "2026-11-23T02:57:14.982Z"
+    },
+    "issue-chip-link.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T02:57:14.982Z"
+    },
+    "issue-chip-link.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T02:57:14.982Z"
+    },
+    "item-status": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5597",
+      "claimedAt": "2026-11-23T03:07:25.564Z",
+      "doneAt": "2026-11-23T03:12:06.850Z"
+    },
+    "item-status.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:12:06.850Z"
+    },
+    "item-status.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:12:06.850Z"
+    },
+    "item-status.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:12:06.850Z"
+    },
+    "item-status.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:12:06.850Z"
+    },
+    "more-settings": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5597",
+      "claimedAt": "2026-11-23T03:12:11.980Z",
+      "doneAt": "2026-11-23T03:22:30.897Z"
+    },
+    "book-issue-list": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5597",
+      "claimedAt": "2026-11-23T03:22:00.552Z",
+      "doneAt": "2026-11-23T03:24:36.088Z"
+    },
+    "more-settings.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:22:30.897Z"
+    },
+    "more-settings.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:22:30.897Z"
+    },
+    "more-settings.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:22:30.897Z"
+    },
+    "book-issue-list.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:24:36.088Z"
+    },
+    "book-issue-list.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:24:36.088Z"
+    },
+    "book-issue-list.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:24:36.088Z"
+    },
+    "book-issue-list.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:24:36.088Z"
+    },
+    "book-list": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5597",
+      "claimedAt": "2026-11-23T03:24:37.580Z",
+      "doneAt": "2026-11-23T03:26:58.613Z"
+    },
+    "book-list.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:26:58.613Z"
+    },
+    "book-list.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:26:58.613Z"
+    },
+    "book-list.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:26:58.613Z"
+    },
+    "book-header": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5597",
+      "claimedAt": "2026-11-23T03:27:00.092Z",
+      "doneAt": "2026-11-23T03:27:25.016Z"
+    },
+    "book-header.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:27:25.016Z"
+    },
+    "book-header.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:27:25.016Z"
+    },
+    "book-header.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:27:25.016Z"
+    },
+    "book-header.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:27:25.016Z"
+    },
+    "add-issues-panel": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5597",
+      "claimedAt": "2026-11-23T03:27:31.557Z",
+      "doneAt": "2026-11-23T03:35:59.702Z"
+    },
+    "add-issues-panel.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:35:59.702Z"
+    },
+    "add-issues-panel.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:35:59.702Z"
+    },
+    "add-issues-panel.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:35:59.702Z"
+    },
+    "add-issues-panel.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:35:59.702Z"
+    },
+    "flywheel-card": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5597",
+      "claimedAt": "2026-11-23T03:36:01.831Z",
+      "doneAt": "2026-11-23T03:40:04.045Z"
+    },
+    "flywheel-card.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:40:04.045Z"
+    },
+    "flywheel-card.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:40:04.045Z"
+    },
+    "flywheel-card.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:40:04.045Z"
+    },
+    "page-shell": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5597",
+      "claimedAt": "2026-11-23T03:40:10.440Z",
+      "doneAt": "2026-11-23T03:54:32.799Z"
+    },
+    "page-shell.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:54:32.799Z"
+    },
+    "page-shell.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:54:32.799Z"
+    },
+    "page-shell.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:54:32.799Z"
+    },
+    "page-shell.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:54:32.799Z"
+    },
+    "page-shell.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:54:32.799Z"
+    },
+    "frontend-cleanup": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5597",
+      "claimedAt": "2026-11-23T04:03:29.184Z",
+      "doneAt": "2026-11-23T04:08:18.694Z"
+    },
+    "frontend-cleanup.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:08:18.694Z"
+    },
+    "frontend-cleanup.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:08:18.694Z"
+    },
+    "frontend-cleanup.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:08:18.694Z"
+    },
+    "docs-cli-reference": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5597",
+      "claimedAt": "2026-11-23T04:08:25.366Z",
+      "doneAt": "2026-11-23T04:10:27.179Z"
+    },
+    "docs-cli-reference.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:10:27.179Z"
+    },
+    "docs-cli-reference.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:10:27.179Z"
+    },
+    "docs-cli-reference.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:10:27.179Z"
+    },
+    "docs-page-and-screenshots": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5597",
+      "claimedAt": "2026-11-23T04:10:28.779Z",
+      "doneAt": "2026-11-23T04:13:25.543Z"
+    },
+    "docs-page-and-screenshots.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:13:25.543Z"
+    },
+    "docs-page-and-screenshots.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:13:25.543Z"
+    },
+    "docs-page-and-screenshots.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:13:25.543Z"
+    },
+    "docs-page-and-screenshots.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:13:25.543Z"
+    },
+    "docs-page-and-screenshots.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-23T04:13:25.543Z"
+    }
+  }
+}

@@ -133,8 +133,6 @@
   "src/dashboard/frontend/src/components/mobile/MobilePairScreen.tsx",
   "src/dashboard/frontend/src/components/newConversation/NewConversationDialog.tsx",
   "src/dashboard/frontend/src/components/open/OpenPathHost.tsx",
-  "src/dashboard/frontend/src/components/orders/LaneItem.tsx",
-  "src/dashboard/frontend/src/components/orders/RunSettingsPanel.tsx",
   "src/dashboard/frontend/src/components/palette-fleet-hits.tsx",
   "src/dashboard/frontend/src/components/palette/fileProvider.ts",
   "src/dashboard/frontend/src/components/project/new/ProjectCreateForm.tsx",
@@ -156,6 +154,5 @@
   "src/dashboard/frontend/src/lib/uiCommands/useUiCommands.ts",
   "src/dashboard/frontend/src/lib/useConversationPaneChoice.ts",
   "src/dashboard/frontend/src/lib/useResolvedModels.ts",
-  "src/dashboard/frontend/src/pages/NewWorkspacePage.tsx",
-  "src/dashboard/frontend/src/pages/OrderBookPage.tsx"
+  "src/dashboard/frontend/src/pages/NewWorkspacePage.tsx"
 ]

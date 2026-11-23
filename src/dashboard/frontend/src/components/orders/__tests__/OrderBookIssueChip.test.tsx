@@ -35,9 +35,10 @@ describe('OrderBookIssueChip', () => {
     vi.stubGlobal('fetch', fetchMock);
     const { rerender } = renderWithQuery(<OrderBookIssueChip issueId="PAN-2" />);
 
-    const chip = await screen.findByRole('link', { name: 'B11 · book · Active campaign' });
-    expect(chip).toHaveAttribute('href', '/orders');
-    expect(chip).toHaveTextContent('B11 · book');
+    const chip = await screen.findByRole('link', { name: 'B11 in order book Active campaign' });
+    expect(chip).toHaveAttribute('href', '/orders?book=active-book');
+    expect(chip).toHaveTextContent('B11');
+    expect(chip).not.toHaveTextContent('· book');
     expect(chip).toHaveTextContent('Active campaign');
 
     rerender(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><OrderBookIssueChip issueId="PAN-404" /></QueryClientProvider>);

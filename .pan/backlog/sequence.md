@@ -1,17 +1,19 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-23T03:21:51Z · model: claude-opus-5-5 · open: 944_
+_Last sequenced: 2026-11-23T04:22:39Z · model: claude-opus-5-5 · open: 948_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-5598 | M | medium | ok |  |  | Order-book CLI/MCP parity: route scopes for /api/orders*, ten MCP tools, new pan orders verbs. In pipeline (planning). |
+| 2 | PAN-5600 | XS | critical | ok |  |  | Dashboard start route hardcodes overdeck-feature-<id>, so every MYN post-planning hand-off 422s; swap in the PAN-3049 resolver. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 4 | PAN-5430 | S | medium | ok |  |  | Markdown Preview prints raw HTML (README logo <div>/<picture>) as text; render it via rehype-raw + rehype-sanitize in doc previews. |
 | 5 | PAN-5567 | S | high | ok |  |  | Codex app-server threads hardcode on-request/workspace-write, so Read-only and Full access settings never apply. |
 | 6 | PAN-5489 | S | high | ok |  |  | pan plan from an agent shell fails workspace creation without HUME_API_KEY, leaves a half-built workspace and hides the cause. |
 | 7 | PAN-5566 | M | high | ok |  |  | UI/help text says Auto blocks destructive calls but the hook approves all; repo .pan.yaml can set bypass mode. |
 | 8 | PAN-5385 | S | critical | ok |  |  | Anywhere remote access is down for trickle clients: machine drops ICE candidates sent before session registers; small server fix |
+| 9 | PAN-5601 | S | high | ok |  |  | pan orders start and the dashboard Start swallow FlywheelAlreadyRunning and drop the book; deliver it to the live conv. Needs handoff |
 | 10 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 10 | PAN-5523 | S | high | ok |  |  | pan conversations move/heal send raw fetch with no token, so routes refuse with Missing origin; same fix pattern as in-pipeline PAN-5516. |
 | 11 | PAN-4553 | S | critical | ok |  |  | Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges. |
@@ -84,6 +86,7 @@ _Last sequenced: 2026-11-23T03:21:51Z · model: claude-opus-5-5 · open: 944_
 | 75 | PAN-3605 | XS | high | ok |  |  | Supply chain: lint-effect-diagnostics npx fell back to the registry and ran a squatted unscoped package; pin the scoped local bin. |
 | 76 | PAN-5133 | M | high | ok |  |  | pan pause cannot hold a planned issue whose deferred work-agent start is retried; no operator door to stop it. |
 | 77 | PAN-4792 | S | high | ok |  |  | Paste guard only knows numbered menus; a failed paste presses Enter into unnumbered selects, silently setting defaultMode=auto. |
+| 77 | PAN-5604 | S | high | ok |  |  | Stale cached snapshot fires a waiting-on-you toast for answered questions; toasts never close. Small fix in two hooks. |
 | 78 | PAN-3557 | S | critical | ok |  |  | Post-merge label writes have no retry; a 403 hides a merged issue from the verify-on-main sweep while lifecycle reports success. |
 | 79 | PAN-3543 | S | critical | ok |  |  | Completed-handoff agents are unstartable: start, --fresh and reset-session all refuse while the refusal itself recommends --fresh. |
 | 80 | PAN-3522 | S | critical | ok |  |  | Supervisor watchdog restart-churns under CPU storm because the probe timeout budget ignores the boot warm phase. |
@@ -367,6 +370,7 @@ _Last sequenced: 2026-11-23T03:21:51Z · model: claude-opus-5-5 · open: 944_
 | 340 | PAN-2193 | S | high | ok |  |  | Held issues (objection/parked/vetoed/needs-handoff) are invisible in the Command Deck tree |
 | 340 | PAN-5496 | S | medium | ok |  | PAN-5058, PAN-5493 | MCP relay S-G: daily Certificate Transparency watch for the relay hostname; ships with S-E. Needs S-D (PAN-5493). |
 | 341 | PAN-1984 | XS | high | ok |  |  | Migrate or delete the 18 dead panopticon.db modules referenced by ~30 test files (#1983 follow-up) |
+| 341 | PAN-5602 | M | medium | ok |  | PAN-5058, PAN-5494 | Live Grok Bot and Muse checkpoints over the MCP relay, moved from PAN-5058. Blocked by relay S-E (PAN-5494); needs operator sign-ins. |
 | 342 | PAN-1913 | XS | high | ok |  |  | Project description: show on click, edit in dashboard, mirror into the project layer (and document what's in .pan and ~/.panopticon) |
 | 343 | PAN-1906 | M | high | ok |  |  | Enforce harness restrictions with subscription: gray out non-claude-code, validate everywhere |
 | 344 | PAN-1544 | M | high | ok |  |  | Type cleanup: strip 'ship' from the Role union and its ~10 downstream references |
@@ -411,7 +415,6 @@ _Last sequenced: 2026-11-23T03:21:51Z · model: claude-opus-5-5 · open: 944_
 | 383 | PAN-2465 | S | medium | ok |  |  | pan done's PR lookup fails at MYN polyrepo root |
 | 384 | PAN-2454 | S | medium | ok |  |  | ratchet audit fails per-commit on push ranges whose NET baseline delta is zero |
 | 385 | PAN-2428 | XS | medium | ok |  |  | MYN workspace Traefik routing broken post-rebrand |
-| 386 | PAN-2423 | XS | medium | ok |  |  | pan workspace rebuild hardcodes 'overdeck-' compose project prefix |
 | 387 | PAN-2416 | S | medium | ok |  |  | codex agents can wedge on the Codex CLI first-run/consent screen |
 | 388 | PAN-4250 | XS | medium | ok |  |  | Stale dated CONVERSATION_TITLE_MODEL literal throws UnknownModelError when titleModel config is unset; one-line fix plus audit |
 | 389 | PAN-2395 | S | medium | ok |  |  | one invalid tiered_execution enum poisons every config read |
@@ -949,12 +952,17 @@ _Last sequenced: 2026-11-23T03:21:51Z · model: claude-opus-5-5 · open: 944_
 | 902 | PAN-5305 | XS | low | ok |  |  | Main build break already fixed: needsYou.ts imports from needsYouRows and main CI is green. Verify and close. |
 | 903 | PAN-5444 | XS | low | ok |  |  | Two Minor CodeRabbit findings left on merged PR #5443: semgrep repo rules resolve from event cwd; hook tests not isolated from Docker. |
 | 904 | PAN-5405 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5403: changes-query refetch after turns, Send menu keyboard/scheduling guard, tab-menu focus. |
+| 905 | PAN-2423 | XS | low | stale |  |  | Likely fixed: rebuild now uses the PAN-3049 resolver (docker.ts:181) and reap has no hardcoded prefix; confirm and close. |
 
 ## Rationale detail
 
 ### PAN-5598 (rank 1)
 
 New issue already in the pipeline with a PRD; pinned at the free rank 1 slot per the in-pipeline rule. Related to PAN-5597 but independent of its code.
+
+### PAN-5600 (rank 2)
+
+New substrate bug that breaks the automatic plan-to-work hand-off and the dashboard Start button for every non-Overdeck docker project (MYN today); the CLI pan start workaround hides it only for CLI users. The fix is a one-call swap to requireComposeProjectNameForWorkspace with a named test, so it is tiny and unblocks the pipeline for a whole project.
 
 ### PAN-5013 (rank 3)
 
@@ -979,6 +987,10 @@ New bug: operators choose Auto believing it gates destructive calls, and a proje
 ### PAN-5385 (rank 8)
 
 New issue. Phones (iOS, Android) and the connector cannot reach the machine at all, directly or through the relay, because RtcTransport.accept awaits ICE servers before registering the signalling session and drops trickle candidates that arrive in that window. The root cause and the fix (buffer candidates from offer acceptance) are stated in the body and touch only the dashboard server, so this is a small, well-defined fix for a full outage of a shipped feature. It takes the open rank-8 slot ahead of the remaining pipeline-substrate bugs.
+
+### PAN-5601 (rank 9)
+
+New substrate bug: starting an order book while a Flywheel conversation runs prints success but never reaches the loop, so operator-queued work silently stalls (seen on the MYN money book 2026-11-23). Root cause and wanted behavior are pinned in the body; TENET-10 means it must run as a supervised handoff, not Flywheel self-work.
 
 ### PAN-4636 (rank 10)
 
@@ -1264,14 +1276,6 @@ New this pass and the only supply-chain finding in the batch. A stale node_modul
 
 New substrate bug placed in a freed high-tier slot. Under memory pressure the operator has no supported way to stop a deferred start, and the Flywheel had to write the journal directly.
 
-### PAN-4792 (rank 77)
-
-New bug found while planning PAN-4738: the tmux paste guard misses Claude Code's unnumbered select dialogs, so a failed paste's fallback Enter can answer them, including a silent permission-mode change. PAN-4738 removes the one known trigger on Fly, so it ranks with the high-tier delivery bugs rather than the top tier.
-
-### PAN-3557 (rank 78)
-
-New this pass. Post-merge label application has no retry, so a rate-limited 403 leaves a merged issue without its verifying-on-main label — and the verify-on-main phase enumerates by that label, which makes the issue invisible to the phase that owns it. Lifecycle reported 'completed' throughout, so nothing noticed for 45 minutes.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1279,10 +1283,10 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-23T03:21:51Z",
+  "generatedAt": "2026-11-23T04:22:39Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 944,
+  "openCount": 948,
   "nodes": [
     {
       "issue": "PAN-5598",
@@ -1294,6 +1298,19 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
       "dependsOn": [],
       "why": "Order-book CLI/MCP parity: route scopes for /api/orders*, ten MCP tools, new pan orders verbs. In pipeline (planning).",
       "rationale": "New issue already in the pipeline with a PRD; pinned at the free rank 1 slot per the in-pipeline rule. Related to PAN-5597 but independent of its code.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5600",
+      "rank": 2,
+      "size": "XS",
+      "importance": "critical",
+      "score": 85,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Dashboard start route hardcodes overdeck-feature-<id>, so every MYN post-planning hand-off 422s; swap in the PAN-3049 resolver.",
+      "rationale": "New substrate bug that breaks the automatic plan-to-work hand-off and the dashboard Start button for every non-Overdeck docker project (MYN today); the CLI pan start workaround hides it only for CLI users. The fix is a one-call swap to requireComposeProjectNameForWorkspace with a named test, so it is tiny and unblocks the pipeline for a whole project.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1372,6 +1389,19 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
       "dependsOn": [],
       "why": "Anywhere remote access is down for trickle clients: machine drops ICE candidates sent before session registers; small server fix",
       "rationale": "New issue. Phones (iOS, Android) and the connector cannot reach the machine at all, directly or through the relay, because RtcTransport.accept awaits ICE servers before registering the signalling session and drops trickle candidates that arrive in that window. The root cause and the fix (buffer candidates from offer acceptance) are stated in the body and touch only the dashboard server, so this is a small, well-defined fix for a full outage of a shipped feature. It takes the open rank-8 slot ahead of the remaining pipeline-substrate bugs.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5601",
+      "rank": 9,
+      "size": "S",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan orders start and the dashboard Start swallow FlywheelAlreadyRunning and drop the book; deliver it to the live conv. Needs handoff",
+      "rationale": "New substrate bug: starting an order book while a Flywheel conversation runs prints success but never reaches the loop, so operator-queued work silently stalls (seen on the MYN money book 2026-11-23). Root cause and wanted behavior are pinned in the body; TENET-10 means it must run as a supervised handoff, not Flywheel self-work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2310,6 +2340,19 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
       "dependsOn": [],
       "why": "Paste guard only knows numbered menus; a failed paste presses Enter into unnumbered selects, silently setting defaultMode=auto.",
       "rationale": "New bug found while planning PAN-4738: the tmux paste guard misses Claude Code's unnumbered select dialogs, so a failed paste's fallback Enter can answer them, including a silent permission-mode change. PAN-4738 removes the one known trigger on Fly, so it ranks with the high-tier delivery bugs rather than the top tier.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5604",
+      "rank": 77,
+      "size": "S",
+      "importance": "high",
+      "score": 74,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Stale cached snapshot fires a waiting-on-you toast for answered questions; toasts never close. Small fix in two hooks.",
+      "rationale": "New substrate-improvement bug with a verified root cause and exact fix; a false needs-you prompt misleads the operator, so it ranks with other high substrate bugs.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -5912,6 +5955,22 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
       "planning": "skip"
     },
     {
+      "issue": "PAN-5602",
+      "rank": 341,
+      "size": "M",
+      "importance": "medium",
+      "score": 46,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-5058",
+        "PAN-5494"
+      ],
+      "why": "Live Grok Bot and Muse checkpoints over the MCP relay, moved from PAN-5058. Blocked by relay S-E (PAN-5494); needs operator sign-ins.",
+      "rationale": "New issue carved out of PAN-5058; it is the last step of the relay chain, so it ranks right after the relay slices it depends on.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1913",
       "rank": 342,
       "size": "XS",
@@ -6444,18 +6503,6 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
       "condition": "ok",
       "dependsOn": [],
       "why": "MYN workspace Traefik routing broken post-rebrand",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2423",
-      "rank": 386,
-      "size": "XS",
-      "importance": "medium",
-      "score": 58,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan workspace rebuild hardcodes 'overdeck-' compose project prefix",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13074,6 +13121,19 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
       "rationale": "New CodeRabbit follow-up from the merged PAN-5295 PR; one Major and four Minor frontend findings, ranked with comparable follow-ups.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-2423",
+      "rank": 905,
+      "size": "XS",
+      "importance": "low",
+      "score": 15,
+      "condition": "stale",
+      "dependsOn": [],
+      "why": "Likely fixed: rebuild now uses the PAN-3049 resolver (docker.ts:181) and reap has no hardcoded prefix; confirm and close.",
+      "rationale": "Demoted: a 2026-11-23 comment and a code check show both the rebuild and reap hardcodes are gone, so only an operator close remains.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -14156,6 +14216,13 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
       "confidence": 1
     },
     {
+      "from": "PAN-5058",
+      "to": "PAN-5602",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
       "from": "PAN-5097",
       "to": "PAN-2954",
       "type": "informs",
@@ -14282,6 +14349,13 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
       "confidence": 1
     },
     {
+      "from": "PAN-5486",
+      "to": "PAN-5602",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
       "from": "PAN-5490",
       "to": "PAN-5491",
       "type": "unblocks",
@@ -14317,6 +14391,13 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
       "confidence": 1
     },
     {
+      "from": "PAN-5492",
+      "to": "PAN-5602",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
       "from": "PAN-5493",
       "to": "PAN-5494",
       "type": "unblocks",
@@ -14333,6 +14414,13 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
     {
       "from": "PAN-5493",
       "to": "PAN-5496",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5494",
+      "to": "PAN-5602",
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
@@ -14392,6 +14480,13 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-5600",
+      "to": "PAN-2423",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
     },
     {
       "from": "PAN-750",

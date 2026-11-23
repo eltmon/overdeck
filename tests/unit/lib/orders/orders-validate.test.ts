@@ -147,11 +147,14 @@ describe('order book start validation', () => {
   it('reports closed issues, cross-book duplicates, unresolved prerequisites, cycles, and missing Lane B PRDs', () => {
     const root = fixtureRoot();
     writeOtherBook(root, book([item('PAN-1', 'A')], '2026-07-17-other'));
-    const value = book([
-      item('PAN-1', 'A'),
-      item('PAN-2', 'B', ['PAN-3', 'PAN-404']),
-      item('PAN-3', 'A', ['PAN-2']),
-    ]);
+    const value: OrderBook = {
+      ...book([
+        item('PAN-1', 'A'),
+        item('PAN-2', 'B', ['PAN-3', 'PAN-404']),
+        item('PAN-3', 'A', ['PAN-2']),
+      ]),
+      status: 'draft',
+    };
     const issueLookup = () => new Map([
       ['PAN-1', { issue: 'PAN-1', open: false, parked: false }],
       ['PAN-2', { issue: 'PAN-2', open: true, parked: false }],
@@ -167,6 +170,37 @@ describe('order book start validation', () => {
       'missing-prd',
     ]));
     expect(result.warns).toEqual([]);
+  });
+
+  it('a closed issue blocks a draft book', () => {
+    const root = fixtureRoot();
+    const value: OrderBook = { ...book([item('PAN-1', 'A')]), status: 'draft' };
+    const issueLookup = () => new Map([['PAN-1', { issue: 'PAN-1', open: false, parked: false }]]);
+    const result = validateBookForStart(root, value, { issueLookup, hasPrd: () => true });
+    expect(result.blocks).toContainEqual(expect.objectContaining({ code: 'issue-not-open', issue: 'PAN-1' }));
+  });
+
+  it('a closed issue does not block a ready book', () => {
+    const root = fixtureRoot();
+    const value = book([item('PAN-1', 'A'), item('PAN-2', 'A')]);
+    const issueLookup = () => new Map([
+      ['PAN-1', { issue: 'PAN-1', open: false, parked: false }],
+      ['PAN-2', { issue: 'PAN-2', open: true, parked: false }],
+    ]);
+    const result = validateBookForStart(root, value, { issueLookup, hasPrd: () => true });
+    expect(result.blocks.filter((finding) => finding.code === 'issue-not-open')).toEqual([]);
+  });
+
+  it('an unresolvable issue blocks a ready book', () => {
+    const root = fixtureRoot();
+    const value = book([item('PAN-404', 'A')]);
+    const issueLookup = () => new Map();
+    const result = validateBookForStart(root, value, { issueLookup, hasPrd: () => true });
+    expect(result.blocks).toContainEqual({
+      code: 'issue-not-open',
+      issue: 'PAN-404',
+      message: 'PAN-404 could not be resolved as an open issue',
+    });
   });
 
   it('moves only a plan-at-pickup missing-PRD finding to warnings', () => {
