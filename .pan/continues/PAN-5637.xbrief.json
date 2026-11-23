@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5637",
   "created": "2026-11-23T19:37:34.841Z",
-  "updated": "2026-11-23T20:27:54.558Z",
+  "updated": "2026-11-23T20:28:00.032Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -84,6 +84,11 @@
     "merge-gate-ci-waiver.ac4": {
       "status": "completed",
       "doneAt": "2026-11-23T20:27:54.558Z"
+    },
+    "board-ci-waiver": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5637",
+      "claimedAt": "2026-11-23T20:28:00.032Z"
     }
   }
 }
