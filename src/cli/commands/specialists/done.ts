@@ -155,6 +155,23 @@ async function postPolyrepoReviewVerdict(
   return { ok: true, result: last! };
 }
 
+/** The forge reports a review rejection: changes requested, or an open GitLab MR left unapproved. */
+function rejectionVisibleIn(facts: PrFacts): boolean {
+  return facts.changesRequested || (facts.forge === 'gitlab' && facts.open && !facts.approved);
+}
+
+/** PAN-5638: a polyrepo rejection is visible once any member PR/MR, read again now, reports it. */
+async function polyrepoRejectionVisible(
+  issueId: string,
+  found: ReadonlyArray<{ target: ReviewArtifactTarget; artifact: { url: string } }>,
+): Promise<boolean> {
+  for (const { target, artifact } of found) {
+    const facts = await readMemberMrFacts(issueId, target.sourceBranch, artifact.url);
+    if (!facts.error && rejectionVisibleIn(facts)) return true;
+  }
+  return false;
+}
+
 export async function doneCommand(
   specialist: string,
   issueId: string,
@@ -489,12 +506,14 @@ export async function doneCommand(
     // `postReviewVerdict` read the forge a moment ago and both read caches
     // (pr-facts' own 60s TTL and the generation-keyed PR-tab cache) now hold
     // the PRE-verdict answer. Without dropping them this "fresh read" is a
-    // cache hit that can never see the verdict that was just posted.
+    // cache hit that can never see the verdict that was just posted. A
+    // polyrepo issue re-reads each member, because `getPrFacts` cannot see a
+    // GitHub member of a GitLab project.
     resetPrFactsCache();
     bumpIssuePrTabCacheGeneration(normalizedIssueId);
-    const facts = await getPrFacts(normalizedIssueId);
-    const rejectionVisible = facts.changesRequested
-      || (facts.forge === 'gitlab' && facts.open && !facts.approved);
+    const rejectionVisible = resolved.polyrepo && !strike
+      ? await polyrepoRejectionVisible(normalizedIssueId, found)
+      : rejectionVisibleIn(await getPrFacts(normalizedIssueId));
     if (!rejectionVisible) {
       console.warn(chalk.yellow(
         `${artifact.url} does not report the rejection yet — not driving the work agent. `
