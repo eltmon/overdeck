@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4242",
   "created": "2026-11-23T08:46:31.743Z",
-  "updated": "2026-11-23T09:36:04.728Z",
+  "updated": "2026-11-23T09:36:06.086Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -124,6 +124,11 @@
     "kickoff-hold-on-refusal.ac3": {
       "status": "completed",
       "doneAt": "2026-11-23T09:36:04.728Z"
+    },
+    "resume-delivers-kickoff": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4242",
+      "claimedAt": "2026-11-23T09:36:06.086Z"
     }
   }
 }
