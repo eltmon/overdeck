@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5633",
   "created": "2026-11-23T19:06:23.391Z",
-  "updated": "2026-11-23T19:11:53.429Z",
+  "updated": "2026-11-23T19:11:54.732Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -78,6 +78,11 @@
     "wi3-codex-provider-error.ac4": {
       "status": "completed",
       "doneAt": "2026-11-23T19:11:53.429Z"
+    },
+    "wi4-auth-failure-scan": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5633",
+      "claimedAt": "2026-11-23T19:11:54.732Z"
     }
   }
 }
