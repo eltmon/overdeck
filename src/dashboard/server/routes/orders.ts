@@ -3,15 +3,18 @@ import type {
   OrderBookItem,
   OrderBookLane,
   OrderBookSettings,
+  OrderBookStatus,
 } from '@overdeck/contracts';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { backlogCandidates, computeBookProgress, getBookAsync, listBooks, liveOrderIssueLookup, normalizeOrderIssueId } from '../../../lib/orders/resolver.js';
+import { deriveBookPhases, type OrderBookPhaseView } from '../../../lib/orders/phase.js';
 import type { OrderIssueLookup, OrderIssueState } from '../../../lib/orders/types.js';
 import { createOrderPrdLookup, hasOrderIssuePrd, validateBookForStart } from '../../../lib/orders/validate.js';
 import {
   addItems,
+  assertRestorable,
   createBook,
   moveItem,
   removeItem,
@@ -224,16 +227,38 @@ function buildOrdersReadSnapshot(deps: OrdersRouteDeps, projectKey?: string): Or
   };
 }
 
-function enrichedBook(book: OrderBook, deps: OrdersRouteDeps, snapshot?: OrdersReadSnapshot, projectKey?: string) {
+/** Phase, queue position and finished for every book in the project, from the same rule dispatch uses. */
+function bookPhases(books: readonly OrderBook[], issueLookup?: OrderIssueLookup): Map<string, OrderBookPhaseView> {
+  return deriveBookPhases(books, (candidate) => computeBookProgress(candidate, issueLookup));
+}
+
+/** Used only when the book is missing from the list it was derived from (a concurrent write raced the read). */
+function fallbackPhase(book: OrderBook): OrderBookPhaseView {
+  return {
+    phase: book.status === 'complete' ? 'archived' : book.status === 'draft' ? 'draft' : 'queued',
+    queuePosition: null,
+    finished: false,
+  };
+}
+
+function enrichedBook(
+  book: OrderBook,
+  deps: OrdersRouteDeps,
+  snapshot?: OrdersReadSnapshot,
+  projectKey?: string,
+  phases?: Map<string, OrderBookPhaseView>,
+) {
   const resolved = snapshot ?? resolveOrdersStateRoot(deps, projectKey);
   const stateRoot = resolved.stateRoot;
   const hasPrd = snapshot?.hasPrd ?? deps.hasPrd ?? ((issueId: string) => hasOrderIssuePrd(stateRoot, issueId));
   const issueLookup = snapshot?.issueLookup ?? deps.issueLookup;
   const prerequisiteIds = [...new Set(book.items.flatMap((item) => item.prereqs.map((prereq) => prereq.toUpperCase())))];
   const prerequisiteState = snapshot?.issueState ?? issueLookup?.(prerequisiteIds) ?? new Map();
+  const phaseMap = phases ?? bookPhases(snapshot?.books ?? listBooks(stateRoot), issueLookup);
   return {
     ...book,
     ...(resolved.project !== undefined ? { project: resolved.project } : {}),
+    ...(phaseMap.get(book.id) ?? fallbackPhase(book)),
     progress: computeBookProgress(book, issueLookup),
     validation: validateBookForStart(stateRoot, book, {
       issueLookup,
@@ -311,9 +336,10 @@ async function defaultStartOrderBook(book: OrderBook, project: ProjectConfig): P
 export async function getOrdersPayload(deps: OrdersRouteDeps = {}, projectKey?: string): Promise<RouteResult> {
   return routeResult(async () => {
     const snapshot = buildOrdersReadSnapshot(deps, projectKey);
+    const phases = bookPhases(snapshot.books, snapshot.issueLookup);
     return {
       ...(snapshot.project !== undefined ? { project: snapshot.project } : {}),
-      books: snapshot.books.map((book) => enrichedBook(book, deps, snapshot)),
+      books: snapshot.books.map((book) => enrichedBook(book, deps, snapshot, undefined, phases)),
     };
   });
 }
@@ -359,6 +385,24 @@ export async function getOrderPayload(
   });
 }
 
+/**
+ * The status moves PATCH /api/orders/:id accepts: queue a draft, move a queued or archived book
+ * back to draft (unqueue / restore), and archive a draft or queued book. `running` and `drained`
+ * are never written through this route.
+ */
+type PatchableStatus = Extract<OrderBookStatus, 'ready' | 'draft' | 'complete'>;
+
+const STATUS_TRANSITIONS: Record<PatchableStatus, { from: readonly OrderBookStatus[]; refusal: string }> = {
+  ready: { from: ['draft'], refusal: 'must be draft before it can be queued' },
+  draft: { from: ['ready', 'complete'], refusal: 'must be queued or archived before it can be moved back to draft' },
+  complete: { from: ['draft', 'ready'], refusal: 'must be draft or queued before it can be archived' },
+};
+
+function statusTransition(value: unknown): PatchableStatus {
+  if (value === 'ready' || value === 'draft' || value === 'complete') return value;
+  throw new Error('status may only transition to ready, draft, or complete through this route');
+}
+
 export async function patchOrderPayload(
   bookId: string,
   body: Record<string, unknown>,
@@ -372,11 +416,13 @@ export async function patchOrderPayload(
       patch.postureSetAt = (deps.now ?? (() => new Date()))().toISOString();
       patch.postureSetBy = (deps.actor ?? (() => 'dashboard'))();
     }
-    if (body['status'] !== undefined) {
-      if (body['status'] !== 'ready') throw new Error('status may only transition to ready through this route');
+    const targetStatus = body['status'] === undefined ? undefined : statusTransition(body['status']);
+    if (targetStatus !== undefined) {
       if (body['runId'] !== undefined) throw new Error('runId is server-controlled');
       const book = await requireBook(stateRoot, bookId);
-      if (book.status !== 'draft') throw new Error(`Order book ${bookId} must be draft before it can be queued`);
+      const transition = STATUS_TRANSITIONS[targetStatus];
+      if (!transition.from.includes(book.status)) throw new Error(`Order book ${bookId} ${transition.refusal}`);
+      if (book.status === 'complete' && targetStatus === 'draft') assertRestorable(stateRoot, book);
     }
 
     let changed = false;
@@ -388,8 +434,8 @@ export async function patchOrderPayload(
       await setSettings(stateRoot, bookId, patch);
       changed = true;
     }
-    if (body['status'] !== undefined) {
-      await setStatus(stateRoot, bookId, 'ready');
+    if (targetStatus !== undefined) {
+      await setStatus(stateRoot, bookId, targetStatus);
       changed = true;
     }
     if (!changed) throw new Error('name, settings, or status is required');

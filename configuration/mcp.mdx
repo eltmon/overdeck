@@ -407,7 +407,10 @@ Give the bot the public URL `https://<machine>.<tailnet>.ts.net:8443/mcp`.
 **Grok Bot and the xAI API.** The Grok Bot plugin and runnable xAI API
 examples live in [`integrations/grok-bot/`](https://github.com/eltmon/overdeck/tree/main/integrations/grok-bot).
 Its `mcp.json` runs the connector over stdio; for Public MCP, replace it
-with the public URL. Grok Bot signs in with OAuth on first use. The xAI API
+with the public URL. Use Public MCP for Grok Bot: the connector route fails
+from Grok Bot's sandbox, which has no WebRTC egress
+([PAN-5242](https://github.com/eltmon/overdeck/issues/5242)).
+Public MCP with Grok Bot has not been verified live yet. Grok Bot signs in with OAuth on first use. The xAI API
 cannot open a browser, so mint its token with
 `pan mcp oauth issue --name xai-api --level read` and
 pass the access token in the `authorization` field of an `mcp` tool, with
@@ -747,7 +750,8 @@ Hermes, OpenClaw, Grok Build, Grok Bot and the xAI API reach this server
 through **Connect a bot** in Settings → Anywhere → Bots. A bot with a shell
 connects in one paste with **Copy for &lt;bot&gt;**; see
 [Connect in one paste](/configuration/bots#connect-in-one-paste); the xAI API
-uses Public MCP above, and Grok Bot can too. See
+and Grok Bot use Public MCP above, because Grok Bot's sandbox cannot run the
+connector ([PAN-5242](https://github.com/eltmon/overdeck/issues/5242)). See
 [Connect a bot](/configuration/bots) for each platform's setup and
 [Run the Overdeck connector](/configuration/bots#run-the-overdeck-connector)
 for the connector. Every `pan mcp` command is in [`pan mcp`](/cli/mcp).

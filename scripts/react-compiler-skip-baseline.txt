@@ -137,10 +137,6 @@
 1 src/dashboard/frontend/src/components/mobile/MobilePairScreen.tsx
 3 src/dashboard/frontend/src/components/mobile/useQrScanner.ts
 1 src/dashboard/frontend/src/components/open/OpenPathHost.tsx
-1 src/dashboard/frontend/src/components/orders/AddIssuesRail.tsx
-2 src/dashboard/frontend/src/components/orders/BacklogCandidatesRail.tsx
-1 src/dashboard/frontend/src/components/orders/BookStrip.tsx
-1 src/dashboard/frontend/src/components/orders/LaneItem.tsx
 1 src/dashboard/frontend/src/components/project/new/AddProjectFolderStep.tsx
 4 src/dashboard/frontend/src/components/project/new/useProjectCreateIntent.ts
 1 src/dashboard/frontend/src/components/push/TurnOnNotificationsButton.tsx
@@ -159,4 +155,3 @@
 1 src/dashboard/frontend/src/lib/uiCommands/useUiCommands.ts
 1 src/dashboard/frontend/src/lib/useChannelMediaSrc.ts
 6 src/dashboard/frontend/src/pages/BacklogSequencerPage.tsx
-5 src/dashboard/frontend/src/pages/OrderBookPage.tsx

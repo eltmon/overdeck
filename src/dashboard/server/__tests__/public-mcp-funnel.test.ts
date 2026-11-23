@@ -155,13 +155,32 @@ describe('public MCP Funnel middleware (PAN-4947)', () => {
     expect(audit.mock.calls.map(([entry]) => entry.message)).toEqual(
       surfaces.map(([method, path]) => `Public MCP ${method} ${path} 200`),
     );
-    expect(audit.mock.calls[0]?.[0].details).toBe(JSON.stringify({ clientId: `odc_${'3'.repeat(32)}` }));
+    expect(audit.mock.calls[0]?.[0].details).toBe(JSON.stringify({ clientId: `odc_${'3'.repeat(32)}`, authScheme: 'bearer' }));
     const logged = JSON.stringify(audit.mock.calls);
     expect(logged).not.toContain(token);
+    expect(logged).not.toContain('odk_');
     expect(logged).not.toContain('code=');
     expect(logged).not.toContain('code_verifier');
     expect(logged).not.toContain('secret');
     for (const [entry] of audit.mock.calls) expect(`${entry.message} ${entry.details}`).not.toContain('?');
+  });
+
+  it('records the POST /mcp authorization scheme, never the token (PAN-5058)', async () => {
+    const token = await oauthToken('4');
+    expect(token).toMatch(/^odk_[0-9a-f]{64}$/);
+    const cases: Array<[Record<string, string>, string]> = [
+      [{ authorization: token }, 'bare'],
+      [{ authorization: `Bearer ${token}` }, 'bearer'],
+      [{}, 'none'],
+      [{ authorization: 'Basic x' }, 'other'],
+    ];
+    for (const [auth, scheme] of cases) {
+      audit.mockClear();
+      await send('POST', '/mcp', { ...FUNNEL, ...auth });
+      expect(audit).toHaveBeenCalledOnce();
+      expect(JSON.parse(audit.mock.calls[0]![0].details ?? '{}')).toMatchObject({ authScheme: scheme });
+      expect(audit.mock.calls[0]![0].details).not.toContain('odk_');
+    }
   });
 
   it('audits the authorize page with its client_id and a message without the query', async () => {

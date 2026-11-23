@@ -36,11 +36,27 @@ keys, because OpenClaw's parser reads single-line keys only, and keep the
 file under 100 lines and 6,000 bytes, because every bot loads it into its
 context.
 
+## Core version pins
+
+A plugin that runs the connector through `npx` pins an exact `@overdeck/core`
+version. Never type a pin by hand. `node integrations/shared/sync-core-pins.mjs`
+rewrites every `@overdeck/core@<digits>` and the `OVERDECK_CORE_VERSION`
+default in `grok-build/scripts/run-mcp.sh` to the root `package.json`
+version, and `--check` writes nothing and exits 1 when any pin differs.
+`pan release stable` and `pan release canary` run the sync and commit the
+pins in the release commit. The `integrations` CI job runs the check, and
+`tests/unit/integrations/sync-core-pins.test.ts` tests the script against
+fixtures and checks the committed pins. Placeholders such as
+`@overdeck/core@<version>` are left alone. Every `@overdeck/core@` followed
+by a digit under `integrations/` counts as a pin, so write a historical
+version without that prefix.
+
 ## Continuous integration
 
 The `integrations` job in `.github/workflows/ci.yml` runs on every pull
 request. It runs the shared skill check
-(`node integrations/shared/sync-skill.mjs --check`), installs `hermes/`
+(`node integrations/shared/sync-skill.mjs --check`) and the core pin check
+(`node integrations/shared/sync-core-pins.mjs --check`), installs `hermes/`
 on Python 3.11 with its `test` extra and runs `python -m pytest integrations/hermes`,
 and runs `npm ci`, `npm run build` and `npm test` in `openclaw/`. The
 `test` check requires it, so a red package blocks merge. `grok-build/` and
@@ -51,6 +67,7 @@ Run the same checks locally from the repository root:
 
 ```bash
 node integrations/shared/sync-skill.mjs --check
+node integrations/shared/sync-core-pins.mjs --check
 python3.11 -m venv .tmp/hermes-venv
 .tmp/hermes-venv/bin/pip install -e 'integrations/hermes[test]'
 .tmp/hermes-venv/bin/python -m pytest integrations/hermes

@@ -1,0 +1,88 @@
+{
+  "version": "1",
+  "issueId": "PAN-5058",
+  "created": "2026-11-23T02:58:48.676Z",
+  "updated": "2026-11-23T04:03:51.718Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-23T04:03Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-23T04:03:51.718Z"
+    }
+  ],
+  "items": {
+    "w1-registration-audit": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5058",
+      "claimedAt": "2026-11-23T02:58:48.676Z",
+      "doneAt": "2026-11-23T03:21:37.461Z"
+    },
+    "w1-registration-audit.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:21:37.461Z"
+    },
+    "w1-registration-audit.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:21:37.461Z"
+    },
+    "w1-registration-audit.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:21:37.461Z"
+    },
+    "w1b-auth-scheme-audit": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5058",
+      "claimedAt": "2026-11-23T03:21:50.041Z",
+      "doneAt": "2026-11-23T03:35:12.908Z"
+    },
+    "w6-pan4927-amendment": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5058",
+      "claimedAt": "2026-11-23T03:33:35.739Z",
+      "doneAt": "2026-11-23T03:34:29.887Z"
+    },
+    "w6-pan4927-amendment.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:34:29.887Z"
+    },
+    "w6-pan4927-amendment.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:34:29.887Z"
+    },
+    "w1b-auth-scheme-audit.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:35:12.908Z"
+    },
+    "w1b-auth-scheme-audit.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:35:12.908Z"
+    },
+    "w2-cp1-grok-funnel": {
+      "status": "cancelled",
+      "claimedBy": "agent-pan-5058",
+      "claimedAt": "2026-11-23T03:35:27.615Z"
+    },
+    "w3-private-scheme-redirects": {
+      "status": "cancelled"
+    },
+    "w4-cp2-muse": {
+      "status": "cancelled"
+    },
+    "w5-grok-docs": {
+      "status": "cancelled"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-23T04:03:51Z",
+      "markdownBody": "# CodeRabbit findings for PAN-5058 (PR #5603)\n\nCodeRabbit posted 2 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4661691838 · .pan/drafts/pan-4927.md:142 [Minor]: Limit the token requirement to `/mcp`.\n  https://github.com/eltmon/overdeck/pull/5603#discussion_r4661691838\n- Thread 4661691845 · .pan/drafts/PAN-5058-critique-2.md:5 [Minor]: Replace the machine-local PRD links.\n  https://github.com/eltmon/overdeck/pull/5603#discussion_r4661691845\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5603/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-5058 -m \"CodeRabbit <thread ids>: <what you changed>\"`.\n   If you only replied, you are done.\n5. If PR #5603 has already merged when you read this, stop: after the merge Overdeck files a follow-up issue\n   for every thread with no reply, no later commit to its file, and no re-review request naming its thread id."
+    }
+  ]
+}

@@ -601,6 +601,7 @@ jobs:
   # lockfile. The Grok packages have no build; tests/unit/integrations/ covers
   # them in the test shards. It feeds the `test` aggregator below, so a red
   # package blocks merge. It needs no bun install and no root build.
+  # The `@overdeck/core` pins match the root package version (PAN-5486).
   integrations:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -614,6 +615,9 @@ jobs:
 
       - name: Shared skill copies match
         run: node integrations/shared/sync-skill.mjs --check
+
+      - name: Core pins match the package version
+        run: node integrations/shared/sync-core-pins.mjs --check
 
       - name: Use Python 3.11
         uses: actions/setup-python@v5

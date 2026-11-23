@@ -1,17 +1,28 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { BookOpen, Loader2 } from 'lucide-react';
+/**
+ * The Order books page (PAN-5597). One column lists the books grouped by the
+ * server-derived phase; the detail shows the selected book's header, the
+ * notices that apply, one issue list and More settings; an Add issues panel
+ * opens on the right. The page never re-derives a book's phase: the server
+ * computes it with the same rule dispatch uses.
+ *
+ * Every request carries the explicit project scope (`?project=`), and the
+ * books query is keyed by it, so a late response for one project can never
+ * land under another.
+ */
+import { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { AlertTriangle, BookOpen, Loader2 } from 'lucide-react';
 
-import { AddIssuesRail } from '../components/orders/AddIssuesRail';
-import { BacklogCandidatesRail } from '../components/orders/BacklogCandidatesRail';
-import { BookStrip, type OrderBookView } from '../components/orders/BookStrip';
-import { LaneEditor } from '../components/orders/LaneEditor';
-import { LifecycleStrip } from '../components/orders/LifecycleStrip';
-import { ProgressPanel } from '../components/orders/ProgressPanel';
-import { withProject } from '../components/orders/projectScope';
-import { RunSettingsPanel } from '../components/orders/RunSettingsPanel';
-import { ValidationPanel } from '../components/orders/ValidationPanel';
-import { dashboardMutationJsonHeaders } from '../lib/wsTransport';
+import { AddIssuesPanel } from '../components/orders/AddIssuesPanel';
+import { BookHeader } from '../components/orders/BookHeader';
+import { BookIssueList } from '../components/orders/BookIssueList';
+import { BookList } from '../components/orders/BookList';
+import { orderBookContext, isLanded } from '../components/orders/itemStatus';
+import { MoreSettings } from '../components/orders/MoreSettings';
+import { bookPath, errorMessage, orderBookRequest } from '../components/orders/orderBookApi';
+import type { OrderBookFindingView, OrderBookView } from '../components/orders/types';
+import { FLYWHEEL_STATUS_QUERY_KEY, useFlywheelRunning } from '../lib/flywheelApi';
+import { useDashboardStore } from '../lib/store';
 
 interface OrdersPayload {
   books: OrderBookView[];
@@ -24,30 +35,50 @@ interface RegisteredProject {
   path: string;
 }
 
-async function readError(response: Response): Promise<string> {
-  const payload = await response.json().catch(() => null) as { error?: unknown } | null;
-  return typeof payload?.error === 'string' ? payload.error : `Request failed (${response.status})`;
+const BOOKS_REFETCH_MS = 15_000;
+const REMOVABLE_FINDINGS = new Set(['issue-not-open', 'duplicate-membership']);
+
+function urlParam(name: string): string | null {
+  return new URLSearchParams(window.location.search).get(name);
 }
 
-function projectFromUrl(): string | null {
-  return new URLSearchParams(window.location.search).get('project');
+function setUrlParam(name: string, value: string | null) {
+  const params = new URLSearchParams(window.location.search);
+  if (value) params.set(name, value);
+  else params.delete(name);
+  const query = params.toString();
+  window.history.replaceState(null, '', `${window.location.pathname}${query ? `?${query}` : ''}`);
+}
+
+/** `?book=` when that book exists; else the active book, the first queued, the first draft. Never archived by default. */
+function defaultBook(books: OrderBookView[]): OrderBookView | null {
+  return books.find((book) => book.phase === 'active')
+    ?? books.filter((book) => book.phase === 'queued').sort((a, b) => (a.queuePosition ?? 0) - (b.queuePosition ?? 0))[0]
+    ?? books.find((book) => book.phase === 'draft')
+    ?? null;
+}
+
+function formatShortDate(iso: string | undefined): string | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+}
+
+function plural(count: number, one: string, many: string): string {
+  return `${count} ${count === 1 ? one : many}`;
 }
 
 export function OrderBookPage() {
-  const [books, setBooks] = useState<OrderBookView[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
-  const [view, setView] = useState<'setup' | 'progress'>('setup');
-  const [starting, setStarting] = useState(false);
-  const [actionMessage, setActionMessage] = useState<string | null>(null);
-  // projectKey is the explicit scope — a deep link or a picker choice — and is
-  // the only thing threaded onto fetches. serverProject is what an unscoped read
-  // resolved from the server's own cwd, so the picker can show it without
-  // pinning the URL (decision D1: absent ?project= stays back-compatible).
-  const [projectKey, setProjectKey] = useState<string | null>(projectFromUrl);
-  const [serverProject, setServerProject] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const flywheelRunning = useFlywheelRunning();
+  const derivedById = useDashboardStore((s) => s.derivedIssueStateByIssueId);
+  const [projectKey, setProjectKey] = useState<string | null>(() => urlParam('project'));
+  const [selectedId, setSelectedId] = useState<string | null>(() => urlParam('book'));
+  const [creating, setCreating] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [addOpenByBook, setAddOpenByBook] = useState<Record<string, boolean>>({});
+  const booksKey = ['order-books', 'page', projectKey ?? null] as const;
 
   const { data: registeredProjects = [] } = useQuery<RegisteredProject[]>({
     queryKey: ['registered-projects'],
@@ -59,273 +90,280 @@ export function OrderBookPage() {
     staleTime: 60_000,
   });
 
-  // Bumped on every loadBooks call so a response from a superseded project
-  // switch can recognize it arrived late and skip applying its stale books.
-  const loadGeneration = useRef(0);
+  const booksQuery = useQuery<OrdersPayload>({
+    queryKey: booksKey,
+    queryFn: () => orderBookRequest<OrdersPayload>('/api/orders', projectKey),
+    refetchInterval: BOOKS_REFETCH_MS,
+  });
+  const books = booksQuery.data?.books ?? [];
+  // A request made with an explicit project only ever carries this scope; the envelope's
+  // project names the server-resolved default for an unscoped read.
+  const scope = projectKey ?? booksQuery.data?.project ?? undefined;
+  const shownProject = projectKey ?? booksQuery.data?.project ?? null;
 
-  const loadBooks = useCallback(async () => {
-    const generation = ++loadGeneration.current;
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await fetch(withProject('/api/orders', projectKey));
-      if (!response.ok) throw new Error(await readError(response));
-      const payload = await response.json() as OrdersPayload;
-      if (loadGeneration.current !== generation) return;
-      setBooks(payload.books);
-      if (payload.project) setServerProject(payload.project);
-      setSelectedId((current) => {
-        if (current && payload.books.some((book) => book.id === current)) return current;
-        return payload.books.find((book) => book.status === 'running')?.id
-          ?? payload.books.find((book) => book.status === 'ready' || book.status === 'draft')?.id
-          ?? payload.books[0]?.id
-          ?? null;
-      });
-    } catch (cause) {
-      if (loadGeneration.current !== generation) return;
-      setError(cause instanceof Error ? cause.message : String(cause));
-    } finally {
-      if (loadGeneration.current === generation) setLoading(false);
-    }
-  }, [projectKey]);
+  const explicit = selectedId ? books.find((book) => book.id === selectedId) ?? null : null;
+  const selected = explicit ?? defaultBook(books);
+  const activeBook = books.find((book) => book.phase === 'active') ?? null;
 
-  const selectProject = useCallback((key: string) => {
+  const refreshBooks = () => {
+    void queryClient.invalidateQueries({ queryKey: booksKey });
+  };
+
+  const selectBook = (bookId: string | null) => {
+    setSelectedId(bookId);
+    setActionError(null);
+    setUrlParam('book', bookId);
+  };
+
+  const applyBook = (updated: OrderBookView) => {
+    setActionError(null);
+    const previous = books.find((book) => book.id === updated.id);
+    queryClient.setQueryData<OrdersPayload>(booksKey, (current) => current && {
+      ...current,
+      books: current.books.some((book) => book.id === updated.id)
+        ? current.books.map((book) => (book.id === updated.id ? updated : book))
+        : [...current.books, updated],
+    });
+    // After an archive, move on to whichever book becomes active.
+    if (updated.phase === 'archived' && previous?.phase !== 'archived' && updated.id === selected?.id) selectBook(null);
+    refreshBooks();
+  };
+
+  const selectProject = (key: string) => {
     setProjectKey(key);
     setSelectedId(null);
-    // Clear immediately so the previous project's books never render under
-    // the newly-selected scope while the new fetch is in flight.
-    setBooks([]);
-    setPreview(null);
-    setActionMessage(null);
-    const params = new URLSearchParams(window.location.search);
-    params.set('project', key);
-    window.history.replaceState(null, '', `${window.location.pathname}?${params.toString()}`);
-  }, []);
+    setActionError(null);
+    setUrlParam('book', null);
+    setUrlParam('project', key);
+  };
 
-  const shownProject = projectKey ?? serverProject;
-  const pickerOptions = useMemo(() => {
-    const keys = registeredProjects.map((project) => project.key);
-    // A project resolved from the envelope or a deep link stays selectable even
-    // when the registry response has not landed yet.
-    return shownProject && !keys.includes(shownProject) ? [shownProject, ...keys] : keys;
-  }, [registeredProjects, shownProject]);
-
-  useEffect(() => {
-    void loadBooks();
-  }, [loadBooks]);
-
-  const selected = useMemo(
-    () => books.find((book) => book.id === selectedId) ?? null,
-    [books, selectedId],
-  );
-
-  const updateBook = useCallback((updated: OrderBookView) => {
-    setBooks((current) => current.map((book) => book.id === updated.id ? updated : book));
-  }, []);
-
-  useEffect(() => {
-    if (!selectedId) return;
-    let current = true;
-    void fetch(withProject(`/api/orders/${encodeURIComponent(selectedId)}`, projectKey))
-      .then(async (response) => {
-        if (!response.ok) throw new Error(await readError(response));
-        return response.json() as Promise<OrderBookView>;
-      })
-      .then((book) => { if (current) updateBook(book); })
-      .catch((cause) => { if (current) setActionMessage(cause instanceof Error ? cause.message : String(cause)); });
-    return () => { current = false; };
-  }, [selectedId, updateBook, projectKey]);
+  const pickerOptions = registeredProjects.map((project) => ({ key: project.key, name: project.name }));
+  if (shownProject && !pickerOptions.some((option) => option.key === shownProject)) {
+    pickerOptions.unshift({ key: shownProject, name: shownProject });
+  }
 
   const createBook = async (name: string) => {
-    const response = await fetch(withProject('/api/orders', projectKey), {
-      method: 'POST',
-      credentials: 'include',
-      headers: await dashboardMutationJsonHeaders(),
-      body: JSON.stringify({ name }),
-    });
-    if (!response.ok) throw new Error(await readError(response));
-    const created = await response.json() as OrderBookView;
-    setBooks((current) => [...current, created]);
-    setSelectedId(created.id);
+    const created = await orderBookRequest(`/api/orders`, scope, { method: 'POST', body: { name } });
+    applyBook(created);
+    selectBook(created.id);
   };
 
-  const patchBook = async (patch: Record<string, unknown>) => {
+  const mutateSelected = async (suffix: string, method: 'PATCH' | 'DELETE', body?: unknown) => {
     if (!selected) return;
-    const response = await fetch(withProject(`/api/orders/${encodeURIComponent(selected.id)}`, projectKey), {
-      method: 'PATCH', credentials: 'include', headers: await dashboardMutationJsonHeaders(),
-      body: JSON.stringify(patch),
-    });
-    if (!response.ok) throw new Error(await readError(response));
-    updateBook(await response.json() as OrderBookView);
-  };
-
-  const patchSettings = async (patch: Partial<OrderBookView['settings']>) => {
-    await patchBook({ settings: patch });
-  };
-
-  const queueBook = async () => {
-    if (!selected) return;
-    setStarting(true);
-    setActionMessage(null);
     try {
-      await patchBook({ status: 'ready' });
-      setActionMessage(`${selected.name} is queued and ready to start.`);
+      applyBook(await orderBookRequest(bookPath(selected.id, suffix), scope, { method, body }));
     } catch (cause) {
-      setActionMessage(cause instanceof Error ? cause.message : String(cause));
-    } finally {
-      setStarting(false);
+      setActionError(errorMessage(cause));
     }
   };
 
-  const previewBrief = async () => {
-    if (!selected) return;
-    setActionMessage(null);
-    const response = await fetch(withProject(`/api/orders/${encodeURIComponent(selected.id)}/preview-brief`, projectKey));
-    if (!response.ok) {
-      setActionMessage(await readError(response));
-      return;
-    }
-    const payload = await response.json() as { brief: string };
-    setPreview(payload.brief);
-  };
-
-  const startRun = async () => {
-    if (!selected) return;
-    setStarting(true);
-    setActionMessage(null);
-    try {
-      const response = await fetch(withProject(`/api/orders/${encodeURIComponent(selected.id)}/start`, projectKey), {
-        method: 'POST', credentials: 'include', headers: await dashboardMutationJsonHeaders(),
-      });
-      if (!response.ok) throw new Error(await readError(response));
-      const payload = await response.json() as { runId: string };
-      setActionMessage(`Started ${payload.runId} from ${selected.name}.`);
-      await loadBooks();
-    } catch (cause) {
-      setActionMessage(cause instanceof Error ? cause.message : String(cause));
-    } finally {
-      setStarting(false);
-    }
+  const editorProps = selected ? {
+    book: selected,
+    project: scope,
+    onBookChange: applyBook,
+    onError: setActionError,
+  } : null;
+  const addOpen = selected !== null && selected.phase !== 'archived'
+    && (addOpenByBook[selected.id] ?? selected.phase === 'draft');
+  const setAddOpen = (open: boolean) => {
+    if (selected) setAddOpenByBook((current) => ({ ...current, [selected.id]: open }));
   };
 
   return (
-    <main className="flex h-full w-full flex-col overflow-hidden bg-background font-medium" aria-label="Order Book page">
-      <header className="flex shrink-0 items-center gap-3 border-b border-border px-5 py-3">
-        <BookOpen className="h-4 w-4 text-muted-foreground" />
-        <div>
-          <h1 className="text-sm font-medium text-foreground">Order Book</h1>
-          <p className="text-[11px] text-muted-foreground">Operator special orders executed with lane semantics</p>
+    <main className="flex h-full w-full flex-col overflow-hidden bg-background" aria-label="Order books page">
+      <header className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-4 py-3 sm:px-5">
+        <BookOpen className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+        <div className="min-w-0 flex-1">
+          <h1 className="text-sm font-medium text-foreground">Order books</h1>
+          <p className="text-[12px] text-muted-foreground">A book is a list of issues the Flywheel works through, in the order you set.</p>
         </div>
-        <label className="ml-2 flex items-center gap-1.5 border-l border-border pl-3 text-[11px] text-muted-foreground">
+        <label className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
           Project
           <select
             aria-label="Order book project"
             value={shownProject ?? ''}
             onChange={(event) => selectProject(event.target.value)}
-            className="rounded-sm border border-border bg-muted/40 px-1.5 py-0.5 font-mono text-[11px] text-foreground"
+            className="max-w-[12rem] rounded-md border border-border bg-card px-1.5 py-1 text-[12px] text-foreground"
           >
             {!shownProject && <option value="">Loading…</option>}
-            {pickerOptions.map((key) => <option key={key} value={key}>{key}</option>)}
+            {pickerOptions.map((option) => <option key={option.key} value={option.key}>{option.name}</option>)}
           </select>
         </label>
-        {selected && (
-          <>
-            <span className="ml-2 border-l border-border pl-3 font-mono text-[11px] text-muted-foreground">{selected.id}</span>
-            <span className="rounded-sm border border-border bg-muted/40 px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">{selected.status}</span>
-            <div className="ml-auto flex rounded-md border border-border p-0.5 text-[10px]" aria-label="Order book view">
-              {(['setup', 'progress'] as const).map((value) => (
-                <button key={value} type="button" aria-pressed={view === value} onClick={() => setView(value)} className={`rounded-sm px-2.5 py-1 capitalize ${view === value ? 'bg-muted text-foreground' : 'text-muted-foreground'}`}>{value}</button>
-              ))}
-            </div>
-            <span className="text-[11px] text-muted-foreground">
-              {view === 'setup' ? <><span className="font-mono text-foreground">{selected.progress.landed}</span>/<span className="font-mono text-foreground">{selected.progress.total}</span> landed</> : 'Live progress below'}
-              {selected.runId && <> · run <span className="font-mono text-foreground">{selected.runId}</span></>}
-            </span>
-          </>
-        )}
       </header>
 
-      <BookStrip books={books} selectedId={selectedId} onSelect={setSelectedId} onCreate={createBook} />
-
-      <div className="flex-1 overflow-auto p-5">
-        {loading && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
-            <Loader2 className="h-4 w-4 animate-spin" /> Loading order books…
+      <div className="min-h-0 flex-1 overflow-auto">
+        {/* Layout: stacked under 900 px. From 900 px the book list sits left of the book; an open
+            Add issues panel takes the list's column until 1440 px, then becomes a third column. */}
+        <div className={`grid min-w-0 gap-5 p-4 sm:p-5 ${addOpen
+          ? 'min-[900px]:grid-cols-[300px_minmax(0,1fr)] min-[1440px]:grid-cols-[250px_minmax(0,1fr)_340px]'
+          : 'min-[900px]:grid-cols-[250px_minmax(0,1fr)]'}`}
+        >
+          <div className={`min-w-0 ${addOpen ? 'min-[900px]:max-[1439px]:hidden' : ''}`}>
+          <BookList
+            books={books}
+            selectedId={selected?.id ?? null}
+            onSelect={selectBook}
+            onCreate={createBook}
+            creating={creating}
+            onCreatingChange={setCreating}
+          />
           </div>
-        )}
-        {error && (
-          <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
-            {error}
-            <button type="button" onClick={() => void loadBooks()} className="ml-3 underline">Retry</button>
-          </div>
-        )}
-        {!loading && !error && !selected && (
-          <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-            No order books yet. Create one to assemble a campaign.
-          </div>
-        )}
-        {!loading && selected && (
-          <div className="mx-auto flex max-w-6xl flex-col gap-4">
-            <LifecycleStrip status={selected.status} />
 
-            {view === 'setup' ? <>
-            <section
-              data-testid="order-book-posture"
-              data-posture={selected.settings.posture}
-              className={`flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3 ${
-                selected.settings.posture === 'drain'
-                  ? 'border-warning/[0.32] bg-warning/[0.08]'
-                  : 'border-border bg-card'
-              }`}
-            >
-              <span className="text-[11px] uppercase tracking-wider text-muted-foreground">Pickup posture</span>
-              <span className={`rounded-sm border px-2 py-1 text-[11px] font-medium ${
-                selected.settings.posture === 'drain'
-                  ? 'border-warning/[0.32] bg-warning/[0.08] text-warning-foreground'
-                  : 'border-border bg-muted/40 text-foreground'
-              }`}
-              >{selected.settings.posture.toUpperCase()}</span>
-              <p className="text-xs text-muted-foreground">
-                {selected.settings.posture === 'drain'
-                  ? `Drain set by ${selected.settings.postureSetBy ?? 'operator'}${selected.settings.postureSetAt ? ` on ${selected.settings.postureSetAt.slice(0, 10)}` : ''} — ${selected.settings.postureReason ?? 'No reason recorded.'}`
-                  : 'Open posture permits eligible order-book items to dispatch; no operator hold is active.'}
-              </p>
-            </section>
-
-            <LaneEditor book={selected} onBookChange={updateBook} project={projectKey} />
-
-            <section className="grid gap-3 lg:grid-cols-2" aria-label="Add issues to order book">
-              <AddIssuesRail book={selected} books={books} onBookChange={updateBook} project={projectKey} />
-              <BacklogCandidatesRail book={selected} onBookChange={updateBook} project={projectKey} />
-            </section>
-
-            <section className="grid gap-3 lg:grid-cols-2">
-              <RunSettingsPanel key={selected.id} settings={selected.settings} onChange={patchSettings} />
-              <ValidationPanel
-                status={selected.status}
-                blocks={selected.validation?.blocks ?? []}
-                warns={selected.validation?.warns ?? []}
-                starting={starting}
-                onPreview={() => void previewBrief()}
-                onQueue={() => void queueBook()}
-                onStart={() => void startRun()}
-              />
-            </section>
-
-            {actionMessage && <p className="text-xs text-muted-foreground" role="status">{actionMessage}</p>}
-            {preview && (
-              <section className="rounded-lg border border-border bg-card p-4" aria-label="Brief preview">
-                <div className="mb-2 flex items-center">
-                  <h2 className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Brief preview</h2>
-                  <button type="button" className="ml-auto text-xs text-muted-foreground hover:text-foreground" onClick={() => setPreview(null)}>Close</button>
-                </div>
-                <pre className="overflow-auto whitespace-pre-wrap font-mono text-[11px] text-muted-foreground">{preview}</pre>
-              </section>
+          <section className="grid min-w-0 content-start gap-4 min-[900px]:col-start-2 min-[900px]:row-start-1" aria-label="Selected order book">
+            {booksQuery.isPending && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
+                <Loader2 className="h-4 w-4 animate-spin" /> Loading order books…
+              </div>
             )}
-            </> : <ProgressPanel book={selected} />}
-          </div>
-        )}
+            {booksQuery.isError && (
+              <div className="rounded-lg border border-destructive/[0.32] bg-destructive/[0.08] p-3 text-sm text-destructive" role="alert">
+                {errorMessage(booksQuery.error)}
+                <button type="button" onClick={() => void booksQuery.refetch()} className="ml-3 underline">Retry</button>
+              </div>
+            )}
+            {booksQuery.isSuccess && books.length === 0 && (
+              <div className="grid max-w-lg gap-3 rounded-lg border border-dashed border-border p-6 text-sm">
+                <h2 className="text-base font-medium text-foreground">No order books yet</h2>
+                <p className="text-muted-foreground">Use a book when the order of work matters: a migration, a refactor, a release push.</p>
+                <ol className="list-decimal space-y-1 pl-5 text-muted-foreground">
+                  <li>Create a book and add issues.</li>
+                  <li>Queue it.</li>
+                  <li>The Flywheel works through it.</li>
+                </ol>
+                <div>
+                  <button type="button" onClick={() => setCreating(true)} className="rounded-md border border-primary bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:opacity-90">New book</button>
+                </div>
+              </div>
+            )}
+            {booksQuery.isSuccess && books.length > 0 && !selected && (
+              <p className="text-sm text-muted-foreground">Select a book on the left, or create one.</p>
+            )}
+
+            {selected && editorProps && (
+              <>
+                <BookHeader
+                  key={selected.id}
+                  {...editorProps}
+                  activeBookName={activeBook?.name ?? null}
+                  flywheelRunning={flywheelRunning}
+                  onAddIssues={() => setAddOpen(!addOpen)}
+                  onStarted={() => {
+                    setActionError(null);
+                    void queryClient.invalidateQueries({ queryKey: FLYWHEEL_STATUS_QUERY_KEY });
+                    refreshBooks();
+                  }}
+                />
+                {actionError && <p role="alert" className="text-xs text-destructive">{actionError}</p>}
+
+                <BookNotices book={selected} onArchive={() => void mutateSelected('', 'PATCH', { status: 'complete' })}
+                  onResume={() => void mutateSelected('', 'PATCH', { settings: { posture: 'open', postureReason: 'Operator reopened pickup.' } })}
+                  onRemove={(issue) => void mutateSelected(`/items/${encodeURIComponent(issue)}`, 'DELETE')}
+                />
+
+                {selected.phase !== 'draft' && selected.items.length > 0 && (
+                  <ProgressLine book={selected} derivedById={derivedById} />
+                )}
+
+                <BookIssueList key={`list-${selected.id}`} {...editorProps} flywheelRunning={flywheelRunning} />
+                <MoreSettings key={`settings-${selected.id}`} {...editorProps} />
+              </>
+            )}
+          </section>
+
+          {selected && editorProps && addOpen && (
+            <div className="min-w-0 min-[900px]:col-start-1 min-[900px]:row-start-1 min-[1440px]:col-start-3">
+              <AddIssuesPanel key={`add-${selected.id}`} {...editorProps} books={books} onClose={() => setAddOpen(false)} />
+            </div>
+          )}
+        </div>
       </div>
     </main>
+  );
+}
+
+function BookNotices({ book, onArchive, onResume, onRemove }: {
+  book: OrderBookView;
+  onArchive: () => void;
+  onResume: () => void;
+  onRemove: (issue: string) => void;
+}) {
+  if (book.phase === 'archived') return null;
+  const blocks = book.validation?.blocks ?? [];
+  const warns = book.validation?.warns ?? [];
+  const problemCount = blocks.length + warns.length;
+  const paused = book.settings.posture === 'drain';
+  const pausedOn = formatShortDate(book.settings.postureSetAt);
+
+  const findingLine = (finding: OrderBookFindingView, warning: boolean) => (
+    <li key={`${finding.code}-${finding.issue}-${finding.message}`} className="flex items-start gap-2">
+      {warning && <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" aria-label="Warning" />}
+      <span className="shrink-0 font-mono text-foreground">{finding.issue}</span>
+      <span className="min-w-0 flex-1 text-body-foreground">{finding.message}</span>
+      {!warning && REMOVABLE_FINDINGS.has(finding.code) && (
+        <button type="button" onClick={() => onRemove(finding.issue)} className="shrink-0 rounded-md border border-border bg-card px-1.5 py-0.5 text-[11px] text-foreground hover:bg-accent">
+          Remove
+        </button>
+      )}
+    </li>
+  );
+
+  return (
+    <>
+      {book.phase === 'active' && book.finished && (
+        <div role="status" data-notice="finished" className="flex flex-wrap items-center gap-3 rounded-lg border border-success/[0.32] bg-success/[0.08] p-3 text-xs">
+          <p className="min-w-0 flex-1 text-foreground">
+            All {book.progress.total} issues have landed. This book still holds the active slot, so queued books cannot start. Archive it to move on.
+          </p>
+          <button type="button" onClick={onArchive} className="rounded-md border border-primary bg-primary px-2.5 py-1.5 text-primary-foreground hover:opacity-90">Archive and move on</button>
+        </div>
+      )}
+      {paused && (
+        <div role="status" data-notice="paused" className="flex flex-wrap items-center gap-3 rounded-lg border border-warning/[0.32] bg-warning/[0.08] p-3 text-xs">
+          <div className="min-w-0 flex-1">
+            <p className="text-foreground">Pickup is paused. Work already running will finish. Nothing new starts from this book.</p>
+            <p className="mt-0.5 text-muted-foreground">
+              Paused by {book.settings.postureSetBy ?? 'operator'}{pausedOn ? ` on ${pausedOn}` : ''}: &quot;{book.settings.postureReason ?? 'No reason recorded.'}&quot;
+            </p>
+          </div>
+          <button type="button" onClick={onResume} className="rounded-md border border-border bg-card px-2.5 py-1.5 text-foreground hover:bg-accent">Resume pickup</button>
+        </div>
+      )}
+      {problemCount > 0 && (
+        <div data-notice="problems" className="rounded-lg border border-destructive/[0.32] bg-destructive/[0.08] p-3 text-xs">
+          <h3 className="mb-2 font-medium text-destructive">
+            {book.phase === 'draft'
+              ? `${plural(problemCount, 'thing', 'things')} to fix before you can queue this book`
+              : `${plural(problemCount, 'problem', 'problems')} in this book`}
+          </h3>
+          <ul className="grid gap-1.5">
+            {blocks.map((finding) => findingLine(finding, false))}
+            {warns.map((finding) => findingLine(finding, true))}
+          </ul>
+        </div>
+      )}
+    </>
+  );
+}
+
+function ProgressLine({ book, derivedById }: { book: OrderBookView; derivedById: Parameters<typeof orderBookContext>[1] }) {
+  const context = orderBookContext(book, derivedById, false);
+  const landed = book.items.filter((item) => isLanded(context, item)).length;
+  const inProgress = book.items.filter((item) => !isLanded(context, item) && context.inFlight.has(item.issue.toUpperCase())).length;
+  const parked = book.items.filter((item) => !isLanded(context, item) && context.progressItems.find((entry) => entry.issue === item.issue)?.parked).length;
+  const waiting = book.items.length - landed - inProgress - parked;
+  const total = book.items.length;
+  const parts = [
+    `${landed} of ${total} landed`,
+    inProgress > 0 ? `${inProgress} in progress` : '',
+    waiting > 0 ? `${waiting} waiting` : '',
+  ].filter(Boolean);
+  return (
+    <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground" data-section="OrderBookProgress">
+      <span className="flex h-1.5 min-w-32 flex-1 overflow-hidden rounded-sm bg-muted" aria-hidden="true">
+        <span className="h-full bg-success" style={{ width: `${(landed / total) * 100}%` }} />
+        <span className="h-full bg-info" style={{ width: `${(inProgress / total) * 100}%` }} />
+      </span>
+      <span>{parts.join(' · ')}</span>
+    </div>
   );
 }

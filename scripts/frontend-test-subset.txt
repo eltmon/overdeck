@@ -63,6 +63,7 @@ src/components/diff/__tests__/DiffFileBar.test.tsx
 src/components/diff/__tests__/DiffMarkdownPreview.test.tsx
 src/components/diff/__tests__/PatchFiles.test.tsx
 src/components/diff/__tests__/markdownPreviewSource.test.ts
+src/components/flywheel/__tests__/FlywheelOrderBookCard.test.tsx
 src/components/frame/__tests__/ConversationsSection.test.tsx
 src/components/frame/__tests__/IssuesSection.test.tsx
 src/components/frame/__tests__/LeftColumn.test.tsx
@@ -80,6 +81,13 @@ src/components/frame/deck/__tests__/useDeckProjects.test.tsx
 src/components/frame/deck/__tests__/useIssueSessionActions.test.tsx
 src/components/frame/deck/__tests__/useOpenConversation.test.tsx
 src/components/frame/deck/__tests__/useProjectScope.test.ts
+src/components/orders/__tests__/AddIssuesPanel.test.tsx
+src/components/orders/__tests__/BookHeader.test.tsx
+src/components/orders/__tests__/BookIssueList.test.tsx
+src/components/orders/__tests__/BookList.test.tsx
+src/components/orders/__tests__/MoreSettings.test.tsx
+src/components/orders/__tests__/OrderBookIssueChip.test.tsx
+src/components/orders/__tests__/itemStatus.test.ts
 src/components/palette/__tests__/fileProvider.test.tsx
 src/components/StaleBuildChip.test.tsx
 src/components/SystemHealthPill.test.tsx
@@ -568,6 +576,7 @@ src/pages/HomePage.test.tsx
 src/pages/__tests__/FlywheelPage.test.tsx
 src/pages/__tests__/NewProjectPage.no-loss.test.tsx
 src/pages/__tests__/NewWorkspacePage.test.tsx
+src/pages/__tests__/OrderBookPage.test.tsx
 src/test-utils/renderCounter.test.tsx
 src/vite-build-commit.test.ts
 src/components/chat/messagesTimeline/__tests__/toolBodyLoader.test.tsx
