@@ -4,17 +4,17 @@
     "created": "2026-11-23T05:19:14Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5599: Order books: the queue skips finished books",
-    "updated": "2026-11-23T05:22:56.578Z"
+    "updated": "2026-11-23T05:23:58.748Z"
   },
   "plan": {
     "id": "pan-5599",
     "title": "Order books: the queue skips finished books",
-    "status": "proposed",
+    "status": "running",
     "uid": "64599a41-7cfc-4014-b53f-6c4435c9e0e5",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-23T05:19:14Z",
-    "updated": "2026-11-23T05:22:56.578Z",
+    "updated": "2026-11-23T05:23:58.748Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5599",
@@ -739,5 +739,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
