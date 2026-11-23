@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5597",
   "created": "2026-11-23T02:38:35.270Z",
-  "updated": "2026-11-23T02:46:57.499Z",
+  "updated": "2026-11-23T02:47:02.264Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -84,6 +84,11 @@
     "api-phase-fields.ac3": {
       "status": "completed",
       "doneAt": "2026-11-23T02:46:57.499Z"
+    },
+    "api-status-transitions": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5597",
+      "claimedAt": "2026-11-23T02:47:02.264Z"
     }
   }
 }
