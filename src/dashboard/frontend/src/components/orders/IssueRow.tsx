@@ -97,7 +97,7 @@ export function IssueRow({
       onDrop={readOnly ? undefined : (event) => onDrop?.(event, item.lane, item.order)}
       className={`list-row group border-l-2 border-t border-t-border first:border-t-0 ${LEFT_BORDER[status.kind] ?? 'border-l-transparent'}`}
     >
-      <div className="relative flex min-w-0 items-center gap-2.5 px-3 py-2 text-xs">
+      <div className="flex min-w-0 items-center gap-2.5 px-3 py-2 text-xs">
         {!readOnly && <GripVertical className="hidden h-3.5 w-3.5 shrink-0 cursor-grab text-faint-foreground sm:block" aria-hidden="true" />}
         <span className="hidden w-7 shrink-0 font-mono text-[11px] text-faint-foreground sm:inline">{item.lane}{item.order}</span>
         {url
@@ -108,9 +108,9 @@ export function IssueRow({
           {!landed && notes.length > 0 && <div className="truncate text-[11px] text-muted-foreground">{notes.join(' · ')}</div>}
         </div>
         {!readOnly && !landed && (
-          // Overlaid on the right edge so the hidden actions take no width from the title;
-          // still in the tab order, and focusing one reveals them.
-          <div className="absolute inset-y-0 right-3 flex items-center gap-1 bg-card pl-2 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+          // Zero width until hover or keyboard focus, so the hidden actions take no room from
+          // the title and never cover the status tag; the buttons stay in the tab order.
+          <div className="flex max-w-0 shrink-0 items-center gap-1 overflow-hidden whitespace-nowrap opacity-0 transition-opacity group-hover:max-w-none group-hover:opacity-100 group-focus-within:max-w-none group-focus-within:opacity-100">
             <button
               type="button"
               onClick={() => onSwapLane?.(item)}

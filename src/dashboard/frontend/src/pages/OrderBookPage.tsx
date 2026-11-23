@@ -192,7 +192,13 @@ export function OrderBookPage() {
       </header>
 
       <div className="min-h-0 flex-1 overflow-auto">
-        <div className={`grid min-w-0 gap-5 p-4 sm:p-5 ${addOpen ? 'min-[900px]:grid-cols-[250px_minmax(0,1fr)_340px]' : 'min-[900px]:grid-cols-[250px_minmax(0,1fr)]'}`}>
+        {/* Layout: stacked under 900 px. From 900 px the book list sits left of the book; an open
+            Add issues panel takes the list's column until 1440 px, then becomes a third column. */}
+        <div className={`grid min-w-0 gap-5 p-4 sm:p-5 ${addOpen
+          ? 'min-[900px]:grid-cols-[300px_minmax(0,1fr)] min-[1440px]:grid-cols-[250px_minmax(0,1fr)_340px]'
+          : 'min-[900px]:grid-cols-[250px_minmax(0,1fr)]'}`}
+        >
+          <div className={`min-w-0 ${addOpen ? 'min-[900px]:max-[1439px]:hidden' : ''}`}>
           <BookList
             books={books}
             selectedId={selected?.id ?? null}
@@ -201,8 +207,9 @@ export function OrderBookPage() {
             creating={creating}
             onCreatingChange={setCreating}
           />
+          </div>
 
-          <section className="grid min-w-0 content-start gap-4" aria-label="Selected order book">
+          <section className="grid min-w-0 content-start gap-4 min-[900px]:col-start-2 min-[900px]:row-start-1" aria-label="Selected order book">
             {booksQuery.isPending && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
                 <Loader2 className="h-4 w-4 animate-spin" /> Loading order books…
@@ -264,7 +271,9 @@ export function OrderBookPage() {
           </section>
 
           {selected && editorProps && addOpen && (
-            <AddIssuesPanel key={`add-${selected.id}`} {...editorProps} books={books} onClose={() => setAddOpen(false)} />
+            <div className="min-w-0 min-[900px]:col-start-1 min-[900px]:row-start-1 min-[1440px]:col-start-3">
+              <AddIssuesPanel key={`add-${selected.id}`} {...editorProps} books={books} onClose={() => setAddOpen(false)} />
+            </div>
           )}
         </div>
       </div>
