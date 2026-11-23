@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5058",
   "created": "2026-11-23T02:58:48.676Z",
-  "updated": "2026-11-23T03:33:35.739Z",
+  "updated": "2026-11-23T03:34:29.887Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -33,9 +33,18 @@
       "claimedAt": "2026-11-23T03:21:50.041Z"
     },
     "w6-pan4927-amendment": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5058",
-      "claimedAt": "2026-11-23T03:33:35.739Z"
+      "claimedAt": "2026-11-23T03:33:35.739Z",
+      "doneAt": "2026-11-23T03:34:29.887Z"
+    },
+    "w6-pan4927-amendment.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:34:29.887Z"
+    },
+    "w6-pan4927-amendment.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:34:29.887Z"
     }
   }
 }
