@@ -136,10 +136,10 @@ pan ask PAN-4638 "The live check cannot run until this branch is merged and rele
 If you are about to **stop short of your deliverable** — self-abort, refuse to fix-forward an orthogonal failure, decide the work needs a different path (for a blocking question use `pan ask` above) — you MUST first notify the orchestrator, *before* you park:
 
 ```bash
-pan tell flywheel-orchestrator "work <issue>: <what I'm NOT doing and why> — <what's needed to unblock>"
+pan tell conv-flywheel "work <issue>: <what I'm NOT doing and why> — <what's needed to unblock>"
 ```
 
-Under full autonomy nobody is watching the `❯` prompt. A silent park leaves the issue Pending forever and the orchestrator never learns you pushed back — it only finds out if a human happens to ask. The one-line tell lets it follow through in the same tick instead of waiting on a human. This is fire-and-forget: it no-ops gracefully when no Flywheel run is active — the message just lands in an idle or absent session. If the tell itself fails (an error, or "not running"), fall back to posting the same analysis as a comment on the issue — that is the durable channel the orchestrator checks on its next tick.
+Under full autonomy nobody is watching the `❯` prompt. A silent park leaves the issue Pending forever and the orchestrator never learns you pushed back — it only finds out if a human happens to ask. The one-line tell lets it follow through in the same tick instead of waiting on a human. This is fire-and-forget, but it is not silent: when no Flywheel is running the tell fails with "not running". If the tell fails for that or any other reason, post the same analysis as a comment on the issue, so it stays on record for the operator and the orchestrator to read.
 
 If you are parked because other issues or PRs must merge first, also run `pan task block <issue> <item> --on <ref>...` for every item that waits on them (issue IDs like `PAN-123`, or `#N` for a PR). Overdeck then wakes you with a `BLOCKERS MERGED` message when the last of them merges; follow it, then `pan task unblock` the item. A comment alone wakes nobody.
 
