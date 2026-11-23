@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5597",
   "created": "2026-11-23T02:38:35.270Z",
-  "updated": "2026-11-23T03:22:30.897Z",
+  "updated": "2026-11-23T03:24:36.089Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -240,9 +240,10 @@
       "doneAt": "2026-11-23T03:22:30.897Z"
     },
     "book-issue-list": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5597",
-      "claimedAt": "2026-11-23T03:22:00.552Z"
+      "claimedAt": "2026-11-23T03:22:00.552Z",
+      "doneAt": "2026-11-23T03:24:36.088Z"
     },
     "more-settings.ac1": {
       "status": "completed",
@@ -255,6 +256,22 @@
     "more-settings.ac3": {
       "status": "completed",
       "doneAt": "2026-11-23T03:22:30.897Z"
+    },
+    "book-issue-list.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:24:36.088Z"
+    },
+    "book-issue-list.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:24:36.088Z"
+    },
+    "book-issue-list.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:24:36.088Z"
+    },
+    "book-issue-list.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:24:36.088Z"
     }
   }
 }
