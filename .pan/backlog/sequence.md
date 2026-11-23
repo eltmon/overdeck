@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-23T18:15:00Z · model: claude-opus-5-5 · open: 952_
+_Last sequenced: 2026-11-23T19:15:32Z · model: claude-opus-5-5 · open: 953_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -97,6 +97,7 @@ _Last sequenced: 2026-11-23T18:15:00Z · model: claude-opus-5-5 · open: 952_
 | 80 | PAN-3522 | S | critical | ok |  |  | Supervisor watchdog restart-churns under CPU storm because the probe timeout budget ignores the boot warm phase. |
 | 81 | PAN-3314 | M | critical | ok |  |  | One cgroup holds every agent pane, so a single hungry agent inflates the unit and oomd kills the whole fleet — twice now. |
 | 82 | PAN-3278 | S | critical | needs-refinement |  |  | A finished work agent with an open PR sat two hours because review was never dispatched and auto-requeue fired none of 25 attempts. |
+| 83 | PAN-5636 | S | medium | ok |  | PAN-5633 | UI follow-up to PAN-5633: row state word and composer notice (with Hand off) for failed Codex turns; needs 5633's providerError.kind. |
 | 84 | PAN-3234 | S | critical | needs-refinement |  |  | Agents freeze indefinitely on blocking choice menus and no health surface notices; the detector is wired only to delivery refusal. |
 | 84 | PAN-5467 | XL | high | ok | ✓ |  | Epic: docs overhaul, 16 page issues, 6 accuracy audits (PAN-5499..5504) and an intro rewrite (PAN-5505); order book drives pickup. |
 | 85 | PAN-3205 | S | critical | ok |  |  | The deployment gate promises the queued deploy will fire at the next verification boundary; that trigger does not exist. |
@@ -1287,10 +1288,10 @@ Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback thi
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-23T18:15:00Z",
+  "generatedAt": "2026-11-23T19:15:32Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 952,
+  "openCount": 953,
   "nodes": [
     {
       "issue": "PAN-5615",
@@ -2489,6 +2490,21 @@ Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback thi
       "dependsOn": [],
       "why": "A finished work agent with an open PR sat two hours because review was never dispatched and auto-requeue fired none of 25 attempts.",
       "rationale": "Triage: the auto-requeue machinery cited targeted the deleted review_status table; verify review-dispatch-after-PR-open against the current mechanism (see PAN-3939 for the post-cut reproduction). Rank held.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5636",
+      "rank": 83,
+      "size": "S",
+      "importance": "medium",
+      "score": 62,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-5633"
+      ],
+      "why": "UI follow-up to PAN-5633: row state word and composer notice (with Hand off) for failed Codex turns; needs 5633's providerError.kind.",
+      "rationale": "New issue split from PAN-5633's PRD (D13); it only reads server fields PAN-5633 adds, so it ranks behind that in-pipeline fix as a small medium-value UI follow-up.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -14551,6 +14567,13 @@ Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback thi
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
+    },
+    {
+      "from": "PAN-5633",
+      "to": "PAN-5636",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
     },
     {
       "from": "PAN-750",
