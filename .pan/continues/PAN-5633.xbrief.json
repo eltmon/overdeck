@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5633",
   "created": "2026-11-23T19:06:23.391Z",
-  "updated": "2026-11-23T19:13:15.100Z",
+  "updated": "2026-11-23T19:13:20.489Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -100,6 +100,11 @@
     "wi4-auth-failure-scan.ac4": {
       "status": "completed",
       "doneAt": "2026-11-23T19:13:15.099Z"
+    },
+    "wi5-codex-auth-replace-burn-flags": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5633",
+      "claimedAt": "2026-11-23T19:13:20.489Z"
     }
   }
 }
