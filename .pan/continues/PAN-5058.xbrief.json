@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5058",
   "created": "2026-11-23T02:58:48.676Z",
-  "updated": "2026-11-23T03:56:12.771Z",
+  "updated": "2026-11-23T03:56:15.421Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -61,6 +61,9 @@
       "claimedAt": "2026-11-23T03:35:27.615Z"
     },
     "w3-private-scheme-redirects": {
+      "status": "cancelled"
+    },
+    "w4-cp2-muse": {
       "status": "cancelled"
     }
   }
