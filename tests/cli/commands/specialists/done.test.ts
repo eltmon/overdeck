@@ -38,6 +38,14 @@ const {
   mockEmitActivityEntry: vi.fn(),
 }));
 
+// PAN-5614: one GitHub target at the workspace, independent of this host's projects.yaml.
+vi.mock('../../../../src/lib/cloister/review-artifact-targets.js', () => ({
+  resolveReviewArtifactTargets: vi.fn(async (issueId: string, cwd: string) => ({
+    polyrepo: false,
+    targets: [{ repoKey: 'repo', forge: 'github', cwd, sourceBranch: `feature/${issueId.toLowerCase()}` }],
+  })),
+  readMemberMrFacts: vi.fn(),
+}));
 vi.mock('../../../../src/lib/activity-logger.js', () => ({
   emitActivityEntry: mockEmitActivityEntry,
 }));

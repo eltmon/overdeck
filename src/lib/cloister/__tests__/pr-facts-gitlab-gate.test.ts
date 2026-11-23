@@ -98,3 +98,41 @@ describe('GitLab MR through the merge gate', () => {
     expect(readiness.reason).toBe('GitLab MR view failed for !77: glab: 502 Bad Gateway');
   });
 });
+
+describe('GitLab polyrepo MR lookup (PAN-5614)', () => {
+  const INFRA_URL = 'https://gitlab.com/eltmon/myn-infra/-/merge_requests/19';
+  const member = (repoPath: string) => ({ forge: 'gitlab', required: true, repoPath, sourceBranch: 'feature/min-1144' });
+
+  it('reads the member repo that has the MR when the first member has none', async () => {
+    resetPrFactsCache();
+    const listed: string[] = [];
+    const facts = await getPrFacts('MIN-1144', {
+      fetchGitHubPr: async (issueId) => ({ issueId, pr: null }),
+      resolveRepos: () => [member('/repos/frontend'), member('/repos/infra')] as never,
+      listGitLabMrs: async (repoPath) => {
+        listed.push(repoPath);
+        return (repoPath === '/repos/infra'
+          ? [{ iid: 19, source_branch: 'feature/min-1144', web_url: INFRA_URL, state: 'opened' }]
+          : []) as never;
+      },
+      viewGitLabMr: async () => ({ ...MERGEABLE_VIEW, iid: 19, web_url: INFRA_URL, source_branch: 'feature/min-1144' }),
+      readGitLabApprovals: async () => APPROVED,
+    });
+
+    expect(listed).toEqual(['/repos/frontend', '/repos/infra']);
+    expect(facts.url).toBe(INFRA_URL);
+    expect(facts.approved).toBe(true);
+  });
+
+  it('reports a failed member listing instead of reading on', async () => {
+    resetPrFactsCache();
+    const facts = await getPrFacts('MIN-1144', {
+      fetchGitHubPr: async (issueId) => ({ issueId, pr: null }),
+      resolveRepos: () => [member('/repos/frontend'), member('/repos/infra')] as never,
+      listGitLabMrs: async () => { throw new Error('glab: 401'); },
+    });
+
+    expect(facts.exists).toBe(false);
+    expect(facts.error).toBe('GitLab MR lookup failed: glab: 401');
+  });
+});
