@@ -28,7 +28,7 @@ export interface DashboardApi {
   request(method: DashboardApiMethod, path: string, body?: unknown, init?: DashboardRequestInit): Promise<DashboardApiResponse>;
 }
 
-/** fetch-based client: `${baseUrl}${path}` with `Authorization: Bearer <token>`; JSON body and Content-Type on POST, PUT and PATCH. */
+/** fetch-based client: `${baseUrl}${path}` with `Authorization: Bearer <token>`; JSON body and Content-Type on POST, PUT, PATCH, and on DELETE when a body is given. */
 export function createFetchDashboardApi(input: { baseUrl: string; token: string; fetchImpl?: typeof fetch }): DashboardApi {
   const baseUrl = input.baseUrl.replace(/\/+$/, '');
   const fetchImpl = input.fetchImpl ?? fetch;
@@ -36,7 +36,7 @@ export function createFetchDashboardApi(input: { baseUrl: string; token: string;
     async request(method, path, body, options) {
       const headers: Record<string, string> = { Authorization: `Bearer ${input.token}`, Accept: 'application/json' };
       const init: RequestInit = { method, headers, ...(options?.signal ? { signal: options.signal } : {}) };
-      if (method !== 'GET' && method !== 'DELETE') {
+      if (method !== 'GET' && (method !== 'DELETE' || body !== undefined)) {
         headers['Content-Type'] = 'application/json';
         init.body = JSON.stringify(body ?? {});
       }

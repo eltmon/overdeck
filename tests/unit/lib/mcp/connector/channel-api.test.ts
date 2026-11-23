@@ -339,6 +339,14 @@ describe('createConnectorDashboardApi', () => {
     link.stop();
   });
 
+  it('sends DELETE with a given body as that body, and with no body sends none', async () => {
+    const { api, calls, link } = apiWith(async () => ({ status: 200, json: { ok: true } }));
+    await api.request('DELETE', '/api/orders/b/items/PAN-1', {});
+    await api.request('DELETE', '/api/connectors/self');
+    expect(calls.map((call) => ['body' in call.init ? call.init.body : 'none'])).toEqual([[{}], ['none']]);
+    link.stop();
+  });
+
   it('maps a non-JSON body to null and keeps real JSON', async () => {
     const { api, link } = apiWith(async (path) =>
       path === '/text' ? { status: 502, json: { error: 'invalid-json', text: '<html>' } } : { status: 200, json: [{ name: 'conv-1' }] },
