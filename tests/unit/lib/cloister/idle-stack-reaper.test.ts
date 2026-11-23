@@ -26,6 +26,7 @@ function makeDeps(over: Partial<IdleStackReaperDeps> & {
     stopContainers: async (names) => { stopped.push(names); },
     now: over.now ?? (() => 1_000_000),
     graceMs: over.graceMs ?? 10_000,
+    isProtected: over.isProtected ?? (async () => false),
   };
   return { deps, stopped };
 }
@@ -55,6 +56,7 @@ describe('reconcileIdleWorkspaceStacks (PAN-1817)', () => {
       stopContainers: async (names) => { stopped.push(names); },
       now: () => nowMs,
       graceMs: 10_000,
+      isProtected: async () => false,
     };
     // Cycle 1: starts the clock, no reap.
     expect(await reconcileIdleWorkspaceStacks(deps)).toEqual([]);
@@ -78,6 +80,7 @@ describe('reconcileIdleWorkspaceStacks (PAN-1817)', () => {
       stopContainers: async (names) => { stopped.push(names); },
       now: () => nowMs,
       graceMs: 10_000,
+      isProtected: async () => false,
     };
     expect(await reconcileIdleWorkspaceStacks(deps)).toEqual([]);
     nowMs += 60_000; // well past grace
@@ -96,6 +99,7 @@ describe('reconcileIdleWorkspaceStacks (PAN-1817)', () => {
       stopContainers: async (names) => { stopped.push(names); },
       now: () => nowMs,
       graceMs: 10_000,
+      isProtected: async () => false,
     };
     await reconcileIdleWorkspaceStacks(deps);   // clock starts
     sessions = ['agent-pan-9004'];              // agent comes back
@@ -118,6 +122,7 @@ describe('reconcileIdleWorkspaceStacks (PAN-1817)', () => {
       stopContainers: async (names) => { stopped.push(names); },
       now: () => nowMs,
       graceMs: 1,
+      isProtected: async () => false,
     };
     nowMs += 100;
     expect(await reconcileIdleWorkspaceStacks(deps)).toEqual([]);
@@ -138,6 +143,7 @@ describe('reconcileIdleWorkspaceStacks (PAN-1817)', () => {
       stopContainers: async (names) => { stopped.push(names); },
       now: () => nowMs,
       graceMs: 1,
+      isProtected: async () => false,
     };
     await reconcileIdleWorkspaceStacks(deps);
     nowMs += 10;
@@ -158,6 +164,7 @@ describe('reconcileIdleWorkspaceStacks (PAN-1817)', () => {
       stopContainers: async (names) => { stopped.push(names); },
       now: () => nowMs,
       graceMs: 10_000,
+      isProtected: async () => false,
     };
     expect(await reconcileIdleWorkspaceStacks(deps)).toEqual([]); // clock starts
     nowMs += 11_000;
@@ -182,6 +189,7 @@ describe('reconcileIdleWorkspaceStacks (PAN-1817)', () => {
       stopContainers: async (names) => { stopped.push(names); },
       now: () => nowMs,
       graceMs: 10_000,
+      isProtected: async () => false,
     };
     await reconcileIdleWorkspaceStacks(deps);
     nowMs += 11_000;
@@ -208,6 +216,7 @@ describe('reconcileIdleWorkspaceStacks (PAN-1817)', () => {
       stopContainers: async (names) => { stopped.push(names); },
       now: () => nowMs,
       graceMs: 10_000,
+      isProtected: async () => false,
     };
     expect(await reconcileIdleWorkspaceStacks(deps)).toEqual([]); // clock starts
     nowMs += 11_000;
@@ -233,6 +242,7 @@ describe('reconcileIdleWorkspaceStacks (PAN-1817)', () => {
       stopContainers: async (names) => { stopped.push(names); },
       now: () => nowMs,
       graceMs: 10_000,
+      isProtected: async () => false,
     };
     expect(await reconcileIdleWorkspaceStacks(deps)).toEqual([]); // clock starts
     nowMs += 11_000;
@@ -265,6 +275,7 @@ describe('reconcileIdleWorkspaceStacks — full-stack tier (2026-07-25 container
       stopContainers: async (names) => { stopped.push(names); },
       now: () => 1_000_000,
       graceMs: 1,
+      isProtected: async () => false,
       fullStackGraceMs: 10_000,
     };
     expect(await reconcileIdleWorkspaceStacks(deps)).toEqual([]);
@@ -288,6 +299,7 @@ describe('reconcileIdleWorkspaceStacks — full-stack tier (2026-07-25 container
       stopContainers: async (names) => { stopped.push(names); },
       now: () => nowMs,
       graceMs: 1,
+      isProtected: async () => false,
       fullStackGraceMs: 10_000,
     };
     expect(await reconcileIdleWorkspaceStacks(deps)).toEqual([]); // clock starts
@@ -312,6 +324,7 @@ describe('reconcileIdleWorkspaceStacks — full-stack tier (2026-07-25 container
       stopContainers: async (names) => { stopped.push(names); },
       now: () => nowMs,
       graceMs: 1,
+      isProtected: async () => false,
       fullStackGraceMs: 10_000,
     };
     expect(await reconcileIdleWorkspaceStacks(deps)).toEqual([]);
@@ -334,6 +347,7 @@ describe('reconcileIdleWorkspaceStacks — full-stack tier (2026-07-25 container
       stopContainers: async (names) => { stopped.push(names); },
       now: () => nowMs,
       graceMs: 1,
+      isProtected: async () => false,
       fullStackGraceMs: 10_000,
     };
     await reconcileIdleWorkspaceStacks(deps);
@@ -353,6 +367,7 @@ describe('reconcileIdleWorkspaceStacks — full-stack tier (2026-07-25 container
       stopContainers: async (names) => { stopped.push(names); },
       now: () => nowMs,
       graceMs: 1,
+      isProtected: async () => false,
       fullStackGraceMs: 10_000,
     };
     await reconcileIdleWorkspaceStacks(deps);
@@ -360,5 +375,62 @@ describe('reconcileIdleWorkspaceStacks — full-stack tier (2026-07-25 container
     const actions = await reconcileIdleWorkspaceStacks(deps);
     expect(actions).toEqual([]);
     expect(stopped).toEqual([]);
+  });
+
+  // PAN-5250 FR-14: a pin, an open browser, an exec session or an unreadable
+  // container holds the old reaper too.
+  it('stops nothing for a protected workspace and restarts the grace clock', async () => {
+    let nowMs = 1_000_000;
+    let protectedNow = true;
+    const stopped: string[][] = [];
+    const isProtected = vi.fn(async (_issueLower: string, _names: string[]) => protectedNow);
+    const deps: Partial<IdleStackReaperDeps> = {
+      listContainerNames: async () => [SERVER('pan-9050'), FRONTEND('pan-9050')],
+      listComposeContainers: async () => [],
+      listLiveAgentIds: async () => [],
+      stopContainers: async (names) => { stopped.push(names); },
+      now: () => nowMs,
+      graceMs: 10_000,
+      isProtected,
+    };
+    await reconcileIdleWorkspaceStacks(deps); // starts the clock
+    nowMs += 11_000;
+    expect(await reconcileIdleWorkspaceStacks(deps)).toEqual([]); // past grace, but protected
+    expect(stopped).toEqual([]);
+    expect(isProtected).toHaveBeenCalledWith('pan-9050', [SERVER('pan-9050'), FRONTEND('pan-9050')]);
+
+    protectedNow = false;
+    nowMs += 1_000;
+    expect(await reconcileIdleWorkspaceStacks(deps)).toEqual([]); // clock restarted: no reap yet
+    nowMs += 5_000;
+    expect(await reconcileIdleWorkspaceStacks(deps)).toEqual([]); // still within the new grace
+    nowMs += 6_000;
+    expect(await reconcileIdleWorkspaceStacks(deps)).toHaveLength(1); // full grace again
+    expect(stopped).toHaveLength(1);
+  });
+
+  it('asks the protection check about the full-stack tier targets too', async () => {
+    let nowMs = 1_000_000;
+    const stopped: string[][] = [];
+    const project = 'myn-feature-pan-9051';
+    const isProtected = vi.fn(async () => true);
+    const deps: Partial<IdleStackReaperDeps> = {
+      listContainerNames: async () => [],
+      listComposeContainers: async () => [
+        { name: `${project}-api-1`, composeProject: project },
+        { name: `${project}-dev-1`, composeProject: project },
+      ],
+      listLiveAgentIds: async () => [],
+      stopContainers: async (names) => { stopped.push(names); },
+      now: () => nowMs,
+      graceMs: 1,
+      fullStackGraceMs: 10_000,
+      isProtected,
+    };
+    await reconcileIdleWorkspaceStacks(deps);
+    nowMs += 11_000;
+    expect(await reconcileIdleWorkspaceStacks(deps)).toEqual([]);
+    expect(stopped).toEqual([]);
+    expect(isProtected).toHaveBeenCalledWith('pan-9051', [`${project}-api-1`]);
   });
 });
