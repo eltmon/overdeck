@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, unlinkSync, utimesSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, unlinkSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { setImmediate as realSetImmediate } from 'node:timers/promises'
@@ -1495,7 +1495,9 @@ describe('readQualityGateQueue (PAN-5283)', () => {
     writeFileSync(join(rootDir, 'owner.json'), ownerJson(process.pid, 50))
     const snapshot = await readQualityGateQueue({ rootDir, slots: 2, isProcessAlive: (pid) => pid === process.pid, now: () => 60, staleMs: 1_000 })
     expect(snapshot.slots).toBe(2)
-    expect(snapshot.owners).toEqual([{ workspacePath: '/tmp/owner', gateName: 'test', createdAt: 50, acquiredAt: 50 }])
+    expect(snapshot.owners).toEqual([{
+      workspacePath: '/tmp/owner', gateName: 'test', createdAt: 50, acquiredAt: 50, ticketId: `owner-${process.pid}`,
+    }])
     expect(snapshot.waiters.map((waiter) => waiter.workspacePath)).toEqual(['/ws/a', '/ws/c', '/ws/b'])
     expect(snapshot.waiters[2]).toMatchObject({ issueId: 'PAN-2', footprintBytes: 1024, createdAt: 200 })
   })
@@ -1514,6 +1516,56 @@ describe('readQualityGateQueue (PAN-5283)', () => {
     const rootDir = join(home(), 'missing')
     expect(await readQualityGateQueue({ rootDir, slots: 3 })).toEqual({ slots: 3, owners: [], waiters: [] })
     expect(existsSync(rootDir)).toBe(false)
+  })
+
+  it('carries ticketId, footprintKey and memoryBlockedSince for a waiter (PAN-5621)', async () => {
+    const rootDir = home()
+    writeFileSync(join(rootDir, 'waiter-m.json'), waiterJson('m', process.pid, 100, {
+      footprintKey: 'gate:typecheck:npm run typecheck', memoryBlockedSince: 1234,
+    }))
+    const snapshot = await readQualityGateQueue({ rootDir, slots: 1, isProcessAlive: (pid) => pid === process.pid })
+    expect(snapshot.waiters).toEqual([{
+      workspacePath: '/ws/m', gateName: 'vitest', createdAt: 100,
+      ticketId: 'm', footprintKey: 'gate:typecheck:npm run typecheck', memoryBlockedSince: 1234,
+    }])
+  })
+
+  it('reports readError for a root that is a regular file, with no readError on a missing root', async () => {
+    const filePath = join(home(), 'not-a-dir')
+    writeFileSync(filePath, 'x')
+    const broken = await readQualityGateQueue({ rootDir: filePath, slots: 2 })
+    expect(broken.owners).toEqual([])
+    expect(broken.waiters).toEqual([])
+    expect(typeof broken.readError).toBe('string')
+
+    const missing = join(home(), 'missing')
+    expect(await readQualityGateQueue({ rootDir: missing, slots: 2 })).toEqual({ slots: 2, owners: [], waiters: [] })
+  })
+})
+
+describe('quality-gate last-admitted marker (PAN-5621)', () => {
+  it('writes last-admitted.json on admission and readQualityGateQueue reports it', async () => {
+    const rootDir = home()
+    const handle = await driveUntilResolved(acquireQualityGateAdmission(
+      { workspacePath: '/tmp/one', gateName: 'test', attempt: 1 },
+      { ...deps(rootDir), now: () => 1 },
+    ))
+    const marker = JSON.parse(readFileSync(join(rootDir, 'last-admitted.json'), 'utf8')) as { at: number }
+    expect(marker.at).toBe(Date.parse(handle.admittedAt))
+    const snapshot = await readQualityGateQueue({ rootDir, slots: 1, isProcessAlive: (pid) => pid === process.pid })
+    expect(snapshot.lastAdmittedAt).toBe(marker.at)
+    await handle.release()
+  })
+
+  it('still admits when last-admitted.json is pre-created as a directory', async () => {
+    const rootDir = home()
+    mkdirSync(join(rootDir, 'last-admitted.json'))
+    const handle = await driveUntilResolved(acquireQualityGateAdmission(
+      { workspacePath: '/tmp/one', gateName: 'test', attempt: 1 },
+      { ...deps(rootDir), now: () => 1 },
+    ))
+    expect(handle.slot).toBe(0)
+    await handle.release()
   })
 })
 

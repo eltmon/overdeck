@@ -120,7 +120,7 @@ target-branch sync, skipped when CI is already green on the exact tip commit
   bound counts once per pressure episode, so the next head does not wait it
   again (PAN-5588). A gate with a memory footprint also waits while starting
   it would push MemAvailable below `resources.governor_soft_reserve_gb`; see
-  [CPU and memory admission](#cpu-and-memory-admission-pan-4311-pan-4546-pan-5248-pan-5285-pan-5520).
+  [CPU and memory admission](#cpu-and-memory-admission-pan-4311-pan-4546-pan-5248-pan-5285-pan-5520-pan-5621).
 - **Agent shells share the queue.** Both `vitest.config.ts` and
   `src/dashboard/frontend/vitest.config.ts` load
   `tests/vitest-cpu-admission.ts` as `globalSetup`, which calls
@@ -497,7 +497,7 @@ Work agents run only the tests they touched (the work prompt names
 CI" only in a CI-mode project); reviewers never run the suite — they read the
 CI result on the head (`gh pr checks <pr>`) where tests run on CI.
 
-### CPU and memory admission (PAN-4311, PAN-4546, PAN-5248, PAN-5285, PAN-5520)
+### CPU and memory admission (PAN-4311, PAN-4546, PAN-5248, PAN-5285, PAN-5520, PAN-5621)
 
 Before each local gate starts, it waits in a machine-wide FIFO queue under
 `~/.overdeck/verification-workers/admission/`. Direct local Vitest runs and
@@ -599,6 +599,33 @@ already queued, without killing them:
   its estimate and reserve at enqueue, so after a reserve change it can look
   as if it fits and still never start; one that has looked that way for 30 s
   with a slot free is treated as blocked on memory.
+- **Starvation (PAN-5621).** The alone-admission rule above has a floor: a head
+  stuck below the hard reserve can never start, even alone. Detection catches
+  that case. While no owner holds a slot and the head has been memory-blocked
+  for at least `resources.quality_gate_starvation_minutes` (default 15, above
+  0 and under 30), and `MemAvailable < resources.governor_hard_reserve_gb` plus
+  the head's clamped footprint, the primary dashboard's 30 s poll
+  (`gate-starvation-service.ts`) opens a starvation episode: a durable record
+  at `~/.overdeck/verification-workers/admission/starvation.json`. One episode
+  produces one warning and one recovery, never more: a new head hands the
+  episode over with refreshed figures instead of re-announcing, and a
+  dashboard restart replays an unsettled announcement with the same id rather
+  than sending a second one. Every successful admission writes
+  `last-admitted.json`, so a gate that starts and finishes between two polls
+  still closes the episode even though no owner file was ever seen. The
+  episode closes when an owner appears or that marker advances past the
+  episode's start ("admitted"), or when the queue is confirmed empty
+  ("emptied"); a queue read that fails for any reason other than a missing
+  admission root is unknown, never empty, and closes nothing. Both the warning
+  and the recovery go through `emitActivityEntryOnce` and retry on the same id
+  until they settle, so a crash between writing the record and sending the
+  notification cannot lose or duplicate it. The three surfaces are a `pan
+  status` line, an activity entry linking to `/flywheel`, and a phone push
+  tagged `gate-starvation:<since>` (best-effort: `pushNeedsYouEdge` gives no
+  delivery guarantee). Detection never changes an admission decision — it only
+  reads the queue `fitsAloneAboveHardReserve` already computes. Automatically
+  reclaiming the memory a starved queue is waiting on (stopping idle parked
+  workspace stacks) is tracked separately in PAN-5623.
 - **Admitted past CPU pressure (PAN-5520, PAN-5588).** CPU contention slows a
   gate down but does not break it, so the CPU wait has a bound,
   `resources.quality_gate_cpu_bypass_minutes` (default 10, under 30 so the
@@ -653,9 +680,12 @@ already queued, without killing them:
   began into its `waiter-*.json` ticket (`wait: { since, reason }`).
   The read-only snapshot `readQualityGateQueue()` in
   `quality-gate-admission.ts`, which the Flywheel page reads (PAN-5283),
-  carries it on each waiter entry as `wait`. To relieve a stall, free memory or lower
-  `resources.governor_soft_reserve_gb`; queued gates pick up the new value on
-  their next poll.
+  carries it on each waiter entry as `wait`, along with `ticketId`,
+  `footprintKey` and `memoryBlockedSince` (PAN-5621). The snapshot itself
+  carries `readError` (set when the queue could not be read, rather than
+  reporting it as empty) and `lastAdmittedAt` (from `last-admitted.json`). To
+  relieve a stall, free memory or lower `resources.governor_soft_reserve_gb`;
+  queued gates pick up the new value on their next poll.
 
 ### Same head: joining or restarting a live worker (PAN-4527)
 

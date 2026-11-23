@@ -36,6 +36,10 @@ vi.mock('../../../lib/restart-status.js', () => ({
 vi.mock('../../../lib/restart-gate-client.js', () => ({
   readRestartGate: vi.fn(() => Promise.resolve(null)),
 }))
+// PAN-5621: keep this test off the real admission root.
+vi.mock('../../../lib/cloister/gate-starvation.js', () => ({
+  gateStarvationStatusLine: vi.fn(async () => null),
+}))
 
 import { statusCommand } from '../status.js'
 import { listRunningAgentsSync } from '../../../lib/agents.js'

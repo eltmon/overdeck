@@ -1,0 +1,145 @@
+{
+  "version": "1",
+  "issueId": "PAN-5621",
+  "created": "2026-11-23T18:11:42.737Z",
+  "updated": "2026-11-23T20:03:50.054Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "wi1-starvation-config-key": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5621",
+      "claimedAt": "2026-11-23T18:11:42.737Z",
+      "doneAt": "2026-11-23T18:25:23.031Z"
+    },
+    "wi1-starvation-config-key.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:25:23.031Z"
+    },
+    "wi1-starvation-config-key.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:25:23.031Z"
+    },
+    "wi1-starvation-config-key.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:25:23.031Z"
+    },
+    "wi2-snapshot-fields-and-alone-helper": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5621",
+      "claimedAt": "2026-11-23T18:25:30.348Z",
+      "doneAt": "2026-11-23T18:51:00.232Z"
+    },
+    "wi2-snapshot-fields-and-alone-helper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:51:00.232Z"
+    },
+    "wi2-snapshot-fields-and-alone-helper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:51:00.232Z"
+    },
+    "wi2-snapshot-fields-and-alone-helper.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:51:00.232Z"
+    },
+    "wi2-snapshot-fields-and-alone-helper.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:51:00.232Z"
+    },
+    "wi2-snapshot-fields-and-alone-helper.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:51:00.232Z"
+    },
+    "wi3-starvation-module": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5621",
+      "claimedAt": "2026-11-23T18:53:24.805Z",
+      "doneAt": "2026-11-23T19:08:47.579Z"
+    },
+    "wi3-starvation-module.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:08:47.579Z"
+    },
+    "wi3-starvation-module.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:08:47.579Z"
+    },
+    "wi3-starvation-module.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:08:47.579Z"
+    },
+    "wi3-starvation-module.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:08:47.579Z"
+    },
+    "wi3-starvation-module.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:08:47.579Z"
+    },
+    "wi4-starvation-service": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5621",
+      "claimedAt": "2026-11-23T19:08:56.541Z",
+      "doneAt": "2026-11-23T19:28:05.494Z"
+    },
+    "wi4-starvation-service.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:28:05.494Z"
+    },
+    "wi4-starvation-service.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:28:05.494Z"
+    },
+    "wi4-starvation-service.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:28:05.494Z"
+    },
+    "wi4-starvation-service.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:28:05.494Z"
+    },
+    "wi4-starvation-service.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:28:05.494Z"
+    },
+    "wi5-status-line": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5621",
+      "claimedAt": "2026-11-23T19:28:13.207Z",
+      "doneAt": "2026-11-23T20:03:14.320Z"
+    },
+    "wi5-status-line.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:03:14.320Z"
+    },
+    "wi5-status-line.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:03:14.320Z"
+    },
+    "wi5-status-line.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:03:14.320Z"
+    },
+    "wi6-docs-changelog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5621",
+      "claimedAt": "2026-11-23T20:03:18.175Z",
+      "doneAt": "2026-11-23T20:03:50.054Z"
+    },
+    "wi6-docs-changelog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:03:50.054Z"
+    },
+    "wi6-docs-changelog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:03:50.054Z"
+    },
+    "wi6-docs-changelog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:03:50.054Z"
+    }
+  }
+}

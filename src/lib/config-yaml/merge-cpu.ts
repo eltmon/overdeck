@@ -50,6 +50,10 @@ export function mergeCpuResources(
   // PAN-5520: below the gate wrappers' 30-minute admission wait, so the head starts before it times out.
   const bypass = yaml.quality_gate_cpu_bypass_minutes;
   if (typeof bypass === 'number' && Number.isFinite(bypass) && bypass > 0 && bypass < 30) resolved.qualityGateCpuBypassMinutes = bypass;
+  const starvation = yaml.quality_gate_starvation_minutes;
+  if (typeof starvation === 'number' && Number.isFinite(starvation) && starvation > 0 && starvation < 30) {
+    resolved.qualityGateStarvationMinutes = starvation;
+  }
   if (resolved.governorCpuPsiRecoveryAvg60 >= resolved.governorCpuPsiHoldAvg60) {
     warnInvertedCpuPsiThresholds(resolved.governorCpuPsiHoldAvg60, resolved.governorCpuPsiRecoveryAvg60, defaults);
     resolved.governorCpuPsiHoldAvg60 = defaults.governorCpuPsiHoldAvg60;
