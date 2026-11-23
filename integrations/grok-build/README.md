@@ -94,9 +94,10 @@ The script serves MCP on stdio by exec'ing, in order:
 1. The paired Overdeck connector, when `pairing.json` exists in the
    connector home (`~/.overdeck-connector` by default, or
    `OVERDECK_CONNECTOR_HOME`): a `pan` on `PATH` that has `mcp connector`,
-   else `npx -y @overdeck/core@0.74.0 mcp connector serve --stdio`. Set
-   `OVERDECK_CORE_VERSION` to match the version the Connect a bot dialog
-   showed you, if it differs from the pin above.
+   else `npx -y @overdeck/core@0.90.1 mcp connector serve --stdio`. The
+   release flow stamps this pin from Overdeck's version; set
+   `OVERDECK_CORE_VERSION` to the version the Connect a bot dialog showed
+   you if your machine runs a different one.
 2. Otherwise, `pan mcp serve` when `pan` is on `PATH`.
 3. Otherwise, it prints an install hint to stderr and exits 1.
 

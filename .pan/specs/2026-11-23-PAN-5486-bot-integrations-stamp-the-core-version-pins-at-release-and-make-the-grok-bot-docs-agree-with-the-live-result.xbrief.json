@@ -1,0 +1,821 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-23T03:08:57Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5486: Bot integrations: stamp the core version pins at release, and make the Grok Bot docs agree with the live result",
+    "updated": "2026-11-23T03:25:44.608Z"
+  },
+  "plan": {
+    "id": "pan-5486",
+    "title": "Bot integrations: stamp the core version pins at release, and make the Grok Bot docs agree with the live result",
+    "status": "running",
+    "uid": "a6a51278-1392-47f3-ae0a-bf33240485c0",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-23T03:08:57Z",
+    "updated": "2026-11-23T03:25:44.608Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5486",
+        "label": "PAN-5486",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5242",
+        "label": "PAN-5242",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5058",
+        "label": "PAN-5058",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "integrations",
+      "release",
+      "docs",
+      "grok-bot",
+      "connect-a-bot"
+    ],
+    "metadata": {
+      "sizeJustification": "The issue is a consistency fix whose surface is wide but shallow: four one-line pin stamps, four verification.md sections, three doc pages and a two-line dialog change, each its own small item. The projected-surface lint counts subsystems by the first two path segments, so integrations/<platform> alone yields five subsystems; splitting Part 1 from Part 2 into sibling issues would still leave each over the 6-subsystem limit (Part 2 alone touches configuration/, integrations/grok-bot, grok-build, hermes, openclaw and src/dashboard). The operator filed it as one issue to run on one cheaper model.",
+      "canonicalFilename": "2026-11-23-PAN-5486-bot-integrations-stamp-the-core-version-pins-at-release-and-make-the-grok-bot-docs-agree-with-the-live-result.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Part 1: the @overdeck/core version each bot plugin installs is typed by hand in four places (grok-build run-mcp.sh and README at 0.74.0, grok-bot mcp.json and README at 0.77.0) while the root package is 0.90.1; nothing writes or checks them. Part 2: configuration/bots.mdx, configuration/mcp.mdx, integrations/grok-bot/README.md and the Connect a bot dialog present the connector as Grok Bot's default route, but the only live run (PAN-5242, 2026-11-14) failed three times because Grok Bot's sandbox has no WebRTC egress, and Public MCP with Grok Bot has never been run live.",
+      "Proposal": "Add integrations/shared/sync-core-pins.mjs (modeled on sync-skill.mjs): it rewrites every numeric @overdeck/core@ pin and the OVERDECK_CORE_VERSION default under integrations/ to the root package.json version, and --check exits 1 on drift. Stamp the pins once, make the existing tests derive the pin from package.json, run --check in the integrations CI job and as a repository-level unit test, and call it from pan release (stable and canary) through an exported stampCorePins helper with staging and rollback. Then make the four Grok Bot surfaces say the same thing: Public MCP is the route (and the dialog default), the connector route fails from Grok Bot's sandbox (PAN-5242), and Public MCP with Grok Bot is not verified live; add dated 'Changes since 2026-11-04' sections to every verification.md without marking anything passed. PRD: .pan/drafts/PAN-5486.md.",
+      "NonGoals": "- Running Grok Bot live over Public MCP (that is PAN-5058 checkpoint CP-1; PAN-5058 W-5 updates the four surfaces afterwards).\n- Changing integrations/grok-bot/mcp.json from the stdio connector config to a URL config.\n- Removing the Overdeck connector reach for Grok Bot from the dialog.\n- Editing ConnectBotOutput.tsx (PAN-5058 W-5 owns its dated note).\n- Editing .github/workflows/release.yml (its full-suite gate already runs the repository-level pin test).\n- Using @latest or version ranges in any pin.\n- Marking any verification row Passed without a dated live run.\n- Publishing any plugin to npm, PyPI or a plugin catalog.\n- #5028, #5029, #5033."
+    },
+    "autoDecisions": [
+      {
+        "summary": "The connector route is kept as a second reach for Grok Bot; Public MCP becomes the default (reaches ['public', 'connector']) with a warning on the connector reach.",
+        "rationale": "The issue says Public MCP is the route to use and the bots.mdx row must drop 'connector (default)'; that table describes the dialog's default, so the dialog must change too. Keeping the reach is reversible and matches PAN-5058 W-5's fail-branch rule ('reaches keeps both routes')."
+      },
+      {
+        "summary": "Both pan release stable and pan release canary stamp the pins, and the regexes accept a prerelease suffix.",
+        "rationale": "CI compares pins with the root version and canary also writes it, so stamping only on stable would turn main red after a canary release."
+      },
+      {
+        "summary": "No release.yml change; FR-2/FR-3 are enforced by a ci.yml step, a repository-level unit test, and the release command itself.",
+        "rationale": "release.yml already runs the full suite on the tag, which includes the repository-level pin test; fewer workflow edits means fewer SSH-only pushes."
+      },
+      {
+        "summary": "The sync script finds pins by pattern across integrations/ rather than from a file list.",
+        "rationale": "The issue asks that pins the table misses be covered too; a pattern catches any future hand-typed pin, and the digit-only match leaves @<version>/@<pin> placeholders alone."
+      },
+      {
+        "summary": "integrations/grok-bot/mcp.json stays the stdio connector config, and the Grok Bot README moves the connector flow under a heading that says it fails from the sandbox.",
+        "rationale": "The issue keeps mcp.json under the pin sync and does not ask to change it; PAN-5072 chose stdio on purpose, and the Public MCP steps already say to replace it."
+      },
+      {
+        "summary": "The verification sections use the verified release versions: connector connect v0.75.0, one-paste Copy and stdio mcp.json v0.78.0, no-webrtc-egress v0.85.0.",
+        "rationale": "git tag --contains on the introducing commits (30d9e498995, fb9b1dc770a, 8cb58a89bca) shows these versions; the issue said one-paste shipped in 0.76.0."
+      }
+    ],
+    "items": [
+      {
+        "id": "core-pin-script",
+        "title": "Add integrations/shared/sync-core-pins.mjs with fixture tests",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T03:08:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5486",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "integrations/shared/sync-core-pins.mjs",
+            "tests/unit/integrations/sync-core-pins.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/integrations/sync-core-pins.test.ts"
+          ],
+          "expected_outputs": [
+            "sync-core-pins.test.ts reports all fixture cases passed, 0 failed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-2",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "core-pin-stamp",
+            "core-pin-release",
+            "core-pin-ci-step"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-5486.md W-1 exactly. Create integrations/shared/sync-core-pins.mjs in the style of integrations/shared/sync-skill.mjs (parseArgs with --check and --root, exit 2 with a usage line on anything else, default root two levels up from the script). Read the root package.json version (semver with an optional prerelease suffix, else exit 1). Walk integrations/ skipping directories node_modules, dist, build, .venv, venv, __pycache__, .pytest_cache, .git and files named package-lock.json. Rewrite only the version group of /(@overdeck\\/core@)(\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?)/g and /(OVERDECK_CORE_VERSION:-)(same semver)(\\})/g. --check prints '✗ <path>:<line> pins <found>, expected <version>' per drift and exits 1; exits 1 with '✗ no core pins found under integrations/' when none exist; otherwise prints '✓ <n> core pins match <version>'. Sync prints 'updated <path>' per changed file and 'core pins: <n> at <version>, <k> file(s) updated'. The script's comments must not contain @overdeck/core@ followed by a digit. Write the fixture tests named in W-1 (spawnSync like sync-skill.test.ts, mkdtemp fixture roots removed in afterEach). Do NOT add the repository-level test here; core-pin-stamp adds it after stamping."
+        },
+        "items": [
+          {
+            "id": "core-pin-script.ac1",
+            "title": "Given a fixture root with package.json version 1.2.3 and pins 0.74.0 (run-mcp.sh) and 0.77.0 (mcp.json), when the script runs with --root, then both files contain 1.2.3 and stdout contains 'core pins: 2 at 1.2.3, 2 file(s) updated'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "core-pin-script.ac2",
+            "title": "Given a synced fixture where mcp.json is edited back to 0.77.0, when --check runs, then it exits 1, stderr names integrations/grok-bot/mcp.json with its line and 'expected 1.2.3', and no file is rewritten",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "core-pin-script.ac3",
+            "title": "Given a fixture README with @overdeck/core@<version> and @overdeck/core@<pin> plus a node_modules file with a numeric pin, when sync runs, then those files remain byte-identical",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "core-pin-script.ac4",
+            "title": "Given a root version 1.3.0-canary.2, when sync then --check run, then mcp.json contains @overdeck/core@1.3.0-canary.2 and --check exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "core-pin-script.ac5",
+            "title": "Given an mcp.json built from registrationLines('grok-bot', registrationFor({ version: '0.77.0', env: {} })), when sync runs with root 1.2.3, then the file equals the same expression built with version 1.2.3, so only the digits change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "core-pin-stamp",
+        "title": "Stamp the four committed pins and derive pins in the existing integration tests",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T03:08:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-5486",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "integrations/grok-build/scripts/run-mcp.sh",
+            "integrations/grok-build/README.md",
+            "integrations/grok-bot/mcp.json",
+            "integrations/grok-bot/README.md",
+            "tests/unit/integrations/grok-build-run-mcp.test.ts",
+            "tests/unit/integrations/grok-bot.test.ts",
+            "tests/unit/integrations/grok-build-readme.test.ts",
+            "tests/unit/integrations/sync-core-pins.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node integrations/shared/sync-core-pins.mjs --check",
+            "npx vitest run tests/unit/integrations/sync-core-pins.test.ts tests/unit/integrations/grok-build-run-mcp.test.ts tests/unit/integrations/grok-bot.test.ts tests/unit/integrations/grok-build-readme.test.ts",
+            "git grep -nE '@overdeck/core@[0-9]' -- integrations"
+          ],
+          "expected_outputs": [
+            "--check prints '✓ <n> core pins match <root version>' and exits 0",
+            "the four test files report 0 failed",
+            "every git grep line shows the root package.json version"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-5486.md W-2. Run pan sync-main, then node integrations/shared/sync-core-pins.mjs (never hand-edit pins). In grok-build-run-mcp.test.ts read ROOT_VERSION from ../../../package.json; line 123 expects `npx -y @overdeck/core@${ROOT_VERSION} mcp connector serve --stdio`; replace the 'pins an exact semver greater than 0.73.1' test with 'pins exactly the root package.json version'. In grok-bot.test.ts replace the pin-regex check with equality to registrationLines('grok-bot', registrationFor({ version: ROOT_VERSION, env: {} })).slice(1).join('\\n') + '\\n'. Widen readPin()'s regex in grok-build-readme.test.ts to accept a prerelease suffix. Reword integrations/grok-build/README.md lines 97-99 as W-2 step 5 states. Add the repository-level describe block to sync-core-pins.test.ts asserting --check exits 0 and stdout matches '✓ <digits> core pins match <ROOT_VERSION>' (do not assert the exact count)."
+        },
+        "items": [
+          {
+            "id": "core-pin-stamp.ac1",
+            "title": "When node integrations/shared/sync-core-pins.mjs --check runs on the branch, then it exits 0 and prints '✓ 4 core pins match' followed by the root package.json version (4 unless sync-main brought in a new stamped pin)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "core-pin-stamp.ac2",
+            "title": "When `git grep -nE '0\\.74\\.0|0\\.77\\.0' -- tests/unit/integrations/grok-build-run-mcp.test.ts tests/unit/integrations/grok-bot.test.ts tests/unit/integrations/grok-build-readme.test.ts` runs, then it prints no line, and `git grep -nE '@overdeck/core@[0-9]' -- integrations` prints only the root version",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "core-pin-stamp.ac3",
+            "title": "Given the root version changes, when grok-build-run-mcp.test.ts and grok-bot.test.ts run, then they compare the pins with the package.json version read at test time rather than a literal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "core-pin-stamp.ac4",
+            "title": "The repository-level case in sync-core-pins.test.ts runs --check against the real repo and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "core-pin-ci-step",
+        "title": "Run the core pin check in the integrations CI job",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T03:08:57Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "infra",
+          "issueLabel": "pan-5486",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".github/workflows/ci.yml"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'sync-core-pins.mjs --check' .github/workflows/ci.yml",
+            "node integrations/shared/sync-core-pins.mjs --check"
+          ],
+          "expected_outputs": [
+            "grep prints exactly one line inside the integrations job",
+            "--check exits 0 locally"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-5486.md W-3. After the 'Shared skill copies match' step in the integrations job of .github/workflows/ci.yml, add a step named 'Core pins match the package version' running `node integrations/shared/sync-core-pins.mjs --check`, and add one comment line above `integrations:` naming PAN-5486. Do this item LAST, after every other item is pushed. IMPLEMENTATION CHECKPOINT (the push): push normally first; if refused with 'refusing to allow an OAuth App to create or update workflow', retry with `git push git@github.com:eltmon/overdeck.git HEAD:feature/pan-5486`, then `git fetch origin`. Fallback if both are refused: the commit is local and unpushed, so `git reset --mixed HEAD~1` and `git restore .github/workflows/ci.yml` (no pushed history is rewritten), then `pan task block core-pin-ci-step` with the reason, `pan tell flywheel-orchestrator` that the ci.yml step needs an operator push, and say so in the PR description; core-pin-stamp's repository-level test still satisfies FR-2."
+        },
+        "items": [
+          {
+            "id": "core-pin-ci-step.ac1",
+            "title": "When ci.yml is read, then the integrations job has a step 'Core pins match the package version' that runs `node integrations/shared/sync-core-pins.mjs --check` directly after 'Shared skill copies match'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "core-pin-ci-step.ac2",
+            "title": "When the new step's command `node integrations/shared/sync-core-pins.mjs --check` runs locally on the branch, then it exits 0 (or the item is blocked through the push fallback and the PR description says so)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "core-pin-release",
+        "title": "Stamp core pins in pan release stable and canary",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T03:08:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5486",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/release.ts",
+            "tests/unit/cli/release-core-pins.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/release-core-pins.test.ts tests/unit/cli/release-changelog-fold.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files report 0 failed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-5486.md W-4. Export stampCorePins(repoRoot) from src/cli/commands/release.ts: execFileSync(process.execPath, [join(repoRoot, 'integrations', 'shared', 'sync-core-pins.mjs'), '--root', repoRoot]) with piped stdio, printing the last stdout line dimmed. In releaseCreateCommand declare `let corePinsStamped = false;` beside changelogApplied; call stampCorePins(repoRoot) and set the flag right after writeContractsPackageJson; run `git add -u -- integrations` right after the existing package git add; in the `if (!committed)` rollback add a separate best-effort `git restore --source=HEAD --staged --worktree -- integrations` guarded by corePinsStamped; update the failure message to mention core pins. Test through the exported helper on a mkdtemp fixture root (copy the real script in). Never readFileSync release.ts in a test (lint:source-introspection)."
+        },
+        "items": [
+          {
+            "id": "core-pin-release.ac1",
+            "title": "Given a fixture root with package.json version 2.0.0 and a copied sync-core-pins.mjs, when stampCorePins(root) runs, then the fixture mcp.json contains @overdeck/core@2.0.0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "core-pin-release.ac2",
+            "title": "Given package.json version 'next', when stampCorePins(root) runs, then it throws",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "core-pin-release.ac3",
+            "title": "releaseCreateCommand calls stampCorePins after the three manifest bumps for both stable and canary, stages pins with `git add -u -- integrations`, and its uncommitted-rollback path restores integrations only when corePinsStamped is true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "core-pin-release.ac4",
+            "title": "npm run typecheck exits 0 and release.ts stays under its 1000-line file-size ceiling",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "core-pin-docs",
+        "title": "Document the pin sync and add the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T03:08:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5486",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "integrations/README.md",
+            "integrations/grok-build/PUBLISHING.md",
+            "docs/RELEASING.md",
+            "sync-sources/skills/pan-release/SKILL.md",
+            ".overdeck/context/codebase/architecture.md",
+            "changelog.d/pan-5486.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n 'sync-core-pins' integrations/README.md docs/RELEASING.md .overdeck/context/codebase/architecture.md"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "grep prints at least one line per file"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-5486.md W-5 with its exact text: a '## Core version pins' section in integrations/README.md after '## The shared skill', plus the check in its Continuous integration list and local block; replace integrations/grok-build/PUBLISHING.md lines 9-12 (no more hand bumps); a paragraph in docs/RELEASING.md after step 2 of 'Update the public changelog'; one sentence in sync-sources/skills/pan-release/SKILL.md 'Preferred operator flow' step 1; update the integrations row (line 25) of .overdeck/context/codebase/architecture.md as stated, leaving its last-verified line unchanged; create changelog.d/pan-5486.md with the two '#### Fixed' bullets."
+        },
+        "items": [
+          {
+            "id": "core-pin-docs.ac1",
+            "title": "integrations/README.md renders a '## Core version pins' section that names `node integrations/shared/sync-core-pins.mjs`, its --check mode, and that pan release runs it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "core-pin-docs.ac2",
+            "title": "When `grep -n 'OVERDECK_CORE_VERSION' integrations/grok-build/PUBLISHING.md` runs, then it prints no instruction to bump the pin by hand, and the bullet contains the sentence that pan release stamps the pin",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "core-pin-docs.ac3",
+            "title": "When `grep -n 'sync-core-pins' docs/RELEASING.md` and `grep -n '@overdeck/core' sync-sources/skills/pan-release/SKILL.md` run, then each prints a line stating that pan release stamps the pins on stable and canary",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "core-pin-docs.ac4",
+            "title": "changelog.d/pan-5486.md exists with a '#### Fixed' heading and two bullets linking issue 5486, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "grok-bot-dialog",
+        "title": "Connect a bot dialog: default Grok Bot to Public MCP and warn on the connector reach",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T03:08:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5486",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/botSnippets.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/ConnectBotDialog.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/botSnippets.test.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/ConnectBotDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/anywhere/__tests__/botSnippets.test.ts src/components/Settings/anywhere/__tests__/ConnectBotDialog.test.tsx",
+            "npx vitest run tests/unit/integrations/grok-bot.test.ts"
+          ],
+          "expected_outputs": [
+            "both frontend test files report 0 failed",
+            "grok-bot.test.ts reports 0 failed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-5486.md W-6. Set the grok-bot entry in BOT_PLATFORMS to reaches ['public', 'connector']. In ConnectBotDialog.tsx, after the reach radio group, render the hint \"Grok Bot's sandbox cannot run the connector (no WebRTC egress). Use Public MCP.\" when platform === 'grok-bot' && reach === 'connector', and \"Public MCP with Grok Bot has not been verified live yet.\" when platform === 'grok-bot' && reach === 'public' (className formStyles.hint). Keep the existing grok-bot public access note and do not touch ConnectBotOutput.tsx. Add the botSnippets test and rewrite the two ConnectBotDialog tests at lines 270 and 281 as W-6 step 4 states."
+        },
+        "items": [
+          {
+            "id": "grok-bot-dialog.ac1",
+            "title": "Given the Connect a bot dialog, when the user selects Grok Bot, then the Public MCP reach radio is checked and the text 'Public MCP with Grok Bot has not been verified live yet.' renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grok-bot-dialog.ac2",
+            "title": "Given Grok Bot is selected, when the user selects the Overdeck connector reach, then the dialog renders \"Grok Bot's sandbox cannot run the connector (no WebRTC egress). Use Public MCP.\" and shows the scope checkboxes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grok-bot-dialog.ac3",
+            "title": "When botSnippets.test.ts runs, then it passes with an assertion that the BOT_PLATFORMS grok-bot reaches equal ['public', 'connector'], and ConnectBotDialog.test.tsx passes too",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "grok-bot-bots-mdx",
+        "title": "configuration/bots.mdx: Grok Bot uses Public MCP, the connector fails (PAN-5242)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T03:08:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5486",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/bots.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '| Grok Bot |' configuration/bots.mdx",
+            "grep -c 'issues/5242' configuration/bots.mdx",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the Grok Bot row starts '| Grok Bot | Public MCP (default)'",
+            "count is 2 or more",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-5486.md W-7 with its exact MDX: rewrite the two 'ways in' bullets (lines 18-25) so Grok Bot is a hosted bot on Public MCP; change the route table row (line 76) to '| Grok Bot | Public MCP (default), Overdeck connector (fails from Grok Bot's sandbox) |'; replace the body of '### Grok Bot' (keep the heading) with the three paragraphs: Public MCP steps, not verified live, and the connector failure on 2026-11-14 (PAN-5242) with a link to #no-webrtc-egress."
+        },
+        "items": [
+          {
+            "id": "grok-bot-bots-mdx.ac1",
+            "title": "`grep -n '| Grok Bot |' configuration/bots.mdx` prints a row beginning '| Grok Bot | Public MCP (default)' that does not contain 'connector (default)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grok-bot-bots-mdx.ac2",
+            "title": "When `grep -c 'issues/5242' configuration/bots.mdx` runs, then it prints 2 or more (intro bullets and the '### Grok Bot' section), and the '### Grok Bot' section contains 'Public MCP with Grok Bot has not been verified live yet'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grok-bot-bots-mdx.ac3",
+            "title": "The 'A bot with a shell' bullet lists Hermes, OpenClaw and Grok Build only, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "grok-bot-mcp-mdx",
+        "title": "configuration/mcp.mdx: the same Grok Bot route and status",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T03:08:57Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5486",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/mcp.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'issues/5242' configuration/mcp.mdx",
+            "grep -n 'and Grok Bot can too' configuration/mcp.mdx",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "count is 2",
+            "second grep prints nothing",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-5486.md W-8: in the '**Grok Bot and the xAI API.**' paragraph insert the two sentences after the mcp.json sentence (keep the anchor and 'Grok Bot signs in with OAuth on first use.'), and in '## Bots' replace 'the xAI API uses Public MCP above, and Grok Bot can too.' with the stated sentence linking PAN-5242."
+        },
+        "items": [
+          {
+            "id": "grok-bot-mcp-mdx.ac1",
+            "title": "When `grep -c 'issues/5242' configuration/mcp.mdx` runs, then it prints 2, and the file contains 'Public MCP with Grok Bot has not been verified live yet'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grok-bot-mcp-mdx.ac2",
+            "title": "`grep -n 'and Grok Bot can too' configuration/mcp.mdx` returns no line and the '**Grok Bot and the xAI API.**' anchor text is preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "grok-bot-readme",
+        "title": "integrations/grok-bot/README.md: lead with Public MCP, connector route under its own heading",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T03:08:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5486",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "integrations/grok-bot/README.md",
+            "tests/unit/integrations/grok-bot.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/integrations/grok-bot.test.ts",
+            "node integrations/shared/sync-core-pins.mjs --check"
+          ],
+          "expected_outputs": [
+            "grok-bot.test.ts reports 0 failed",
+            "--check exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-5486.md W-9: reorder the README to intro (with the PAN-5242 sentence), then '## Before you start', '## Grok Bot over Public MCP', '## xAI API', \"## The connector route (fails from Grok Bot's sandbox)\" with its paragraph and the old one-paste text under '### Connect in one paste' (keep the stamped mcp.json block byte-for-byte), '## Status' (reworded), then the rest unchanged. Rename and rewrite the grok-bot.test.ts README-order test as W-9 states, keeping the connectMessage and mcp.json toContain assertions."
+        },
+        "items": [
+          {
+            "id": "grok-bot-readme.ac1",
+            "title": "In integrations/grok-bot/README.md the first '## ' heading is '## Before you start' and '## Grok Bot over Public MCP' appears before \"## The connector route (fails from Grok Bot's sandbox)\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grok-bot-readme.ac2",
+            "title": "The README links https://github.com/eltmon/overdeck/issues/5242 and still contains the connectMessage(...) text and the mcp.json text verbatim",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grok-bot-readme.ac3",
+            "title": "npx vitest run tests/unit/integrations/grok-bot.test.ts passes and the core pin --check still exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "grok-bot-verification",
+        "title": "integrations/grok-bot/docs/verification.md: dated section for changes since 2026-11-04",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T03:08:57Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5486",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "integrations/grok-bot/docs/verification.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '## Changes since 2026-11-04' integrations/grok-bot/docs/verification.md",
+            "grep -c 'Passed' integrations/grok-bot/docs/verification.md"
+          ],
+          "expected_outputs": [
+            "one heading line",
+            "count is 2, unchanged"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-5486.md W-10: keep the existing 2026-11-04 table unchanged and add the '## Changes since 2026-11-04' section (Recorded <date +%F> (PAN-5486)) with the four rows given, before '## Running the live checks'."
+        },
+        "items": [
+          {
+            "id": "grok-bot-verification.ac1",
+            "title": "When `git diff` of integrations/grok-bot/docs/verification.md is read, then it shows only added lines (every 2026-11-04 row is preserved) and the file contains a '## Changes since 2026-11-04' heading followed by 'Recorded <edit date> (PAN-5486)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grok-bot-verification.ac2",
+            "title": "When `grep -n 'Failed 2026-11-14' integrations/grok-bot/docs/verification.md` runs, then it prints the one-paste connector row citing PAN-5242, and the Public MCP row contains 'Not run' citing PAN-5058 CP-1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grok-bot-verification.ac3",
+            "title": "When `grep -c 'Passed' integrations/grok-bot/docs/verification.md` runs, then it prints 2, the same count as before the edit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "other-verification",
+        "title": "grok-build, hermes and openclaw verification.md: dated section for changes since 2026-11-04",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T03:08:57Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5486",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "integrations/grok-build/docs/verification.md",
+            "integrations/hermes/docs/verification.md",
+            "integrations/openclaw/docs/verification.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -l '## Changes since 2026-11-04' integrations/grok-build/docs/verification.md integrations/hermes/docs/verification.md integrations/openclaw/docs/verification.md | wc -l"
+          ],
+          "expected_outputs": [
+            "prints 3"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-5486.md W-11: in each of the three files keep the existing table unchanged and add the same-shaped '## Changes since 2026-11-04' section before '## Running the live checks', with the two 'Not run.' rows (connector connect v0.75.0, one-paste v0.78.0) and, for Grok Build only, the third unit-test-only row."
+        },
+        "items": [
+          {
+            "id": "other-verification.ac1",
+            "title": "When the grok-build, hermes and openclaw verification.md files are read, then each contains a '## Changes since 2026-11-04' section whose connection rows read 'Not run.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "other-verification.ac2",
+            "title": "When `grep -c 'Passed'` runs on each of the three files, then it prints the same count as before the edit, and `git diff` shows only added lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "core-pin-script",
+        "to": "core-pin-stamp",
+        "type": "blocks"
+      },
+      {
+        "from": "core-pin-script",
+        "to": "core-pin-ci-step",
+        "type": "blocks"
+      },
+      {
+        "from": "core-pin-script",
+        "to": "core-pin-release",
+        "type": "blocks"
+      },
+      {
+        "from": "core-pin-script",
+        "to": "core-pin-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "core-pin-release",
+        "to": "core-pin-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "core-pin-stamp",
+        "to": "grok-bot-readme",
+        "type": "blocks"
+      },
+      {
+        "from": "core-pin-stamp",
+        "to": "core-pin-ci-step",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

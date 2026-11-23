@@ -11,6 +11,16 @@ Date: 2026-11-04. Grok Build version: `grok 1.0.34 (3736acbc8658) [stable]`.
 | Bare `/overdeck` on an Overdeck computer | Not run: same `grok -p` sign-in blocker as the row above. |
 | AC-27 connector | Not run: needs the operator's overdeck.ai device-flow approval for `pan mcp connector login`, and, once paired, the same `grok -p` sign-in from the row above (the dispatch to `mcp connector serve --stdio` is covered either way by `grok-build-run-mcp.test.ts`). |
 
+## Changes since 2026-11-04
+
+Recorded 2026-11-22 (PAN-5486). Only a dated live run counts as a result.
+
+| Change | Check | Result |
+| --- | --- | --- |
+| `mcp connector connect` (PAN-5069, v0.75.0) | Grok Build runs the command and pairs | Not run. |
+| One-paste connect: **Copy for Grok Build** in Connect a bot (PAN-5070, v0.78.0) | Grok Build runs the copied message end to end and calls list_conversations | Not run. |
+| The npx fallback pin is stamped by the release flow (PAN-5486) | `grok-build-run-mcp.test.ts` checks the npx fallback uses the root package version | Unit test only; not a live run. |
+
 ## Running the live checks
 
 Steps 2-7 below need an operator who can sign in to `grok` and approve a

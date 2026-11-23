@@ -18,6 +18,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 // PAN-4955 W-INT3 WI-2: the Grok Build dispatch script execs the paired connector
 // (capable pan, else pinned npx), or falls back to `pan mcp serve`.
 const scriptPath = fileURLToPath(new URL('../../../integrations/grok-build/scripts/run-mcp.sh', import.meta.url));
+// PAN-5486: the release flow stamps the pin from the root package.json version.
+const ROOT_VERSION = JSON.parse(readFileSync(new URL('../../../package.json', import.meta.url), 'utf-8')).version as string;
 
 function resolveBin(name: string): string {
   const result = spawnSync('bash', ['-c', `command -v ${name}`], { encoding: 'utf-8' });
@@ -120,7 +122,7 @@ describe('integrations/grok-build scripts/run-mcp.sh', () => {
     const result = run();
 
     expect(result.status).toBe(0);
-    expect(readFileSync(callsLog, 'utf-8').trim()).toBe('npx -y @overdeck/core@0.74.0 mcp connector serve --stdio');
+    expect(readFileSync(callsLog, 'utf-8').trim()).toBe(`npx -y @overdeck/core@${ROOT_VERSION} mcp connector serve --stdio`);
   });
 
   it('honors OVERDECK_CONNECTOR_HOME when the default home has no pairing', () => {
@@ -182,13 +184,10 @@ describe('integrations/grok-build scripts/run-mcp.sh', () => {
     expect(spawnSync(absBash, ['-n', scriptPath]).status).toBe(0);
   });
 
-  it('pins an exact semver greater than 0.73.1', () => {
+  it('pins exactly the root package.json version', () => {
     const text = readFileSync(scriptPath, 'utf-8');
-    const match = text.match(/OVERDECK_CORE_VERSION:-(\d+\.\d+\.\d+)\}/);
+    const match = text.match(/OVERDECK_CORE_VERSION:-(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)\}/);
     expect(match).not.toBeNull();
-
-    const [major, minor, patch] = match![1].split('.').map(Number);
-    const isGreaterThan0731 = major > 0 || minor > 73 || (minor === 73 && patch > 1);
-    expect(isGreaterThan0731).toBe(true);
+    expect(match![1]).toBe(ROOT_VERSION);
   });
 });

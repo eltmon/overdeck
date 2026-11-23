@@ -47,7 +47,9 @@ version's block already exists (a retag).
    which case it leaves `changelog.mdx` unchanged and still releases; it
    refuses to proceed on a malformed entry, a misnamed file, or a leftover
    Upcoming block, and `pan release canary` never folds. Details:
-   `docs/RELEASING.md`, "Update the public changelog".
+   `docs/RELEASING.md`, "Update the public changelog". Both `pan release
+   stable` and `pan release canary` also stamp the `@overdeck/core` pins
+   under `integrations/`.
 2. Run:
    ```bash
    pan release check
