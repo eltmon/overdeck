@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5621",
+  "created": "2026-11-23T18:11:42.737Z",
+  "updated": "2026-11-23T18:11:42.737Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "wi1-starvation-config-key": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5621",
+      "claimedAt": "2026-11-23T18:11:42.737Z"
+    }
+  }
+}
