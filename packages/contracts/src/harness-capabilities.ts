@@ -74,6 +74,12 @@ export interface HarnessCapabilities {
   readonly skillSlashCommands: boolean
   /** How pack skills added to a running conversation load (PAN-5465), or null when this harness gets no conversation packs. */
   readonly conversationSkillApply: HarnessConversationSkillApply | null
+  /**
+   * A launch that shows a blocking menu and writes no transcript for 180 s is reported as a
+   * startup stall (PAN-4242): Claude Code's folder-trust dialog blocks before the first
+   * transcript line.
+   */
+  readonly startupMenuStallSignal: boolean
 }
 
 export const HARNESS_CAPABILITY_KEYS = [
@@ -101,6 +107,7 @@ export const HARNESS_CAPABILITY_KEYS = [
   "overdeckMcp",
   "skillSlashCommands",
   "conversationSkillApply",
+  "startupMenuStallSignal",
 ] as const satisfies readonly (keyof HarnessCapabilities)[]
 
 export const CLAUDE_CODE_CAPABILITIES: HarnessCapabilities = {
@@ -128,6 +135,7 @@ export const CLAUDE_CODE_CAPABILITIES: HarnessCapabilities = {
   overdeckMcp: true,
   skillSlashCommands: true,
   conversationSkillApply: "hot-reload",
+  startupMenuStallSignal: true,
 }
 
 export const OHMYPI_CAPABILITIES: HarnessCapabilities = {
@@ -155,6 +163,7 @@ export const OHMYPI_CAPABILITIES: HarnessCapabilities = {
   overdeckMcp: false,
   skillSlashCommands: false,
   conversationSkillApply: null,
+  startupMenuStallSignal: false,
 }
 
 /**
@@ -195,6 +204,7 @@ export const CODEX_CAPABILITIES: HarnessCapabilities = {
   overdeckMcp: true,
   skillSlashCommands: false,
   conversationSkillApply: "restart",
+  startupMenuStallSignal: false,
 }
 
 export const ACP_CAPABILITIES: HarnessCapabilities = {
@@ -222,6 +232,7 @@ export const ACP_CAPABILITIES: HarnessCapabilities = {
   overdeckMcp: true,
   skillSlashCommands: false,
   conversationSkillApply: null,
+  startupMenuStallSignal: false,
 }
 
 export const KIMI_CODE_CAPABILITIES: HarnessCapabilities = {
@@ -249,6 +260,7 @@ export const KIMI_CODE_CAPABILITIES: HarnessCapabilities = {
   overdeckMcp: false,
   skillSlashCommands: false,
   conversationSkillApply: null,
+  startupMenuStallSignal: false,
 }
 
 export const OPENCODE_CAPABILITIES: HarnessCapabilities = {
@@ -276,6 +288,7 @@ export const OPENCODE_CAPABILITIES: HarnessCapabilities = {
   overdeckMcp: true,
   skillSlashCommands: false,
   conversationSkillApply: null,
+  startupMenuStallSignal: false,
 }
 
 export const GROK_CAPABILITIES: HarnessCapabilities = {
@@ -319,6 +332,7 @@ export const MUSE_CAPABILITIES: HarnessCapabilities = {
   overdeckMcp: false,
   skillSlashCommands: false,
   conversationSkillApply: null,
+  startupMenuStallSignal: false,
 }
 
 export const PRIME_AGENT_CAPABILITIES: HarnessCapabilities = {
@@ -346,4 +360,5 @@ export const PRIME_AGENT_CAPABILITIES: HarnessCapabilities = {
   overdeckMcp: false,
   skillSlashCommands: false,
   conversationSkillApply: null,
+  startupMenuStallSignal: false,
 }

@@ -7,7 +7,8 @@
  * so a planning or work agent could sit at such a menu for hours while every
  * surface reported it running.
  *
- * The signal is narrow on purpose. It needs all of: a Claude Code agent, at
+ * The signal is narrow on purpose. It needs all of: a harness that declares
+ * `startupMenuStallSignal` (Claude Code), at
  * least STARTUP_TRANSCRIPT_GRACE_MS since launch, no transcript written since
  * launch, and a blocking menu on the pane. An idle resumed agent shows no
  * menu, so it is never flagged.
@@ -18,6 +19,8 @@ import {
   type AwaitingInputDetection,
 } from '../agent-input-detection.js';
 import { parsePaneChoiceMenu } from '../pane-choice-menu.js';
+import { getHarnessBehavior } from '../runtimes/behavior.js';
+import type { RuntimeName } from '../runtimes/types.js';
 import { getAgentState } from './agent-state-read.js';
 
 export const STARTUP_TRANSCRIPT_GRACE_MS = 180_000;
@@ -32,7 +35,8 @@ export interface StartupStallDeps {
    */
   transcriptMtime: (agentId: string) => Promise<number | null>;
   now?: () => number;
-  harness?: (agentId: string) => string | undefined;
+  /** The agent's recorded harness; undefined (an older agent) is Claude Code. */
+  harness?: (agentId: string) => RuntimeName | undefined;
   readPane?: (agentId: string) => Promise<string>;
 }
 
@@ -48,7 +52,7 @@ export async function detectStartupStall(
   deps: StartupStallDeps,
 ): Promise<AwaitingInputDetection | null> {
   const harness = (deps.harness ?? ((id: string) => getAgentState(id)?.harness))(agentId);
-  if (harness !== undefined && harness !== 'claude-code') return null;
+  if (!getHarnessBehavior(harness).capabilities.startupMenuStallSignal) return null;
 
   const startedAtMs = Date.parse(startedAt ?? '');
   if (!Number.isFinite(startedAtMs)) return null;
