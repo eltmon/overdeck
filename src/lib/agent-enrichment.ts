@@ -14,6 +14,7 @@ import { Effect } from 'effect'
 import { getAgentState } from './agents/agent-state.js'
 import { deftEscalationQuestions, deftMenuQuestion } from './deft/pending.js'
 import { getAgentRuntimeState } from './agents/runtime-state.js'
+import { detectStartupStall } from './agents/startup-stall.js'
 import {
   detectAwaitingInputForAgent,
   normalizeAwaitingInputPrompt,
@@ -139,7 +140,8 @@ export function appendPaneDetectionKind(detection: AwaitingInputDetection | null
   // not double-represented.
   if (
     (detection?.reason === 'user_question' || detection?.reason === 'confirmation'
-      || detection?.reason === 'disambiguation' || detection?.reason === 'planning_done')
+      || detection?.reason === 'disambiguation' || detection?.reason === 'planning_done'
+      || detection?.reason === 'startup_blocked')
     && !kinds.includes('askUserQuestion') && !kinds.includes('paneQuestion')
   ) {
     kinds.push('paneQuestion')
@@ -163,6 +165,7 @@ const BLOCKING_AWAITING_INPUT_REASONS: ReadonlySet<string> = new Set<AwaitingInp
   'planning_done',
   'session_resume',
   'rate_limit',
+  'startup_blocked',
 ])
 
 /**
@@ -793,7 +796,7 @@ export async function computeAgentEnrichment(
     : null
 
   const paneDetection = !questionDetection && !runtimeDetection
-    ? await detectAwaitingInputForAgent(agentId, { isPlanning })
+    ? (await detectAwaitingInputForAgent(agentId, { isPlanning })) ?? (await detectStartupStall(agentId, startedAt, { transcriptMtime: getAgentJsonlMtime }))
     : null
 
   // Resolution is a stop-hook verdict and can outlive the stop that produced it.
