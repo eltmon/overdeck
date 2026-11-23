@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5250",
   "created": "2026-11-23T23:10:09.644Z",
-  "updated": "2026-11-23T23:22:01.170Z",
+  "updated": "2026-11-23T23:25:29.362Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -158,9 +158,34 @@
       "doneAt": "2026-11-23T23:21:42.322Z"
     },
     "wi7-idle-stop-service": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5250",
-      "claimedAt": "2026-11-23T23:22:01.169Z"
+      "claimedAt": "2026-11-23T23:22:01.169Z",
+      "doneAt": "2026-11-23T23:25:29.361Z"
+    },
+    "wi7-idle-stop-service.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:25:29.361Z"
+    },
+    "wi7-idle-stop-service.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:25:29.361Z"
+    },
+    "wi7-idle-stop-service.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:25:29.361Z"
+    },
+    "wi7-idle-stop-service.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:25:29.361Z"
+    },
+    "wi7-idle-stop-service.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:25:29.361Z"
+    },
+    "wi7-idle-stop-service.ac6": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:25:29.361Z"
     }
   }
 }
