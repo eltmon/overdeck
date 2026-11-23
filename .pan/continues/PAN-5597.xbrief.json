@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5597",
   "created": "2026-11-23T02:38:35.270Z",
-  "updated": "2026-11-23T02:50:25.607Z",
+  "updated": "2026-11-23T02:50:26.798Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -128,6 +128,11 @@
     "cli-verbs.ac4": {
       "status": "completed",
       "doneAt": "2026-11-23T02:50:25.607Z"
+    },
+    "cli-list-phase": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5597",
+      "claimedAt": "2026-11-23T02:50:26.798Z"
     }
   }
 }
