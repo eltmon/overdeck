@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5597",
   "created": "2026-11-23T02:38:35.270Z",
-  "updated": "2026-11-23T02:57:14.982Z",
+  "updated": "2026-11-23T03:07:25.564Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -210,6 +210,11 @@
     "issue-chip-link.ac2": {
       "status": "completed",
       "doneAt": "2026-11-23T02:57:14.982Z"
+    },
+    "item-status": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5597",
+      "claimedAt": "2026-11-23T03:07:25.564Z"
     }
   }
 }
