@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5623",
   "created": "2026-11-23T20:20:25.006Z",
-  "updated": "2026-11-23T20:54:10.547Z",
+  "updated": "2026-11-23T20:54:36.858Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -147,9 +147,22 @@
       "doneAt": "2026-11-23T20:53:59.760Z"
     },
     "wi8-health-reclaim-aware": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5623",
-      "claimedAt": "2026-11-23T20:54:10.547Z"
+      "claimedAt": "2026-11-23T20:54:10.547Z",
+      "doneAt": "2026-11-23T20:54:36.858Z"
+    },
+    "wi8-health-reclaim-aware.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:54:36.858Z"
+    },
+    "wi8-health-reclaim-aware.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:54:36.858Z"
+    },
+    "wi8-health-reclaim-aware.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:54:36.858Z"
     }
   }
 }
