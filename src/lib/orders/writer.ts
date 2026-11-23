@@ -248,6 +248,23 @@ export async function setStatus(
   return serializeByPanDir(panDir, () => setStatusInLock(panDir, bookId, status, options));
 }
 
+/**
+ * Refuse to restore an archived book when one of its issues now belongs to another book that is
+ * not archived. `membership()` throws on an issue in two non-complete books, so restoring such a
+ * book would break every order route that resolves membership. Reads only; writes nothing.
+ * Callers run it before moving a `complete` book back to `draft`.
+ */
+export function assertRestorable(panDir: string, book: OrderBook): void {
+  const others = listBooks(panDir).filter((other) => other.id !== book.id && other.status !== 'complete');
+  for (const item of book.items) {
+    const issue = item.issue.toUpperCase();
+    const owner = others.find((other) => other.items.some((candidate) => candidate.issue.toUpperCase() === issue));
+    if (owner) {
+      throw new Error(`Order book ${book.id} cannot be restored: ${issue} already belongs to order book ${owner.id}`);
+    }
+  }
+}
+
 export async function advanceQueue(
   panDir: string,
   completedBookId: string,
