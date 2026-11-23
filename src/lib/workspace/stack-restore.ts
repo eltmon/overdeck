@@ -17,7 +17,7 @@
  * verification runs in a detached worker process.
  */
 import { existsSync } from 'node:fs';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, utimes } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
 import { Effect } from 'effect';
@@ -57,6 +57,8 @@ export type StackRestoreResult =
 export const STACK_LOCK_FILE = 'stack-reclaim.lock';
 /** A lock older than this is a crashed holder; it exceeds four 60 s stops. */
 export const STACK_LOCK_STALE_MS = 300_000;
+/** PAN-5648 (r4672667704 part a): how often a long-running holder re-touches its lock so it is never mistaken for abandoned. */
+export const STACK_LOCK_RENEW_MS = 60_000;
 const STACK_LOCK_RETRY_MS = 250;
 const RESTORE_LOCK_TIMEOUT_MS = 300_000;
 
@@ -64,17 +66,58 @@ export function stackLockPath(workspacePath: string): string {
   return join(workspacePath, '.overdeck', STACK_LOCK_FILE);
 }
 
+/** Sets the lock file's mtime to now, so `STACK_LOCK_STALE_MS` is measured from the holder's last renewal. */
+async function defaultTouchLock(lockPath: string): Promise<void> {
+  const now = new Date();
+  await utimes(lockPath, now, now);
+}
+
+/**
+ * Touches `lockPath` on an unref'd interval until `stop()` is called. A
+ * rejected touch (e.g. the lock was already removed) is swallowed — a missed
+ * renewal is not a reason to crash the holder.
+ */
+function startLockRenewal(lockPath: string, intervalMs: number, touch: (path: string) => Promise<void>): { stop: () => void } {
+  const timer = setInterval(() => {
+    void touch(lockPath).catch(() => {});
+  }, intervalMs);
+  timer.unref?.();
+  return { stop: () => clearInterval(timer) };
+}
+
+export interface WithStackLockOptions {
+  /** Defaults to touching the lock file's mtime; tests inject a mock. */
+  touch?: (lockPath: string) => Promise<void>;
+}
+
 /**
  * Runs `fn` holding the stack lock at `lockPath`, waiting at most `timeoutMs`.
  * Creates the lock's `.overdeck/` directory first, because it need not exist
  * yet, but never the workspace itself: a workspace the reaper removed makes
  * this reject (ENOENT) instead of coming back as an empty directory.
+ *
+ * While `fn` runs, the lock is renewed every `STACK_LOCK_RENEW_MS` so a
+ * holder running close to `STACK_LOCK_STALE_MS` is never treated as crashed
+ * and reclaimed out from under it (FR-6).
  */
-export async function withStackLock<T>(lockPath: string, fn: () => Promise<T>, timeoutMs: number): Promise<T> {
+export async function withStackLock<T>(
+  lockPath: string,
+  fn: () => Promise<T>,
+  timeoutMs: number,
+  options: WithStackLockOptions = {},
+): Promise<T> {
   await mkdir(dirname(lockPath)).catch((error: NodeJS.ErrnoException) => {
     if (error.code !== 'EEXIST') throw error;
   });
-  return withFileLock(lockPath, fn, {
+  const touch = options.touch ?? defaultTouchLock;
+  return withFileLock(lockPath, async () => {
+    const renewal = startLockRenewal(lockPath, STACK_LOCK_RENEW_MS, touch);
+    try {
+      return await fn();
+    } finally {
+      renewal.stop();
+    }
+  }, {
     staleMs: STACK_LOCK_STALE_MS,
     retryMs: STACK_LOCK_RETRY_MS,
     maxAttempts: Number.POSITIVE_INFINITY,

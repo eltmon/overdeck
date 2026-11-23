@@ -10,6 +10,7 @@ import { appendPipelineEntry, readPipelineJournal } from '../../cloister/pipelin
 import type { ComposeContainer } from '../stack-reclaim-docker.js';
 import type { DockerContainerLifecycle } from '../stack-health.js';
 import {
+  STACK_LOCK_RENEW_MS,
   restoreReclaimedStack,
   restoreReclaimedStackForSpawn,
   stackLockPath,
@@ -264,5 +265,54 @@ describe('withStackLock (PAN-5623)', () => {
     const gone = join(workspace, 'reaped');
     await expect(withStackLock(stackLockPath(gone), async () => 'ran', 1_000)).rejects.toMatchObject({ code: 'ENOENT' });
     expect(existsSync(gone)).toBe(false);
+  });
+});
+
+describe('withStackLock lock renewal (PAN-5648 stack-lock-renew, CodeRabbit r4672667704 part a)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('touches the lock twice over 120000 ms while fn runs (ac1)', async () => {
+    const lockPath = stackLockPath(workspace);
+    const touch = vi.fn(async () => {});
+    const resultPromise = withStackLock(lockPath, async () => {
+      await vi.advanceTimersByTimeAsync(STACK_LOCK_RENEW_MS * 2);
+      return 'ran';
+    }, 1_000, { touch });
+
+    await expect(resultPromise).resolves.toBe('ran');
+    expect(touch).toHaveBeenCalledTimes(2);
+    expect(touch).toHaveBeenCalledWith(lockPath);
+  });
+
+  it('stops renewing once withStackLock has resolved (ac2)', async () => {
+    const lockPath = stackLockPath(workspace);
+    const touch = vi.fn(async () => {});
+    await withStackLock(lockPath, async () => {
+      await vi.advanceTimersByTimeAsync(STACK_LOCK_RENEW_MS);
+      return 'ran';
+    }, 1_000, { touch });
+    expect(touch).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(STACK_LOCK_RENEW_MS * 2);
+
+    expect(touch).toHaveBeenCalledTimes(1);
+  });
+
+  it('still resolves with fn\'s value when a renewal touch rejects (ac3)', async () => {
+    const lockPath = stackLockPath(workspace);
+    const touch = vi.fn(async () => { throw new Error('ENOENT'); });
+    const resultPromise = withStackLock(lockPath, async () => {
+      await vi.advanceTimersByTimeAsync(STACK_LOCK_RENEW_MS);
+      return 'ran';
+    }, 1_000, { touch });
+
+    await expect(resultPromise).resolves.toBe('ran');
+    expect(touch).toHaveBeenCalledTimes(1);
   });
 });
