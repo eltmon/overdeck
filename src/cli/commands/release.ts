@@ -42,6 +42,18 @@ export function resolveReleaseManifestPaths(repoRoot: string) {
   };
 }
 
+// PAN-5486: the plugins under integrations/ pin @overdeck/core; stamp them from the bumped root version.
+export function stampCorePins(repoRoot: string): void {
+  const script = join(repoRoot, 'integrations', 'shared', 'sync-core-pins.mjs');
+  const output = execFileSync(process.execPath, [script, '--root', repoRoot], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  const summary = output.trim().split('\n').pop();
+  if (summary) console.log(chalk.dim(summary));
+}
+
 export function registerReleaseCommands(program: Command): void {
   const release = program
     .command('release')
@@ -679,6 +691,7 @@ async function releaseCreateCommand(
   // wrote to them, never when it only planned to and failed before applying (PAN-5137
   // review: an edit made to an untouched entry during preflight must survive rollback).
   let changelogApplied = false;
+  let corePinsStamped = false;
   try {
     pkg.version = resolvedVersion;
     writePackageJson(repoRoot, pkg);
@@ -690,6 +703,9 @@ async function releaseCreateCommand(
     const contractsPkg = readContractsPackageJson(repoRoot);
     contractsPkg.version = resolvedVersion;
     writeContractsPackageJson(repoRoot, contractsPkg);
+    // Set before the call: a sync that fails part-way may already have written some pins.
+    corePinsStamped = true;
+    stampCorePins(repoRoot);
 
     const entries = getCommitSubjects(repoRoot, previousTag ? `${previousTag}..HEAD` : 'HEAD');
     const releaseNotes = buildReleaseNotesMarkdown({
@@ -720,6 +736,8 @@ async function releaseCreateCommand(
       `git add package.json apps/desktop/package.json packages/contracts/package.json bun.lock ${releaseNotesPath}`,
       repoRoot
     );
+    // -u stages only tracked files under integrations/, so an untracked file never rides along.
+    run('git add -u -- integrations', repoRoot);
     if (changelogFold.kind === 'fold') {
       // Exact paths, never -A: a changelog.d entry that appeared after planning (and so
       // was never folded into changelog.mdx) must not ride along in this release commit.
@@ -762,8 +780,15 @@ async function releaseCreateCommand(
           // Best-effort, separate from the package restore so one failing never skips the other.
         }
       }
+      if (corePinsStamped) {
+        try {
+          run('git restore --source=HEAD --staged --worktree -- integrations', repoRoot);
+        } catch {
+          // Best-effort, separate so one failing restore never skips another.
+        }
+      }
       rmSync(releaseNotesPath, { force: true });
-      console.error(chalk.red('Release creation failed — rolled back the version bumps and release notes.'));
+      console.error(chalk.red('Release creation failed — rolled back the version bumps, core pins and release notes.'));
     }
     throw error;
   }
