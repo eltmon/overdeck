@@ -5,7 +5,7 @@
  * background job; container progress lives in the lifecycle log + phase
  * events, never in AgentState.
  */
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -166,5 +166,99 @@ describe('container orchestration under the no-placeholder claim flow', () => {
 
     await vi.waitFor(() => expect(updateIssueStatus).toHaveBeenCalledTimes(1));
     releaseAgentStart(AGENT);
+  });
+});
+
+// PAN-5600: the start route resolves the compose project through the canonical
+// PAN-3049 resolver, so a project-specific prefix (MYN's `myn-${FEATURE_FOLDER}`)
+// reaches the container check instead of being rejected as non-`overdeck-`.
+describe('container orchestration compose project name (PAN-5600)', () => {
+  let workspacePath: string;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetAgentStartsInFlight();
+    workspacePath = mkdtempSync(join(tmpdir(), 'pan-container-name-'));
+    shared.execAsync.mockResolvedValue({ stdout: '' });
+    // Containers already healthy: orchestration returns null and the caller spawns directly.
+    shared.execFileAsync.mockResolvedValue({ stdout: 'stack-web-1|Up 5 seconds (healthy)\n' });
+    shared.appendAgentLifecycleLog.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    resetAgentStartsInFlight();
+    rmSync(workspacePath, { recursive: true, force: true });
+  });
+
+  function writeDevcontainerDev(content: string): string {
+    mkdirSync(join(workspacePath, '.devcontainer'), { recursive: true });
+    const devPath = join(workspacePath, '.devcontainer', 'dev');
+    writeFileSync(devPath, content);
+    return devPath;
+  }
+
+  function run(devScript: string) {
+    return Effect.runPromise(handleContainerOrchestration({
+      issueId: ISSUE,
+      workspacePath,
+      devScript,
+      agentSessionName: AGENT,
+      role: 'work',
+      effectiveHarness: 'claude-code',
+      startedBy: 'test',
+      allowHost: false,
+      explicitModel: null,
+      spawnGuardrails: {} as never,
+      projectPath: workspacePath,
+      eventStore: { append: () => Effect.succeed(1) },
+      spawnPanCommand: vi.fn(),
+      markWorkStartAccepted: vi.fn(),
+      updateIssueStatus: vi.fn(),
+    }) as Effect.Effect<{ status?: number; body?: unknown } | null>);
+  }
+
+  function containerCheckFeatureName(): unknown {
+    const call = shared.appendAgentLifecycleLog.mock.calls.find(([, event]) => event === 'agent.start_container_check');
+    return (call?.[2] as { featureName?: unknown } | undefined)?.featureName;
+  }
+
+  it('accepts a project-prefixed name declared as myn-${FEATURE_FOLDER}', async () => {
+    const devScript = writeDevcontainerDev('#!/bin/sh\nexport COMPOSE_PROJECT_NAME="myn-${FEATURE_FOLDER}"\n');
+
+    const response = await run(devScript);
+
+    expect(response).toBeNull();
+    expect(containerCheckFeatureName()).toBe('myn-feature-pan-700');
+    expect(shared.execFileAsync).toHaveBeenCalledWith(
+      'docker',
+      ['ps', '--filter', 'name=myn-feature-pan-700', '--format', '{{.Names}}|{{.Status}}'],
+      expect.anything(),
+    );
+  });
+
+  it('returns 422 when the declared name does not end in the feature folder', async () => {
+    const devScript = writeDevcontainerDev('#!/bin/sh\nexport COMPOSE_PROJECT_NAME="myn-shared-stack"\n');
+
+    const response = await run(devScript);
+
+    expect(response?.status).toBe(422);
+    expect(readJson(response!)).toMatchObject({
+      success: false,
+      blocked: true,
+      skipped: true,
+      error: expect.stringContaining('expected a name ending in feature-pan-700'),
+    });
+    expect(containerCheckFeatureName()).toBeUndefined();
+    expect(shared.execFileAsync).not.toHaveBeenCalled();
+  });
+
+  it('falls back to overdeck-feature-<id> when nothing declares a name and no compose file exists', async () => {
+    const devScript = join(workspacePath, 'dev');
+    writeFileSync(devScript, '#!/bin/sh\nexit 0\n');
+
+    const response = await run(devScript);
+
+    expect(response).toBeNull();
+    expect(containerCheckFeatureName()).toBe('overdeck-feature-pan-700');
   });
 });
