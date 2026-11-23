@@ -14,6 +14,8 @@ export interface ResolvedProjectRepo {
   targetBranch: string;
   mergeOrder: number;
   required: boolean;
+  /** PAN-5637: the repo declares `ci: none` (see `RepoConfig.ci`). Absent otherwise. */
+  ciNone?: boolean;
 }
 
 export function normalizeForge(value?: string | null): ForgeType | null {
@@ -127,6 +129,7 @@ export function resolveConfiguredRepos(
     targetBranch: getRepoTargetBranch(repo, projectConfig),
     mergeOrder: index,
     required: repo.readonly !== true,
+    ...(repo.ci === 'none' ? { ciNone: true } : {}),
   }));
 }
 

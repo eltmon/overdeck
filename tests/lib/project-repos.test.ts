@@ -134,6 +134,42 @@ describe('project-repos', () => {
   });
 });
 
+describe('ci: none (PAN-5637)', () => {
+  it('sets ciNone on a repo that declares ci: none', () => {
+    const projectConfig: ProjectConfig = {
+      name: 'Mind Your Now',
+      path: '/tmp/myn',
+      gitlab_repo: 'eltmon/mind-your-now',
+      workspace: {
+        type: 'polyrepo',
+        repos: [{ name: 'infra', path: 'infra', ci: 'none' }],
+      },
+    };
+
+    const repos = resolveConfiguredRepos('mind-your-now', '/tmp/myn', projectConfig, 'MIN-632');
+    expect(repos[0].ciNone).toBe(true);
+  });
+
+  it('leaves ciNone off a repo without the field or with another value', () => {
+    const projectConfig: ProjectConfig = {
+      name: 'Mind Your Now',
+      path: '/tmp/myn',
+      gitlab_repo: 'eltmon/mind-your-now',
+      workspace: {
+        type: 'polyrepo',
+        repos: [
+          { name: 'api', path: 'api' },
+          { name: 'x', path: 'x', ci: 'gitlab' as never },
+        ],
+      },
+    };
+
+    const repos = resolveConfiguredRepos('mind-your-now', '/tmp/myn', projectConfig, 'MIN-632');
+    expect('ciNone' in repos[0]).toBe(false);
+    expect('ciNone' in repos[1]).toBe(false);
+  });
+});
+
 describe('computeWorkspaceRepoRoots', () => {
   const makeRepo = (repoKey: string, overrides: Partial<ResolvedRepoT> = {}): ResolvedRepoT => ({
     projectKey: 'mind-your-now',

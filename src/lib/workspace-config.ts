@@ -29,6 +29,12 @@ export interface RepoConfig {
    * quality gates own its dependencies). Runs only when the repo directory has a package.json.
    */
   package_manager?: 'bun' | 'npm' | 'pnpm';
+  /**
+   * PAN-5637: `none` says this repo runs no CI. The merge train then counts a
+   * GitLab MR here with no pipeline as passing; red and pending still block.
+   * Any other value is ignored. Remove it when the repo gains CI.
+   */
+  ci?: 'none';
 }
 
 export interface DnsConfig {
