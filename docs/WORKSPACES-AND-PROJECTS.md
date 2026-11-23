@@ -585,8 +585,9 @@ route, `WorkspaceService.create`, the planning session, `pan swarm` and remote
 completion. `pan start` never rolls back a worktree whose setup it resumed.
 A worktree with no marker is a finished workspace, including every workspace
 created before the marker existed. Soft setup failures (port assignment,
-devcontainer render, tunnel, Hume, Docker) are reported but do not keep the
-marker, so a retry does not repeat them.
+devcontainer render, tunnel, Docker) are reported but do not keep the marker,
+so a retry does not repeat them. A failed Hume step keeps the marker, so a
+retry repeats the Hume step and writes `.hume-config` (PAN-5489).
 
 ## Disk floor and in-flight reservations (PAN-4961)
 
