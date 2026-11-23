@@ -1,0 +1,13 @@
+plan-digest: 0a50659e101e25ae351ce8dbbde3f760356e7d0e6b85f9f48dd00545112e307e
+
+## blocks-the-design: Contracts build runs before admission
+
+`package.json:117` defines `pretypecheck` as `npm run build:contracts`, and `package.json:104` runs `tsdown` through that script (`packages/contracts/package.json:27` gives it a 16 GiB heap ceiling). npm executes `pretypecheck` before the `typecheck` body. The proposed wrapper is only the `typecheck` body (`.pan/drafts/PAN-5617.md:142-145, 440-445`), so concurrent `npm run typecheck` calls still launch their contracts builds outside the shared queue under the memory pressure this issue addresses. The chain's measured footprint also excludes that build. Move the existing contracts build into the command held by `gate-admitted.mjs` and remove the npm pre-hook, preserving its order before the twelve lanes; update the footprint description and an acceptance check to cover that stage.
+
+## blocks-the-design: A live chain can lose its slot after 25 minutes
+
+`src/lib/cloister/quality-gate-admission.ts:66,312-318,775-780` reclaims an owner when `now - acquiredAt` exceeds 25 minutes even if its PID is alive. `src/lib/cloister/gate-admission-run.ts:180-196` waits for the child with no run-time bound or lease renewal. The existing verification gate has a 20-minute child timeout (`src/lib/cloister/validation.ts:244,530`), but the proposed agent-shell wrapper does not. A slow or hung chain can therefore continue running after its owner file is reclaimed and another gate takes the same slot, contradicting FR-3's slot limit (`.pan/drafts/PAN-5617.md:101-102`). Recent runtimes cited in D7 do not enforce a bound. Add lease renewal while the chain runs, or bound and terminate the whole child process tree before the stale threshold; test that a live chain cannot lose its slot.
+
+## blocks-the-design: Setup failure bypasses admission for every lane
+
+FR-6 and WI-1 (`.pan/drafts/PAN-5617.md:112-117,235-248`) explicitly run a chain after a non-timeout acquisition error with `OVERDECK_GATE_ADMISSION=0`. WI-2 does the same when `tsx` or the runner cannot load (`.pan/drafts/PAN-5617.md:384-399`). `scripts/tsc-admitted.mjs:33-35,52-53` then bypasses admission for every lane. If the admission directory becomes unreadable, each concurrent agent can run its entire 13-process typecheck sequence without a slot, the same overload that the plan correctly prevents after a queue timeout. Make non-bypass chain failures fail closed without spawning the child; preserve the current single-lane fallback if that compatibility is required. Replace the tests that expect a setup-failure bypass with refusal tests.

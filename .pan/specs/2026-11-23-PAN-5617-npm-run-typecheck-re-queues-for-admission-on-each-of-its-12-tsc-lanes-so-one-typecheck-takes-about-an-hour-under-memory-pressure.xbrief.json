@@ -1,0 +1,555 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-23T07:17:09Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5617: npm run typecheck re-queues for admission on each of its 12 tsc lanes, so one typecheck takes about an hour under memory pressure",
+    "updated": "2026-11-23T18:06:03.192Z"
+  },
+  "plan": {
+    "id": "pan-5617",
+    "title": "npm run typecheck re-queues for admission on each of its 12 tsc lanes, so one typecheck takes about an hour under memory pressure",
+    "status": "proposed",
+    "uid": "3436a264-4c3a-47cd-b9c8-5911e6b493b2",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-23T07:17:09Z",
+    "updated": "2026-11-23T18:06:03.192Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5617",
+        "label": "PAN-5617",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5617.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "gate-admission",
+      "typecheck",
+      "quality-gates",
+      "performance"
+    ],
+    "narratives": {
+      "Problem": "npm run typecheck chains 12 steps (13 tsc processes); each goes through scripts/tsc-admitted.mjs and takes its own gate admission, releasing its slot after the lane and re-queueing at the back for the next one. Under memory pressure each head can wait up to 5 minutes (PAN-5285) and other agents' typechecks interleave, so one typecheck took ~49 minutes for 6 of 12 lanes on 2026-11-23. npm run lint has the same shape in lint:effect-diagnostics (4 tsc lanes in a bash loop).",
+      "Proposal": "Add scripts/gate-admitted.mjs <footprint-key> -- <command> [args...], a built-ins-only bypass plus a call to the existing generic runAdmittedCommand, so one admission covers a whole chain and its children run with OVERDECK_GATE_ADMITTED=1 (lanes then run tsc directly). Rename today's typecheck chain to typecheck:lanes and make typecheck = gate-admitted.mjs chain:typecheck -- npm run typecheck:lanes; wrap lint:effect-diagnostics the same way under chain:lint:effect-diagnostics. A chain fails closed (exit 75) on any admission timeout (memory, queue, slots or cpu) via a runner failClosedOnTimeout option; only a non-timeout setup failure runs it unadmitted, with OVERDECK_GATE_ADMISSION=0 so lanes do not each fail again. Lone lanes keep PAN-5248 D15. The Flywheel board labels chain:<script> gates as <script>. Footprint is the chain's own recorded tree peak (= largest lane, lanes run in series). Docs (PIPELINE-GATES.md, CLAUDE.md, codebase stack.md, tsc-admitted.mjs header) and changelog.d/pan-5617.md describe the new behavior.",
+      "NonGoals": "- No change to the admission algorithm in src/lib/cloister/quality-gate-admission.ts (queue order, memory rule, 25-minute stale bound, slots)\n- No lease heartbeat or renewal for long-held slots\n- No change to any typecheck:<lane> script; npm run typecheck:share run alone still admits twice\n- No change to the verification gate (src/lib/cloister/validation.ts) or its gate:typecheck:npm run typecheck key\n- bash scripts/lint-effect-diagnostics.sh run directly (including --update) still admits per lane\n- No seeding of a chain's first-run footprint from its lanes' estimates\n- No change to the lint script string in package.json or to scripts/run-lint-group.mjs\n- No change to scripts/tsc-admitted.mjs behavior or imports (header comment only)\n- No new configuration key\n- No test drives the real admission queue or uses real timers\n- Extra arguments after `npm run typecheck --` are not forwarded to the last lane any more (they reach the inner `npm run typecheck:lanes`); no caller passes them"
+    },
+    "autoDecisions": [
+      {
+        "summary": "One generic wrapper scripts/gate-admitted.mjs instead of a mode in tsc-admitted.mjs",
+        "rationale": "tests/unit/scripts/lint-effect-diagnostics.test.ts copies tsc-admitted.mjs standalone, and runAdmittedCommand is already generic over command/args/key, so a thin new script reuses it without touching the lane wrapper."
+      },
+      {
+        "summary": "Move today's typecheck chain to typecheck:lanes; typecheck wraps it",
+        "rationale": "Lane scripts stay byte-identical so a lane run alone keeps self-admitting (FR-1), and the verification gate's npm run typecheck still bypasses because it already carries OVERDECK_GATE_ADMITTED=1."
+      },
+      {
+        "summary": "Wrap lint:effect-diagnostics in package.json, not by re-exec inside the .sh",
+        "rationale": "run-lint-group.mjs maps the exact lint step string, and the .sh test copies only the .sh and tsc-admitted.mjs into a temp root; a package.json body change touches neither."
+      },
+      {
+        "summary": "Chain footprint = the chain's own recorded tree peak under chain:<script>; first run uses the 2.5 GiB default",
+        "rationale": "Lanes run in series so the tree peak equals the largest lane (host data: gate:typecheck peaks 2.6 GiB vs largest lane 2.45 GiB); peers read estimates by key, so a computed max-of-lanes would be invisible to them. The effect-diag chain under-reserves ~0.5 GiB once, which the soft reserve absorbs."
+      },
+      {
+        "summary": "A chain exits 75 on any admission timeout; only a non-timeout setup failure runs it unadmitted with OVERDECK_GATE_ADMISSION=0",
+        "rationale": "Critique round 1: the timeout carries the last wait kind, which is queue or slots for any waiter behind other gates even when memory is the real cause, so memory-only fail-closed would let a timed-out chain start all 13 tsc processes unadmitted. A setup failure cannot be fixed by waiting, and the propagated opt-out stops each lane failing the same way. Lone lanes keep PAN-5248 D15."
+      },
+      {
+        "summary": "No lease heartbeat for chains",
+        "rationale": "The stale bound is 25 minutes and recent verification-gate typechecks (which already hold one slot for the whole chain) ran 110-270 s, outlier 912 s."
+      },
+      {
+        "summary": "Flywheel board shows chain:<script> as <script>",
+        "rationale": "gateLabel in src/lib/flywheel/board.ts otherwise prints the raw key; matching the existing tsc:/gate: label rules is the smallest consistent change."
+      },
+      {
+        "summary": "A chain waits up to 60 minutes for admission (CHAIN_MAX_WAIT_MS), a lane 30",
+        "rationale": "acquireQualityGateAdmission times out on now() - createdAt > maxWaitMs from ticket creation at any queue position. A chain waits once behind whole-chain holders; under the issue's conditions (6 typechecks, heads waiting 5 min for memory then running alone) the last chain would pass 30 minutes and a memory-reason timeout would exit 75, failing a typecheck that used to succeed slowly. 60 minutes still fails closed eventually as PAN-5248 requires."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Small change: 1 new script, 1 runner tweak, 2 package.json script bodies, 1 label rule, docs.",
+      "canonicalFilename": "2026-11-23-PAN-5617-npm-run-typecheck-re-queues-for-admission-on-each-of-its-12-tsc-lanes-so-one-typecheck-takes-about-an-hour-under-memory-pressure.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "runner-unadmitted-env",
+        "title": "Runner: chain timeouts fail closed, setup failures give children OVERDECK_GATE_ADMISSION=0, CHAIN_MAX_WAIT_MS, one-admission-per-chain tests",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T07:17:09Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5617",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/gate-admission-run.ts",
+            "tests/unit/lib/cloister/gate-admission-run.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/gate-admission-run.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "gate-admission-run.test.ts passes including the new 'admitted chains (PAN-5617)' tests",
+            "typecheck exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-6",
+            "FR-9",
+            "NFR-2"
+          ],
+          "acJustification": "Seven ACs: the runner carries three distinct failure paths (memory timeout, other timeout for chains, setup failure) plus the lone-lane regression guard, the chain-once proof and the wait-bound constant; splitting would put one 20-line catch block across items."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 exactly. Add RunAdmittedDeps.failClosedOnTimeout, export CHAIN_MAX_WAIT_MS = 60 * 60_000, admissionTimeoutKindOf and timeoutRefusalMessage. In runAdmittedCommand's catch: memory timeout returns 75 as today; else if failClosedOnTimeout and the error is a QualityGateAdmissionTimeoutError, warn timeoutRefusalMessage and return 75 without spawning; else warn 'proceeding without admission' and set proceedingUnadmitted. childEnv = handle ? {...env, OVERDECK_GATE_ADMITTED:'1'} : proceedingUnadmitted ? {...env, OVERDECK_GATE_ADMISSION:'0'} : env. Update the module header comment. Add PRD WI-1 tests 1-7 using injected acquire/spawn/env only (no real queue, no timers)."
+        },
+        "items": [
+          {
+            "id": "runner-unadmitted-env.ac1",
+            "title": "Given an outer runAdmittedCommand for chain:typecheck whose fake child runs 12 inner runAdmittedCommand lanes with the env it received, when it completes, then the shared acquire spy was called exactly once with footprintKey chain:typecheck and each of the 12 inner spawns received OVERDECK_GATE_ADMITTED=1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runner-unadmitted-env.ac2",
+            "title": "Given failClosedOnTimeout true and an acquire that throws new Error('EACCES: admission root'), when runAdmittedCommand runs, then it spawns the child with OVERDECK_GATE_ADMISSION=0 and without OVERDECK_GATE_ADMITTED, and inner lanes started with that env make no further acquire call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runner-unadmitted-env.ac3",
+            "title": "Given env {} and a single tsc:tsconfig.json lane, when runAdmittedCommand runs, then acquire is called exactly once and the existing test expecting env { PATH: '/bin', OVERDECK_GATE_ADMITTED: '1' } still passes unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runner-unadmitted-env.ac4",
+            "title": "Given a memory-reason admission timeout, when runAdmittedCommand runs, then it still returns 75 and never spawns (existing test passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runner-unadmitted-env.ac5",
+            "title": "gate-admission-run.ts exports CHAIN_MAX_WAIT_MS = 3600000, and given maxWaitMs CHAIN_MAX_WAIT_MS with an acquire that throws a memory-reason timeout, runAdmittedCommand returns 75 and prints a line containing 'waited 60 minutes for memory'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runner-unadmitted-env.ac6",
+            "title": "Given failClosedOnTimeout true and an acquire that throws QualityGateAdmissionTimeoutError(CHAIN_MAX_WAIT_MS, kind) for kind queue, slots or cpu, when runAdmittedCommand runs, then it returns 75, never spawns, and prints '[gate-admission] refusing to start tsc:tsconfig.json: waited 60 minutes for admission (last waiting on <kind>)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runner-unadmitted-env.ac7",
+            "title": "Given failClosedOnTimeout unset and an acquire that throws a queue timeout, when runAdmittedCommand runs for a lone lane, then it falls back to spawning once and returns 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gate-admitted-wrapper",
+        "title": "Add scripts/gate-admitted.mjs chain wrapper with its subprocess tests",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T07:17:09Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-5617",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "typecheck-chain",
+            "lint-effect-diag-chain"
+          ],
+          "files_scope": [
+            "scripts/gate-admitted.mjs",
+            "tests/unit/scripts/gate-admitted.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/scripts/gate-admitted.test.ts",
+            "OVERDECK_GATE_ADMITTED=1 node scripts/gate-admitted.mjs chain:x -- node -e \"process.exit(4)\"; echo exit=$?"
+          ],
+          "expected_outputs": [
+            "gate-admitted.test.ts passes",
+            "the shell prints exit=4"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-9",
+            "NFR-1",
+            "NFR-3"
+          ],
+          "acJustification": "Six ACs: four observable subprocess behaviors plus the bypass-import and fail-closed wiring checks."
+        },
+        "narrative": {
+          "Action": "Create scripts/gate-admitted.mjs with the exact structure in PRD WI-2: argv `<footprint-key> -- <command> [args...]`, usage line + exit 2 on malformed argv, bypass under CI / OVERDECK_GATE_ADMISSION=0 / OVERDECK_GATE_ADMITTED=1 that loads only node:child_process and node:os, otherwise load src/lib/cloister/gate-admission-run.ts through tsx and set process.exitCode from runAdmittedCommand({footprintKey, command, args, cwd: process.cwd()}); if the tsx load fails, warn and runDirect with OVERDECK_GATE_ADMISSION=0. Write tests/unit/scripts/gate-admitted.test.ts per PRD WI-2 using spawnSync(process.execPath, ...) with env {...process.env, OVERDECK_GATE_ADMITTED:'1'} so the real queue is never touched. The admitted branch calls run.runAdmittedCommand({ footprintKey, command, args, cwd: process.cwd() }, { maxWaitMs: run.CHAIN_MAX_WAIT_MS, failClosedOnTimeout: true }). Add PRD WI-2 test 4 (copy the script alone into a mkdtemp root, strip CI/OVERDECK_GATE_ADMITTED/OVERDECK_GATE_ADMISSION, assert the child prints OVERDECK_GATE_ADMISSION '0' and stderr has the 'proceeding without admission:' line)."
+        },
+        "items": [
+          {
+            "id": "gate-admitted-wrapper.ac1",
+            "title": "Given OVERDECK_GATE_ADMITTED=1, when node scripts/gate-admitted.mjs chain:test -- <node> -e 'process.exit(3)' runs, then the wrapper exits 3",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-admitted-wrapper.ac2",
+            "title": "Given OVERDECK_GATE_ADMITTED=1, when the wrapped node command prints its args and OVERDECK_GATE_ADMITTED with extra args a b, then stdout equals 'a,b|1'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-admitted-wrapper.ac3",
+            "title": "When the wrapper is called with argv missing the key, the `--` separator, or the command, then it exits 2 and writes 'usage: node scripts/gate-admitted.mjs <footprint-key> -- <command> [args…]' to stderr",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-admitted-wrapper.ac4",
+            "title": "The bypass branch of scripts/gate-admitted.mjs contains no dynamic import; only the non-bypass branch imports tsx/esm/api and gate-admission-run.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-admitted-wrapper.ac5",
+            "title": "Given the script copied alone into a temp root and no bypass env, when it runs a node command that prints OVERDECK_GATE_ADMISSION, then the child prints '0', the wrapper exits 0, and stderr contains '[gate-admission] proceeding without admission:'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-admitted-wrapper.ac6",
+            "title": "The admitted branch of scripts/gate-admitted.mjs passes { maxWaitMs: run.CHAIN_MAX_WAIT_MS, failClosedOnTimeout: true } to runAdmittedCommand, and its header comment states that any admission timeout exits 75",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "typecheck-chain",
+        "title": "Route npm run typecheck through gate-admitted.mjs via a new typecheck:lanes script",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T07:17:09Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-5617",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "package.json",
+            "tests/unit/scripts/admitted-chains.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/scripts/admitted-chains.test.ts",
+            "env -u CI -u OVERDECK_GATE_ADMITTED -u OVERDECK_GATE_ADMISSION npm run typecheck 2>$HOME/.overdeck/tmp/pan-5617-typecheck.stderr; echo exit=$?; grep -c 'proceeding without admission' $HOME/.overdeck/tmp/pan-5617-typecheck.stderr; grep -l '\"key\":\"chain:typecheck\"' ~/.overdeck/verification-workers/admission/footprints/*.json"
+          ],
+          "expected_outputs": [
+            "admitted-chains.test.ts passes",
+            "exit=0, the proceeding-without-admission count is 0, and grep lists one footprint file for chain:typecheck"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-3: set scripts.typecheck to `node scripts/gate-admitted.mjs chain:typecheck -- npm run typecheck:lanes` and add `typecheck:lanes` directly after it holding the former 12-step typecheck string byte for byte. Do not change any typecheck:<lane> script. Create tests/unit/scripts/admitted-chains.test.ts that JSON-parses package.json and asserts the three facts in PRD WI-3."
+        },
+        "items": [
+          {
+            "id": "typecheck-chain.ac1",
+            "title": "When admitted-chains.test.ts parses package.json, then it passes only if scripts.typecheck equals 'node scripts/gate-admitted.mjs chain:typecheck -- npm run typecheck:lanes' and scripts['typecheck:lanes'].split(' && ') returns the former 12 steps in order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "typecheck-chain.ac2",
+            "title": "When admitted-chains.test.ts checks each npm run typecheck:<lane> step of typecheck:lanes, then every named script starts with 'node scripts/tsc-admitted.mjs' or 'bash scripts/lint-', so a lane run alone still admits itself",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "typecheck-chain.ac3",
+            "title": "Given CI, OVERDECK_GATE_ADMITTED and OVERDECK_GATE_ADMISSION unset, when npm run typecheck runs on the branch, then it exits 0, its stderr contains no 'proceeding without admission' line and no [gate-admission] line naming a tsc: key, and a footprint file containing '\"key\":\"chain:typecheck\"' exists afterwards",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lint-effect-diag-chain",
+        "title": "Route npm run lint:effect-diagnostics through gate-admitted.mjs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T07:17:09Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "infra",
+          "issueLabel": "pan-5617",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "package.json",
+            "scripts/lint-effect-diagnostics.sh",
+            "tests/unit/scripts/admitted-chains.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/scripts/admitted-chains.test.ts tests/unit/scripts/lint-effect-diagnostics.test.ts",
+            "git diff origin/main -- package.json | grep '\"lint\":' || echo lint-unchanged",
+            "env -u CI -u OVERDECK_GATE_ADMITTED -u OVERDECK_GATE_ADMISSION npm run lint:effect-diagnostics 2>$HOME/.overdeck/tmp/pan-5617-lint.stderr; echo exit=$?; grep -c 'proceeding without admission' $HOME/.overdeck/tmp/pan-5617-lint.stderr; grep -l '\"key\":\"chain:lint:effect-diagnostics\"' ~/.overdeck/verification-workers/admission/footprints/*.json"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "the grep prints lint-unchanged",
+            "exit=0, the proceeding-without-admission count is 0, and grep lists one footprint file for chain:lint:effect-diagnostics"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ],
+          "acJustification": "Four checks: script body, lint string untouched, existing script test, and positive admission evidence."
+        },
+        "narrative": {
+          "Action": "Per PRD WI-4: set scripts['lint:effect-diagnostics'] to `node scripts/gate-admitted.mjs chain:lint:effect-diagnostics -- bash scripts/lint-effect-diagnostics.sh`; leave scripts.lint byte-identical. Replace the '# PAN-5248: one gate admission per lane (CPU and memory).' comment in scripts/lint-effect-diagnostics.sh with the two-line PAN-5617 comment from the PRD; no other script change. Add the two assertions from PRD WI-4 to tests/unit/scripts/admitted-chains.test.ts."
+        },
+        "items": [
+          {
+            "id": "lint-effect-diag-chain.ac1",
+            "title": "When admitted-chains.test.ts parses package.json, then it passes only if scripts['lint:effect-diagnostics'] equals 'node scripts/gate-admitted.mjs chain:lint:effect-diagnostics -- bash scripts/lint-effect-diagnostics.sh'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lint-effect-diag-chain.ac2",
+            "title": "Given the branch, when scripts.lint is compared with origin/main, then it is byte-identical and its && steps still contain 'npm run lint:effect-diagnostics', so scripts/run-lint-group.mjs routes it to the effect group",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lint-effect-diag-chain.ac3",
+            "title": "tests/unit/scripts/lint-effect-diagnostics.test.ts passes unchanged against the edited script",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lint-effect-diag-chain.ac4",
+            "title": "Given admission env unset, when npm run lint:effect-diagnostics runs, then it exits 0, prints no 'proceeding without admission' line, and a footprint file containing '\"key\":\"chain:lint:effect-diagnostics\"' exists afterwards",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "board-chain-label",
+        "title": "Flywheel board gateLabel renders chain:<script> as <script>",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-11-23T07:17:09Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-5617",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/flywheel/board.ts",
+            "tests/unit/lib/flywheel/board.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/flywheel/board.test.ts"
+          ],
+          "expected_outputs": [
+            "board.test.ts passes including the chain: label assertions"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-5: in gateLabel add `if (gateName.startsWith('chain:')) return gateName.slice('chain:'.length);` after the tsc: rules and before the gate: regex; update the doc comment. Add the two expectations to describe('gateLabel (D9)') in tests/unit/lib/flywheel/board.test.ts."
+        },
+        "items": [
+          {
+            "id": "board-chain-label.ac1",
+            "title": "gateLabel('chain:typecheck') returns 'typecheck'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "board-chain-label.ac2",
+            "title": "gateLabel('chain:lint:effect-diagnostics') returns 'lint:effect-diagnostics' and the existing vitest/tsc:/gate: label expectations still pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-and-changelog",
+        "title": "Document one admission per chain in PIPELINE-GATES.md, CLAUDE.md, stack.md and tsc-admitted.mjs; add changelog.d/pan-5617.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T07:17:09Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5617",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md",
+            "CLAUDE.md",
+            ".overdeck/context/codebase/stack.md",
+            "scripts/tsc-admitted.mjs",
+            "changelog.d/pan-5617.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -c 'gate-admitted.mjs' docs/PIPELINE-GATES.md CLAUDE.md .overdeck/context/codebase/stack.md"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "each of the three files reports a count of at least 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-3"
+          ],
+          "acJustification": "Five doc files each need one observable check; grouped into four ACs."
+        },
+        "narrative": {
+          "Action": "Apply PRD WI-6 steps 1-6 exactly: rewrite the typecheck sentences of the 'Agent shells share the queue' bullet in docs/PIPELINE-GATES.md; in the 'CPU and memory admission' section add gate-admitted.mjs to the first paragraph, the chain:<npm script> key and its peak semantics to the Keys bullet, and the exit-75 / OVERDECK_GATE_ADMISSION=0 behavior to the Failure modes bullet; edit the CLAUDE.md Key Invariants admission clause; add the one-sentence note to .overdeck/context/codebase/stack.md (keep its last-verified line unchanged); replace the tsc-admitted.mjs header sentence (comment only, no code change); create changelog.d/pan-5617.md with the #### Fixed entry from the PRD."
+        },
+        "items": [
+          {
+            "id": "docs-and-changelog.ac1",
+            "title": "docs/PIPELINE-GATES.md contains scripts/gate-admitted.mjs and the chain:typecheck and chain:lint:effect-diagnostics keys, and states that lanes inside a chain run with OVERDECK_GATE_ADMITTED=1 and record no peaks, that a chain exits 75 on any admission timeout, that a non-timeout setup failure runs it with OVERDECK_GATE_ADMISSION=0, and that a chain waits up to 60 minutes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-changelog.ac2",
+            "title": "CLAUDE.md's Key Invariants admission clause says standalone tsc lanes enter the queue individually and contains 'scripts/gate-admitted.mjs' for the npm run typecheck and npm run lint:effect-diagnostics chains; .overdeck/context/codebase/stack.md contains 'scripts/gate-admitted.mjs' and 'typecheck:lanes', and preserves its last-verified line byte for byte",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-changelog.ac3",
+            "title": "When git diff origin/main -- scripts/tsc-admitted.mjs runs, then it shows changes only inside the header comment, which now contains 'OVERDECK_GATE_ADMITTED=1 from `scripts/gate-admitted.mjs`'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-changelog.ac4",
+            "title": "changelog.d/pan-5617.md exists with a single '#### Fixed' bullet linking #5617, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "runner-unadmitted-env",
+        "to": "gate-admitted-wrapper",
+        "type": "blocks"
+      },
+      {
+        "from": "gate-admitted-wrapper",
+        "to": "typecheck-chain",
+        "type": "blocks"
+      },
+      {
+        "from": "gate-admitted-wrapper",
+        "to": "lint-effect-diag-chain",
+        "type": "blocks"
+      },
+      {
+        "from": "typecheck-chain",
+        "to": "lint-effect-diag-chain",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
