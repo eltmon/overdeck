@@ -36,8 +36,6 @@ export function usePendingInputAnnouncements(args: {
 }): void {
   const { agentsWithAskUserQuestion, agentsWithProposedPlan, convRows, issueTitleById, onOpen } = args;
   const notifiedPendingInputRef = useRef<Set<string>>(new Set());
-  const onOpenRef = useRef(onOpen);
-  onOpenRef.current = onOpen;
 
   useEffect(() => {
     // #1102 — clicking the toast or desktop notification re-opens the dialog
@@ -46,7 +44,7 @@ export function usePendingInputAnnouncements(args: {
       const key = id;
       if (notifiedPendingInputRef.current.has(key)) return;
       notifiedPendingInputRef.current.add(key);
-      showPendingInputNotification(key, title, body, () => onOpenRef.current(subjectId));
+      showPendingInputNotification(key, title, body, () => onOpen(subjectId));
     };
 
     for (const a of agentsWithAskUserQuestion) {
@@ -100,5 +98,5 @@ export function usePendingInputAnnouncements(args: {
       notifiedPendingInputRef.current.delete(k);
       dismissPendingInputNotification(k);
     }
-  }, [agentsWithAskUserQuestion, agentsWithProposedPlan, convRows, issueTitleById]);
+  }, [agentsWithAskUserQuestion, agentsWithProposedPlan, convRows, issueTitleById, onOpen]);
 }
