@@ -243,18 +243,6 @@ function buildCandidates(
   return candidates;
 }
 
-/** FR-2 rule 8 (D7): an unresolved blocker declaration first, then the merge gate's own `ready`. */
-async function isParked(deps: StackReclaimServiceDeps, candidate: ReclaimCandidate): Promise<boolean> {
-  const journal = deps.readJournal(candidate.workspacePath);
-  if (journal === null) return false;
-  if (pendingDeclarations(journal).length > 0) return true;
-  try {
-    return await deps.mergeReady(candidate.issueId);
-  } catch {
-    return false;
-  }
-}
-
 /**
  * FR-3 step 8: every fact the decision rested on, re-read fresh inside the
  * stack lock. Returns the head for the journal entry, or null when anything
@@ -335,10 +323,28 @@ export async function runStackReclaimPoll(
   const memory = await deps.readMemoryBytes(candidates.flatMap((candidate) => candidate.containers.map((c) => c.name)));
   if (!memory) return idle('stats-unreadable');
 
-  // 7: the largest parked candidate among the top few.
+  // 7 (FR-2 rule 8 / FR-4): the largest parked candidate. A pending blocker
+  // declaration is free and checked for every candidate; the merge gate is
+  // a network call, so only the first MERGE_GATE_CANDIDATES candidates this
+  // poll — by rank, not by position in the scan — spend that budget.
   let target: ReclaimCandidate | null = null;
-  for (const candidate of rankCandidates(candidates, memory).slice(0, MERGE_GATE_CANDIDATES)) {
-    if (await isParked(deps, candidate)) {
+  let mergeGateCalls = 0;
+  for (const candidate of rankCandidates(candidates, memory)) {
+    const journal = deps.readJournal(candidate.workspacePath);
+    if (journal === null) continue;
+    if (pendingDeclarations(journal).length > 0) {
+      target = candidate;
+      break;
+    }
+    if (mergeGateCalls >= MERGE_GATE_CANDIDATES) continue;
+    mergeGateCalls += 1;
+    let ready: boolean;
+    try {
+      ready = await deps.mergeReady(candidate.issueId);
+    } catch {
+      ready = false;
+    }
+    if (ready) {
       target = candidate;
       break;
     }

@@ -281,6 +281,38 @@ describe('runStackReclaimPoll (PAN-5623 WI-12)', () => {
     expect(journals.get(wsPath('MIN-1144'))!.at(-1)).toMatchObject({ type: 'stack.reclaimed', issueId: 'MIN-1144' });
   });
 
+  it('checks every ranked candidate for a free blocker declaration, budgeting the merge gate to the top three (PAN-5648 blocker-scan-all.ac1)', async () => {
+    const issues = ['MIN-2001', 'MIN-2002', 'MIN-2003', 'MIN-2004'];
+    const { deps, journals, memory } = world({
+      listWorkspaces: vi.fn(() => issues.map((issue) => workspace(issue))),
+      listRunningContainers: vi.fn(async () => issues.flatMap((issue) => [stackContainer(issue, 'api')])),
+      mergeReady: vi.fn(async () => false),
+    });
+    issues.forEach((issue, index) => memory.set(`${project(issue)}-api-1`, (issues.length - index) * GiB));
+    journals.set(wsPath('MIN-2004'), [{ at: SINCE, type: 'blocked.declared', issueId: 'MIN-2004', data: { item: 'wi1', blockers: ['PAN-1'] } }]);
+
+    const result = await runStackReclaimPoll(deps, createStackReclaimState());
+
+    expect(result).toMatchObject({ kind: 'reclaimed', issueId: 'MIN-2004' });
+    expect(stoppedIds(deps)).toEqual([`id-${project('MIN-2004')}-api-1`]);
+    expect(deps.mergeReady).toHaveBeenCalledTimes(3);
+  });
+
+  it('gives up once the merge gate has been asked three times with nothing parked (PAN-5648 blocker-scan-all.ac2)', async () => {
+    const issues = ['MIN-3001', 'MIN-3002', 'MIN-3003', 'MIN-3004', 'MIN-3005'];
+    const { deps, memory } = world({
+      listWorkspaces: vi.fn(() => issues.map((issue) => workspace(issue))),
+      listRunningContainers: vi.fn(async () => issues.flatMap((issue) => [stackContainer(issue, 'api')])),
+      mergeReady: vi.fn(async () => false),
+    });
+    issues.forEach((issue, index) => memory.set(`${project(issue)}-api-1`, (issues.length - index) * GiB));
+
+    await expect(runStackReclaimPoll(deps, createStackReclaimState())).resolves.toEqual({ kind: 'idle', reason: 'none-parked' });
+
+    expect(deps.mergeReady).toHaveBeenCalledTimes(3);
+    expect(deps.stopContainer).not.toHaveBeenCalled();
+  });
+
   it('reclaims an issue with an idle work pane and a finished review pane', async () => {
     const { deps } = world({
       listPanes: vi.fn(async () => [
