@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-23T21:22:52Z · model: claude-opus-5-5 · open: 953_
+_Last sequenced: 2026-11-23T22:23:22Z · model: claude-opus-5-5 · open: 954_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -84,6 +84,7 @@ _Last sequenced: 2026-11-23T21:22:52Z · model: claude-opus-5-5 · open: 953_
 | 68 | PAN-5228 | S | high | ok |  |  | Advisory CodeRabbit journal entries land last and hide stalled reviews from recoverStalledReviews and other last-entry readers. |
 | 69 | PAN-4344 | S | high | ok |  |  | Registered projects lack the agent main-push guard; ship a pre-push hook so agents cannot push to main outside overdeck |
 | 70 | PAN-4550 | XS | medium | ok |  |  | Two unit tests read host state (DASHSCOPE_BASE_URL, git-ignored .map files), so pan release check reports false reds locally |
+| 70 | PAN-5648 | S | high | ok |  |  | 10 CodeRabbit findings on merged PAN-5623 stack reclaim; 4 Major: open-reclaim exclusion, journal read failures, restore snapshot refresh. |
 | 71 | PAN-4566 | S | high | ok |  |  | A failed replayEvents leaves the coordinator un-bootstrapped; tab defers live events with no banner. PAN-4559 fallback has landed. |
 | 72 | PAN-5193 | XS | high | ok |  |  | PRD-first gate reads a short main stub before the full workspace draft and refuses finalize for epic children. |
 | 73 | PAN-2940 | M | critical | ok |  |  | Three red-mains in one day from direct-push series bypassing PR CI |
@@ -1277,9 +1278,9 @@ New issue from the Deft adoption PRD. Its dependency PAN-3308 has closed. The ma
 
 Found cutting v0.65.0: CI was green but the local release check failed on two host-dependent tests. XS fix that removes false reds from the release verb, so it sits above routine medium work.
 
-### PAN-4566 (rank 71)
+### PAN-5648 (rank 70)
 
-Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback this fix routes failures to is on main and work can start.
+New CodeRabbit follow-up on the just-merged PAN-5623 stack-reclaim code, which stops and restarts workspace containers. Four Major findings touch reclaim correctness (re-reclaiming issues with an open reclaim, transient journal read failures, stale container snapshots after partial restores), so it ranks above routine CodeRabbit follow-ups as high-importance substrate hardening.
 
 
 <!-- machine-readable; do not hand-edit below this line -->
@@ -1288,10 +1289,10 @@ Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback thi
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-23T21:22:52Z",
+  "generatedAt": "2026-11-23T22:23:22Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 953,
+  "openCount": 954,
   "nodes": [
     {
       "issue": "PAN-5637",
@@ -2324,6 +2325,19 @@ Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback thi
       "dependsOn": [],
       "why": "Two unit tests read host state (DASHSCOPE_BASE_URL, git-ignored .map files), so pan release check reports false reds locally",
       "rationale": "Found cutting v0.65.0: CI was green but the local release check failed on two host-dependent tests. XS fix that removes false reds from the release verb, so it sits above routine medium work.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5648",
+      "rank": 70,
+      "size": "S",
+      "importance": "high",
+      "score": 64,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "10 CodeRabbit findings on merged PAN-5623 stack reclaim; 4 Major: open-reclaim exclusion, journal read failures, restore snapshot refresh.",
+      "rationale": "New CodeRabbit follow-up on the just-merged PAN-5623 stack-reclaim code, which stops and restarts workspace containers. Four Major findings touch reclaim correctness (re-reclaiming issues with an open reclaim, transient journal read failures, stale container snapshots after partial restores), so it ranks above routine CodeRabbit follow-ups as high-importance substrate hardening.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -14549,6 +14563,13 @@ Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback thi
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-5623",
+      "to": "PAN-5648",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
     },
     {
       "from": "PAN-5633",
