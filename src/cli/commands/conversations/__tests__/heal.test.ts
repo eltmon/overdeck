@@ -54,7 +54,7 @@ describe('healAction', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       'http://dashboard.test/api/conversations/repair-me/clear-fork-state',
-      { method: 'POST' },
+      { method: 'POST', headers: { Origin: 'http://dashboard.test' } },
     );
     expect(logs.join('\n')).toContain('Cleared fork/spawn failure state for repair-me (session alive)');
   });

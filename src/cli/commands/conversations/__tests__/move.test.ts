@@ -99,6 +99,20 @@ describe('moveAction', () => {
     expect(logs.join('\n')).toContain('Exact match conv');
   });
 
+  it('sends the dashboard URL as the Origin header (PAN-5610)', async () => {
+    await seedConversation({ name: 'move-origin', title: 'Origin header conv' });
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ projectKey: 'myn' }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const { moveAction } = await import('../move.js');
+    captureConsole();
+    mockExit();
+
+    await moveAction('move-origin', 'myn');
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect((init.headers as Record<string, string>).Origin).toBe('http://dashboard.test');
+  });
+
   it('resolves by a unique fuzzy title match (ac1)', async () => {
     await seedConversation({ name: 'move-fuzzy-1', title: 'Refactor the billing pipeline' });
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ projectKey: 'myn' }), { status: 200 }));
