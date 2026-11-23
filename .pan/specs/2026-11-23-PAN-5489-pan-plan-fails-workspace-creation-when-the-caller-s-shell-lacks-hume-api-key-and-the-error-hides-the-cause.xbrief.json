@@ -4,17 +4,17 @@
     "created": "2026-11-23T06:51:26Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5489: pan plan fails workspace creation when the caller's shell lacks HUME_API_KEY, and the error hides the cause",
-    "updated": "2026-11-23T06:58:02.929Z"
+    "updated": "2026-11-23T06:59:13.716Z"
   },
   "plan": {
     "id": "pan-5489",
     "title": "pan plan fails workspace creation when the caller's shell lacks HUME_API_KEY, and the error hides the cause",
-    "status": "proposed",
+    "status": "running",
     "uid": "46fdec23-0f93-4d7d-bc43-0e537fcc2136",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-23T06:51:26Z",
-    "updated": "2026-11-23T06:58:02.929Z",
+    "updated": "2026-11-23T06:59:13.716Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5489",
@@ -505,5 +505,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
