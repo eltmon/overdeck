@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-23T03:53:02Z · model: claude-opus-5-5 · open: 946_
+_Last sequenced: 2026-11-23T04:22:39Z · model: claude-opus-5-5 · open: 948_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -86,6 +86,7 @@ _Last sequenced: 2026-11-23T03:53:02Z · model: claude-opus-5-5 · open: 946_
 | 75 | PAN-3605 | XS | high | ok |  |  | Supply chain: lint-effect-diagnostics npx fell back to the registry and ran a squatted unscoped package; pin the scoped local bin. |
 | 76 | PAN-5133 | M | high | ok |  |  | pan pause cannot hold a planned issue whose deferred work-agent start is retried; no operator door to stop it. |
 | 77 | PAN-4792 | S | high | ok |  |  | Paste guard only knows numbered menus; a failed paste presses Enter into unnumbered selects, silently setting defaultMode=auto. |
+| 77 | PAN-5604 | S | high | ok |  |  | Stale cached snapshot fires a waiting-on-you toast for answered questions; toasts never close. Small fix in two hooks. |
 | 78 | PAN-3557 | S | critical | ok |  |  | Post-merge label writes have no retry; a 403 hides a merged issue from the verify-on-main sweep while lifecycle reports success. |
 | 79 | PAN-3543 | S | critical | ok |  |  | Completed-handoff agents are unstartable: start, --fresh and reset-session all refuse while the refusal itself recommends --fresh. |
 | 80 | PAN-3522 | S | critical | ok |  |  | Supervisor watchdog restart-churns under CPU storm because the probe timeout budget ignores the boot warm phase. |
@@ -369,6 +370,7 @@ _Last sequenced: 2026-11-23T03:53:02Z · model: claude-opus-5-5 · open: 946_
 | 340 | PAN-2193 | S | high | ok |  |  | Held issues (objection/parked/vetoed/needs-handoff) are invisible in the Command Deck tree |
 | 340 | PAN-5496 | S | medium | ok |  | PAN-5058, PAN-5493 | MCP relay S-G: daily Certificate Transparency watch for the relay hostname; ships with S-E. Needs S-D (PAN-5493). |
 | 341 | PAN-1984 | XS | high | ok |  |  | Migrate or delete the 18 dead panopticon.db modules referenced by ~30 test files (#1983 follow-up) |
+| 341 | PAN-5602 | M | medium | ok |  | PAN-5058, PAN-5494 | Live Grok Bot and Muse checkpoints over the MCP relay, moved from PAN-5058. Blocked by relay S-E (PAN-5494); needs operator sign-ins. |
 | 342 | PAN-1913 | XS | high | ok |  |  | Project description: show on click, edit in dashboard, mirror into the project layer (and document what's in .pan and ~/.panopticon) |
 | 343 | PAN-1906 | M | high | ok |  |  | Enforce harness restrictions with subscription: gray out non-claude-code, validate everywhere |
 | 344 | PAN-1544 | M | high | ok |  |  | Type cleanup: strip 'ship' from the Role union and its ~10 downstream references |
@@ -1281,10 +1283,10 @@ New substrate bug placed in a freed high-tier slot. Under memory pressure the op
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-23T03:53:02Z",
+  "generatedAt": "2026-11-23T04:22:39Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 946,
+  "openCount": 948,
   "nodes": [
     {
       "issue": "PAN-5598",
@@ -2338,6 +2340,19 @@ New substrate bug placed in a freed high-tier slot. Under memory pressure the op
       "dependsOn": [],
       "why": "Paste guard only knows numbered menus; a failed paste presses Enter into unnumbered selects, silently setting defaultMode=auto.",
       "rationale": "New bug found while planning PAN-4738: the tmux paste guard misses Claude Code's unnumbered select dialogs, so a failed paste's fallback Enter can answer them, including a silent permission-mode change. PAN-4738 removes the one known trigger on Fly, so it ranks with the high-tier delivery bugs rather than the top tier.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5604",
+      "rank": 77,
+      "size": "S",
+      "importance": "high",
+      "score": 74,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Stale cached snapshot fires a waiting-on-you toast for answered questions; toasts never close. Small fix in two hooks.",
+      "rationale": "New substrate-improvement bug with a verified root cause and exact fix; a false needs-you prompt misleads the operator, so it ranks with other high substrate bugs.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -5938,6 +5953,22 @@ New substrate bug placed in a freed high-tier slot. Under memory pressure the op
       "rationale": "Re-derived cross-reference this pass: the body opens 'Follow-up to #1983' and says #1983's code already landed, so it is narrative history, not a blocker - recorded as an informs edge, not dependsOn. Rank unchanged.",
       "gate": "auto",
       "planning": "skip"
+    },
+    {
+      "issue": "PAN-5602",
+      "rank": 341,
+      "size": "M",
+      "importance": "medium",
+      "score": 46,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-5058",
+        "PAN-5494"
+      ],
+      "why": "Live Grok Bot and Muse checkpoints over the MCP relay, moved from PAN-5058. Blocked by relay S-E (PAN-5494); needs operator sign-ins.",
+      "rationale": "New issue carved out of PAN-5058; it is the last step of the relay chain, so it ranks right after the relay slices it depends on.",
+      "gate": "auto",
+      "planning": "auto"
     },
     {
       "issue": "PAN-1913",
@@ -14185,6 +14216,13 @@ New substrate bug placed in a freed high-tier slot. Under memory pressure the op
       "confidence": 1
     },
     {
+      "from": "PAN-5058",
+      "to": "PAN-5602",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
       "from": "PAN-5097",
       "to": "PAN-2954",
       "type": "informs",
@@ -14311,6 +14349,13 @@ New substrate bug placed in a freed high-tier slot. Under memory pressure the op
       "confidence": 1
     },
     {
+      "from": "PAN-5486",
+      "to": "PAN-5602",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
       "from": "PAN-5490",
       "to": "PAN-5491",
       "type": "unblocks",
@@ -14346,6 +14391,13 @@ New substrate bug placed in a freed high-tier slot. Under memory pressure the op
       "confidence": 1
     },
     {
+      "from": "PAN-5492",
+      "to": "PAN-5602",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
       "from": "PAN-5493",
       "to": "PAN-5494",
       "type": "unblocks",
@@ -14362,6 +14414,13 @@ New substrate bug placed in a freed high-tier slot. Under memory pressure the op
     {
       "from": "PAN-5493",
       "to": "PAN-5496",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5494",
+      "to": "PAN-5602",
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
