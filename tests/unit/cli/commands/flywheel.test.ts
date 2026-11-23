@@ -234,6 +234,17 @@ describe('pan flywheel verbs (PAN-3964 FR-6)', () => {
     expect(mocks.sendOrderBookToFlywheel).toHaveBeenCalledWith('b1', 'myn');
   });
 
+  // CodeRabbit 4664060873: an issue_routing cwd outside the project root still finds the selected project.
+  it('startFlywheelRun resolves the project key from projectPath, not a routed cwd', async () => {
+    mocks.startFlywheel.mockRejectedValue(new FlywheelAlreadyRunning());
+    mocks.resolveProjectKeyForCwdAsync.mockImplementation(async (path: string) => (path === '/repos/myn' ? 'myn' : null));
+    mocks.sendOrderBookToFlywheel.mockResolvedValue({ session: 'conv-flywheel', prompt: '/pan-flywheel b1 --project myn' });
+    await expect(startFlywheelRun({ cwd: '/routed/myn-frontend', orders: 'b1', projectPath: '/repos/myn' }))
+      .resolves.toEqual({ runId: 'conv-flywheel', delivered: 'running-conversation' });
+    expect(mocks.startFlywheel).toHaveBeenCalledWith({ cwd: '/routed/myn-frontend', orders: 'b1' });
+    expect(mocks.sendOrderBookToFlywheel).toHaveBeenCalledWith('b1', 'myn');
+  });
+
   it('startFlywheelRun fails loudly when the book cannot be delivered', async () => {
     mocks.startFlywheel.mockRejectedValue(new FlywheelAlreadyRunning());
     mocks.resolveProjectKeyForCwdAsync.mockResolvedValue('myn');
