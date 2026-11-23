@@ -12,6 +12,17 @@ Date: 2026-11-04.
 | CP-8c authorization value: bare token vs "Bearer <token>" | Not run: depends on CP-8b. |
 | CP-8d client needs GET /mcp or SSE responses | Not run: depends on CP-8a and CP-8b. Overdeck answers GET /mcp with 405 and POST with JSON. |
 
+## Changes since 2026-11-04
+
+Recorded 2026-11-22 (PAN-5486). Only a dated live run counts as a result.
+
+| Change | Check | Result |
+| --- | --- | --- |
+| `mcp.json` runs the connector over stdio, not one https server (PAN-5072, v0.78.0) | Package structure | The 2026-11-04 "one https server" row is out of date. `tests/unit/integrations/grok-bot.test.ts` now checks that `mcp.json` equals the connector registration for the root package version. |
+| One-paste connect: **Copy for Grok Bot** (PAN-5070, v0.78.0) running `mcp connector connect` (v0.75.0) | Grok Bot runs the copied command and pairs | Failed 2026-11-14: three runs, each `retry` / `machine-unreachable`; the recorded cause is no WebRTC egress from Grok Bot's sandbox (PAN-5242). |
+| `no-webrtc-egress` connect error (PAN-5242, v0.85.0) | Grok Bot gets `no-webrtc-egress` and switches to Public MCP | Not run. |
+| Grok Bot defaults to Public MCP in Connect a bot (PAN-5486) | CP-8a Grok Bot over Public MCP, OAuth sign-in, list_conversations | Not run: the live run is PAN-5058 checkpoint CP-1. |
+
 ## Running the live checks
 
 1. Turn Public MCP on and run the three `tailscale funnel` commands from
