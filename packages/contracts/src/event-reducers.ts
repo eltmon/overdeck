@@ -9,6 +9,7 @@
  * eventually consistent (the T3Code pattern).
  */
 
+import type { ConversationSearchActivitySnapshot } from './conversation-search-activity'
 import type {
   AgentRuntimeSnapshot,
   AgentSnapshot,
@@ -133,6 +134,8 @@ export interface ReadModelState {
   deployByProjectKey: Record<string, ProjectDeploySnapshot>
   /** PAN-5342 — the safe-shutdown drain; derived, never stored; null when none runs. */
   shutdown: ShutdownSnapshot | null
+  /** PAN-5609 — conversation-search indexing; derived, never stored; null until the tracker first reports. */
+  conversationSearchActivity: ConversationSearchActivitySnapshot | null
   /** sessionId (from agent snapshot or runtime claudeSessionId) → agentId index */
   agentIdBySessionId: Record<string, string>
 }
@@ -183,6 +186,7 @@ export const INITIAL_READ_MODEL_STATE: ReadModelState = {
   githubQuota: null,
   deployByProjectKey: {},
   shutdown: null,
+  conversationSearchActivity: null,
   agentIdBySessionId: {},
   dashboardLifecycle: {
     active: false,
@@ -339,6 +343,7 @@ export function syncSnapshot(state: ReadModelState, snapshot: DashboardSnapshot)
     deployByProjectKey: snapshot.deployByProjectKey ?? state.deployByProjectKey,
     // PAN-5342: never fall back to the old state; a fresh boot has no drain.
     shutdown: snapshot.shutdown ?? null,
+    conversationSearchActivity: snapshot.conversationSearchActivity ?? null,
     agentIdBySessionId,
   }
 }
@@ -791,6 +796,10 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
 
     case 'system.shutdown_changed':
       return { ...state, sequence: Math.max(state.sequence, event.sequence), shutdown: event.payload.shutdown }
+
+    // PAN-5609: complete activity snapshot, plain replace — like the shutdown drain.
+    case 'conversation_search.activity_changed':
+      return { ...state, sequence: Math.max(state.sequence, event.sequence), conversationSearchActivity: event.payload.activity }
 
     case 'resources.updated':
       return {

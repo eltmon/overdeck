@@ -4,17 +4,17 @@
     "created": "2026-11-23T05:43:14Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5609: Show active conversation-search indexing in the dashboard top bar, with hover and click details",
-    "updated": "2026-11-23T05:49:15.533Z"
+    "updated": "2026-11-23T06:07:43.670Z"
   },
   "plan": {
     "id": "pan-5609",
     "title": "Show active conversation-search indexing in the dashboard top bar, with hover and click details",
-    "status": "proposed",
+    "status": "running",
     "uid": "38ec7dad-a30e-4b00-bb29-6fc463b4b7b3",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-23T05:43:14Z",
-    "updated": "2026-11-23T05:49:15.533Z",
+    "updated": "2026-11-23T06:07:43.670Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5609",
@@ -706,5 +706,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }

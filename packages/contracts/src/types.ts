@@ -2,6 +2,7 @@ import { Schema } from "effect"
 import { BackendPane } from "./backend-pane"
 import { DerivedIssueState } from "./derived-issue-state"
 import { GitHubQuotaSnapshot } from "./github-quota"
+import { ConversationSearchActivitySnapshot } from "./conversation-search-activity"
 
 // ─── Primitives ───────────────────────────────────────────────────────────────
 
@@ -655,6 +656,7 @@ export const DashboardSnapshot = Schema.Struct({
   /** PAN-3751 — in-flight deploys keyed by project key. */
   deployByProjectKey: Schema.optional(Schema.Record(Schema.String, ProjectDeploySnapshot)),
   shutdown: Schema.optional(Schema.NullOr(ShutdownSnapshot)), // PAN-5342
+  conversationSearchActivity: Schema.optional(Schema.NullOr(ConversationSearchActivitySnapshot)), // PAN-5609
   timestamp: Schema.String,
 })
 export type DashboardSnapshot = typeof DashboardSnapshot.Type
