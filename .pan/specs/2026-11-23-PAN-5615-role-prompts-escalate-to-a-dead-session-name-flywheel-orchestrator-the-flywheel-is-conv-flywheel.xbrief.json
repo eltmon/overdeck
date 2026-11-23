@@ -1,0 +1,762 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-23T06:18:55Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5615: Role prompts escalate to a dead session name (flywheel-orchestrator); the Flywheel is conv-flywheel",
+    "updated": "2026-11-23T18:05:25.584Z"
+  },
+  "plan": {
+    "id": "pan-5615",
+    "title": "Role prompts escalate to a dead session name (flywheel-orchestrator); the Flywheel is conv-flywheel",
+    "status": "proposed",
+    "uid": "85ff11b3-976c-4ace-bac2-b5c4b54f9c66",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-23T06:18:55Z",
+    "updated": "2026-11-23T18:05:25.584Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5615",
+        "label": "PAN-5615",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5615.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "roles",
+      "flywheel",
+      "prompts",
+      "costs",
+      "bug"
+    ],
+    "narratives": {
+      "Problem": "Five role prompts (plan, review, test, work, strike) tell agents to escalate stalls with `pan tell flywheel-orchestrator`, a session name nothing has used since PAN-3964; the Flywheel runs as conv-flywheel (FLYWHEEL_CONVERSATION_SESSION). Every escalation fails with 'Agent flywheel-orchestrator not running' and is lost (MIN-1144 review blocker unreported ~2h on 2026-11-23). Four of those prompts also falsely claim the tell 'no-ops gracefully' when no Flywheel runs. Cost attribution only recognises the old name, so live Flywheel no-issue cost lands in CONVERSATIONS.",
+      "Proposal": "Retarget the six escalation tells to `pan tell conv-flywheel` (one item per role file, Prompt-Change trailer), correct the false 'no-ops gracefully' sentence in plan/review/test/work, make classifySessionBucket recognise conv-flywheel, retired conv-flywheel~<id8> runs and the legacy flywheel-orchestrator name, add a vitest guard that renders every roles/*.md through roleSystemPromptInjection under a temp OVERDECK_HOME and scans sync-sources for a dead tell target, document the escalation path in docs/FLYWHEEL.md, and add a changelog.d entry. Also make messageAgent fall back to the full row name so `pan tell conv-flywheel` resolves the Flywheel's real harness (critique finding), and word the issue-comment fallback without promising the loop reads it on its next tick.",
+      "NonGoals": "- Changing other legacy flywheel-orchestrator references that are not pan tell targets: SINGLETON_AGENT_IDS, AGENT_SESSION_SINGLETONS, restart-announcer.ts, scripts/guard-flywheel-orchestrator-commit.sh, scripts/guard-agent-main-push.sh, pan-recap SKILL.md capture-pane lines, the auto-approve-hook comment, and historical docs (DASHBOARD-ARCHITECTURE.md, TERMINAL-BACKENDS.md, FLYWHEEL.md line 82, docs/history/)\n- Backfilling cost rows already bucketed as CONVERSATIONS\n- Changing pan tell resolution or the prompt guard, or adding a flywheel-orchestrator → conv-flywheel alias\n- Live verification against a running Flywheel (roles reach new sessions only after merge + pan reload)\n- Editing the pan-flywheel skill or src/lib/cloister/prompts/*.md\n- Raising any file-size allowlist cap or source-introspection baseline\n- Changing getConversationByTmuxSession() in src/lib/overdeck/conversations.ts\n- Adding an issue-comment read step to the /pan-flywheel loop"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Role prompts name conv-flywheel literally; the guard test's positive assertion is built from FLYWHEEL_CONVERSATION_SESSION.",
+        "rationale": "Role files are plain Markdown loaded via --append-system-prompt-file with no template engine; tying the test to the constant makes a future rename fail loudly."
+      },
+      {
+        "summary": "Also correct the false 'no-ops gracefully … lands in an idle or absent session' sentence in plan/review/test/work.",
+        "rationale": "messaging.ts throws 'Agent <id> not running' for an absent conversation; the false claim tells agents a failed escalation is harmless, which is how the MIN-1144 blocker went unreported. The edit is confined to the same paragraph as the target."
+      },
+      {
+        "summary": "Attribution also matches retired Flywheel runs named conv-flywheel~<id8>.",
+        "rationale": "vacateConversationName renames linked old Flywheel rows to `${name}~${id8}`; two such rows exist live, and their UNKNOWN cost is Flywheel cost."
+      },
+      {
+        "summary": "sync-sources is scanned file-by-file rather than through a renderer.",
+        "rationale": "There is no single sync-sources renderer (skills are copied, rules go through context layers); agent-text-cli-verbs.test.ts already scans sync-sources this way, and lint-source-introspection only flags readFile calls with .ts/.tsx literals."
+      },
+      {
+        "summary": "One xBRIEF item per role file instead of one item for all five.",
+        "rationale": "Separate files, no shared mutation, independently verifiable; they fan out in parallel and each blocks the guard test."
+      },
+      {
+        "summary": "No backfill of already-bucketed cost rows.",
+        "rationale": "reclassifyUnknownCostEvents only touches issue_id='UNKNOWN'; rewriting history is outside the issue's FR-2."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Twelve files, almost all one- or two-line edits: one retired session name in five role prompts, the cost bucket that keys on it, the harness lookup that misses the conv-flywheel row on the tell path, a guard test, one docs paragraph and a changelog entry. The 'subsystems' are just the directories those few lines live in. Splitting into sibling issues would land the guard test separately from the prompts it checks, so it would be red on its own PR, and the delivery fix is what makes the retargeted tell reach a non-Claude Flywheel.",
+      "canonicalFilename": "2026-11-23-PAN-5615-role-prompts-escalate-to-a-dead-session-name-flywheel-orchestrator-the-flywheel-is-conv-flywheel.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "role-plan-escalation-target",
+        "title": "Retarget the plan role escalation tell to conv-flywheel",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T06:18:55Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5615",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "roles/plan.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c flywheel-orchestrator roles/plan.md",
+            "grep -c 'pan tell conv-flywheel' roles/plan.md",
+            "bash scripts/lint-prompts.sh"
+          ],
+          "expected_outputs": [
+            "grep prints 0 for flywheel-orchestrator in roles/plan.md",
+            "grep prints 1 for 'pan tell conv-flywheel'",
+            "lint-prompts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Edit only roles/plan.md. Replace `pan tell flywheel-orchestrator` with `pan tell conv-flywheel` at line(s) 129 (search for `pan tell flywheel-orchestrator`). In the paragraph right after the bash block (starts 'Under full autonomy nobody is watching'), replace the two sentences 'This is fire-and-forget: it no-ops gracefully when no Flywheel run is active — the message just lands in an idle or absent session. If the tell itself fails (an error, or \"not running\"), fall back to posting the same analysis as a comment on the issue — that is the durable channel the orchestrator checks on its next tick.' with 'This is fire-and-forget, but it is not silent: when no Flywheel is running the tell fails with \"not running\". If the tell fails for that or any other reason, post the same analysis as a comment on the issue, so it stays on record for the operator and the orchestrator to read.' Keep every other character of the section unchanged. Commit with trailers `Item: role-plan-escalation-target` and `Prompt-Change: escalation tell targets conv-flywheel instead of the dead flywheel-orchestrator session` (npm run lint:prompt-trailer requires a Prompt-Change trailer when roles/*.md changes). See PRD .pan/drafts/PAN-5615.md W1–W5 for before/after."
+        },
+        "items": [
+          {
+            "id": "role-plan-escalation-target.ac1",
+            "title": "Given the edited roles/plan.md, when `grep -c flywheel-orchestrator roles/plan.md` runs, then it prints 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "role-plan-escalation-target.ac2",
+            "title": "Given the edited roles/plan.md, when `grep -c 'pan tell conv-flywheel' roles/plan.md` runs, then it prints 1.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "role-plan-escalation-target.ac3",
+            "title": "Given the edited roles/plan.md, when `grep -c 'no-ops gracefully' roles/plan.md` runs, then it prints 0 and the file contains the sentence 'when no Flywheel is running the tell fails with \"not running\"'. The new text does not contain 'checks on its next tick'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "role-plan-escalation-target.ac4",
+            "title": "Given the item commit, when `git log -1 --format=%B` is read for it, then the message contains an `Item: role-plan-escalation-target` trailer and a `Prompt-Change:` trailer, and `bash scripts/lint-prompts.sh` exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "role-review-escalation-target",
+        "title": "Retarget the review role escalation tell to conv-flywheel",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T06:18:55Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5615",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "roles/review.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c flywheel-orchestrator roles/review.md",
+            "grep -c 'pan tell conv-flywheel' roles/review.md",
+            "bash scripts/lint-prompts.sh"
+          ],
+          "expected_outputs": [
+            "grep prints 0 for flywheel-orchestrator in roles/review.md",
+            "grep prints 1 for 'pan tell conv-flywheel'",
+            "lint-prompts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Edit only roles/review.md. Replace `pan tell flywheel-orchestrator` with `pan tell conv-flywheel` at line(s) 228 (search for `pan tell flywheel-orchestrator`). In the paragraph right after the bash block (starts 'Under full autonomy nobody is watching'), replace the two sentences 'This is fire-and-forget: it no-ops gracefully when no Flywheel run is active — the message just lands in an idle or absent session. If the tell itself fails (an error, or \"not running\"), fall back to posting the same analysis as a comment on the issue — that is the durable channel the orchestrator checks on its next tick.' with 'This is fire-and-forget, but it is not silent: when no Flywheel is running the tell fails with \"not running\". If the tell fails for that or any other reason, post the same analysis as a comment on the issue, so it stays on record for the operator and the orchestrator to read.' Keep every other character of the section unchanged. Commit with trailers `Item: role-review-escalation-target` and `Prompt-Change: escalation tell targets conv-flywheel instead of the dead flywheel-orchestrator session` (npm run lint:prompt-trailer requires a Prompt-Change trailer when roles/*.md changes). See PRD .pan/drafts/PAN-5615.md W1–W5 for before/after."
+        },
+        "items": [
+          {
+            "id": "role-review-escalation-target.ac1",
+            "title": "Given the edited roles/review.md, when `grep -c flywheel-orchestrator roles/review.md` runs, then it prints 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "role-review-escalation-target.ac2",
+            "title": "Given the edited roles/review.md, when `grep -c 'pan tell conv-flywheel' roles/review.md` runs, then it prints 1.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "role-review-escalation-target.ac3",
+            "title": "Given the edited roles/review.md, when `grep -c 'no-ops gracefully' roles/review.md` runs, then it prints 0 and the file contains the sentence 'when no Flywheel is running the tell fails with \"not running\"'. The new text does not contain 'checks on its next tick'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "role-review-escalation-target.ac4",
+            "title": "Given the item commit, when `git log -1 --format=%B` is read for it, then the message contains an `Item: role-review-escalation-target` trailer and a `Prompt-Change:` trailer, and `bash scripts/lint-prompts.sh` exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "role-test-escalation-target",
+        "title": "Retarget the test role escalation tell to conv-flywheel",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T06:18:55Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5615",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "roles/test.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c flywheel-orchestrator roles/test.md",
+            "grep -c 'pan tell conv-flywheel' roles/test.md",
+            "bash scripts/lint-prompts.sh"
+          ],
+          "expected_outputs": [
+            "grep prints 0 for flywheel-orchestrator in roles/test.md",
+            "grep prints 1 for 'pan tell conv-flywheel'",
+            "lint-prompts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Edit only roles/test.md. Replace `pan tell flywheel-orchestrator` with `pan tell conv-flywheel` at line(s) 103 (search for `pan tell flywheel-orchestrator`). In the paragraph right after the bash block (starts 'Under full autonomy nobody is watching'), replace the two sentences 'This is fire-and-forget: it no-ops gracefully when no Flywheel run is active — the message just lands in an idle or absent session. If the tell itself fails (an error, or \"not running\"), fall back to posting the same analysis as a comment on the issue — that is the durable channel the orchestrator checks on its next tick.' with 'This is fire-and-forget, but it is not silent: when no Flywheel is running the tell fails with \"not running\". If the tell fails for that or any other reason, post the same analysis as a comment on the issue, so it stays on record for the operator and the orchestrator to read.' Keep every other character of the section unchanged. Commit with trailers `Item: role-test-escalation-target` and `Prompt-Change: escalation tell targets conv-flywheel instead of the dead flywheel-orchestrator session` (npm run lint:prompt-trailer requires a Prompt-Change trailer when roles/*.md changes). See PRD .pan/drafts/PAN-5615.md W1–W5 for before/after."
+        },
+        "items": [
+          {
+            "id": "role-test-escalation-target.ac1",
+            "title": "Given the edited roles/test.md, when `grep -c flywheel-orchestrator roles/test.md` runs, then it prints 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "role-test-escalation-target.ac2",
+            "title": "Given the edited roles/test.md, when `grep -c 'pan tell conv-flywheel' roles/test.md` runs, then it prints 1.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "role-test-escalation-target.ac3",
+            "title": "Given the edited roles/test.md, when `grep -c 'no-ops gracefully' roles/test.md` runs, then it prints 0 and the file contains the sentence 'when no Flywheel is running the tell fails with \"not running\"'. The new text does not contain 'checks on its next tick'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "role-test-escalation-target.ac4",
+            "title": "Given the item commit, when `git log -1 --format=%B` is read for it, then the message contains an `Item: role-test-escalation-target` trailer and a `Prompt-Change:` trailer, and `bash scripts/lint-prompts.sh` exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "role-work-escalation-target",
+        "title": "Retarget the work role escalation tell to conv-flywheel",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T06:18:55Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5615",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "roles/work.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c flywheel-orchestrator roles/work.md",
+            "grep -c 'pan tell conv-flywheel' roles/work.md",
+            "bash scripts/lint-prompts.sh"
+          ],
+          "expected_outputs": [
+            "grep prints 0 for flywheel-orchestrator in roles/work.md",
+            "grep prints 1 for 'pan tell conv-flywheel'",
+            "lint-prompts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Edit only roles/work.md. Replace `pan tell flywheel-orchestrator` with `pan tell conv-flywheel` at line(s) 139 (search for `pan tell flywheel-orchestrator`). In the paragraph right after the bash block (starts 'Under full autonomy nobody is watching'), replace the two sentences 'This is fire-and-forget: it no-ops gracefully when no Flywheel run is active — the message just lands in an idle or absent session. If the tell itself fails (an error, or \"not running\"), fall back to posting the same analysis as a comment on the issue — that is the durable channel the orchestrator checks on its next tick.' with 'This is fire-and-forget, but it is not silent: when no Flywheel is running the tell fails with \"not running\". If the tell fails for that or any other reason, post the same analysis as a comment on the issue, so it stays on record for the operator and the orchestrator to read.' Keep every other character of the section unchanged. Commit with trailers `Item: role-work-escalation-target` and `Prompt-Change: escalation tell targets conv-flywheel instead of the dead flywheel-orchestrator session` (npm run lint:prompt-trailer requires a Prompt-Change trailer when roles/*.md changes). See PRD .pan/drafts/PAN-5615.md W1–W5 for before/after."
+        },
+        "items": [
+          {
+            "id": "role-work-escalation-target.ac1",
+            "title": "Given the edited roles/work.md, when `grep -c flywheel-orchestrator roles/work.md` runs, then it prints 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "role-work-escalation-target.ac2",
+            "title": "Given the edited roles/work.md, when `grep -c 'pan tell conv-flywheel' roles/work.md` runs, then it prints 1.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "role-work-escalation-target.ac3",
+            "title": "Given the edited roles/work.md, when `grep -c 'no-ops gracefully' roles/work.md` runs, then it prints 0 and the file contains the sentence 'when no Flywheel is running the tell fails with \"not running\"'. The new text does not contain 'checks on its next tick'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "role-work-escalation-target.ac4",
+            "title": "Given the item commit, when `git log -1 --format=%B` is read for it, then the message contains an `Item: role-work-escalation-target` trailer and a `Prompt-Change:` trailer, and `bash scripts/lint-prompts.sh` exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "role-strike-escalation-target",
+        "title": "Retarget the strike role escalation tell to conv-flywheel",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T06:18:55Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5615",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "roles/strike.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c flywheel-orchestrator roles/strike.md",
+            "grep -c 'pan tell conv-flywheel' roles/strike.md",
+            "bash scripts/lint-prompts.sh"
+          ],
+          "expected_outputs": [
+            "grep prints 0 for flywheel-orchestrator in roles/strike.md",
+            "grep prints 2 for 'pan tell conv-flywheel'",
+            "lint-prompts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Edit only roles/strike.md. Replace `pan tell flywheel-orchestrator` with `pan tell conv-flywheel` at line(s) 99 and 108 (search for `pan tell flywheel-orchestrator`). No other change: the strike paragraph has no 'no-ops gracefully' sentence. Commit with trailers `Item: role-strike-escalation-target` and `Prompt-Change: escalation tell targets conv-flywheel instead of the dead flywheel-orchestrator session` (npm run lint:prompt-trailer requires a Prompt-Change trailer when roles/*.md changes). See PRD .pan/drafts/PAN-5615.md W1–W5 for before/after."
+        },
+        "items": [
+          {
+            "id": "role-strike-escalation-target.ac1",
+            "title": "Given the edited roles/strike.md, when `grep -c flywheel-orchestrator roles/strike.md` runs, then it prints 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "role-strike-escalation-target.ac2",
+            "title": "Given the edited roles/strike.md, when `grep -c 'pan tell conv-flywheel' roles/strike.md` runs, then it prints 2.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "role-strike-escalation-target.ac3",
+            "title": "Given the item commit, when `git log -1 --format=%B` is read for it, then the message contains an `Item: role-strike-escalation-target` trailer and a `Prompt-Change:` trailer, and `bash scripts/lint-prompts.sh` exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conv-tell-harness-lookup",
+        "title": "Resolve the Flywheel's harness by its full conv-flywheel row name in messageAgent",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T07:10:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5615",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/messaging.ts",
+            "src/lib/agents/__tests__/messaging-conversation-harness.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/messaging-conversation-harness.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "messaging-conversation-harness.test.ts passes with 2 tests",
+            "typecheck completes without errors",
+            "lint-file-size passes (messaging.ts stays under 1000 lines)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/agents/messaging.ts inside messageAgent (search 'Rows are keyed by the bare name'), replace `conversationHarness = getConversationByName(normalizedId.slice('conv-'.length))?.harness ?? undefined;` with a comment line `// The Flywheel's row keeps the full session name, conv-flywheel (PAN-5615).` plus `const row = getConversationByName(normalizedId.slice('conv-'.length)) ?? getConversationByName(normalizedId);` and `conversationHarness = row?.harness ?? undefined;`. Bare-name lookup stays first. In src/lib/agents/__tests__/messaging-conversation-harness.test.ts make the getConversationByName mock also return { name, harness: 'pi' } for name === 'conv-flywheel'; reset probe.lookups.length = 0 at the start of each test; in the existing test assert probe.lookups equals ['brisk-otter']; add test 'probes the Flywheel by its full row name, conv-flywheel (PAN-5615)': messageAgent('conv-flywheel','hello','pan-tell') rejects with 'not running', probe.lookups equals ['flywheel','conv-flywheel'], probe.harness is 'pi'. Do not change getConversationByTmuxSession or pan tell target resolution. See PRD W10."
+        },
+        "items": [
+          {
+            "id": "conv-tell-harness-lookup.ac1",
+            "title": "Given a conversations row named conv-flywheel with harness pi and no row named flywheel, when messageAgent('conv-flywheel', …) runs, then the liveness probe receives harness 'pi', not the claude-code default.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-tell-harness-lookup.ac2",
+            "title": "Given the conv-flywheel target, when messageAgent resolves its harness, then it looks up 'flywheel' first and 'conv-flywheel' second (probe.lookups equals ['flywheel','conv-flywheel']).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-tell-harness-lookup.ac3",
+            "title": "Given a conv-brisk-otter target whose bare-name row exists, when messageAgent resolves its harness, then it performs only the bare-name lookup (probe.lookups equals ['brisk-otter']) and probes with harness 'codex'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "flywheel-cost-attribution",
+        "title": "Bucket conv-flywheel cost as Flywheel",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T06:18:55Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5615",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/costs/attribution.ts",
+            "src/lib/costs/__tests__/attribution.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/costs/__tests__/attribution.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "attribution.test.ts passes including the four new cases",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/costs/attribution.ts import FLYWHEEL_CONVERSATION_SESSION from '../flywheel/constants.js' (no-import module, no cycle risk). Add a non-exported const LEGACY_FLYWHEEL_CONVERSATION = 'flywheel-orchestrator' and a non-exported isFlywheelConversationName(name) returning true for name === FLYWHEEL_CONVERSATION_SESSION, name.startsWith(`${FLYWHEEL_CONVERSATION_SESSION}~`) (retired runs renamed by vacateConversationName in src/lib/overdeck/conversation-replace.ts), or name === LEGACY_FLYWHEEL_CONVERSATION. Replace line 23 `if (conversation.name === 'flywheel-orchestrator')` with `if (isFlywheelConversationName(conversation.name))`. In src/lib/costs/__tests__/attribution.test.ts keep the existing flywheel-orchestrator case and add: stub lookup {name:'conv-flywheel'} → FLYWHEEL; {name:'conv-flywheel~074a2fec'} → FLYWHEEL; {name:'conv-flywheel-notes'} → CONVERSATIONS; and in describe('findConversationForCostSession') seed {id:'conv-uuid-fw', name:'conv-flywheel', tmuxSession:'conv-flywheel', locator:'session-fw'} and assert classifySessionBucket({agentId:'conv-flywheel'}, findConversationForCostSession) and classifySessionBucket({sessionId:'session-fw'}, findConversationForCostSession) both return NO_ISSUE_BUCKETS.flywheel. No backfill of already-bucketed rows."
+        },
+        "items": [
+          {
+            "id": "flywheel-cost-attribution.ac1",
+            "title": "Given a lookup returning {name:'conv-flywheel'}, when classifySessionBucket runs, then it returns NO_ISSUE_BUCKETS.flywheel ('FLYWHEEL').",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "flywheel-cost-attribution.ac2",
+            "title": "Given lookups returning {name:'flywheel-orchestrator'} and {name:'conv-flywheel~074a2fec'}, when classifySessionBucket runs, then it returns 'FLYWHEEL' for both.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "flywheel-cost-attribution.ac3",
+            "title": "Given a lookup returning {name:'conv-flywheel-notes'}, when classifySessionBucket runs, then it returns 'CONVERSATIONS' (no prefix false positive).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "flywheel-cost-attribution.ac4",
+            "title": "Given a seeded conversations row named conv-flywheel with tmux_session conv-flywheel and locator session-fw, when classifySessionBucket runs with the real findConversationForCostSession for agentId 'conv-flywheel' and for sessionId 'session-fw', then both return 'FLYWHEEL'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "escalation-target-guard-test",
+        "title": "Guard test: rendered role prompts and sync-sources never tell flywheel-orchestrator",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T06:18:55Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-5615",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/__tests__/role-escalation-target.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/role-escalation-target.test.ts",
+            "bash scripts/lint-source-introspection.sh",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "role-escalation-target.test.ts passes (4 tests)",
+            "lint-source-introspection prints '✓ source-introspection guard passed' with no baseline file change",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/agents/__tests__/role-escalation-target.test.ts exactly as PRD .pan/drafts/PAN-5615.md W7 specifies. Define DEAD_TELL_TARGET = /\\bpan tell\\s+(?:--?[\\w-]+\\s+)*[\"']?(?:conv-)?flywheel-orchestrator\\b/ and a pure namesDeadTellTarget(text). Tests: (1) detector fixtures — true for `pan tell flywheel-orchestrator \"x\"`, `pan tell --steer flywheel-orchestrator \"x\"`, `pan tell conv-flywheel-orchestrator \"x\"`; false for `pan tell conv-flywheel \"x\"`, `tmux capture-pane -t flywheel-orchestrator -p`, `OVERDECK_AGENT_ID=flywheel-orchestrator`. (2) With process.env.OVERDECK_HOME and HOME set to mkdtempSync(join(tmpdir(),'role-escalation-')) in beforeEach and restored + rmSync in afterEach (pattern: src/lib/agents/__tests__/role-mcp-parser.test.ts), render every roles/*.md via roleSystemPromptInjection(join(packageRoot,'roles',file)), read join(tempHome,'role-prompts',file), and expect the list of files where namesDeadTellTarget is true to equal []; also assert rendered count equals roles/*.md count and is > 0. (3) For ['plan','review','test','work','strike'] the rendered prompt contains `pan tell ${FLYWHEEL_CONVERSATION_SESSION} \"`. (4) Walk join(packageRoot,'sync-sources') recursively (skip node_modules), read each file as a Buffer, skip buffers containing byte 0, and expect offenders (relative paths) to equal []; assert at least one file scanned. Never call readFile/readFileSync with a string literal ending .ts/.tsx; no skipIf/.only/.skip. The temp OVERDECK_HOME is mandatory so the test never overwrites the real ~/.overdeck/role-prompts."
+        },
+        "items": [
+          {
+            "id": "escalation-target-guard-test.ac1",
+            "title": "Given the detector fixtures, when namesDeadTellTarget runs, then it returns true for `pan tell flywheel-orchestrator`, `pan tell --steer flywheel-orchestrator` and `pan tell conv-flywheel-orchestrator`, and false for `pan tell conv-flywheel`, `tmux capture-pane -t flywheel-orchestrator` and `OVERDECK_AGENT_ID=flywheel-orchestrator`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "escalation-target-guard-test.ac2",
+            "title": "Given every roles/*.md rendered through roleSystemPromptInjection under a temporary OVERDECK_HOME, when the test scans the files written to <tempHome>/role-prompts/, then it finds no dead tell target, and restoring `pan tell flywheel-orchestrator` in any one role file makes this test fail naming that file.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "escalation-target-guard-test.ac3",
+            "title": "Given the rendered plan, review, test, work and strike prompts, when the test reads them, then each contains `pan tell conv-flywheel \"` built from FLYWHEEL_CONVERSATION_SESSION.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "escalation-target-guard-test.ac4",
+            "title": "Given every non-binary file under sync-sources/, when the test scans it, then no file names a dead tell target and at least one file was scanned.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "escalation-target-guard-test.ac5",
+            "title": "Given the new test file, when `bash scripts/lint-source-introspection.sh` runs, then it exits 0 and scripts/source-introspection-baseline.txt is unchanged in the diff.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "flywheel-escalation-docs",
+        "title": "Document role escalation to conv-flywheel in docs/FLYWHEEL.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T06:18:55Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5615",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/FLYWHEEL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'pan tell conv-flywheel' docs/FLYWHEEL.md",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "grep prints 1 or more",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In docs/FLYWHEEL.md, insert one paragraph directly after the paragraph that begins 'Every agent the loop starts carries provenance' (line 7), with the exact text given in PRD .pan/drafts/PAN-5615.md W8: role agents (plan, work, review, test, strike) escalate with `pan tell conv-flywheel \"<role> <issue>: …\"`; when no Flywheel is running the tell fails with \"not running\" and the agent posts the analysis as an issue comment; the retired `flywheel-orchestrator` reaches no session and src/lib/agents/__tests__/role-escalation-target.test.ts fails if a rendered role prompt or sync-sources file names it as a pan tell target (PAN-5615). Do not edit line 82 or any other line. Use the exact paragraph text in the PRD W8, which does not claim the loop reads comments on its next tick."
+        },
+        "items": [
+          {
+            "id": "flywheel-escalation-docs.ac1",
+            "title": "Given docs/FLYWHEEL.md, when a reader opens it, then a paragraph after the provenance paragraph states that role agents escalate with `pan tell conv-flywheel`, fall back to an issue comment when the tell fails with \"not running\", and does not claim the loop reads that comment on its next tick.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "flywheel-escalation-docs.ac2",
+            "title": "Given docs/FLYWHEEL.md, when `grep -c role-escalation-target.test.ts docs/FLYWHEEL.md` runs, then it prints 1, and `npm run lint:docs` exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "changelog-entry",
+        "title": "Add changelog.d/pan-5615.md",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-11-23T06:18:55Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5615",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "changelog.d/pan-5615.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create changelog.d/pan-5615.md with exactly one `#### Fixed` heading and the single bullet given in PRD .pan/drafts/PAN-5615.md W9 (bold lead 'Stalled agents reach the Flywheel again:', link ([#5615](https://github.com/eltmon/overdeck/issues/5615))). Follow changelog.d/README.md format; do not edit changelog.mdx."
+        },
+        "items": [
+          {
+            "id": "changelog-entry.ac1",
+            "title": "Given changelog.d/pan-5615.md, when it is read, then it contains exactly one `#### Fixed` heading with one bullet that names conv-flywheel and links https://github.com/eltmon/overdeck/issues/5615.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changelog-entry.ac2",
+            "title": "Given the new file, when `npm run lint:docs` runs, then it exits 0 and changelog.mdx is unchanged in the diff.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "role-plan-escalation-target",
+        "to": "escalation-target-guard-test",
+        "type": "blocks"
+      },
+      {
+        "from": "role-review-escalation-target",
+        "to": "escalation-target-guard-test",
+        "type": "blocks"
+      },
+      {
+        "from": "role-test-escalation-target",
+        "to": "escalation-target-guard-test",
+        "type": "blocks"
+      },
+      {
+        "from": "role-work-escalation-target",
+        "to": "escalation-target-guard-test",
+        "type": "blocks"
+      },
+      {
+        "from": "role-strike-escalation-target",
+        "to": "escalation-target-guard-test",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
