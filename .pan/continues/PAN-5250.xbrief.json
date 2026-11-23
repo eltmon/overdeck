@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5250",
   "created": "2026-11-23T23:10:09.644Z",
-  "updated": "2026-11-23T23:20:19.096Z",
+  "updated": "2026-11-23T23:20:22.265Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -130,6 +130,11 @@
     "wi5-reclaim-service-reasons.ac4": {
       "status": "completed",
       "doneAt": "2026-11-23T23:20:19.095Z"
+    },
+    "wi6-idle-stop-rules": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5250",
+      "claimedAt": "2026-11-23T23:20:22.265Z"
     }
   }
 }
