@@ -78,6 +78,16 @@ describe('rereviewStaleApproval (PAN-4772)', () => {
     expect(requestReview).not.toHaveBeenCalled();
   });
 
+  it('still sees the in-flight review behind a trailing stack.reclaimed (PAN-5623)', async () => {
+    const { deps, requestReview } = journalWorld([
+      { at: '2026-11-02T02:50:00.000Z', type: 'review.requested', issueId: 'PAN-4759', source: 'pan-done' },
+      { at: '2026-11-02T02:52:00.000Z', type: 'stack.reclaimed', issueId: 'PAN-4759', source: 'stack-reclaim' },
+    ]);
+    await expect(rereviewStaleApproval('PAN-4759', STALE, deps))
+      .resolves.toBe('approval is stale at 697a05f8; a review is already running');
+    expect(requestReview).not.toHaveBeenCalled();
+  });
+
   // Review of #4783: only an answer that started (or found) a review latches
   // the head. Any other answer leaves it unlatched, so a later tick asks again.
   it.each([

@@ -39,7 +39,7 @@ import type { LegacyConversation } from '../overdeck/conversations.js';
 import type { PendingAutoMerge, UatGeneration } from '../overdeck/merge-types.js';
 import type { QualityGateMemorySample, QualityGateQueueEntry, QualityGateQueueSnapshot } from '../cloister/quality-gate-admission.js';
 import type { LoadedPr, TrackerIssueFacts } from '../overdeck/derived-issue-state.js';
-import type { PipelineJournalEntry } from '../cloister/pipeline-journal.js';
+import { isHousekeepingEntry, type PipelineJournalEntry } from '../cloister/pipeline-journal.js';
 import {
   FLYWHEEL_CONVERSATION_SESSION,
   FLYWHEEL_FRESHNESS_BREATHING_MS,
@@ -623,7 +623,9 @@ export async function deriveFlywheelStatus(options: DeriveFlywheelStatusOptions 
     const derived = states.get(id);
     const issue = issues[id] ?? null;
     // A tick-only id has no workspace, so it has no journal of its own.
-    const journal = candidate.workspacePath ? await attempt(() => journalTail(candidate.workspacePath!), []) : [];
+    // PAN-5623: stack.* housekeeping entries are never the row's journal tail.
+    const journal = (candidate.workspacePath ? await attempt(() => journalTail(candidate.workspacePath!), []) : [])
+      .filter((entry) => !isHousekeepingEntry(entry));
     const entry = journal[journal.length - 1] ?? null;
     // A strike row with no feature-branch PR carries its open strike PR as
     // `row.pr`; tracker state wins, so a closed issue stays closed even with
