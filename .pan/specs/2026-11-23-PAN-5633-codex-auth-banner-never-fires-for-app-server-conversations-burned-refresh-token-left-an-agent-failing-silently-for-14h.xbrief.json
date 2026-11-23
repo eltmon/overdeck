@@ -1,0 +1,784 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-23T18:59:06Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5633: Codex auth banner never fires for app-server conversations: burned refresh token left an agent failing silently for 14h",
+    "updated": "2026-11-23T19:06:09.049Z"
+  },
+  "plan": {
+    "id": "pan-5633",
+    "title": "Codex auth banner never fires for app-server conversations: burned refresh token left an agent failing silently for 14h",
+    "status": "running",
+    "uid": "c7e4d459-9659-4cdf-ab5c-79c9e5d6b88e",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-23T18:59:06Z",
+    "updated": "2026-11-23T19:06:09.049Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5633",
+        "label": "PAN-5633",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-5633.md",
+        "label": "PRD draft (.pan/drafts/pan-5633.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5636",
+        "label": "PAN-5636 (sibling: conversation UI)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "codex",
+      "auth",
+      "dashboard",
+      "conversations",
+      "banner"
+    ],
+    "narratives": {
+      "Problem": "A Codex conversation failed every turn for 14 hours on an already-used refresh token while the dashboard showed nothing. The banner's burn signal depends on an agent-state flag nothing writes any more, the route passes no agent states, the static classifier cannot see a used refresh token, the Codex parser keeps isWorking true after a failed turn because no agent message is written, and the banner polls only every 120 s.",
+      "Proposal": "Derive the failure from the rollout: the newest turn-end event, a task_complete carrying error.codex_error_info (unauthorized / context_window_exceeded). One leaf reader (codex-thread-status.ts) classifies it; the Codex parser ends turns on task_complete and renders Turn failed rows; conversation rows carry providerError with kind and authRecovered; a cached scan of live Codex sessions feeds GET /api/settings/codex-auth, the reauth-status route, the issue-spawn route and the CLI spawn gate; a failure older than ~/.codex/auth.json's mtime counts as healed. The banner polls every 30 s. The dead burn-flag code is deleted. Conversation-panel UX (row state word, notice with Hand off) is split into PAN-5636.",
+      "NonGoals": "- Changing classifyNativeCodexAuth's static rules\n- Auto-retrying prompts or auto-sending a message after re-auth\n- Auto-handoff of a context-full conversation\n- Blocking message delivery to a conversation while its sign-in is burned\n- Changing the CLIProxy log-based burn check (evaluateBurnedFromLog)\n- A WebSocket push channel for the auth status (polling stays)\n- Detecting failures in stopped sessions or vault browse copies\n- Mapping Codex usageLimitExceeded to usageLimit with a reset time\n- Writing any new agent-state field, flag or database column for the failure\n- Adding a new HTTP route\n- The Command Deck row state word and composer notice with Hand off (sibling issue PAN-5636)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Derive the burn signal from the rollout's task_complete.error instead of writing the agent-state burn flag the issue's agent notes suggest",
+        "rationale": "Conversations have no state.json, the dashboard route passes no agent states, and the repo invariant is that Overdeck stores no status it can derive; the rollout already records every failed turn with a structured codex_error_info."
+      },
+      {
+        "summary": "Classify by codex_error_info first, message regex only as a fallback",
+        "rationale": "The structured code (unauthorized, context_window_exceeded) was verified in the incident rollout and app-server schema; text matching alone is brittle across CLI versions."
+      },
+      {
+        "summary": "After re-auth show 'sign-in fixed, send a message to resume' rather than auto-retrying",
+        "rationale": "The issue allows either; auto-retry replays prompts and, as in the incident, can fail again on a full context. Showing the state is reversible and safe."
+      },
+      {
+        "summary": "Banner poll 30 s with a 15 s single-flight scan cache",
+        "rationale": "Meets the issue's one-minute target (worst case about 45 s) while bounding the 5,100-dir agent-state scan to one per 15 s across all tabs."
+      },
+      {
+        "summary": "Delete the dead burn-flag readers and switch the CLI spawn gate to the same scan",
+        "rationale": "The readers have no writer since PAN-3917; keeping them leaves a gate that can never fire. spawn.ts stays net-zero lines."
+      },
+      {
+        "summary": "Split the conversation-panel UX (row state word, composer notice, Hand off button) into sibling issue PAN-5636",
+        "rationale": "Keeps this plan inside the 25-file finalize limit; the UX consumes only providerError.kind and authRecovered and ships independently."
+      },
+      {
+        "summary": "Put the CodexAuthFailure type in the leaf codex-thread-status.ts module",
+        "rationale": "Breaks the ordering knot between the scan module and codex-auth.ts and keeps codex-auth.ts an import leaf for lint:circular."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-23-PAN-5633-codex-auth-banner-never-fires-for-app-server-conversations-burned-refresh-token-left-an-agent-failing-silently-for-14h.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "wi1-last-turn-reader",
+        "title": "Last-turn reader classifies failed Codex turns",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T18:59:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5633",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "foundationFor": [
+            "wi3-codex-provider-error",
+            "wi4-auth-failure-scan",
+            "wi5-codex-auth-replace-burn-flags"
+          ],
+          "files_scope": [
+            "src/lib/conversations/codex-thread-status.ts",
+            "src/lib/conversations/__tests__/codex-thread-status.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/conversations/__tests__/codex-thread-status.test.ts src/lib/agents/__tests__/external-registry.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "codex-thread-status.test.ts: all six cases pass",
+            "external-registry.test.ts still passes (codexThreadStatus callers unchanged)",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-1: extend src/lib/conversations/codex-thread-status.ts with CodexTurnFailureKind, CodexTurnFailure, CodexAuthFailure, CodexLastTurn, classifyCodexTurnFailure and readCodexLastTurn (newest task_started/task_complete/turn_aborted decides; task_complete with an error object is a failure; codex_error_info unauthorized => auth, context_window_exceeded/contextWindowExceeded => context-window, message regex fallback => auth, else other; object code reads as its first key; message trimmed to 300 chars). Keep the existing 128 KiB O_NONBLOCK tail read and make codexThreadStatus a one-line wrapper so its three callers do not change. Add the new test file with the six cases named in the PRD."
+        },
+        "items": [
+          {
+            "id": "wi1-last-turn-reader.ac1",
+            "title": "Given a rollout whose newest turn event is a task_complete with codex_error_info unauthorized, readCodexLastTurn returns status done and a failure with kind auth, code unauthorized, the record timestamp as at, and the error message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-last-turn-reader.ac2",
+            "title": "Given a task_complete with codex_error_info context_window_exceeded, readCodexLastTurn returns a failure with kind context-window",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-last-turn-reader.ac3",
+            "title": "Given a task_complete error with no codex_error_info whose message contains 'refresh token was already used', classifyCodexTurnFailure returns auth; an object-valued code such as {response_stream_disconnected:{}} returns code response_stream_disconnected and kind other",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-last-turn-reader.ac4",
+            "title": "Given a successful task_complete (no error key) readCodexLastTurn returns failure null, and when task_started is the newest turn event it returns status running",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-last-turn-reader.ac5",
+            "title": "codexThreadStatus keeps its signature and git grep 'codexThreadStatus(' -- src shows codex-subagents.ts, external-registry.ts and transcript-turn.ts unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi2-parser-turn-end",
+        "title": "Codex parser ends turns on task_complete and renders Turn failed rows",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T18:59:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5633",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/dashboard/server/services/codex-conversation-parser.ts",
+            "src/dashboard/server/services/__tests__/codex-conversation-parser.test.ts",
+            "src/dashboard/server/services/conversation/__tests__/activity-summary-sources.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/codex-conversation-parser.test.ts src/dashboard/server/services/__tests__/codex-incremental-parser.test.ts src/dashboard/server/services/conversation/__tests__/activity-summary-sources.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "codex-conversation-parser.test.ts passes including the two new cases",
+            "activity-summary-sources.test.ts passes including the codex failed-turn case",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-2: in src/dashboard/server/services/codex-conversation-parser.ts add an else-if branch after the token_count branch of the event_msg handler: task_complete or turn_aborted sets trailingAgentMessageAt = createdAt; a task_complete carrying an error object also adds one work-log row {id codex-turn-failed-<turn_id>, label and toolTitle 'Turn failed', tone 'error', detail and result = the trimmed error message or 'The turn failed.'} using the existing addWork, rowSuffix and nextRowSequence helpers. Change no other branch. Add the named parser and activity-summary tests."
+        },
+        "items": [
+          {
+            "id": "wi2-parser-turn-end.ac1",
+            "title": "Given a rollout fixture task_started, user message, task_complete with error, the parser returns lastTurnCompletedAt equal to the task_complete timestamp",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-parser-turn-end.ac2",
+            "title": "The same fixture produces a final workLog entry with tone error, label 'Turn failed' and detail equal to the error message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-parser-turn-end.ac3",
+            "title": "Given a fresh rollout (mtime now) ending in a failed turn, summarizeConversationActivity(path, { harness: 'codex' }) returns isWorking false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-parser-turn-end.ac4",
+            "title": "Given a successful task_complete, the parser returns lastTurnCompletedAt set and adds no error row, and the existing codex parser and incremental parser test files still return green results",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi3-codex-provider-error",
+        "title": "Live Codex conversation rows carry providerError for failed turns",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T18:59:06Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5633",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/lib/overdeck/codex-provider-error.ts",
+            "src/lib/overdeck/conversation-provider-error.ts",
+            "src/lib/overdeck/conversation-list.ts",
+            "src/lib/overdeck/__tests__/conversation-list-codex-provider-error.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-list-codex-provider-error.test.ts src/lib/overdeck/__tests__/conversation-provider-error.test.ts src/lib/overdeck/__tests__/conversation-list-costs.test.ts src/lib/overdeck/__tests__/conversation-list-input-target.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-list-codex-provider-error.test.ts passes",
+            "existing conversation-list and conversation-provider-error tests still pass",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-4",
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-3: add optional kind and authRecovered fields to ConversationProviderError in src/lib/overdeck/conversation-provider-error.ts (nothing else there); create src/lib/overdeck/codex-provider-error.ts with codexProviderErrorFromFailure and readCodexConversationProviderError using the exact operator messages in the PRD; in src/lib/overdeck/conversation-list.ts add the codex-rollout-jsonl else-if next to the claude-jsonl providerError line, with a per-call memo of the ~/.codex/auth.json mtime via async stat(getNativeCodexAuthPath()). Add conversation-list-codex-provider-error.test.ts modelled on conversation-list-input-target.test.ts."
+        },
+        "items": [
+          {
+            "id": "wi3-codex-provider-error.ac1",
+            "title": "Given a live (status active, session in listLiveConversationSessions) codex conversation row whose rollout ends in an unauthorized task_complete, the conversation list returns providerError with kind auth, status null, code unauthorized and a message starting 'Codex sign-in failed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-codex-provider-error.ac2",
+            "title": "When ~/.codex/auth.json mtime is later than the failure, codexProviderErrorFromFailure returns authRecovered true and a message starting 'Codex sign-in is fixed. Send a message to resume.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-codex-provider-error.ac3",
+            "title": "A context_window_exceeded failure returns kind context-window and a message starting 'The context window is full and compaction failed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-codex-provider-error.ac4",
+            "title": "Given a live codex row whose last turn succeeded, the list returns providerError null; Claude Code rows keep using readConversationProviderError unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi4-auth-failure-scan",
+        "title": "Scan live Codex sessions for active sign-in failures",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T18:59:06Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5633",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/lib/codex/auth-failure-scan.ts",
+            "src/lib/codex/__tests__/auth-failure-scan.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/codex/__tests__/auth-failure-scan.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "auth-failure-scan.test.ts: all five cases pass",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "traces": [
+            "FR-5",
+            "FR-7",
+            "NFR-1",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-4: create src/lib/codex/auth-failure-scan.ts with listLiveCodexSessionIds (active codex conversations by tmuxSession plus running codex agents from listAgentStatesAsync skipping conv-/ext- dirs), createCodexAuthFailureScanner(deps) with a 15 s single-flight cache driven by an injectable now(), a 64-session cap, per-session errors skipped, and only kind auth failures returned as CodexAuthFailure; export the process-wide scanCodexAuthFailures. Import the type and readCodexLastTurn from codex-thread-status.ts. Never import this module from codex-auth.ts. Add the five named tests with injected deps."
+        },
+        "items": [
+          {
+            "id": "wi4-auth-failure-scan.ac1",
+            "title": "Given three live sessions whose last turns are an auth failure, a context-window failure and a success, the scanner returns exactly one CodexAuthFailure with that session's id and at",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-auth-failure-scan.ac2",
+            "title": "When the scanner is called twice within 15 s of injected time, listSessionIds is called once; when injected time advances 15_001 ms, a second call rescans",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-auth-failure-scan.ac3",
+            "title": "A session whose rollout read throws is skipped and the other sessions' failures are still returned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-auth-failure-scan.ac4",
+            "title": "Given 70 live session ids, resolveRollout is called 64 times",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi5-codex-auth-replace-burn-flags",
+        "title": "Replace the dead burn-flag path with the rollout failure signal",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T18:59:06Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5633",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/lib/codex-auth.ts",
+            "src/lib/__tests__/codex-auth.test.ts",
+            "src/lib/agents/spawn.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/codex-auth.test.ts src/lib/__tests__/agents-spawn-supervisor.test.ts src/lib/__tests__/agents-spawn-tier-fitness.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "codex-auth.test.ts passes including the new active-failure and gate cases",
+            "spawn supervisor and tier-fitness tests still pass",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle",
+            "lint-file-size reports no growth for src/lib/agents/spawn.ts"
+          ],
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-10",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-5: in src/lib/codex-auth.ts import type CodexAuthFailure from ./conversations/codex-thread-status.js, replace CheckCodexAuthOptions.agentStates with authFailures, delete the Pane-burn flag section (CODEX_AUTH_BURNED_REASON_PREFIX, CodexAuthBurnFlagState, codexAuthBurnFlaggedAtMs, filterCodexAuthBurnedAgentIds, listCodexAuthBurnedAgentsSync, hasActiveBurnedCodexAgentsSync) and the unused sync probes, add the new header comment and the pure activeCodexAuthFailures filter, make checkCodexAuthStatus return burned with affectedAgents from active failures, and make assertCodexNativeAuthForSpawn async with a loadAuthFailures loader. Change exactly the two call lines in src/lib/agents/spawn.ts to await the gate with a dynamic import of the scan module; spawn.ts must not gain a line. Replace the burn-flag tests in codex-auth.test.ts. Run the lint:circular checkpoint and apply the PRD fallback if a new cycle appears."
+        },
+        "items": [
+          {
+            "id": "wi5-codex-auth-replace-burn-flags.ac1",
+            "title": "git grep -n 'codex-auth-burned\\|CodexAuthBurnFlagState\\|filterCodexAuthBurnedAgentIds\\|hasActiveBurnedCodexAgentsSync' -- src returns no matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-codex-auth-replace-burn-flags.ac2",
+            "title": "Given authFailures with one failure at or after the auth.json mtime, checkCodexAuthStatus returns status burned, source native and affectedAgents [that id]; a failure older than the mtime returns the static status instead",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-codex-auth-replace-burn-flags.ac3",
+            "title": "assertCodexNativeAuthForSpawn rejects a codex spawn with the 'revoked' reason while an active auth failure exists, and never calls the loader for a non-codex harness",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-codex-auth-replace-burn-flags.ac4",
+            "title": "Given origin/main, src/lib/agents/spawn.ts contains the same number of lines after the change, and both gate call sites contain 'await assertCodexNativeAuthForSpawn'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-codex-auth-replace-burn-flags.ac5",
+            "title": "src/lib/codex-auth.ts contains no import statement or dynamic import() referencing auth-failure-scan, agents/queries or overdeck/conversations (git grep -nE \"(from|import\\\\()\\\\s*'[^']*(auth-failure-scan|agents/queries|overdeck/conversations)\" src/lib/codex-auth.ts returns no matches)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi6-routes-pass-scan",
+        "title": "Dashboard routes pass live-session failures into the auth check",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T18:59:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-5633",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/dashboard/server/routes/codex-auth.ts",
+            "src/dashboard/server/routes/agents/spawn-issue.ts",
+            "src/dashboard/server/routes/__tests__/codex-auth.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/codex-auth.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "routes/__tests__/codex-auth.test.ts passes including both new cases",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-6: in src/dashboard/server/routes/codex-auth.ts replace the PAN-3917 comment and checkCodexAuth({}) in GET /api/settings/codex-auth with a scanCodexAuthFailures() call passed as authFailures, and pass authFailures in POST /api/settings/codex-reauth/status keeping the ignoreBurnBefore spread; in src/dashboard/server/routes/agents/spawn-issue.ts pass { authFailures: await scanCodexAuthFailures() } to checkCodexAuthStatus. Add no route. Mock the scan module in the route test and add the two named cases."
+        },
+        "items": [
+          {
+            "id": "wi6-routes-pass-scan.ac1",
+            "title": "Given a mocked scan returning a failure whose at is later than auth.json mtime, GET /api/settings/codex-auth returns status burned with affectedAgents containing that session id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-routes-pass-scan.ac2",
+            "title": "Given the same failure but auth.json rewritten after it, GET /api/settings/codex-auth returns status valid",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-routes-pass-scan.ac3",
+            "title": "spawn-issue.ts passes authFailures from scanCodexAuthFailures to checkCodexAuthStatus, and the subscription spawn path returns the existing 429 blocked response when the status is burned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi7-banner-poll",
+        "title": "Codex auth banner polls every 30 s and counts failing sessions",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T18:59:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5633",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/dashboard/frontend/src/hooks/useCodexAuthStatus.ts",
+            "src/dashboard/frontend/src/components/CodexAuthBanner.tsx",
+            "src/dashboard/frontend/src/components/CodexAuthBanner.test.tsx"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/CodexAuthBanner.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "CodexAuthBanner.test.tsx passes including both new cases",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-7: in src/dashboard/frontend/src/hooks/useCodexAuthStatus.ts export CODEX_AUTH_REFETCH_MS = 30_000 and CODEX_AUTH_STALE_MS = 15_000 and use them in useQuery, and update the affectedAgents comment; in src/dashboard/frontend/src/components/CodexAuthBanner.tsx change the affected count text to '<n> Codex session(s) failing on a revoked sign-in'. Add the two named banner tests."
+        },
+        "items": [
+          {
+            "id": "wi7-banner-poll.ac1",
+            "title": "Given a burned status with two affectedAgents, the banner renders '2 Codex sessions failing on a revoked sign-in'; with one it renders '1 Codex session failing on a revoked sign-in'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-banner-poll.ac2",
+            "title": "Given useCodexAuthStatus, the query uses refetchInterval CODEX_AUTH_REFETCH_MS (30_000) and staleTime CODEX_AUTH_STALE_MS (15_000), and the banner test asserts both constants",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-banner-poll.ac3",
+            "title": "The Re-authenticate button still renders for expired and burned statuses and the banner returns null for valid",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi8-panel-working",
+        "title": "Conversation panel stops the working indicator after an error row",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T18:59:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5633",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/workingPhase.ts",
+            "src/dashboard/frontend/src/lib/__tests__/workingPhase.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/lib/__tests__/workingPhase.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "workingPhase.test.ts passes including the three new cases and every existing case",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-8: in src/dashboard/frontend/src/lib/workingPhase.ts isConversationWorking, insert before the msgRecent user/assistant check a rule that returns false when the last work-log entry has tone error, has no toolInput, and its createdAt is at or after the last message's time (or there is no parseable last message). The !toolInput guard is required: the Claude Code parser marks failed tool results tone error and those rows carry toolInput, so they must stay working mid-turn. Add the three named tests to workingPhase.test.ts."
+        },
+        "items": [
+          {
+            "id": "wi8-panel-working.ac1",
+            "title": "Given a recent user message followed by a tone error work-log entry without toolInput, isConversationWorking returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-panel-working.ac2",
+            "title": "Given a tone error entry followed by a newer user message, isConversationWorking returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-panel-working.ac3",
+            "title": "Given a recent assistant message followed by a tone error entry that carries toolInput (a Claude failed tool result), isConversationWorking returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-panel-working.ac4",
+            "title": "Given the pre-existing workingPhase.test.ts cases, each returns the same result as before the change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi9-docs",
+        "title": "Document the Codex sign-in failure signal and add the changelog entry",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T18:59:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5633",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "configuration/harnesses.mdx",
+            "changelog.d/pan-5633.md"
+          ],
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n 'Codex sign-in failures (PAN-5633)' docs/DASHBOARD-ARCHITECTURE.md",
+            "grep -n 'auth-failure-scan.ts' docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors",
+            "DASHBOARD-ARCHITECTURE.md contains the new section heading and names auth-failure-scan.ts"
+          ],
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-9: in docs/DASHBOARD-ARCHITECTURE.md extend the DirectoryEntry.providerError paragraph with the Codex source, kind and authRecovered and the three operator messages, and add a '## Codex sign-in failures (PAN-5633)' subsection after the Scheduled messages section covering readCodexLastTurn, auth-failure-scan.ts (64 cap, 128 KiB tail, 15 s single-flight cache), the healing rule, the 30 s banner poll (worst case about 45 s), burned plus affectedAgents, the spawn gates, no restart after codex login and no auto-retry; add the bullet from the PRD to the OpenAI Codex CLI section of configuration/harnesses.mdx; create changelog.d/pan-5633.md with the exact #### Fixed entry in the PRD."
+        },
+        "items": [
+          {
+            "id": "wi9-docs.ac1",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains a '## Codex sign-in failures (PAN-5633)' section that names auth-failure-scan.ts, the 15 s cache, the 30 s banner poll and the auth.json mtime healing rule",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-docs.ac2",
+            "title": "configuration/harnesses.mdx shows a Codex bullet telling the operator the banner appears within about a minute and that running sessions pick up a new codex login without a restart",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-docs.ac3",
+            "title": "changelog.d/pan-5633.md contains a single '#### Fixed' section with a bullet linking #5633, and npm run lint:docs passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wi1-last-turn-reader",
+        "to": "wi3-codex-provider-error",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-last-turn-reader",
+        "to": "wi4-auth-failure-scan",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-last-turn-reader",
+        "to": "wi5-codex-auth-replace-burn-flags",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-parser-turn-end",
+        "to": "wi3-codex-provider-error",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4-auth-failure-scan",
+        "to": "wi5-codex-auth-replace-burn-flags",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4-auth-failure-scan",
+        "to": "wi6-routes-pass-scan",
+        "type": "blocks"
+      },
+      {
+        "from": "wi5-codex-auth-replace-burn-flags",
+        "to": "wi6-routes-pass-scan",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-codex-provider-error",
+        "to": "wi9-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "wi6-routes-pass-scan",
+        "to": "wi9-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "wi7-banner-poll",
+        "to": "wi9-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "wi8-panel-working",
+        "to": "wi9-docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

@@ -171,6 +171,77 @@ describe('codex conversation parser', () => {
 });
 
 /**
+ * PAN-5633: a failed Codex turn writes the user message, then a `task_complete`
+ * carrying `error`, and no agent message. The turn-end event must end the turn
+ * and the error must reach the timeline.
+ */
+describe('codex conversation parser — turn-end events (PAN-5633)', () => {
+  const AUTH_ERROR = 'Error running remote compact task: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.';
+  let dir: string;
+
+  beforeEach(async () => { dir = await mkdtemp(join(tmpdir(), 'codex-turn-end-')); });
+  afterEach(async () => { await rm(dir, { recursive: true, force: true }); });
+
+  async function rollout(lines: unknown[]): Promise<string> {
+    const file = join(dir, 'rollout-turn-end.jsonl');
+    await writeFile(file, lines.map((l) => JSON.stringify(l)).join('\n') + '\n', 'utf-8');
+    return file;
+  }
+
+  function failedTurn(at: (offsetMs: number) => string): unknown[] {
+    return [
+      { type: 'event_msg', timestamp: at(-3_000), payload: { type: 'task_started', turn_id: 'turn-1' } },
+      { type: 'event_msg', timestamp: at(-2_000), payload: { type: 'user_message', message: 'are you there?' } },
+      { type: 'event_msg', timestamp: at(-1_000), payload: { type: 'task_complete', turn_id: 'turn-1', last_agent_message: null, error: { message: AUTH_ERROR, codex_error_info: 'unauthorized' } } },
+    ];
+  }
+
+  it('ends the turn on a failed task_complete and renders a Turn failed row', async () => {
+    const base = Date.parse('2026-11-23T17:33:20.000Z');
+    const file = await rollout(failedTurn((offset) => new Date(base + offset).toISOString()));
+
+    const result = await parseCodexConversationMessages(file);
+
+    expect(result.lastTurnCompletedAt).toBe(new Date(base - 1_000).toISOString());
+    const last = result.workLog[result.workLog.length - 1];
+    expect(last).toMatchObject({
+      id: 'codex-turn-failed-turn-1',
+      tone: 'error',
+      label: 'Turn failed',
+      toolTitle: 'Turn failed',
+      detail: AUTH_ERROR,
+      result: AUTH_ERROR,
+    });
+    expect(result.messages.map((m) => m.role)).toEqual(['user']);
+  });
+
+  it('a successful task_complete sets lastTurnCompletedAt and adds no error row', async () => {
+    const file = await rollout([
+      { type: 'event_msg', timestamp: '2026-11-18T14:30:40.000Z', payload: { type: 'task_started', turn_id: 'turn-0' } },
+      { type: 'event_msg', timestamp: '2026-11-18T14:30:41.000Z', payload: { type: 'user_message', message: 'hi' } },
+      { type: 'event_msg', timestamp: '2026-11-18T14:30:48.000Z', payload: { type: 'agent_message', message: 'Hello.' } },
+      { type: 'event_msg', timestamp: '2026-11-18T14:30:49.000Z', payload: { type: 'task_complete', turn_id: 'turn-0', last_agent_message: 'Hello.' } },
+    ]);
+
+    const result = await parseCodexConversationMessages(file);
+
+    expect(result.lastTurnCompletedAt).toBe('2026-11-18T14:30:49.000Z');
+    expect(result.workLog.some((w) => w.tone === 'error')).toBe(false);
+  });
+
+  it('codex: a failed turn is not working even when the rollout is fresh', async () => {
+    // Written now, so the rollout mtime is fresh and every recency guard passes.
+    const now = Date.now();
+    const file = await rollout(failedTurn((offset) => new Date(now + offset).toISOString()));
+
+    const result = await summarizeConversationActivity(file, { harness: 'codex' });
+
+    expect(result.isWorking).toBe(false);
+    expect(result.currentTool).toBeNull();
+  });
+});
+
+/**
  * PAN-3781 — codex-cli >= 0.153.4 renamed the rollout's message events. Every
  * assertion here has a twin in the legacy suite above; both shapes must render
  * identically, because old rollouts on disk keep the old names forever.

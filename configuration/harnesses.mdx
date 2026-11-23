@@ -390,6 +390,12 @@ Stored conversations with `harness: pi` read as pi. They all predate the
   `Codex model floor` row per model. On the claude-code harness through
   CLIProxy, CLIProxy `7.3.16` (the pin until [PAN-5282](https://github.com/eltmon/overdeck/issues/5282) moved it to `v8.0.71`) was verified
   on 2026-09-29 to serve `gpt-6-sol`, `gpt-6-luna` and `gpt-6.1-sol` under ChatGPT sign-in. The same version served `gpt-6.1-terra` on the claude-code harness on 2026-11-11 ([PAN-4634](https://github.com/eltmon/overdeck/issues/4634)); on 2026-10-26 it did not. CLIProxy refreshes its model list from a remote catalog every three hours, so which models it serves can change without a version change. CLIProxy `v8.0.71` listed and served `gpt-6.2-astra` and `gpt-6.2-sol` under ChatGPT sign-in on 2026-11-18 ([PAN-5522](https://github.com/eltmon/overdeck/issues/5522)). It does not list `gpt-6-rosalind` or `gpt-6-astra-law`; use those on the Codex harness.
+- When a Codex turn fails because the shared sign-in is dead (a used or
+  revoked refresh token), the dashboard shows the Codex authentication banner
+  within about a minute. Click **Re-authenticate** or run `codex login`;
+  running sessions pick up the new sign-in without a restart. Send a message
+  to resume each affected conversation. A conversation whose context is full
+  and cannot compact shows that error and needs a handoff.
 - Work agents use a persistent `codex app-server` child by default. Overdeck
   talks newline-delimited JSON-RPC over stdio, so message delivery, approvals,
   readiness, and interruption are structured protocol events rather than TUI
