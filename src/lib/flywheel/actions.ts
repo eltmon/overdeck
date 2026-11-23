@@ -279,6 +279,22 @@ export async function requestFlywheelReport(deps: FlywheelActionDeps = {}): Prom
 }
 
 /**
+ * Hand an order book to a flywheel that is already running (PAN-5601): send
+ * `/pan-flywheel <book-id> --project <key>` to the live conversation through
+ * the same delivery `resume` and `report` use. A delivery failure throws.
+ */
+export async function sendOrderBookToFlywheel(
+  orders: string,
+  projectKey: string,
+  deps: FlywheelActionDeps = {},
+): Promise<{ session: string; prompt: string }> {
+  await requireRunning(deps);
+  const prompt = `${FLYWHEEL_SKILL_COMMAND} ${orders} --project ${projectKey}`;
+  await (deps.sendMessage ?? defaultSendMessage)(FLYWHEEL_CONVERSATION_SESSION, prompt, 'pan orders start');
+  return { session: FLYWHEEL_CONVERSATION_SESSION, prompt };
+}
+
+/**
  * Graceful stop: ask the loop to write, commit, and push its report, then
  * poll every 5 s for the loop's `phase=stopping` tick newer than the request
  * — the skill prints it only after the commit and push, so pausing earlier

@@ -14,6 +14,7 @@ import {
 } from '../../lib/orders/writer.js';
 import { findProjectByPath, getProjectSync, resolveProjectPath, type ProjectConfig } from '../../lib/projects.js';
 import { getProjectPanPaths } from '../../lib/pan-dir/paths.js';
+import type { FlywheelRunResult } from './flywheel.js';
 import { commitPlanArtifacts, pushPlanArtifacts } from '../../lib/overdeck/plan-artifact-commit.js';
 import { surfacePlanArtifactPush } from '../../lib/overdeck/plan-artifact-push-report.js';
 
@@ -23,7 +24,7 @@ interface OrdersCommandDeps {
   projectKey?: string;
   now?: () => Date;
   actor?: string;
-  startOrderBook?: (bookId: string) => Promise<{ runId: string }>;
+  startOrderBook?: (bookId: string) => Promise<FlywheelRunResult>;
 }
 
 interface OrdersAddOptions {
@@ -140,7 +141,7 @@ export function formatBookList(books: readonly OrderBook[]): string {
   ].join('\n');
 }
 
-async function defaultStartOrderBook(bookId: string, project?: ProjectConfig): Promise<{ runId: string }> {
+async function defaultStartOrderBook(bookId: string, project?: ProjectConfig): Promise<FlywheelRunResult> {
   const { startFlywheelRun } = await import('./flywheel.js');
   return startFlywheelRun({ cwd: project ? resolveProjectPath(project) : undefined, orders: bookId });
 }
@@ -242,7 +243,7 @@ export async function runOrdersMove(
   return moved;
 }
 
-export async function runOrdersStart(bookId: string, deps: OrdersCommandDeps = {}): Promise<{ runId: string }> {
+export async function runOrdersStart(bookId: string, deps: OrdersCommandDeps = {}): Promise<FlywheelRunResult> {
   const resolved = resolveOrdersProject(deps);
   await requireBook(resolved.panDir, bookId);
   return (deps.startOrderBook ?? ((id: string) => defaultStartOrderBook(id, resolved.projectConfig)))(bookId);
@@ -337,6 +338,10 @@ export function createOrdersCommand(): Command {
     .option('--project <key>', 'Resolve the order book in another registered project')
     .action((id: string, options: { project?: string }) => commandAction(async () => {
       const result = await runOrdersStart(id, { projectKey: options.project });
+      if (result.delivered === 'running-conversation') {
+        console.log(`Flywheel already running; sent order book ${id} to conversation ${result.runId}`);
+        return;
+      }
       console.log(`Flywheel started: ${result.runId}`);
       console.log(`Order book: ${id}`);
     }));

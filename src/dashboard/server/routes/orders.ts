@@ -34,6 +34,8 @@ interface RouteResult {
 
 interface StartOrderBookResult {
   runId: string;
+  /** PAN-5601: whether the book opened a new flywheel or went to the running one. */
+  delivered?: 'started' | 'running-conversation';
 }
 
 export interface OrdersRouteDeps {
@@ -503,7 +505,12 @@ export async function postOrderStartPayload(
       if (!resolved.projectConfig) throw new Error(`No configured project contains ${process.cwd()}`);
       result = await defaultStartOrderBook(book, resolved.projectConfig);
     }
-    return { ok: true, runId: result.runId, warnings: validation.warns };
+    return {
+      ok: true,
+      runId: result.runId,
+      ...(result.delivered ? { delivered: result.delivered } : {}),
+      warnings: validation.warns,
+    };
   }).then((result) => {
     if (
       result.status === 200

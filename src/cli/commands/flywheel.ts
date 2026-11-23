@@ -20,6 +20,7 @@ import {
   pauseFlywheel,
   requestFlywheelReport,
   resumeFlywheel,
+  sendOrderBookToFlywheel,
   startFlywheel,
   stopFlywheel,
   type FlywheelStartOptions,
@@ -64,19 +65,41 @@ export async function flywheelStartCommand(options: FlywheelStartOptions = {}): 
   });
 }
 
+export interface FlywheelRunResult {
+  runId: string;
+  /**
+   * `started`: a new flywheel conversation opened with the book.
+   * `running-conversation`: the flywheel was already running, so the book was
+   * sent to its conversation. Absent when the flywheel was already running and
+   * there was no book to send.
+   */
+  delivered?: 'started' | 'running-conversation';
+}
+
 /**
  * `pan orders start <book>` — the order book is an input to the flywheel, so
- * starting one starts the flywheel conversation and names the book. A flywheel
- * that is already running keeps running; the dashboard's orders route calls
- * this too, so it never prints or sets an exit code.
+ * starting one starts the flywheel conversation and names the book. When the
+ * flywheel is already running, the book is sent to its conversation
+ * (`/pan-flywheel <book> --project <key>`); a failed delivery throws, so the
+ * book is never dropped silently (PAN-5601). The dashboard's orders route
+ * calls this too, so it never prints or sets an exit code.
  */
-export async function startFlywheelRun(options: FlywheelStartOptions = {}): Promise<{ runId: string }> {
+export async function startFlywheelRun(options: FlywheelStartOptions = {}): Promise<FlywheelRunResult> {
   try {
     await startFlywheel(options);
+    return { runId: FLYWHEEL_CONVERSATION_SESSION, delivered: 'started' };
   } catch (error) {
     if (!(error instanceof FlywheelAlreadyRunning)) throw error;
   }
-  return { runId: FLYWHEEL_CONVERSATION_SESSION };
+  if (!options.orders) return { runId: FLYWHEEL_CONVERSATION_SESSION };
+  const cwd = options.cwd ?? process.cwd();
+  const { resolveProjectKeyForCwdAsync } = await import('../../lib/projects.js');
+  const projectKey = await resolveProjectKeyForCwdAsync(cwd);
+  if (!projectKey) {
+    throw new Error(`Flywheel already running, but order book ${options.orders} was not sent: no registered project contains ${cwd}`);
+  }
+  await sendOrderBookToFlywheel(options.orders, projectKey);
+  return { runId: FLYWHEEL_CONVERSATION_SESSION, delivered: 'running-conversation' };
 }
 
 export async function flywheelStopCommand(options: FlywheelStopOptions = {}): Promise<void> {
