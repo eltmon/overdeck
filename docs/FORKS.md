@@ -235,6 +235,26 @@ pending-input feed also lists every unarchived held conversation (alive or
 ended) with `heldKickoff: { since, focus? }`, so Awareness → Needs you shows
 it under Waiting until it is started or archived.
 
+**Undelivered kickoff (PAN-4242).** When a fork's kickoff delivery is
+refused, the kickoff becomes the conversation's held kickoff. A refusal
+(`refused: …`: Herdr's `agent_blocked` when the pane sits at a dialog such as
+Claude Code's folder-trust prompt, or the tmux guard) types nothing, so
+`assertForkDelivered` throws `ForkDeliveryRefusedError` and `deliverForkSeed`
+stores the seed with `restoreHeldKickoff`, which never overwrites a kickoff
+already held. Only refused deliveries are held: any other failure, and a
+`stranded` turn whose text already reached the pane, store nothing, so the
+text can never be sent twice. The failed conversation then shows as a held
+handoff with **Start**, and `pan answer conv-<name>` can answer the dialog
+first. A resume by respawn through `POST /api/conversations/:name/resume`
+delivers the held kickoff once, in place of the `CONVERSATION RESUME` notice
+(`deliverResumeNoticeOrKickoff` in
+`src/lib/overdeck/conversation-undelivered-kickoff.ts`, with `deliverForkSeed`
+passed in as `deliverKickoff`); a failed delivery restores the hold. A resume
+never sends a kickoff whose fork request asked for a hold (`hold: true`, from
+`pan handoff --hold`; `forkRequestedHold`); only Start sends that one. Resumes
+started without a deliverer (message auto-resume, scheduled messages, the
+Flywheel) send the resume notice and leave the kickoff held.
+
 `pan handoff --skill <name>` / `--pack <id>` write only the successor's
 `conversations.skill_overrides` (PAN-4486's per-conversation skill layer) —
 `src/lib/skill-overrides/conversation-flags.ts` resolves the requested names

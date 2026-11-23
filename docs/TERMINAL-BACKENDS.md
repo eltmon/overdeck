@@ -100,6 +100,22 @@ with the missing import when nothing registered it.
 creates the issue workspace, starts the pane, and stamps the tokens. Every launcher goes through
 it, so none of them can forget a token — see "Spawn paths" below for the full list.
 
+**Claude Code folder trust (PAN-3905, PAN-4242).** Before it starts a Claude Code pane,
+`launchAgentPane` marks trusted in `~/.claude.json` the cwd as given, its real path (a trailing
+slash or a symlink otherwise writes a key Claude Code never reads) and, inside a git working tree,
+the repository root (the main checkout; `claudeTrustTargets` in
+`src/lib/workspace-manager/worktree-ops.ts`). Home and `/` are never trusted. The repository root
+is needed because Claude Code 2.1.x shows its folder-trust dialog ("This folder pre-approves N tool
+permissions … No, continue without these permissions / Yes, I trust this folder") for a worktree
+whose `.claude/settings.json` carries `permissions.allow` rules until the root is trusted, even when
+the worktree itself is. Workspace settings sync no longer copies the operator's user-level
+`permissions` block into workspaces, since those rules already apply to every session. If a Claude
+Code agent still has written no transcript 180 s after launch and its pane shows a blocking menu,
+its enrichment reports `pendingInputKinds: ['paneQuestion']` (reason `startup_blocked`,
+`src/lib/agents/startup-stall.ts`) with the menu and the command to answer it. `pan answer
+<agent-or-conv> [n]` lists and answers such a menu, the folder-trust dialog included, through the
+host's backend (`resolveAgentPaneIo`), so it works on Herdr as well as tmux.
+
 ### Session naming and isolation
 
 The Herdr session name is the **per-home instance name**, `managedInstanceName()` in

@@ -71,6 +71,13 @@ A steer never falls back silently to a queued message. A harness without steer a
   yet, so treat it as experimental. See
   [Local models (Ollama)](/configuration/local-models).
 - Works with both subscription auth (Claude Code OAuth) and API-key auth.
+- **Folder trust.** Before each launch Overdeck marks the launch folder and its
+  git repository root trusted in `~/.claude.json`, so an agent never waits at
+  Claude Code's "Is this a project you trust?" dialog. Overdeck does not copy
+  your user-level `permissions` into workspace `.claude/settings.json`; they
+  already apply to every session. If an agent is still stuck at a startup
+  menu three minutes after launch, Needs you lists it, and
+  `pan answer <agent> <n>` answers it on Herdr and tmux (PAN-4242).
 - All role runs (`plan`, `work`, `review`, `test`, `ship`) default here.
 - The model picker includes Claude Fable 5.2 (`claude-fable-5-2`): 1M context,
   128K maximum output, always-on adaptive thinking, and low through max effort.
