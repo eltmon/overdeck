@@ -121,12 +121,19 @@ describe('fitsAloneAboveHardReserve (PAN-5621)', () => {
     estimateBytes: 2_864_852_992,
   }
 
-  it('is false when the hard reserve would be breached', () => {
-    expect(fitsAloneAboveHardReserve({ ...base, memAvailableBytes: 10.4e9 })).toBe(false)
+  it('is not ok when the hard reserve would be breached', () => {
+    expect(fitsAloneAboveHardReserve({ ...base, memAvailableBytes: 10.4e9 })).toEqual({ ok: false, footprintBytes: base.estimateBytes })
   })
 
-  it('is true once MemAvailable leaves the hard reserve free', () => {
-    expect(fitsAloneAboveHardReserve({ ...base, memAvailableBytes: 11.5e9 })).toBe(true)
+  it('is ok once MemAvailable leaves the hard reserve free', () => {
+    expect(fitsAloneAboveHardReserve({ ...base, memAvailableBytes: 11.5e9 })).toEqual({ ok: true, footprintBytes: base.estimateBytes })
+  })
+
+  it('clamps an estimate larger than memTotal minus the hard reserve', () => {
+    const verdict = fitsAloneAboveHardReserve({
+      memAvailableBytes: 60 * GiB, memTotalBytes: 10 * GiB, hardReserveBytes: 8 * GiB, estimateBytes: 50 * GiB,
+    })
+    expect(verdict.footprintBytes).toBe(2 * GiB)
   })
 })
 

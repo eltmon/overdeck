@@ -149,7 +149,7 @@ export function evaluateMemoryHeadroom(input: MemoryHeadroomInput): MemoryHeadro
   return { ok: headroomBytes >= input.softReserveBytes, footprintBytes, headroomBytes }
 }
 
-export interface AloneHeadroomInput {
+export interface FitsAloneInput {
   memAvailableBytes: number
   memTotalBytes: number
   hardReserveBytes: number
@@ -157,13 +157,14 @@ export interface AloneHeadroomInput {
 }
 
 /**
- * PAN-5285: alone, the gate would still leave the hard reserve free. Its
- * footprint is clamped to what the host could give it above the hard
- * reserve, not the soft reserve, so a large estimate is never under-counted.
+ * PAN-5285 alone rule, shared with starvation detection (PAN-5621): admitted
+ * alone, the gate must still leave the hard reserve free. The footprint is
+ * clamped to what the host could give it above the hard reserve, so a large
+ * estimate is never under-counted.
  */
-export function fitsAloneAboveHardReserve(input: AloneHeadroomInput): boolean {
+export function fitsAloneAboveHardReserve(input: FitsAloneInput): { ok: boolean; footprintBytes: number } {
   const footprintBytes = Math.min(input.estimateBytes, Math.max(0, input.memTotalBytes - input.hardReserveBytes))
-  return input.memAvailableBytes - footprintBytes >= input.hardReserveBytes
+  return { ok: input.memAvailableBytes - footprintBytes >= input.hardReserveBytes, footprintBytes }
 }
 
 /**

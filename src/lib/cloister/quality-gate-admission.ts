@@ -729,7 +729,7 @@ export async function acquireQualityGateAdmission(
     memTotalBytes: poll.memory.memTotalBytes,
     hardReserveBytes: poll.hardReserveBytes,
     estimateBytes,
-  })
+  }).ok
   /**
    * Why we must keep our place behind `ahead`, or null when we may pass all of
    * them: each is blocked on memory and the head is not due to run alone. A
