@@ -78,6 +78,7 @@ import { startScheduledMessagePatrol, stopScheduledMessagePatrol } from './servi
 import { warnIfAutonomousMergeBackendUnavailable } from './services/merge-backend-health.js';
 import { warnIfAppCannotMerge } from './services/merge-app-scopes-health.js';
 import { startConversationSearchWatcher, stopConversationSearchWatcher } from './services/conversation-search-watcher.js';
+import { republishConversationSearchActivity } from './services/conversation-search-activity.js';
 import { startConversationRescanScheduler, stopConversationRescanScheduler } from './services/conversation-rescan-scheduler.js';
 import { startConversationSweeps, stopConversationSweeps } from './services/conversation-sweeps.js';
 import { startVaultService, stopVaultService } from './services/vault-service.js';
@@ -651,6 +652,10 @@ if (!isPeerDashboard) {
 
 void (async () => {
   const store = await initEventStore();
+  // PAN-5609: the startup sweep can begin (and emit) before this resolves;
+  // republish whatever the tracker currently holds so a client that connects
+  // in that window still sees it instead of a stuck idle indicator.
+  republishConversationSearchActivity();
   // Request serving comes first. Resource convergence starts only after the
   // Node 22 server has bound its socket, then all boot/event/periodic work flows
   // through the same non-overlapping project queue.

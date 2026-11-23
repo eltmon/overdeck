@@ -369,15 +369,23 @@ export class ConversationSearchWatcher {
     this.pending.set(filePath, timer);
   }
 
-  /** PAN-5609 — report the current watcher queue to the activity tracker. */
+  /**
+   * PAN-5609 — report the current watcher queue to the activity tracker.
+   * `rerun` counts as waiting work too (CodeRabbit): a file re-queues there
+   * while its current index pass is still in flight, so the indicator must
+   * not report zero waiting files until that pass finishes. Moving a file
+   * from `rerun` to `queued` (the task `.finally` below) is a net-zero change
+   * to this total, so the reported count does not jump at that transition.
+   */
   private reportQueue(startedFile?: string): void {
     if (this.stopped) return;
-    this.activity.setQueue(this.queued.size, this.inFlight.size, startedFile);
+    this.activity.setQueue(this.queued.size + this.rerun.size, this.inFlight.size, startedFile);
   }
 
   private enqueue(filePath: string): void {
     if (this.inFlight.has(filePath)) {
       this.rerun.add(filePath);
+      this.reportQueue();
       return;
     }
     this.queued.add(filePath);
@@ -417,11 +425,13 @@ export class ConversationSearchWatcher {
       const task = this.indexFile({ filePath, config: this.config, signal })
         .then((result) => {
           if (result.disabled) return;
-          this.activity.recordIncrementalFile(result.chunksIndexed);
+          // PAN-5609: a stopped watcher's in-flight completions must not bleed
+          // into a replacement watcher's burst (CodeRabbit).
+          if (!this.stopped) this.activity.recordIncrementalFile(result.chunksIndexed);
           const firstError = result.errors[0];
           if (firstError) {
             recordConversationSearchFailure(firstError.message);
-            this.activity.recordIncrementalError(firstError.message);
+            if (!this.stopped) this.activity.recordIncrementalError(firstError.message);
           } else {
             recordConversationSearchSuccess();
           }
@@ -432,7 +442,7 @@ export class ConversationSearchWatcher {
           }
           if (!isAbortError(error)) {
             recordConversationSearchFailure(error);
-            this.activity.recordIncrementalError(error);
+            if (!this.stopped) this.activity.recordIncrementalError(error);
             this.log.warn(`[conversation-search] failed to index ${filePath}:`, error);
           }
         })

@@ -1,7 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ConversationSearchActivitySnapshot } from '@overdeck/contracts';
-import { createConversationSearchActivityTracker, toLegacyReindexProgress } from '../conversation-search-activity.js';
+
+const mocks = vi.hoisted(() => ({ emitOnly: vi.fn() }));
+vi.mock('../../event-store.js', () => ({ getEventStore: () => ({ emitOnly: mocks.emitOnly }) }));
+
+import {
+  conversationSearchActivity,
+  createConversationSearchActivityTracker,
+  republishConversationSearchActivity,
+  toLegacyReindexProgress,
+} from '../conversation-search-activity.js';
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -31,7 +40,7 @@ describe('createConversationSearchActivityTracker (PAN-5609 WI-2)', () => {
     )
   })
 
-  it('a trailing emit after end() carries active:false and endedAt set', () => {
+  it('end() emits immediately, bypassing the throttle, with active:false and endedAt set (CodeRabbit)', () => {
     const emit = vi.fn()
     const tracker = createConversationSearchActivityTracker({ emit })
     const handle = tracker.beginBatch('full-reindex')
@@ -39,14 +48,19 @@ describe('createConversationSearchActivityTracker (PAN-5609 WI-2)', () => {
     handle.progress({ filesScanned: 5, filesIndexed: 2, chunksIndexed: 9 })
     vi.advanceTimersByTime(10)
     handle.end()
-    expect(emit).toHaveBeenCalledTimes(1)
-
-    vi.advanceTimersByTime(500)
+    // A run ending is a discrete, low-frequency event: it must reach
+    // subscribers at once, not wait out the 500ms progress throttle (a
+    // delayed terminal emit can otherwise let a stale "still active"
+    // snapshot satisfy the frontend's 3s show gate after the run is over).
     expect(emit).toHaveBeenCalledTimes(2)
     const snapshot = emit.mock.calls[1]![0] as ConversationSearchActivitySnapshot
     expect(snapshot.active).toBe(false)
     expect(snapshot.endedAt).not.toBeNull()
     expect(snapshot.filesIndexed).toBe(2)
+
+    // No further emit is pending for this already-delivered terminal state.
+    vi.advanceTimersByTime(500)
+    expect(emit).toHaveBeenCalledTimes(2)
   })
 
   it('a stale handle is a no-op', () => {
@@ -78,6 +92,19 @@ describe('createConversationSearchActivityTracker (PAN-5609 WI-2)', () => {
     tracker.setQueue(0, 0)
     snapshot = tracker.getSnapshot()
     expect(snapshot).toMatchObject({ active: false, kind: 'incremental', filesIndexed: 1, chunksIndexed: 4, currentFile: null })
+  })
+
+  it('a burst ending (queue drains to 0) emits immediately, bypassing the throttle (CodeRabbit)', () => {
+    const emit = vi.fn()
+    const tracker = createConversationSearchActivityTracker({ emit })
+    tracker.setQueue(1, 0)
+    expect(emit).toHaveBeenCalledTimes(1)
+
+    vi.advanceTimersByTime(10)
+    tracker.setQueue(0, 0)
+    expect(emit).toHaveBeenCalledTimes(2)
+    const snapshot = emit.mock.calls[1]![0] as ConversationSearchActivitySnapshot
+    expect(snapshot.active).toBe(false)
   })
 
   it('shows queue counts during a batch without changing its kind', () => {
@@ -168,3 +195,24 @@ describe('toLegacyReindexProgress (PAN-5609 D-6)', () => {
     expect(toLegacyReindexProgress(snapshot)).toEqual({ active: false, filesScanned: 0, filesIndexed: 0, chunksIndexed: 0 })
   })
 })
+
+describe('republishConversationSearchActivity (PAN-5609 CodeRabbit)', () => {
+  beforeEach(() => {
+    mocks.emitOnly.mockClear();
+  });
+
+  it('republishes whatever the singleton tracker currently holds', () => {
+    republishConversationSearchActivity();
+    expect(mocks.emitOnly).toHaveBeenCalledTimes(1);
+    const [event] = mocks.emitOnly.mock.calls[0] as [{ type: string; payload: { activity: ConversationSearchActivitySnapshot } }];
+    expect(event.type).toBe('conversation_search.activity_changed');
+    expect(event.payload.activity).toEqual(conversationSearchActivity.getSnapshot());
+  });
+
+  it('swallows an event-store error instead of throwing (store not ready yet)', () => {
+    mocks.emitOnly.mockImplementationOnce(() => {
+      throw new Error('event store not ready');
+    });
+    expect(() => republishConversationSearchActivity()).not.toThrow();
+  });
+});

@@ -918,5 +918,74 @@ describe('conversation search watcher', () => {
       expect(snapshot.active).toBe(false);
       expect(snapshot.kind).toBe('incremental');
     });
+
+    it("ignores a stopped watcher's in-flight completion instead of feeding a replacement burst (CodeRabbit)", async () => {
+      const fakeWatcher = new FakeWatcher();
+      const activity = createConversationSearchActivityTracker({ emit: vi.fn() });
+      const recordIncrementalFileSpy = vi.spyOn(activity, 'recordIncrementalFile');
+      let resolveIndexFile!: (value: typeof EMPTY_INDEX_RESULT) => void;
+      const indexFile = vi.fn(() => new Promise<typeof EMPTY_INDEX_RESULT>((resolve) => { resolveIndexFile = resolve; }));
+      const watcher = new ConversationSearchWatcher({
+        config: config(),
+        roots: ['/tmp/conversations'],
+        debounceMs: 25,
+        watchFactory: vi.fn(() => fakeWatcher),
+        indexAll: vi.fn(async () => ({ ...EMPTY_INDEX_RESULT })),
+        indexFile,
+        activity,
+        log: { log: vi.fn(), warn: vi.fn() },
+      });
+
+      watcher.start();
+      await vi.advanceTimersByTimeAsync(0);
+      fakeWatcher.emit('change', '/tmp/conversations/a.jsonl');
+      await vi.advanceTimersByTimeAsync(25); // the file is now in flight
+
+      const stopPromise = watcher.stop();
+      // Resolves only after stop() already set `stopped`, as a replacement
+      // watcher's burst would already be running by the time a slow index
+      // call from the old watcher finally settles.
+      resolveIndexFile({ ...EMPTY_INDEX_RESULT, chunksIndexed: 7 });
+      await stopPromise;
+
+      expect(recordIncrementalFileSpy).not.toHaveBeenCalled();
+    });
+
+    it('counts a pending rerun as waiting work in the reported queue (CodeRabbit)', async () => {
+      const fakeWatcher = new FakeWatcher();
+      const activity = createConversationSearchActivityTracker({ emit: vi.fn() });
+      const setQueueSpy = vi.spyOn(activity, 'setQueue');
+      let resolveIndexFile!: (value: typeof EMPTY_INDEX_RESULT) => void;
+      const indexFile = vi.fn(() => new Promise<typeof EMPTY_INDEX_RESULT>((resolve) => { resolveIndexFile = resolve; }));
+      const watcher = new ConversationSearchWatcher({
+        config: config(),
+        roots: ['/tmp/conversations'],
+        debounceMs: 25,
+        watchFactory: vi.fn(() => fakeWatcher),
+        indexAll: vi.fn(async () => ({ ...EMPTY_INDEX_RESULT })),
+        indexFile,
+        activity,
+        log: { log: vi.fn(), warn: vi.fn() },
+      });
+
+      watcher.start();
+      await vi.advanceTimersByTimeAsync(0);
+      fakeWatcher.emit('change', '/tmp/conversations/a.jsonl');
+      await vi.advanceTimersByTimeAsync(25); // the file is now in flight
+
+      // A second change while the first pass is still in flight re-queues it
+      // as a rerun, not a fresh queue entry — it must still count as waiting.
+      fakeWatcher.emit('change', '/tmp/conversations/a.jsonl');
+      await vi.advanceTimersByTimeAsync(25);
+
+      expect(setQueueSpy.mock.calls.at(-1)).toEqual([1, 1, undefined]);
+
+      resolveIndexFile(EMPTY_INDEX_RESULT);
+      await vi.advanceTimersByTimeAsync(0);
+
+      // Moving the file from rerun to queued, and then back into flight, is a
+      // net-zero change to the reported total until it actually finishes.
+      expect(setQueueSpy.mock.calls.at(-1)).toEqual([0, 1, '/tmp/conversations/a.jsonl']);
+    });
   });
 });

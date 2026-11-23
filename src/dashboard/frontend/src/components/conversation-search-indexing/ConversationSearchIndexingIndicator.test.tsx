@@ -101,6 +101,19 @@ describe('ConversationSearchIndexingIndicator (PAN-5609 WI-6)', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
+  it('moves focus into the dialog on open and restores it to the chip on close (CodeRabbit)', () => {
+    seed(snapshot())
+    render(<ConversationSearchIndexingIndicator />)
+    const chip = screen.getByTestId('conversation-search-indexing-indicator')
+
+    fireEvent.click(chip)
+    const dialog = screen.getByRole('dialog')
+    expect(document.activeElement).toBe(dialog)
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(document.activeElement).toBe(chip)
+  })
+
   it('calls onOpenSettings and dispatches the settings-section event when the footer link is clicked', () => {
     seed(snapshot())
     const onOpenSettings = vi.fn()

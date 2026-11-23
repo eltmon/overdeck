@@ -38,11 +38,13 @@ export function createIndicatorVisibility(): IndicatorVisibility {
   let snapshot: ConversationSearchActivitySnapshot | null = null
   let visible = false
   let showTimer: ReturnType<typeof setTimeout> | null = null
+  let showTimerRunStartedAt: string | null = null
   let lingerTimer: ReturnType<typeof setTimeout> | null = null
   let view: IndicatorView = { visible: false, snapshot: null }
   const listeners = new Set<() => void>()
 
   function clearShowTimer(): void {
+    showTimerRunStartedAt = null
     if (showTimer === null) return
     clearTimeout(showTimer)
     showTimer = null
@@ -65,10 +67,14 @@ export function createIndicatorVisibility(): IndicatorVisibility {
     return true
   }
 
-  function armShowTimer(): void {
-    if (showTimer !== null) return
+  /** Arms the 3s show gate for `runStartedAt`; restarts it when a different run replaces a pending one. */
+  function armShowTimer(runStartedAt: string | null): void {
+    if (showTimer !== null && showTimerRunStartedAt === runStartedAt) return
+    clearShowTimer()
+    showTimerRunStartedAt = runStartedAt
     showTimer = setTimeout(() => {
       showTimer = null
+      showTimerRunStartedAt = null
       if (snapshot?.active) {
         visible = true
         if (syncView()) notify()
@@ -76,7 +82,7 @@ export function createIndicatorVisibility(): IndicatorVisibility {
     }, INCREMENTAL_SHOW_DELAY_MS)
   }
 
-  function armLingerTimer(): void {
+  function armLingerTimer(ms: number): void {
     if (lingerTimer !== null) return
     lingerTimer = setTimeout(() => {
       lingerTimer = null
@@ -84,7 +90,7 @@ export function createIndicatorVisibility(): IndicatorVisibility {
         visible = false
         if (syncView()) notify()
       }
-    }, HIDE_LINGER_MS)
+    }, ms)
   }
 
   function applyRules(): void {
@@ -101,13 +107,24 @@ export function createIndicatorVisibility(): IndicatorVisibility {
           clearLingerTimer()
           return
         }
-        armShowTimer()
+        armShowTimer(snapshot.startedAt)
         return
       }
     }
     // null, not active, or an unexpected null kind while active
     if (visible) {
-      armLingerTimer()
+      // D-3: endedAt may already be well in the past (e.g. the run ended while
+      // every subscriber was unmounted and the store update never reached us
+      // until just now) — honor only what's left of the 2s linger, so a stale
+      // resubscribe does not restart it from scratch.
+      const endedAt = snapshot?.endedAt ?? null
+      const elapsedSinceEnd = endedAt !== null ? Math.max(0, Date.now() - new Date(endedAt).getTime()) : 0
+      const remaining = HIDE_LINGER_MS - elapsedSinceEnd
+      if (remaining <= 0) {
+        visible = false
+      } else {
+        armLingerTimer(remaining)
+      }
     } else {
       clearShowTimer()
     }

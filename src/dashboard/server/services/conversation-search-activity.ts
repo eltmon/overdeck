@@ -123,6 +123,7 @@ export function createConversationSearchActivityTracker(deps?: {
 
   let lastEmitAt = -Infinity;
   let lastEmittedKey: string | null = null;
+  let lastEmittedActive = false;
   let trailingTimer: ReturnType<typeof setTimeout> | null = null;
 
   function getSnapshot(): ConversationSearchActivitySnapshot {
@@ -169,13 +170,20 @@ export function createConversationSearchActivityTracker(deps?: {
     const key = JSON.stringify(snapshot);
     if (key === lastEmittedKey) return;
     lastEmittedKey = key;
+    lastEmittedActive = snapshot.active;
     lastEmitAt = now();
     emit(snapshot);
   }
 
   function scheduleEmit(): void {
+    // A run ending is a discrete, low-frequency event (at most once per run),
+    // unlike progress — so it bypasses the throttle. Without this, a delayed
+    // trailing emit can still read a stale active snapshot after the run's
+    // own end, letting the frontend's 3s show-gate fire on a run that is
+    // actually already over (CodeRabbit).
+    const endsActiveRun = lastEmittedActive && !getSnapshot().active;
     const elapsed = now() - lastEmitAt;
-    if (elapsed >= throttleMs) {
+    if (endsActiveRun || elapsed >= throttleMs) {
       doEmit();
       return;
     }
@@ -313,6 +321,25 @@ export function createConversationSearchActivityTracker(deps?: {
 
 /** The dashboard's tracker; emits `conversation_search.activity_changed` via emitOnly. */
 export const conversationSearchActivity: ConversationSearchActivityTracker = createConversationSearchActivityTracker();
+
+/**
+ * One-time catch-up publish for boot (CodeRabbit): the startup sweep can begin
+ * before `initEventStore()` resolves, so the tracker's first emit silently
+ * drops (`getEventStore()` throws) and the read model starts idle. Call this
+ * once `initEventStore()` resolves to republish whatever the tracker currently
+ * holds; a no-op change is harmless (the reducer is a plain replace).
+ */
+export function republishConversationSearchActivity(): void {
+  try {
+    getEventStore().emitOnly({
+      type: 'conversation_search.activity_changed',
+      timestamp: new Date().toISOString(),
+      payload: { activity: conversationSearchActivity.getSnapshot() },
+    });
+  } catch {
+    // Event store still not ready; the next real change emits again.
+  }
+}
 
 /** D-6 legacy shape for GET /api/settings/conversation-search/reindex-progress. */
 export function toLegacyReindexProgress(snapshot: ConversationSearchActivitySnapshot): {

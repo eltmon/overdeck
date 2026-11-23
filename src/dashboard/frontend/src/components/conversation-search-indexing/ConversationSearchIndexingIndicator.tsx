@@ -38,6 +38,8 @@ export function ConversationSearchIndexingIndicator({ onOpenSettings }: { onOpen
   const [open, setOpen] = useState(false);
   const [hover, setHover] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -55,6 +57,16 @@ export function ConversationSearchIndexingIndicator({ onOpenSettings }: { onOpen
     };
   }, [open]);
 
+  // Non-modal focus management: move focus into the dialog on open, and
+  // restore it to the chip (if still mounted) on close or dismount.
+  useEffect(() => {
+    if (!open) return;
+    dialogRef.current?.focus();
+    return () => {
+      triggerRef.current?.focus();
+    };
+  }, [open]);
+
   if ((!view.visible && !open) || view.snapshot === null) return null;
   const snapshot = view.snapshot;
   const showTooltip = hover && !open;
@@ -62,6 +74,7 @@ export function ConversationSearchIndexingIndicator({ onOpenSettings }: { onOpen
   return (
     <div ref={wrapRef} className="relative">
       <button
+        ref={triggerRef}
         type="button"
         data-testid="conversation-search-indexing-indicator"
         aria-haspopup="dialog"
@@ -95,10 +108,12 @@ export function ConversationSearchIndexingIndicator({ onOpenSettings }: { onOpen
 
       {open && (
         <div
+          ref={dialogRef}
+          tabIndex={-1}
           role="dialog"
           aria-label="Conversation search indexing"
           data-testid="conversation-search-indexing-popover"
-          className="absolute right-0 top-full z-50 mt-1.5 w-[320px] rounded-md border border-border bg-card p-3 text-xs text-foreground shadow-lg"
+          className="absolute right-0 top-full z-50 mt-1.5 w-[320px] rounded-md border border-border bg-card p-3 text-xs text-foreground shadow-lg outline-none"
         >
           <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
             Conversation search indexing

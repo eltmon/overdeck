@@ -28,6 +28,8 @@ instinct to `docker restart` a stuck/stale-looking workspace container directly 
 `workspaces/<feature>/.devcontainer/`, run
 `docker compose -f docker-compose.devcontainer.yml run --rm init` (reinstalls deps + rebuilds
 dashboard server into the shared volume) followed by
-`docker compose -f docker-compose.devcontainer.yml up -d frontend server`. Never plain
-`docker restart` these containers, and never use the top-level
-`docker-compose.devcontainer.yml` copy.
+`docker compose -f docker-compose.devcontainer.yml up -d --force-recreate frontend server`
+(`up -d` alone only recreates a container whose config or image changed, so without
+`--force-recreate` an already-running, unchanged `server` keeps the `dist/` it had loaded
+before the build). Never plain `docker restart` these containers, and never use the
+top-level `docker-compose.devcontainer.yml` copy.
