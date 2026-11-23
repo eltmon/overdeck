@@ -78,6 +78,7 @@ projects:
           path: backend
           branch_prefix: "feature/"
           # default_branch: develop  # Example: API uses 'develop' as default
+          ci: none  # this repo runs no CI
 
       # DNS entries for local development
       dns:
@@ -134,7 +135,7 @@ projects:
 
 A few notes on these keys:
 
-- **Repos:** each repo can also set `forge` (`github` or `gitlab`), `remote` (a legacy alias for `forge`) and `pr_target` (the branch its PR targets). The Add-project dialog's **Add this folder as one project** writes this `workspace` block for you.
+- **Repos:** each repo can also set `forge` (`github` or `gitlab`), `remote` (a legacy alias for `forge`) and `pr_target` (the branch its PR targets). The Add-project dialog's **Add this folder as one project** writes this `workspace` block for you. Set `ci: none` on a repo that runs no CI. The merge train then counts a GitLab merge request in that repo with no pipeline as passing; a failing or pending pipeline still blocks the merge, and a repo without the field still needs a green pipeline. It has no effect on GitHub member repos. Remove it as soon as the repo gains CI.
 - **Services:** each service needs its own `start_command`, and optionally `docker_command`, `health_url` and `port`.
 - **Docker:** setting `docker.traefik` makes Overdeck start its own Traefik from `~/.overdeck/traefik/docker-compose.yml` (installed by `pan install`) when a workspace starts its containers. It never reads a project compose file. See [Docker & HTTPS Setup](/guides/docker-setup).
 - **Agent templates:** templates that target `CLAUDE.md`, `AGENTS.md` or another harness-native instruction file are dropped. Put project instructions in `.overdeck/context/project.md` instead (see [Context Layers](/configuration/context-layers)). `symlinks:` is a deprecated alias for `copy_dirs:`.
