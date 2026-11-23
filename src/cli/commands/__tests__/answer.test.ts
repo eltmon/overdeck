@@ -1,4 +1,19 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+import { CLAUDE_TRUST_DIALOG_BACKSTOP } from '../../../../tests/fixtures/claude-trust-dialog.js'
+
+const paneIo = vi.hoisted(() => ({
+  read: vi.fn<(lines: number) => Promise<string>>(),
+  sendKey: vi.fn<(key: string) => Promise<void>>(async () => undefined),
+  resolved: [] as string[],
+}))
+
+vi.mock('../../../lib/terminal-backends/agent-pane-io.js', () => ({
+  resolveAgentPaneIo: vi.fn(async (agentId: string) => {
+    paneIo.resolved.push(agentId)
+    return { backend: 'herdr', read: paneIo.read, sendKey: paneIo.sendKey, pressSendNow: vi.fn() }
+  }),
+}))
 
 import { answerCommand, normalizeAnswerSessionId } from '../answer.js'
 
@@ -91,6 +106,59 @@ describe('answerCommand', () => {
     })
 
     expect(error).toHaveBeenCalledWith(expect.stringContaining('menu changed'))
+    expect(exit).toHaveBeenCalledWith(1)
+  })
+})
+
+// PAN-4242: on a Herdr host tmux sees no pane, so pan answer reads and keys
+// through the host's terminal backend.
+describe('answerCommand through the terminal backend', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+    paneIo.read.mockReset()
+    paneIo.sendKey.mockClear()
+    paneIo.resolved.length = 0
+  })
+
+  it('lists the folder-trust dialog read from a Herdr pane', async () => {
+    paneIo.read.mockResolvedValue(CLAUDE_TRUST_DIALOG_BACKSTOP)
+    const log = vi.fn()
+
+    await answerCommand('planning-cli-2', undefined, { log, exit: vi.fn(async () => undefined) })
+
+    expect(paneIo.resolved).toEqual(['planning-cli-2'])
+    const lines = log.mock.calls.map(([line]) => line)
+    expect(lines[0]).toBe('Accessing workspace:')
+    expect(lines).toContain('1. No, continue without these permissions')
+    expect(lines).toContain('2. Yes, I trust this folder')
+  })
+
+  it('answers option 2 with Down then Enter', async () => {
+    vi.useFakeTimers()
+    paneIo.read
+      .mockResolvedValueOnce(CLAUDE_TRUST_DIALOG_BACKSTOP)
+      .mockResolvedValueOnce(CLAUDE_TRUST_DIALOG_BACKSTOP)
+      .mockResolvedValue('Claude Code v2.1.330\n❯ ')
+    const log = vi.fn()
+    const exit = vi.fn(async () => undefined)
+
+    const run = answerCommand('planning-cli-2', '2', { log, exit })
+    await vi.runAllTimersAsync()
+    await run
+
+    expect(paneIo.sendKey.mock.calls.map(([key]) => key)).toEqual(['Down', 'Enter'])
+    expect(log).toHaveBeenCalledWith('Answered planning-cli-2: Yes, I trust this folder')
+    expect(exit).not.toHaveBeenCalled()
+  })
+
+  it('reports no menu when the pane cannot be read', async () => {
+    paneIo.read.mockRejectedValue(new Error('herdr holds no pane for planning-cli-2'))
+    const error = vi.fn()
+    const exit = vi.fn(async () => undefined)
+
+    await answerCommand('planning-cli-2', undefined, { error, exit })
+
+    expect(error).toHaveBeenCalledWith('No pending choice menu for planning-cli-2')
     expect(exit).toHaveBeenCalledWith(1)
   })
 })
