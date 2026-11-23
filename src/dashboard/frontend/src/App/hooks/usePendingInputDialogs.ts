@@ -10,7 +10,8 @@ import type { TerminalPendingPermission } from '../../components/TerminalPermiss
 import { useTerminalPermissionDialog } from './useTerminalPermissionDialog';
 import { showPendingInputNotification, usePermissionNotifications } from './usePermissionNotifications';
 import { useHeldMessageRelease } from './useHeldMessageRelease';
-import { useDashboardStore, hasDetectedToolPermission, selectAgentsWithPendingAskUserQuestion, selectAgentsWithPendingProposedPlan, selectChannelPermissionRequests } from '../../lib/store';
+import { useLivePendingAgentInputs } from './useLivePendingAgentInputs';
+import { useDashboardStore, hasDetectedToolPermission, selectChannelPermissionRequests } from '../../lib/store';
 import { useAskUserQuestionUiStore } from '../../lib/askUserQuestionUiStore';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
 import { fetchWithTimeout } from '../../lib/apiFetch';
@@ -59,8 +60,7 @@ export function usePendingInputDialogs() {
   const queryClient = useQueryClient();
   const issueTitleById = useDashboardStore(useShallow((s) => issueTitlesById(s.issuesRaw)));
   const channelPermissionRequests = useDashboardStore(selectChannelPermissionRequests);
-  const agentsWithAskUserQuestion = useDashboardStore(selectAgentsWithPendingAskUserQuestion);
-  const agentsWithProposedPlan = useDashboardStore(selectAgentsWithPendingProposedPlan);
+  const { agentsWithAskUserQuestion, agentsWithProposedPlan } = useLivePendingAgentInputs();
   const resolvedPlanToolUseIds = useAskUserQuestionUiStore((s) => s.resolvedPlanToolUseIds);
   const dismissedPlanSubjectIds = useAskUserQuestionUiStore((s) => s.dismissedPlanSubjectIds);
   const markPlanResolved = useAskUserQuestionUiStore((s) => s.markPlanResolved);
