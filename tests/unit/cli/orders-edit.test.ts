@@ -3,8 +3,8 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { runOrdersCreate } from '../../../src/cli/commands/orders.js';
-import { runOrdersPause, runOrdersResume, runOrdersRename, runOrdersSet } from '../../../src/cli/commands/orders-edit.js';
+import { runOrdersAdd, runOrdersCreate } from '../../../src/cli/commands/orders.js';
+import { runOrdersItem, runOrdersPause, runOrdersResume, runOrdersRename, runOrdersSet } from '../../../src/cli/commands/orders-edit.js';
 
 const { mockGetProjectSync, mockGetProjectPanPaths, mockStartFlywheelRun } = vi.hoisted(() => ({
   mockGetProjectSync: vi.fn(),
@@ -130,5 +130,46 @@ describe('pan orders rename, set, pause, resume (PAN-5598 WI-7)', () => {
     await runOrdersPause(created.id, {}, deps);
     const resumed = await runOrdersResume(created.id, {}, deps);
     expect(resumed.settings).toMatchObject({ posture: 'open', postureReason: 'Operator reopened pickup.' });
+  });
+});
+
+describe('pan orders item (PAN-5598 WI-8)', () => {
+  it('item --prereqs sets the list and leaves reVerify unchanged', async () => {
+    const panDir = gitFixture();
+    const deps = { panDir, now: () => new Date(at), actor: 'operator' };
+    const created = await runOrdersCreate('Item Book', deps);
+    await runOrdersAdd(created.id, ['PAN-2'], { reverify: true }, deps);
+    const updated = await runOrdersItem(created.id, 'PAN-2', { prereqs: 'pan-1' }, deps);
+    const item = updated.items.find((candidate) => candidate.issue === 'PAN-2');
+    expect(item).toMatchObject({ prereqs: ['PAN-1'], reVerify: true });
+  });
+
+  it('item --no-reverify clears reVerify', async () => {
+    const panDir = gitFixture();
+    const deps = { panDir, now: () => new Date(at), actor: 'operator' };
+    const created = await runOrdersCreate('Item Reverify', deps);
+    await runOrdersAdd(created.id, ['PAN-2'], { reverify: true }, deps);
+    const updated = await runOrdersItem(created.id, 'PAN-2', { reverify: false }, deps);
+    const item = updated.items.find((candidate) => candidate.issue === 'PAN-2');
+    expect(item).toMatchObject({ reVerify: false });
+  });
+
+  it('item --prereqs "" clears the list', async () => {
+    const panDir = gitFixture();
+    const deps = { panDir, now: () => new Date(at), actor: 'operator' };
+    const created = await runOrdersCreate('Item Clear', deps);
+    await runOrdersAdd(created.id, ['PAN-2'], { prereqs: 'PAN-1' }, deps);
+    const updated = await runOrdersItem(created.id, 'PAN-2', { prereqs: '' }, deps);
+    const item = updated.items.find((candidate) => candidate.issue === 'PAN-2');
+    expect(item).toMatchObject({ prereqs: [] });
+  });
+
+  it('item with no flag fails', async () => {
+    const panDir = gitFixture();
+    const deps = { panDir, now: () => new Date(at), actor: 'operator' };
+    const created = await runOrdersCreate('Item No Flag', deps);
+    await runOrdersAdd(created.id, ['PAN-2'], {}, deps);
+    await expect(runOrdersItem(created.id, 'PAN-2', {}, deps))
+      .rejects.toThrow('--prereqs, --reverify, --no-reverify, --plan-at-pickup or --no-plan-at-pickup is required');
   });
 });

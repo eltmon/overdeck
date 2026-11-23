@@ -6,7 +6,7 @@
 import type { OrderBook } from '@overdeck/contracts';
 import { Command, InvalidArgumentError } from 'commander';
 
-import { renameBook, setSettings } from '../../lib/orders/writer.js';
+import { renameBook, setItemRequirements, setSettings } from '../../lib/orders/writer.js';
 import { commandAction, commitOrders, formatBook, type OrdersCommandDeps, panDirFor } from './orders.js';
 
 interface OrdersSetOptions {
@@ -17,6 +17,13 @@ interface OrdersSetOptions {
 
 interface OrdersPostureOptions {
   reason?: string;
+  project?: string;
+}
+
+interface OrdersItemOptions {
+  prereqs?: string;
+  reverify?: boolean;
+  planAtPickup?: boolean;
   project?: string;
 }
 
@@ -80,6 +87,31 @@ export async function runOrdersResume(bookId: string, options: OrdersPostureOpti
   return runOrdersPosture(bookId, 'open', 'Operator reopened pickup.', options, deps, `chore(orders): resume pickup for ${bookId}`);
 }
 
+export async function runOrdersItem(
+  bookId: string,
+  issueId: string,
+  options: OrdersItemOptions,
+  deps: OrdersCommandDeps = {},
+): Promise<OrderBook> {
+  if (options.prereqs === undefined && options.reverify === undefined && options.planAtPickup === undefined) {
+    throw new Error('--prereqs, --reverify, --no-reverify, --plan-at-pickup or --no-plan-at-pickup is required');
+  }
+  const panDir = panDirFor(deps);
+  const requirements: { prereqs?: readonly string[]; reVerify?: boolean; planAtPickup?: boolean } = {};
+  if (options.prereqs !== undefined) {
+    requirements.prereqs = options.prereqs
+      .split(',')
+      .map((prereq) => prereq.trim())
+      .filter((prereq) => prereq.length > 0)
+      .map((prereq) => prereq.toUpperCase());
+  }
+  if (options.reverify !== undefined) requirements.reVerify = options.reverify;
+  if (options.planAtPickup !== undefined) requirements.planAtPickup = options.planAtPickup;
+  const book = await setItemRequirements(panDir, bookId, issueId, requirements);
+  await commitOrders(panDir, `chore(orders): update ${issueId.toUpperCase()} in ${bookId}`);
+  return book;
+}
+
 export function registerOrdersEditCommands(orders: Command): void {
   orders
     .command('rename <id> <name>')
@@ -116,5 +148,18 @@ export function registerOrdersEditCommands(orders: Command): void {
     .option('--project <key>', 'Resolve the order book in another registered project')
     .action((id: string, options: OrdersPostureOptions) => commandAction(async () => {
       console.log(formatBook(await runOrdersResume(id, options, { projectKey: options.project })));
+    }));
+
+  orders
+    .command('item <id> <issue>')
+    .description('Change an issue\'s prerequisites, re-verify, or plan-at-pickup requirement')
+    .option('--prereqs <issues>', 'Comma-separated issues that must land first; "" clears the list')
+    .option('--reverify', 'Require PRD re-verification before pickup')
+    .option('--no-reverify', 'Do not require PRD re-verification before pickup')
+    .option('--plan-at-pickup', 'Write the plan when the issue starts')
+    .option('--no-plan-at-pickup', 'Do not write the plan when the issue starts')
+    .option('--project <key>', 'Resolve the order book in another registered project')
+    .action((id: string, issue: string, options: OrdersItemOptions) => commandAction(async () => {
+      console.log(formatBook(await runOrdersItem(id, issue, options, { projectKey: options.project })));
     }));
 }
