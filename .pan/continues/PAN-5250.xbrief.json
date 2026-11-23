@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5250",
   "created": "2026-11-23T23:10:09.644Z",
-  "updated": "2026-11-23T23:33:00.536Z",
+  "updated": "2026-11-23T23:36:56.211Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -242,9 +242,22 @@
       "doneAt": "2026-11-23T23:32:55.767Z"
     },
     "wi10-docs-changelog": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5250",
-      "claimedAt": "2026-11-23T23:33:00.536Z"
+      "claimedAt": "2026-11-23T23:33:00.536Z",
+      "doneAt": "2026-11-23T23:36:56.210Z"
+    },
+    "wi10-docs-changelog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:36:56.210Z"
+    },
+    "wi10-docs-changelog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:36:56.210Z"
+    },
+    "wi10-docs-changelog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:36:56.210Z"
     }
   }
 }
