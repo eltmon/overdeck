@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5621",
   "created": "2026-11-23T18:11:42.737Z",
-  "updated": "2026-11-23T18:11:42.737Z",
+  "updated": "2026-11-23T18:25:23.032Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,22 @@
   "sessionHistory": [],
   "items": {
     "wi1-starvation-config-key": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5621",
-      "claimedAt": "2026-11-23T18:11:42.737Z"
+      "claimedAt": "2026-11-23T18:11:42.737Z",
+      "doneAt": "2026-11-23T18:25:23.031Z"
+    },
+    "wi1-starvation-config-key.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:25:23.031Z"
+    },
+    "wi1-starvation-config-key.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:25:23.031Z"
+    },
+    "wi1-starvation-config-key.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:25:23.031Z"
     }
   }
 }
