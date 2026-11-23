@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5058",
   "created": "2026-11-23T02:58:48.676Z",
-  "updated": "2026-11-23T03:34:29.887Z",
+  "updated": "2026-11-23T03:35:12.908Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -28,9 +28,10 @@
       "doneAt": "2026-11-23T03:21:37.461Z"
     },
     "w1b-auth-scheme-audit": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5058",
-      "claimedAt": "2026-11-23T03:21:50.041Z"
+      "claimedAt": "2026-11-23T03:21:50.041Z",
+      "doneAt": "2026-11-23T03:35:12.908Z"
     },
     "w6-pan4927-amendment": {
       "status": "completed",
@@ -45,6 +46,14 @@
     "w6-pan4927-amendment.ac2": {
       "status": "completed",
       "doneAt": "2026-11-23T03:34:29.887Z"
+    },
+    "w1b-auth-scheme-audit.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:35:12.908Z"
+    },
+    "w1b-auth-scheme-audit.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:35:12.908Z"
     }
   }
 }
