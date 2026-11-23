@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5250",
   "created": "2026-11-23T23:10:09.644Z",
-  "updated": "2026-11-23T23:12:11.336Z",
+  "updated": "2026-11-23T23:14:02.187Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -36,9 +36,26 @@
       "doneAt": "2026-11-23T23:12:02.434Z"
     },
     "wi2-idle-config-pin": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5250",
-      "claimedAt": "2026-11-23T23:12:11.336Z"
+      "claimedAt": "2026-11-23T23:12:11.336Z",
+      "doneAt": "2026-11-23T23:14:02.187Z"
+    },
+    "wi2-idle-config-pin.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:14:02.187Z"
+    },
+    "wi2-idle-config-pin.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:14:02.187Z"
+    },
+    "wi2-idle-config-pin.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:14:02.187Z"
+    },
+    "wi2-idle-config-pin.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:14:02.187Z"
     }
   }
 }
