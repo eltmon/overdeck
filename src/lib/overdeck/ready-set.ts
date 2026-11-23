@@ -19,7 +19,12 @@
  *     per MR head for a minute.
  *   - **Polyrepo**: every writable member repo, each with its own forge and
  *     branch prefix. An issue is ready when every open PR/MR for it, across
- *     the member repos, is ready.
+ *     the member repos, is ready. A GitHub member row is judged on its
+ *     listing when the forge decided (`reviewDecision`); otherwise, since
+ *     branch protection is usually off, by its own facts
+ *     (`readGitHubMemberReadyFacts`: a forge decision, a trusted dated
+ *     marker, or a standing review at head), cached per PR head for a
+ *     minute (PAN-5638).
  *
  * A GitLab or polyrepo read that fails throws {@link ReadySetUnavailableError}.
  * It never reads as "not ready": the reconciler treats an empty ready set as
@@ -77,6 +82,8 @@ export interface ReadySetDeps {
   readonly readMergeRequests?: (repoPath: string) => Promise<readonly GlabMrRow[] | null>;
   /** One GitLab MR's facts (view + approvals); cached per MR head here. */
   readonly gitlabMrFacts?: (issueId: string, row: GlabMrRow) => Promise<PrFacts>;
+  /** One GitHub member PR's facts, a standing review of the head folded in (PAN-5638); cached per PR head here. */
+  readonly githubPrFacts?: (issueId: string, row: GhPrRow) => Promise<PrFacts>;
   readonly projectConfig?: (projectPath: string) => ProjectConfig | null | undefined;
   readonly forgeOf?: (projectPath: string) => ForgeType;
   /** A polyrepo project's writable member repos. */
@@ -92,17 +99,25 @@ interface IssueRow {
   readonly ready: () => Promise<boolean>;
 }
 
-const GITLAB_MR_FACTS_TTL_MS = 60_000;
+const MEMBER_FACTS_TTL_MS = 60_000;
 /** Keyed `<repoPath>|<iid>|<sha>`: a push re-reads. A failed read is not kept. */
 const gitlabMrFactsCache = createSettledTtlPromiseCache<string, PrFacts>(
-  GITLAB_MR_FACTS_TTL_MS,
+  MEMBER_FACTS_TTL_MS,
   () => Date.now(),
-  (facts) => (facts.error ? 0 : GITLAB_MR_FACTS_TTL_MS),
+  (facts) => (facts.error ? 0 : MEMBER_FACTS_TTL_MS),
+);
+
+/** Keyed `<repoPath>|<number>|<headRefOid>`: a push re-reads. A failed read is not kept. */
+const githubPrFactsCache = createSettledTtlPromiseCache<string, PrFacts>(
+  MEMBER_FACTS_TTL_MS,
+  () => Date.now(),
+  (facts) => (facts.error ? 0 : MEMBER_FACTS_TTL_MS),
 );
 
 /** Test seam. */
 export function _resetReadySetCacheForTests(): void {
   gitlabMrFactsCache.invalidate(undefined, { includeInFlight: true });
+  githubPrFactsCache.invalidate(undefined, { includeInFlight: true });
 }
 
 /** `<prefix><issue>` → the upper-cased issue id; anything else has none. */
@@ -131,18 +146,38 @@ async function defaultGitlabMrFacts(issueId: string, row: GlabMrRow): Promise<Pr
   return readGitLabMrFacts(issueId, { ...row, source_branch: row.source_branch ?? '' });
 }
 
+async function defaultGithubPrFacts(issueId: string, row: GhPrRow): Promise<PrFacts> {
+  const { readGitHubMemberReadyFacts } = await import('../cloister/github-member-pr-facts.js');
+  return readGitHubMemberReadyFacts(issueId, row.url ?? '');
+}
+
 async function githubRows(repo: ReadySetRepo, deps: ReadySetDeps, scope: 'open' | 'all'): Promise<IssueRow[]> {
   const read = scope === 'open'
     ? deps.readOpenPullRequests ?? readOpenRepoPullRequests
     : deps.readAllPullRequests ?? readRepoPullRequests;
   const rows = await read(repo.repoPath);
   if (rows === null) throw new ReadySetUnavailableError(repo.repoPath, 'the GitHub PR listing could not be read');
+  const readFacts = deps.githubPrFacts ?? defaultGithubPrFacts;
   return rows.flatMap((row) => {
     const issueId = issueIdForBranch(row.headRefName, repo.branchPrefix);
     const pr = issueId ? prFromGhRow(row) : null;
     if (!issueId || !pr) return [];
-    const ready = !row.isDraft && pr.reviewState === 'approved' && pr.checks === 'green' && pr.mergeable === true;
-    return [{ issueId, title: row.title ?? null, number: pr.number, merged: pr.merged, ready: async () => ready }];
+    const ready = async (): Promise<boolean> => {
+      // The listing rules a row out, and rules it in on a forge decision.
+      if (row.isDraft || pr.checks !== 'green' || pr.mergeable !== true) return false;
+      if (pr.reviewState === 'approved') return true;
+      if (pr.reviewState === 'changes-requested') return false;
+      // PAN-5638: without branch protection GitHub reports no decision, and a
+      // self-authored PR's verdict is a marker comment. Read the PR's own facts.
+      const key = `${repo.repoPath}|${pr.number}|${row.headRefOid ?? ''}`;
+      const facts = await githubPrFactsCache(key, () => readFacts(issueId, row));
+      // An unread approval is never an approval (C3): the set is unknown.
+      if (facts.error) throw new ReadySetUnavailableError(repo.repoPath, facts.error);
+      // A push between the listing and the read: judge the new head next tick.
+      if (facts.headSha && row.headRefOid && facts.headSha.toLowerCase() !== row.headRefOid.toLowerCase()) return false;
+      return facts.open && !facts.draft && !facts.changesRequested && facts.approved;
+    };
+    return [{ issueId, title: row.title ?? null, number: pr.number, merged: pr.merged, ready }];
   });
 }
 

@@ -52,6 +52,16 @@ function mrFacts(issueId: string, overrides: Partial<PrFacts> = {}): PrFacts {
   };
 }
 
+/** The facts `readGitHubMemberReadyFacts` returns for a GitHub member PR. */
+function ghFacts(issueId: string, overrides: Partial<PrFacts> = {}): PrFacts {
+  return {
+    issueId, forge: 'github', url: null, number: null, exists: true, open: true, merged: false, closed: false,
+    draft: false, headSha: null, headBranch: null, reviewDecision: null, approved: false,
+    changesRequested: false, mergeable: true, mergeableState: 'mergeable', checks: 'green', testChecks: 'none',
+    ...overrides,
+  };
+}
+
 const GITLAB_MONO = { name: 'gl', path: '/repos/gl', gitlab_repo: 'eltmon/gl' } as ProjectConfig;
 const POLY = { name: 'myn', path: '/repos/myn', workspace: { type: 'polyrepo' } } as ProjectConfig;
 const POLY_REPOS: ReadySetRepo[] = [
@@ -69,10 +79,20 @@ function gitlabMono(rows: GlabMrRow[], facts: ReadySetDeps['gitlabMrFacts']): Re
   };
 }
 
+/** A not-approved GitHub member facts stub, so a test that does not care about
+ * the GitHub member's own facts never reaches the real `gh`. */
+async function notApprovedGithubFacts(issueId: string, row: GhPrRow): Promise<PrFacts> {
+  return ghFacts(issueId, {
+    url: row.url ?? null, number: row.number ?? null, headSha: row.headRefOid ?? null, headBranch: row.headRefName ?? null,
+    approved: false,
+  });
+}
+
 function poly(
   mrs: Record<string, GlabMrRow[] | null>,
   prs: Record<string, GhPrRow[] | null>,
   facts: ReadySetDeps['gitlabMrFacts'],
+  githubFacts?: ReadySetDeps['githubPrFacts'],
 ): ReadySetDeps {
   return {
     projectConfig: () => POLY,
@@ -82,6 +102,7 @@ function poly(
     readOpenPullRequests: async (repoPath) => (repoPath in prs ? prs[repoPath]! : []),
     readAllPullRequests: async (repoPath) => (repoPath in prs ? prs[repoPath]! : []),
     ...(facts ? { gitlabMrFacts: facts } : {}),
+    githubPrFacts: githubFacts ?? notApprovedGithubFacts,
   };
 }
 
@@ -91,6 +112,7 @@ beforeEach(() => {
 
 describe('listReadyIssuesForProject — GitHub monorepo (unchanged)', () => {
   it('keeps approved, green, mergeable feature PRs and drops the rest', async () => {
+    const githubPrFacts = vi.fn();
     const ready = await listReadyIssuesForProject('/repos/gh', {
       projectConfig: () => null,
       forgeOf: () => 'github',
@@ -101,8 +123,10 @@ describe('listReadyIssuesForProject — GitHub monorepo (unchanged)', () => {
         ghRow('feature/pan-4', 4, { mergeable: 'CONFLICTING' }),
         ghRow('strike/pan-5', 5),
       ],
+      githubPrFacts,
     });
     expect(ready).toEqual([{ issueId: 'PAN-1', title: 'PR 1', pr: 1 }]);
+    expect(githubPrFacts).not.toHaveBeenCalled();
   });
 });
 
@@ -234,6 +258,96 @@ describe('listReadyIssuesForProject — polyrepo', () => {
       { repoKey: 'fe', repoPath: '/repos/myn/frontend', forge: 'gitlab', branchPrefix: 'feature/' },
       { repoKey: 'skills', repoPath: '/repos/myn/myn-skills', forge: 'github', branchPrefix: 'feat/' },
     ]);
+  });
+});
+
+describe('listReadyIssuesForProject — polyrepo GitHub members (PAN-5638)', () => {
+  it("is ready when the member PR's own facts show a marker approval", async () => {
+    const row = ghRow('feature/min-1', 30, { reviewDecision: null });
+    const facts = vi.fn(async (issueId: string, r: GhPrRow) => ghFacts(issueId, { headSha: r.headRefOid ?? null, approved: true }));
+    const ready = await listReadyIssuesForProject('/repos/myn', poly({}, { '/repos/myn/myn-skills': [row] }, undefined, facts));
+    expect(ready).toEqual([{ issueId: 'MIN-1', title: 'PR 30', pr: 30 }]);
+    expect(facts).toHaveBeenCalledTimes(1);
+    expect(facts).toHaveBeenCalledWith('MIN-1', row);
+  });
+
+  it('is not ready when the member PR facts show no approval, or a newer head', async () => {
+    const notApproved = await listReadyIssuesForProject('/repos/myn', poly(
+      {}, { '/repos/myn/myn-skills': [ghRow('feature/min-1', 30, { reviewDecision: null })] }, undefined,
+      async (issueId, r) => ghFacts(issueId, { headSha: r.headRefOid ?? null, approved: false }),
+    ));
+    expect(notApproved).toEqual([]);
+
+    const staleHead = await listReadyIssuesForProject('/repos/myn', poly(
+      {}, { '/repos/myn/myn-skills': [ghRow('feature/min-2', 31, { reviewDecision: null })] }, undefined,
+      async (issueId) => ghFacts(issueId, { headSha: 'other', approved: true }),
+    ));
+    expect(staleHead).toEqual([]);
+  });
+
+  it('rules a row in or out from the listing without a facts read', async () => {
+    const facts = vi.fn();
+    const ready = await listReadyIssuesForProject('/repos/myn', poly({}, {
+      '/repos/myn/myn-skills': [
+        ghRow('feature/min-1', 1, { reviewDecision: 'APPROVED' }),
+        ghRow('feature/min-2', 2, { isDraft: true }),
+        ghRow('feature/min-3', 3, { statusCheckRollup: [{ status: 'COMPLETED', conclusion: 'FAILURE' }] }),
+        ghRow('feature/min-4', 4, { mergeable: 'CONFLICTING' }),
+        ghRow('feature/min-5', 5, { reviewDecision: 'CHANGES_REQUESTED' }),
+      ],
+    }, undefined, facts));
+    expect(ready).toEqual([{ issueId: 'MIN-1', title: 'PR 1', pr: 1 }]);
+    expect(facts).not.toHaveBeenCalled();
+  });
+
+  it('throws, never answers "not ready", when a member PR read fails', async () => {
+    await expect(listReadyIssuesForProject('/repos/myn', poly(
+      {}, { '/repos/myn/myn-skills': [ghRow('feature/min-1', 30, { reviewDecision: null })] }, undefined,
+      async (issueId) => ghFacts(issueId, { error: 'gh pr view failed' }),
+    ))).rejects.toBeInstanceOf(ReadySetUnavailableError);
+  });
+});
+
+describe('listReadyIssuesForProject — the per-member-PR-head facts cache (GitHub, PAN-5638)', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('reads a member PR head once per minute, again after a push, and never keeps a failed read', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-14T12:00:00Z'));
+    let fail = false;
+    const facts = vi.fn(async (issueId: string, row: GhPrRow) => (fail
+      ? ghFacts(issueId, { error: 'view failed' })
+      : ghFacts(issueId, { headSha: row.headRefOid ?? null, approved: true })));
+    let rows = [ghRow('feature/min-1', 30, { reviewDecision: null })];
+    const deps: ReadySetDeps = {
+      projectConfig: () => POLY,
+      forgeOf: () => 'gitlab',
+      memberRepos: () => POLY_REPOS,
+      readMergeRequests: async () => [],
+      readOpenPullRequests: async (repoPath) => (repoPath === '/repos/myn/myn-skills' ? rows : []),
+      githubPrFacts: facts,
+    };
+
+    await listReadyIssuesForProject('/repos/myn', deps);
+    await listReadyIssuesForProject('/repos/myn', deps);
+    expect(facts).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(60_000);
+    await listReadyIssuesForProject('/repos/myn', deps);
+    expect(facts).toHaveBeenCalledTimes(2);
+
+    rows = [ghRow('feature/min-1', 30, { reviewDecision: null, headRefOid: 'pushed' })];
+    await listReadyIssuesForProject('/repos/myn', deps);
+    expect(facts).toHaveBeenCalledTimes(3);
+
+    rows = [ghRow('feature/min-1', 30, { reviewDecision: null, headRefOid: 'pushed-again' })];
+    fail = true;
+    await expect(listReadyIssuesForProject('/repos/myn', deps)).rejects.toBeInstanceOf(ReadySetUnavailableError);
+    fail = false;
+    await expect(listReadyIssuesForProject('/repos/myn', deps)).resolves.toHaveLength(1);
+    expect(facts).toHaveBeenCalledTimes(5);
   });
 });
 
