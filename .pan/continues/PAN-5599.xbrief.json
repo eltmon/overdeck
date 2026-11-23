@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5599",
   "created": "2026-11-23T05:24:22.748Z",
-  "updated": "2026-11-23T05:53:13.458Z",
+  "updated": "2026-11-23T05:53:23.299Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -88,6 +88,11 @@
     "orders-route-finished-and-backfill.ac3": {
       "status": "completed",
       "doneAt": "2026-11-23T05:53:13.457Z"
+    },
+    "status-summary-finished-rule": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5599",
+      "claimedAt": "2026-11-23T05:53:23.299Z"
     }
   }
 }
