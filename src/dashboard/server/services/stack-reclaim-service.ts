@@ -62,6 +62,7 @@ import {
   issueInGateQueue,
   issuePanes,
   panesAllowReclaim,
+  panesNeedStack,
   rankCandidates,
   reclaimableContainers,
   type ReclaimCandidate,
@@ -391,8 +392,42 @@ export async function runStackReclaimPoll(
   return { kind: 'reclaimed', issueId: chosen.issueId, stopped: outcome.stopped, failed: outcome.failed };
 }
 
-/** The restore poll (D15). Filled in by WI-13; a no-op until then. */
-export async function runStackRestorePoll(_deps: StackReclaimServiceDeps, _state: StackReclaimState): Promise<void> {}
+/** D15: seed the index once from every workspace journal, so open reclaims survive a restart (FR-7). */
+function seedRestoreIndex(deps: StackReclaimServiceDeps, state: StackReclaimState): void {
+  for (const workspace of deps.listWorkspaces()) {
+    if (!workspace.issueId || !deps.pathExists(workspace.path)) continue;
+    if (openStackReclaim(deps.readJournal(workspace.path))) {
+      state.restoreIndex.set(workspace.issueId.toUpperCase(), workspace.path);
+    }
+  }
+  state.seeded = true;
+}
+
+/** The restore poll (D15, WI-13): restores an open reclaim when its issue's agent is working or mid-turn. */
+export async function runStackRestorePoll(deps: StackReclaimServiceDeps, state: StackReclaimState): Promise<void> {
+  if (!state.seeded) seedRestoreIndex(deps, state);
+  if (state.restoreIndex.size === 0) return;
+  const panes = await deps.listPanes();
+  if (!panes) return;
+  const now = deps.now();
+  for (const [issueId, workspacePath] of [...state.restoreIndex]) {
+    if (!deps.pathExists(workspacePath) || !openStackReclaim(deps.readJournal(workspacePath))) {
+      state.restoreIndex.delete(issueId);
+      state.restoreRetryAt.delete(issueId);
+      continue;
+    }
+    if ((state.restoreRetryAt.get(issueId) ?? 0) > now) continue;
+    if (!panesNeedStack(issuePanes(panes, issueId, workspacePath), deps.turnState)) continue;
+    const result = await deps.restore({ issueId, workspacePath, trigger: 'turn' });
+    if (result.kind === 'failed') {
+      state.restoreRetryAt.set(issueId, now + STACK_RESTORE_RETRY_MS);
+      console.warn(`[stack-reclaim] restore of ${issueId} failed: ${result.error}; retrying in ${STACK_RESTORE_RETRY_MS / 1000} s`);
+      continue;
+    }
+    state.restoreIndex.delete(issueId);
+    state.restoreRetryAt.delete(issueId);
+  }
+}
 
 interface ServiceState {
   deps: StackReclaimServiceDeps;

@@ -14,8 +14,11 @@ import type { TurnState } from '../../../../lib/workspace/stack-reclaim.js';
 import type { WorkspaceRow } from '../../../../lib/workspaces/types.js';
 import {
   STACK_RECLAIM_POLL_MS,
+  STACK_RESTORE_POLL_MS,
   createStackReclaimState,
   runStackReclaimPoll,
+  runStackRestorePoll,
+  stackReclaimStateForTests,
   startStackReclaimService,
   stopStackReclaimService,
   type StackReclaimServiceDeps,
@@ -354,5 +357,86 @@ describe('stack reclaim timer (PAN-5623 WI-12)', () => {
 
     await vi.advanceTimersByTimeAsync(STACK_RECLAIM_POLL_MS);
     expect(deps.stopContainer).toHaveBeenCalled();
+  });
+});
+
+describe('runStackRestorePoll (PAN-5623 WI-13)', () => {
+  const RECLAIMED: PipelineJournalEntry = {
+    at: SINCE, type: 'stack.reclaimed', issueId: 'MIN-1144', data: { containers: [`${project('MIN-1144')}-api-1`], episodeSince: SINCE },
+  };
+
+  it('seeds the index on its first tick from open reclaims only', async () => {
+    const { deps, journals } = world({ listWorkspaces: vi.fn(() => [workspace('MIN-1144'), workspace('MIN-1146')]) });
+    journals.set(wsPath('MIN-1144'), [RECLAIMED]);
+    journals.set(wsPath('MIN-1146'), [{ ...RECLAIMED, issueId: 'MIN-1146' }, { at: SINCE, type: 'stack.restored', issueId: 'MIN-1146' }]);
+    const state = createStackReclaimState();
+
+    await runStackRestorePoll(deps, state);
+
+    expect([...state.restoreIndex]).toEqual([['MIN-1144', wsPath('MIN-1144')]]);
+    expect(state.seeded).toBe(true);
+  });
+
+  it('restores with trigger turn when a work pane is mid-turn, then drops the issue', async () => {
+    const { deps, journals } = world({
+      listPanes: vi.fn(async () => [pane({ issue: 'MIN-1144', agentId: 'agent-min-1144' })]),
+      turnState: vi.fn((): TurnState => 'in-turn'),
+    });
+    journals.set(wsPath('MIN-1144'), [RECLAIMED]);
+    const state = createStackReclaimState();
+
+    await runStackRestorePoll(deps, state);
+
+    expect(deps.restore).toHaveBeenCalledExactlyOnceWith({ issueId: 'MIN-1144', workspacePath: wsPath('MIN-1144'), trigger: 'turn' });
+    expect(state.restoreIndex.size).toBe(0);
+  });
+
+  it('restores nothing while every pane is at a turn boundary', async () => {
+    const { deps, journals } = world({ listPanes: vi.fn(async () => [pane({ issue: 'MIN-1144', agentId: 'agent-min-1144' })]) });
+    journals.set(wsPath('MIN-1144'), [RECLAIMED]);
+    const state = createStackReclaimState();
+    await runStackRestorePoll(deps, state);
+    expect(deps.restore).not.toHaveBeenCalled();
+    expect(state.restoreIndex.has('MIN-1144')).toBe(true);
+  });
+
+  it('drops an entry whose journal now shows a restore, without calling restore', async () => {
+    const { deps, journals } = world({
+      listPanes: vi.fn(async () => [pane({ issue: 'MIN-1144', agentId: 'agent-min-1144', state: 'working' })]),
+    });
+    journals.set(wsPath('MIN-1144'), [RECLAIMED, { at: SINCE, type: 'stack.restored', issueId: 'MIN-1144' }]);
+    const state = createStackReclaimState();
+    state.seeded = true;
+    state.restoreIndex.set('MIN-1144', wsPath('MIN-1144'));
+
+    await runStackRestorePoll(deps, state);
+
+    expect(deps.restore).not.toHaveBeenCalled();
+    expect(state.restoreIndex.size).toBe(0);
+  });
+
+  it('never reads the pane inventory with an empty index', async () => {
+    const { deps } = world();
+    await runStackRestorePoll(deps, createStackReclaimState());
+    expect(deps.listPanes).not.toHaveBeenCalled();
+  });
+
+  it('retries a failed restore no sooner than 60 s later', async () => {
+    vi.useFakeTimers();
+    const { deps, journals } = world({
+      listPanes: vi.fn(async () => [pane({ issue: 'MIN-1144', agentId: 'agent-min-1144', state: 'working' })]),
+      now: vi.fn(() => Date.now()),
+      restore: vi.fn(async () => ({ kind: 'failed' as const, failed: [`${project('MIN-1144')}-api-1`], error: 'port is already allocated' })),
+    });
+    journals.set(wsPath('MIN-1144'), [RECLAIMED]);
+    startStackReclaimService(deps);
+
+    await vi.advanceTimersByTimeAsync(STACK_RESTORE_POLL_MS);
+    expect(deps.restore).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(deps.restore).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(31_000);
+    expect(deps.restore).toHaveBeenCalledTimes(2);
+    expect(stackReclaimStateForTests()?.restoreIndex.has('MIN-1144')).toBe(true);
   });
 });
