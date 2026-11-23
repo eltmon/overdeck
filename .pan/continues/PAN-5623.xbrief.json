@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5623",
   "created": "2026-11-23T20:20:25.006Z",
-  "updated": "2026-11-23T20:55:13.908Z",
+  "updated": "2026-11-23T20:55:42.533Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -191,9 +191,18 @@
       "doneAt": "2026-11-23T20:55:07.664Z"
     },
     "wi9-status-reclaim-line": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5623",
-      "claimedAt": "2026-11-23T20:55:13.908Z"
+      "claimedAt": "2026-11-23T20:55:13.908Z",
+      "doneAt": "2026-11-23T20:55:42.533Z"
+    },
+    "wi9-status-reclaim-line.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:55:42.533Z"
+    },
+    "wi9-status-reclaim-line.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:55:42.533Z"
     }
   }
 }
