@@ -257,6 +257,17 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'POST', path: '/api/explorer/edit-workspaces/:workspaceId/pr', scope: 'admin' },
   { method: 'POST', path: '/api/explorer/edit-workspaces/:workspaceId/merge', scope: 'admin' },
   { method: 'POST', path: '/api/explorer/edit-workspaces/:workspaceId/discard', scope: 'admin' },
+  // PAN-5598: order books for agent and connector tokens.
+  { method: 'GET', path: '/api/orders/backlog-candidates', scope: 'read:state' },
+  { method: 'GET', path: '/api/orders', scope: 'read:state' },
+  { method: 'POST', path: '/api/orders', scope: 'operate' },
+  { method: 'GET', path: '/api/orders/:id', scope: 'read:state' },
+  { method: 'PATCH', path: '/api/orders/:id', scope: 'operate' },
+  { method: 'GET', path: '/api/orders/:id/preview-brief', scope: 'read:state' },
+  { method: 'POST', path: '/api/orders/:id/start', scope: 'operate' },
+  { method: 'POST', path: '/api/orders/:id/items', scope: 'operate' },
+  { method: 'PATCH', path: '/api/orders/:id/items/:issue', scope: 'operate' },
+  { method: 'DELETE', path: '/api/orders/:id/items/:issue', scope: 'operate' },
   // PAN-5321: POST /api/merge-train/policy/:issueId has no row on purpose. It writes the
   // operator grant labels auto-merge / hold-for-uat, so it keeps the admin default, which no
   // agent token holds. Never add a row that gives it an agent scope.

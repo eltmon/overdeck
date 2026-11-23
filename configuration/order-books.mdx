@@ -130,7 +130,7 @@ The selection is mirrored into the URL as `/orders?project=mind-your-now`, which
 
 ## Use the CLI
 
-The dashboard is the complete editor, but the CLI covers common create, inspect, lane, and start operations:
+The CLI and the Overdeck MCP tools can do everything the page can:
 
 ```bash
 pan orders create "Refactor P3 remainder"
@@ -153,7 +153,7 @@ pan orders start 2026-07-18-refactor-p3-remainder
 pan flywheel start --orders 2026-07-18-refactor-p3-remainder
 ```
 
-`queue` is the CLI form of the dashboard's **Queue book** action: it moves a draft to the queue. It refuses a book that is not a draft. The CLI `pan orders queue` and `pan orders start` skip the problems check; fix problems on `/orders` first.
+`queue` is the CLI form of the dashboard's **Queue book** action: it moves a draft to the queue. It refuses a book that is not a draft. The CLI `pan orders queue` and `pan orders start` skip the problems check; run `pan orders check <id>` or fix problems on `/orders` first.
 
 `pan orders list` shows each book's phase: `active`, `queued #<n>`, `draft` or `archived`, with ` (finished)` when every issue has landed or is parked. Three more verbs move a book between phases:
 
@@ -177,6 +177,26 @@ pan orders queue 2026-08-01-frontend-sweep --project mind-your-now
 ```
 
 Without the flag, the command resolves the project that contains your current directory, as before. An unregistered key fails with `Unknown project: <key>` instead of reporting the book as missing.
+
+### Every action, three ways
+
+| Action | Dashboard | CLI | MCP tool |
+| --- | --- | --- | --- |
+| List books | Order books page | `pan orders list` | `list_order_books` |
+| Read a book and its problems | select the book | `pan orders show`, `pan orders check` | `get_order_book` |
+| Create a book | New book | `pan orders create` | `create_order_book` |
+| Rename | click the name | `pan orders rename` | `update_order_book` (`name`) |
+| Parallel limit | stepper in the parallel lane | `pan orders set --parallel` | `update_order_book` (`parallelLimit`) |
+| Extra instructions file | More settings | `pan orders set --brief` | `update_order_book` (`briefFile`) |
+| Pause or resume pickup | Pause pickup, Resume pickup | `pan orders pause`, `pan orders resume` | `update_order_book` (`pickup`) |
+| Queue, move back to draft, archive | header buttons | `pan orders queue`, `unqueue`, `archive`, `unarchive` | `update_order_book` (`status`) |
+| Add issues | Add issues | `pan orders add` | `add_order_book_issues` |
+| Move or reorder an issue | drag, Run one at a time | `pan orders move` | `update_order_book_issue` |
+| Issue options | Options | `pan orders item` | `update_order_book_issue` |
+| Remove an issue | Remove | `pan orders remove` | `remove_order_book_issue` |
+| Backlog candidates | Add issues panel | `pan orders candidates` | `list_order_book_candidates` |
+| Preview the brief | More settings | `pan orders preview` | `preview_order_book_brief` |
+| Start the Flywheel on a book | Start Flywheel | `pan orders start` | `start_order_book` |
 
 ## What finished means
 

@@ -157,18 +157,53 @@ describe('pan orders commands', () => {
       'archive',
       'unarchive',
       'start',
+      'rename',
+      'set',
+      'pause',
+      'resume',
+      'item',
+      'preview',
+      'candidates',
+      'check',
     ]);
     for (const child of command.commands) {
       expect(child.options.map((option) => option.long)).toContain('--project');
     }
     const add = command.commands.find((child) => child.name() === 'add')!;
-    expect(add.options.map((option) => option.long)).toEqual(['--lane', '--after', '--reverify', '--project']);
+    expect(add.options.map((option) => option.long)).toEqual(['--lane', '--after', '--reverify', '--prereqs', '--plan-at-pickup', '--project']);
     const move = command.commands.find((child) => child.name() === 'move')!;
     expect(move.options.map((option) => option.long)).toEqual(['--lane', '--order', '--project']);
+    const list = command.commands.find((child) => child.name() === 'list')!;
+    expect(list.options.map((option) => option.long)).toEqual(['--project', '--json']);
+    const show = command.commands.find((child) => child.name() === 'show')!;
+    expect(show.options.map((option) => option.long)).toEqual(['--project', '--json']);
     const help = command.helpInformation();
     expect(help).toContain('Move a queued order book back to draft');
     expect(help).toContain('Archive an order book and free its issues');
     expect(help).toContain('Restore an archived order book as a draft');
+  });
+
+  it('add --prereqs --plan-at-pickup stores both on the item', async () => {
+    const panDir = gitFixture();
+    const deps = { panDir, now: () => new Date(at), actor: 'operator' };
+    const created = await runOrdersCreate('Prereqs Campaign', deps);
+    const added = await runOrdersAdd(created.id, ['PAN-2'], { prereqs: 'pan-1, PAN-3', planAtPickup: true }, deps);
+    expect(added.items[0]).toMatchObject({ issue: 'PAN-2', prereqs: ['PAN-1', 'PAN-3'], planAtPickup: true });
+  });
+
+  it('list --json prints the books as JSON', async () => {
+    const panDir = gitFixture();
+    const deps = { panDir, now: () => new Date(at), actor: 'operator' };
+    const created = await runOrdersCreate('JSON Campaign', deps);
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
+    const command = createOrdersCommand();
+    mockGetProjectPanPaths.mockImplementation(() => ({ panDir }));
+    mockGetProjectSync.mockImplementation((key: string) => (key === 'p' ? ({ path: '/fake/p' } as ProjectConfig) : null));
+    await command.parseAsync(['list', '--project', 'p', '--json'], { from: 'user' });
+    const printed = JSON.parse(logSpy.mock.calls.at(-1)![0] as string) as Array<{ id: string }>;
+    expect(printed.map((book) => book.id)).toContain(created.id);
+    expect(exitSpy).toHaveBeenCalledWith(0);
   });
 
   it('resolves --project through the projects registry regardless of cwd', async () => {
