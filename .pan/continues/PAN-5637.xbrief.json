@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5637",
   "created": "2026-11-23T19:37:34.841Z",
-  "updated": "2026-11-23T19:55:42.727Z",
+  "updated": "2026-11-23T19:55:47.694Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,6 +22,11 @@
     "repo-ci-config.ac2": {
       "status": "completed",
       "doneAt": "2026-11-23T19:55:42.726Z"
+    },
+    "ci-waiver-predicate": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5637",
+      "claimedAt": "2026-11-23T19:55:47.694Z"
     }
   }
 }
