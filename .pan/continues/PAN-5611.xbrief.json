@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5611",
   "created": "2026-11-23T06:14:33.904Z",
-  "updated": "2026-11-23T09:55:13.741Z",
+  "updated": "2026-11-23T09:55:18.887Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,11 @@
     "store-idle-clock-reason.ac2": {
       "status": "completed",
       "doneAt": "2026-11-23T09:55:13.741Z"
+    },
+    "display-root-helper": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5611",
+      "claimedAt": "2026-11-23T09:55:18.887Z"
     }
   }
 }
