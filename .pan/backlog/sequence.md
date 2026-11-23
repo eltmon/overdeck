@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-23T20:52:59Z · model: claude-opus-5-5 · open: 954_
+_Last sequenced: 2026-11-23T21:22:52Z · model: claude-opus-5-5 · open: 953_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -13,7 +13,7 @@ _Last sequenced: 2026-11-23T20:52:59Z · model: claude-opus-5-5 · open: 954_
 | 6 | PAN-5489 | S | high | ok |  |  | pan plan from an agent shell fails workspace creation without HUME_API_KEY, leaves a half-built workspace and hides the cause. |
 | 7 | PAN-5566 | M | high | ok |  |  | UI/help text says Auto blocks destructive calls but the hook approves all; repo .pan.yaml can set bypass mode. |
 | 8 | PAN-5385 | S | critical | ok |  |  | Anywhere remote access is down for trickle clients: machine drops ICE candidates sent before session registers; small server fix |
-| 8 | PAN-5623 | L | critical | ok |  | PAN-5621 | While gate admission is starved, stop Overdeck-owned stack containers of parked issues and restart them on demand (FR-2 of PAN-5621). |
+| 8 | PAN-5623 | L | critical | ok |  |  | While gate admission is starved, stop Overdeck-owned stack containers of parked issues and restart them on demand (FR-2 of PAN-5621). |
 | 9 | PAN-5633 | M | high | ok |  |  | Codex app-server auth burn never flags: banner silent, conv shows isWorking while 578 turns fail over 14h. Detect turn errors. |
 | 10 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 10 | PAN-5523 | S | high | ok |  |  | pan conversations move/heal send raw fetch with no token, so routes refuse with Missing origin; same fix pattern as in-pipeline PAN-5516. |
@@ -958,7 +958,6 @@ _Last sequenced: 2026-11-23T20:52:59Z · model: claude-opus-5-5 · open: 954_
 | 903 | PAN-5444 | XS | low | ok |  |  | Two Minor CodeRabbit findings left on merged PR #5443: semgrep repo rules resolve from event cwd; hook tests not isolated from Docker. |
 | 904 | PAN-5405 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5403: changes-query refetch after turns, Send menu keyboard/scheduling guard, tab-menu focus. |
 | 905 | PAN-2423 | XS | low | stale |  |  | Likely fixed: rebuild now uses the PAN-3049 resolver (docker.ts:181) and reap has no hardcoded prefix; confirm and close. |
-| 906 | PAN-5621 | M | low | ok |  |  | Fix merged and closed out (verifying on main); issue awaits closure. Nothing left to pick up. |
 
 ## Rationale detail
 
@@ -1289,10 +1288,10 @@ Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback thi
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-23T20:52:59Z",
+  "generatedAt": "2026-11-23T21:22:52Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 954,
+  "openCount": 953,
   "nodes": [
     {
       "issue": "PAN-5637",
@@ -1405,9 +1404,7 @@ Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback thi
       "importance": "critical",
       "score": 82,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-5621"
-      ],
+      "dependsOn": [],
       "why": "While gate admission is starved, stop Overdeck-owned stack containers of parked issues and restart them on demand (FR-2 of PAN-5621).",
       "rationale": "New substrate issue split from in-pipeline PAN-5621: detection alone does not end a starvation, reclaiming parked stacks does (the Flywheel did it by hand on 2026-11-23). The body is a verified, deny-by-default spec, so it ranks right behind its parent among the critical gate-throughput fixes; it overlaps PAN-5250's restart-on-demand path.",
       "gate": "auto",
@@ -13213,19 +13210,6 @@ Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback thi
       "rationale": "Demoted: a 2026-11-23 comment and a code check show both the rebuild and reap hardcodes are gone, so only an operator close remains.",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-5621",
-      "rank": 906,
-      "size": "M",
-      "importance": "low",
-      "score": 5,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Fix merged and closed out (verifying on main); issue awaits closure. Nothing left to pick up.",
-      "rationale": "Rank dropped from 1: the fix merged and the issue now carries closed-out, so it left the pipeline and has no remaining work.",
-      "gate": "auto",
-      "planning": "auto"
     }
   ],
   "edges": [
@@ -14565,13 +14549,6 @@ Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback thi
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
-    },
-    {
-      "from": "PAN-5621",
-      "to": "PAN-5623",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
     },
     {
       "from": "PAN-5633",
