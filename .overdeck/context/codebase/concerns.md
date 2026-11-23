@@ -432,6 +432,10 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   unseen id `unknown` (with a tombstone that refuses a late POST). The client
   must never abort a POST it cancelled: the cancelled handler may still be
   sending ensure-main keys, and the next queued POST would overlap them.
+- **A route calling `validateOrigin(request)` directly does not exempt the internal
+  token** — only `odk_` bearers skip it. CLI writes to such routes must send
+  `Origin: getDashboardApiUrl()` (PAN-5610); `rejectUnsafeDashboardMutationRequest`,
+  `crossSiteWriteRefusal` and `requireTrustedOrigin` do accept the internal token.
 - **Origin checks never authenticate** — `validateOriginHeaders` passes a GET
   (so every WebSocket upgrade) that carries no `Origin`/`Referer`. Credentials
   are `hasDashboardAuthHeaders` (session cookie or internal token); peer trust
