@@ -38,7 +38,7 @@ describe('startConversationIdleSettleService', () => {
   it('sweeps first at 120 s, then every 900 s', async () => {
     expect(IDLE_SETTLE_BOOT_DELAY_MS).toBe(120_000);
     expect(IDLE_SETTLE_INTERVAL_MS).toBe(900_000);
-    const sweep = vi.fn(async () => []);
+    const sweep = vi.fn(async () => ({ settled: [], resurfaced: [] }));
     expect(startConversationIdleSettleService({ sweep, isFrozen: () => false, log: vi.fn() })).toBe(true);
 
     await vi.advanceTimersByTimeAsync(119_000);
@@ -53,7 +53,7 @@ describe('startConversationIdleSettleService', () => {
   });
 
   it('does not sweep while the Deacon is frozen', async () => {
-    const sweep = vi.fn(async () => []);
+    const sweep = vi.fn(async () => ({ settled: [], resurfaced: [] }));
     startConversationIdleSettleService({ sweep, isFrozen: () => true, log: vi.fn() });
     await vi.advanceTimersByTimeAsync(IDLE_SETTLE_BOOT_DELAY_MS + IDLE_SETTLE_INTERVAL_MS);
     expect(sweep).not.toHaveBeenCalled();
@@ -61,44 +61,87 @@ describe('startConversationIdleSettleService', () => {
 
   it('returns false on a peer dashboard', () => {
     bootGates.isPeerDashboardProcess.mockReturnValue(true);
-    expect(startConversationIdleSettleService({ sweep: vi.fn(async () => []) })).toBe(false);
+    expect(startConversationIdleSettleService({ sweep: vi.fn(async () => ({ settled: [], resurfaced: [] })) })).toBe(false);
   });
 
   it('returns false with OVERDECK_DISABLE_IDLE_SETTLE=1', () => {
     process.env.OVERDECK_DISABLE_IDLE_SETTLE = '1';
-    expect(startConversationIdleSettleService({ sweep: vi.fn(async () => []) })).toBe(false);
+    expect(startConversationIdleSettleService({ sweep: vi.fn(async () => ({ settled: [], resurfaced: [] })) })).toBe(false);
   });
 
   it('returns false on a second start', () => {
-    expect(startConversationIdleSettleService({ sweep: vi.fn(async () => []) })).toBe(true);
-    expect(startConversationIdleSettleService({ sweep: vi.fn(async () => []) })).toBe(false);
+    expect(startConversationIdleSettleService({ sweep: vi.fn(async () => ({ settled: [], resurfaced: [] })) })).toBe(true);
+    expect(startConversationIdleSettleService({ sweep: vi.fn(async () => ({ settled: [], resurfaced: [] })) })).toBe(false);
   });
 
   it('skips a sweep while the previous one is still running', async () => {
-    let finish: (names: string[]) => void = () => {};
-    const sweep = vi.fn(() => new Promise<string[]>((resolve) => { finish = resolve; }));
+    let finish: (outcome: { settled: string[]; resurfaced: string[] }) => void = () => {};
+    const sweep = vi.fn(() => new Promise<{ settled: string[]; resurfaced: string[] }>((resolve) => { finish = resolve; }));
     const log = vi.fn();
     startConversationIdleSettleService({ sweep, isFrozen: () => false, log });
     await vi.advanceTimersByTimeAsync(IDLE_SETTLE_BOOT_DELAY_MS + IDLE_SETTLE_INTERVAL_MS);
     expect(sweep).toHaveBeenCalledOnce();
     expect(log).toHaveBeenCalledWith('[idle-settle] previous sweep still running, skipping');
-    finish([]);
+    finish({ settled: [], resurfaced: [] });
     await vi.advanceTimersByTimeAsync(0);
   });
 
   it('invalidates the list cache and logs after a sweep that settled something', async () => {
     const invalidate = vi.fn();
     const log = vi.fn();
-    startConversationIdleSettleService({ sweep: async () => ['conv-a'], invalidate, isFrozen: () => false, log });
+    startConversationIdleSettleService({
+      sweep: async () => ({ settled: ['conv-a'], resurfaced: [] }),
+      invalidate,
+      isFrozen: () => false,
+      log,
+    });
     await vi.advanceTimersByTimeAsync(IDLE_SETTLE_BOOT_DELAY_MS);
     expect(invalidate).toHaveBeenCalledOnce();
     expect(log).toHaveBeenCalledWith('[idle-settle] settled 1 idle conversation(s): conv-a');
   });
 
-  it('does not invalidate after a sweep that settled nothing', async () => {
+  it('does not invalidate after a sweep that settled and resurfaced nothing', async () => {
     const invalidate = vi.fn();
-    startConversationIdleSettleService({ sweep: async () => [], invalidate, isFrozen: () => false, log: vi.fn() });
+    startConversationIdleSettleService({
+      sweep: async () => ({ settled: [], resurfaced: [] }),
+      invalidate,
+      isFrozen: () => false,
+      log: vi.fn(),
+    });
     await vi.advanceTimersByTimeAsync(IDLE_SETTLE_BOOT_DELAY_MS);
     expect(invalidate).not.toHaveBeenCalled();
+  });
+
+  it('invalidates, emits, and logs after a sweep that resurfaced something', async () => {
+    const invalidate = vi.fn();
+    const emitChanged = vi.fn();
+    const log = vi.fn();
+    startConversationIdleSettleService({
+      sweep: async () => ({ settled: [], resurfaced: ['conv-b'] }),
+      invalidate,
+      emitChanged,
+      isFrozen: () => false,
+      log,
+    });
+    await vi.advanceTimersByTimeAsync(IDLE_SETTLE_BOOT_DELAY_MS);
+    expect(invalidate).toHaveBeenCalledOnce();
+    expect(emitChanged).toHaveBeenCalledWith('conv-b');
+    expect(log).toHaveBeenCalledWith('[idle-settle] resurfaced 1 conversation(s) with new activity: conv-b');
+  });
+
+  it('logs both lines, invalidating once, when a sweep both settled and resurfaced', async () => {
+    const invalidate = vi.fn();
+    const log = vi.fn();
+    startConversationIdleSettleService({
+      sweep: async () => ({ settled: ['conv-a'], resurfaced: ['conv-b'] }),
+      invalidate,
+      emitChanged: vi.fn(),
+      isFrozen: () => false,
+      log,
+    });
+    await vi.advanceTimersByTimeAsync(IDLE_SETTLE_BOOT_DELAY_MS);
+    expect(invalidate).toHaveBeenCalledOnce();
+    expect(log).toHaveBeenCalledWith('[idle-settle] settled 1 idle conversation(s): conv-a');
+    expect(log).toHaveBeenCalledWith('[idle-settle] resurfaced 1 conversation(s) with new activity: conv-b');
   });
 });
