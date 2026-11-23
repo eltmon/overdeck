@@ -1,0 +1,520 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-23T19:34:02Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5637: Merge train never admits a polyrepo issue that touches a member repo with no CI",
+    "updated": "2026-11-23T19:35:58.755Z"
+  },
+  "plan": {
+    "id": "pan-5637",
+    "title": "Merge train never admits a polyrepo issue that touches a member repo with no CI",
+    "status": "proposed",
+    "uid": "b25fe16d-4624-45bc-9731-98684d16ce49",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-23T19:34:02Z",
+    "updated": "2026-11-23T19:35:58.755Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5637",
+        "label": "PAN-5637",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5640",
+        "label": "PAN-5640 (follow-up: polyrepo promote reads MRs at the root)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5638",
+        "label": "PAN-5638 (sibling: GitHub member PRs in the ready set)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "merge-train",
+      "polyrepo",
+      "gitlab",
+      "merge-gate",
+      "ready-set"
+    ],
+    "narratives": {
+      "Problem": "The merge-train ready set (src/lib/overdeck/ready-set.ts gitlabRows, line 164) requires checks === 'green' on every open MR of a polyrepo issue. A member repo with no CI never has a pipeline, so gitLabChecks returns 'none' and the issue is never ready, never queued, never merged. MYN's infra (eltmon/myn-infra) and docs (eltmon/mind-your-now-docs) have no .gitlab-ci.yml, so MIN-1144 and MIN-1146 (api green + infra none) are shut out. The merge gate (evaluateMergeReadiness, pr-facts.ts line 963) refuses 'none' the same way, which blocks an infra-only or docs-only issue whose facts come from the CI-less repo. The 'none is not green' rule must not loosen for repos that do run CI.",
+      "Proposal": "Add an explicit, per-repo positive signal: workspace.repos[].ci: none in projects.yaml. resolveConfiguredRepos carries it as ciNone: true. A new import-free module src/lib/cloister/member-ci.ts holds the one predicate checksPass({checks, ciNone}) (green passes; none passes only with ciNone; red/pending never) and withMemberCi(facts, repo). The ready set's gitlabRows, the merge gate (readPrFacts stamps PrFacts.ciNone from the GitLab member it read; evaluateMergeReadiness uses checksPass), and the merge-train board's two checks tests all call checksPass. PrFacts.checks stays the forge's honest verdict. pr-facts.ts stays at <= 1000 lines. Docs (configuration/polyrepo.mdx, docs/MERGE-TRAIN.md) and changelog.d/pan-5637.md describe the field, and the operator config sets ci: none on MYN's infra and docs entries.",
+      "NonGoals": "- No change to githubRows in ready-set.ts (PAN-5638 owns it; the GitHub listing maps an empty rollup to 'pending', not 'none')\n- ci: none has no effect on GitHub member repos or on GitLab/GitHub monorepos\n- No change to polyrepo batch promote or getDerivedIssueState (tracked as PAN-5640); this issue does not promise that MIN-1144/MIN-1146 merge\n- No rewriting of PrFacts.checks: the forge verdict 'none' is reported as 'none' everywhere\n- red and pending checks are never waived, with or without ci: none\n- No change to mergeabilityPending, withForgeApprovalAtHead, evaluateConflictRepairGate, blockerReasonsFor or deriveState\n- No new value of ci besides 'none'; no validation, warning or pan doctor check for unknown values\n- No new forge (gh/glab) reads\n- No file-size allowlist row and no extraction of other code out of pr-facts.ts\n- Auricle's infra entry and every non-MYN project config stay unchanged\n- No change to how the gate picks which member MR to read (first writable GitLab member with an MR)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Config field is workspace.repos[].ci with the single recognized value 'none'; anything else is ignored silently.",
+        "rationale": "The issue proposes exactly this field and value; a closed single value keeps the waiver an explicit positive statement and avoids a validation surface nobody asked for."
+      },
+      {
+        "summary": "Only checks 'none' is waived; 'red' and 'pending' still block on a ci: none repo.",
+        "rationale": "The issue's constraint is that the absence-of-evidence rule must not loosen beyond the declared case; a repo that later gains a failing pipeline must still stop the merge."
+      },
+      {
+        "summary": "PrFacts.checks keeps the forge's verdict; the waiver is applied at judgment time through one predicate, checksPass, in a new import-free module member-ci.ts.",
+        "rationale": "Rewriting checks to 'green' would lie to every UI consumer; one predicate keeps the ready set, gate and board in agreement; a new module keeps pr-facts.ts under its 1000-line ceiling and avoids an import cycle."
+      },
+      {
+        "summary": "The gate learns the member from readPrFacts, which stamps ciNone on facts read from a GitLab member declaring ci: none.",
+        "rationale": "readPrFacts already holds the ResolvedProjectRepo it found the MR in; no extra forge read or remote-matching is needed."
+      },
+      {
+        "summary": "The waiver is honored for GitLab members only; githubRows is untouched.",
+        "rationale": "PAN-5638 is rewriting githubRows' approval rule concurrently, and the GitHub listing never reports 'none' for an open PR (empty rollup maps to 'pending'), so a GitHub waiver would need a different design."
+      },
+      {
+        "summary": "The merge-train board's two checks tests (lines 294, 424) switch to checksPass.",
+        "rationale": "Otherwise the board shows a car the ready set admitted as checks-pending; it is a two-line change on the same facts."
+      },
+      {
+        "summary": "Polyrepo batch promote (derived state reads MRs at the polyrepo root) is out of scope and filed as PAN-5640.",
+        "rationale": "A read-only probe returned pr: null for MIN-1144 and MIN-1146; the defect is unrelated to CI, and folding it in would double the change surface."
+      },
+      {
+        "summary": "The work agent edits ~/.overdeck/projects.yaml itself (with a dated backup) to add ci: none to MYN infra and docs, inside the docs item.",
+        "rationale": "The issue asks for it; the field is ignored by the old code, so the edit is safe before deploy; agents do console/config steps themselves (operator memory)."
+      },
+      {
+        "summary": "ciNone is added by conditional spread only when true, never as ciNone: false.",
+        "rationale": "Keeps every existing toEqual assertion on resolved repos and ready-set repos unchanged (NFR-1)."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Six small items across five source files, five test files and three doc files; well under the 25-file and 6-subsystem limits.",
+      "canonicalFilename": "2026-11-23-PAN-5637-merge-train-never-admits-a-polyrepo-issue-that-touches-a-member-repo-with-no-ci.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "repo-ci-config",
+        "title": "Resolve workspace.repos[].ci: none into ResolvedProjectRepo.ciNone",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T19:34:02Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5637",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspace-config.ts",
+            "src/lib/project-repos.ts",
+            "tests/lib/project-repos.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/project-repos.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/lib/project-repos.test.ts passes including the ci: none (PAN-5637) cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Add `ci?: 'none'` (with the PAN-5637 doc comment from the PRD) to RepoConfig in src/lib/workspace-config.ts after `package_manager` (line 31). Add optional `ciNone?: boolean` to ResolvedProjectRepo in src/lib/project-repos.ts after `required: boolean;` (line 16). In resolveConfiguredRepos' repos.map object, after `required: repo.readonly !== true,` (line 129) add `...(repo.ci === 'none' ? { ciNone: true } : {}),`. Leave the single-repo branch unchanged. Add a `describe('ci: none (PAN-5637)')` block to tests/lib/project-repos.test.ts with the two cases named in the PRD."
+        },
+        "items": [
+          {
+            "id": "repo-ci-config.ac1",
+            "title": "Given a polyrepo config whose infra entry sets ci: 'none', when resolveConfiguredRepos runs, then the infra repo returns ciNone: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "repo-ci-config.ac2",
+            "title": "Given repo entries without ci or with another value, when resolveConfiguredRepos runs, then those repos have no ciNone key and the existing project-repos tests pass unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-waiver-predicate",
+        "title": "Add checksPass and withMemberCi in an import-free member-ci module",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T19:34:02Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5637",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "ready-set-ci-waiver",
+            "merge-gate-ci-waiver",
+            "board-ci-waiver"
+          ],
+          "files_scope": [
+            "src/lib/cloister/member-ci.ts",
+            "src/lib/cloister/__tests__/member-ci.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/member-ci.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "member-ci.test.ts passes all four cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Create src/lib/cloister/member-ci.ts with the module header and exactly the two exports shown in the PRD: `checksPass(facts: { readonly checks: string; readonly ciNone?: boolean }): boolean` returning `facts.checks === 'green' || (facts.checks === 'none' && facts.ciNone === true)`, and `withMemberCi<T extends object>(facts: T, repo: { readonly ciNone?: boolean }): T` returning `{ ...facts, ciNone: true }` when repo.ciNone === true, else the same facts object. The module has no import statements (not even type imports from pr-facts.ts). Add src/lib/cloister/__tests__/member-ci.test.ts with the four named cases."
+        },
+        "items": [
+          {
+            "id": "ci-waiver-predicate.ac1",
+            "title": "checksPass returns true for green with or without ciNone, and for none only when ciNone is true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-waiver-predicate.ac2",
+            "title": "checksPass returns false for red and for pending even when ciNone is true, and false for none when ciNone is absent or false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-waiver-predicate.ac3",
+            "title": "withMemberCi returns facts with ciNone: true for a ci: none repo and returns the same object reference otherwise; member-ci.ts contains no import statement",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ready-set-ci-waiver",
+        "title": "Ready set admits a GitLab member MR with no checks when its repo declares ci: none",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T19:34:02Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5637",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/ready-set.ts",
+            "src/lib/overdeck/__tests__/ready-set.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/ready-set.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ready-set.test.ts passes including the ci: none members (PAN-5637) block",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In src/lib/overdeck/ready-set.ts: add `readonly ciNone?: boolean` to ReadySetRepo; in memberReposForProject add `...(repo.ciNone ? { ciNone: true } : {})` after branchPrefix; in gitlabRows replace `facts.checks === 'green'` (line 164) with `checksPass({ checks: facts.checks, ciNone: repo.ciNone })` imported from '../cloister/member-ci.js'; append the one-sentence ci: none note to the Polyrepo bullet of the module header. Do NOT touch githubRows (PAN-5638 owns it). Add a separate `describe('ci: none members (PAN-5637)')` block at the end of ready-set.test.ts with the five cases named in the PRD (MIN-1144 shape admitted; same without ciNone refused; red refused; pending refused; memberReposForProject carries ciNone)."
+        },
+        "items": [
+          {
+            "id": "ready-set-ci-waiver.ac1",
+            "title": "Given a polyrepo issue with an api MR whose facts are green and an infra MR whose facts are checks none in a ciNone member, when listReadyIssuesForProject runs, then it returns that issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ready-set-ci-waiver.ac2",
+            "title": "Given the same fixture without ciNone on infra, when listReadyIssuesForProject runs, then it returns an empty list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ready-set-ci-waiver.ac3",
+            "title": "Given a ciNone member MR whose facts are red or pending, when listReadyIssuesForProject runs, then it returns an empty list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ready-set-ci-waiver.ac4",
+            "title": "memberReposForProject returns ciNone: true for a repo entry with ci: none and no ciNone key for a repo without it; githubRows is unchanged in the diff",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "merge-gate-ci-waiver",
+        "title": "Merge gate answers ready for a GitLab member MR with no checks when its repo declares ci: none",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T19:34:02Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5637",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "board-ci-waiver"
+          ],
+          "files_scope": [
+            "src/lib/cloister/pr-facts.ts",
+            "src/lib/cloister/__tests__/pr-facts-gitlab-gate.test.ts",
+            "src/lib/cloister/__tests__/merge-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/pr-facts-gitlab-gate.test.ts src/lib/cloister/__tests__/merge-gate.test.ts tests/unit/lib/cloister/merge-readiness.test.ts",
+            "wc -l src/lib/cloister/pr-facts.ts",
+            "bash scripts/lint-file-size.sh",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all three test files pass, including the new PAN-5637 cases",
+            "wc prints a line count of 1000 or less",
+            "lint-file-size.sh exits 0",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. In src/lib/cloister/pr-facts.ts (996 lines; must end <= 1000; net +4): (1) add `import { checksPass, withMemberCi } from './member-ci.js';` after the project-repos import (line 26); (2) add the one-line-doc-commented `ciNone?: boolean;` to PrFacts after `checks: ChecksVerdict;` (line 88); (3) in readPrFacts change line 685 to `if (row?.iid) return withMemberCi(await readGitLabMrFacts(issueId, row, deps), repo);`; (4) in evaluateMergeReadiness change `if (facts.checks !== 'green')` (line 963) to `if (!checksPass(facts))` keeping the reason text, and extend the FR-9 comment's last line with the PAN-5637 note. The red and pending checks above it stay unchanged. Implementation checkpoint: if wc -l exceeds 1000, shorten the new comments; never extract other code and never add an allowlist row. Tests: in pr-facts-gitlab-gate.test.ts give the deps helper an optional third parameter `repo: { ciNone?: boolean } = {}` spread into the resolved repo, and add the three named cases (ciNone + no pipeline -> ready; no ciNone -> 'no CI checks reported'; ciNone + failed pipeline -> 'CI checks failing'). In merge-gate.test.ts add the evaluateIssueMergeGate case using readyFacts('MIN-9', { forge: 'gitlab', checks: 'none', ciNone: true }) -> ready, and without ciNone -> not ready with /no CI checks reported/."
+        },
+        "items": [
+          {
+            "id": "merge-gate-ci-waiver.ac1",
+            "title": "Given an issue whose only MR is in a ciNone GitLab member and has no pipeline, when getPrFacts reads it, then facts.checks is 'none', facts.ciNone is true, and evaluateMergeReadiness returns { ready: true }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-gate-ci-waiver.ac2",
+            "title": "Given the same MR in a member without ci: none, when the gate judges it, then it rejects with a reason matching 'no CI checks reported' and facts.ciNone is undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-gate-ci-waiver.ac3",
+            "title": "Given a ciNone member MR with a failed pipeline, when the gate judges it, then it rejects with a reason matching 'CI checks failing'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-gate-ci-waiver.ac4",
+            "title": "wc -l src/lib/cloister/pr-facts.ts prints 1000 or less, bash scripts/lint-file-size.sh exits 0, and scripts/file-size-allowlist.txt is not in the diff",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "board-ci-waiver",
+        "title": "Merge-train board judges checks with checksPass so a waived MR is not shown as checks-pending",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T19:34:02Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5637",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/merge-train-board.ts",
+            "src/dashboard/server/services/__tests__/merge-train-board.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/merge-train-board.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "merge-train-board.test.ts passes including the new ciNone strike case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. In src/dashboard/server/services/merge-train-board.ts import checksPass from '../../../lib/cloister/member-ci.js'; change line 294 `facts.checks === 'green'` to `checksPass(facts)` in the inReadySet expression; change line 424 `} else if (facts?.checks !== 'green') {` to `} else if (!facts || !checksPass(facts)) {`. In merge-train-board.test.ts, following the existing strikes fixture (the case asserting PAN-6 is 'checks-pending'), add a case: strike facts with checks 'none' and ciNone true are not 'checks-pending'; the same facts without ciNone are 'checks-pending'."
+        },
+        "items": [
+          {
+            "id": "board-ci-waiver.ac1",
+            "title": "Given a strike whose facts have checks 'none' and ciNone true, when getMergeTrainBoard runs, then its state is not 'checks-pending'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "board-ci-waiver.ac2",
+            "title": "Given the same strike facts without ciNone, when getMergeTrainBoard runs, then its state is 'checks-pending', and the existing board tests pass unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-ci-none",
+        "title": "Document ci: none, add the changelog entry, and set ci: none on MYN infra and docs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T19:34:02Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5637",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/polyrepo.mdx",
+            "docs/MERGE-TRAIN.md",
+            "changelog.d/pan-5637.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'ci: none' configuration/polyrepo.mdx docs/MERGE-TRAIN.md changelog.d/pan-5637.md",
+            "npm run lint:docs",
+            "grep -c 'ci: none' ~/.overdeck/projects.yaml"
+          ],
+          "expected_outputs": [
+            "grep matches in all three repo files",
+            "lint:docs exits 0",
+            "grep -c prints 2"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. (1) configuration/polyrepo.mdx: append the PRD's ci: none sentences to the Repos bullet (line 137) and add `ci: none  # this repo runs no CI` to one repo of the YAML example near lines 72-80. (2) docs/MERGE-TRAIN.md: extend the Polyrepo row of 'The ready set' table (lines 61-71) with the ci: none waiver (checksPass, src/lib/cloister/member-ci.ts) and add one paragraph after the table saying the merge gate applies the same waiver to facts read from such a member and that polyrepo batch promote is tracked in PAN-5640. (3) Create changelog.d/pan-5637.md with the exact '#### Fixed' entry from the PRD. (4) Operator config: `cp ~/.overdeck/projects.yaml ~/.overdeck/projects.yaml.bak-2026-11-23-ci-none`, then add `ci: none` (same indentation as branch_prefix) under the mind-your-now project's infra and docs repo entries only; never touch Auricle's infra or any other project. Mention the config edit in the item commit message."
+        },
+        "items": [
+          {
+            "id": "docs-ci-none.ac1",
+            "title": "configuration/polyrepo.mdx states that ci: none makes a GitLab member MR with no pipeline count as passing, that failing or pending pipelines still block, that it has no effect on GitHub members, and that the field should be removed when the repo gains CI",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-ci-none.ac2",
+            "title": "docs/MERGE-TRAIN.md's ready-set table Polyrepo row contains the ci: none waiver and checksPass, and the paragraph after the table contains the merge gate waiver and PAN-5640",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-ci-none.ac3",
+            "title": "changelog.d/pan-5637.md exists with a single '#### Fixed' bullet linking #5637, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-ci-none.ac4",
+            "title": "grep -c 'ci: none' ~/.overdeck/projects.yaml prints 2, both inside the mind-your-now block under infra and docs, and ~/.overdeck/projects.yaml.bak-2026-11-23-ci-none exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "repo-ci-config",
+        "to": "ready-set-ci-waiver",
+        "type": "blocks"
+      },
+      {
+        "from": "ci-waiver-predicate",
+        "to": "ready-set-ci-waiver",
+        "type": "blocks"
+      },
+      {
+        "from": "repo-ci-config",
+        "to": "merge-gate-ci-waiver",
+        "type": "blocks"
+      },
+      {
+        "from": "ci-waiver-predicate",
+        "to": "merge-gate-ci-waiver",
+        "type": "blocks"
+      },
+      {
+        "from": "merge-gate-ci-waiver",
+        "to": "board-ci-waiver",
+        "type": "blocks"
+      },
+      {
+        "from": "ci-waiver-predicate",
+        "to": "board-ci-waiver",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
