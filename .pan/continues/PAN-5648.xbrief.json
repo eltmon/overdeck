@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5648",
   "created": "2026-11-23T23:03:53.057Z",
-  "updated": "2026-11-23T23:27:41.986Z",
+  "updated": "2026-11-23T23:36:16.324Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -128,9 +128,30 @@
       "doneAt": "2026-11-23T23:27:33.747Z"
     },
     "restore-refresh-snapshot": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5648",
-      "claimedAt": "2026-11-23T23:27:41.985Z"
+      "claimedAt": "2026-11-23T23:27:41.985Z",
+      "doneAt": "2026-11-23T23:36:16.324Z"
+    },
+    "restore-refresh-snapshot.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:36:16.324Z"
+    },
+    "restore-refresh-snapshot.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:36:16.324Z"
+    },
+    "restore-refresh-snapshot.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:36:16.324Z"
+    },
+    "restore-refresh-snapshot.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:36:16.324Z"
+    },
+    "restore-refresh-snapshot.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:36:16.324Z"
     }
   }
 }
