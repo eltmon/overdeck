@@ -153,7 +153,9 @@ Later gates may pass a head that is waiting on memory. A
 gate at the head of the queue that has waited 5 minutes on memory can no
 longer be passed by later gates. The slots drain and it runs alone, as long
 as available memory minus its footprint stays at or above the hard reserve
-(PAN-5285).
+(PAN-5285). When even that is impossible for
+`resources.quality_gate_starvation_minutes`, Overdeck reports the stall once
+instead of waiting on it silently (PAN-5621).
 
 | Key | Default | What it does |
 | --- | --- | --- |
@@ -167,6 +169,7 @@ as available memory minus its footprint stays at or above the hard reserve
 | `resources.quality_gate_slots` | `2` | Quality gates, local Vitest runs and typecheck lanes that may hold admission at once (1-16). Set it in `~/.overdeck/config.yaml`; a project `.pan.yaml` value is ignored. A gate starts only while CPU is unpressured: utilization below 75 %, and, from 50 % utilization, PSI some avg10 below `resources.quality_gate_psi_start_avg10` (load per core below 1 without PSI). It also waits while starting it would push MemAvailable below `resources.governor_soft_reserve_gb`. Under pressure new gates wait; running gates keep their slots. |
 | `resources.quality_gate_psi_start_avg10` | `25` | New quality gates wait while CPU PSI `some avg10` is at or above this percentage and CPU utilization is at least 50 % (above 0, at most 100). Below 50 % utilization PSI is ignored, because workloads pinned to a few cores raise it while other cores sit idle. Global config only. |
 | `resources.quality_gate_cpu_bypass_minutes` | `10` | Minutes the admission queue waits on CPU pressure before its head starts alone, once no other gate holds a slot. The bound counts once per pressure episode, not per gate. Must be above 0 and under 30, the gate wrappers' admission wait. Global config only; queued gates pick up a change on their next poll. |
+| `resources.quality_gate_starvation_minutes` | `15` | Minutes the gate at the head of the admission queue may wait on memory, with no gate running and too little memory to start even alone above `resources.governor_hard_reserve_gb`, before Overdeck reports the queue as starved: one line in `pan status`, one activity entry and one phone push per stall. Must be above 0 and under 30. Global config only. |
 
 The deacon log (`~/.overdeck/logs/deacon.log`) gets one `cpu-pressure sample`
 line every 5 minutes with PSI some avg10/avg60 and load per core, so you can
