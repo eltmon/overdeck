@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5486",
   "created": "2026-11-23T03:25:55.145Z",
-  "updated": "2026-11-23T03:34:09.880Z",
+  "updated": "2026-11-23T03:34:11.440Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,11 @@
     "core-pin-stamp.ac4": {
       "status": "completed",
       "doneAt": "2026-11-23T03:34:09.880Z"
+    },
+    "core-pin-release": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5486",
+      "claimedAt": "2026-11-23T03:34:11.440Z"
     }
   }
 }
