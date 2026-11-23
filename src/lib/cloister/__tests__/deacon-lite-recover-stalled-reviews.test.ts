@@ -157,12 +157,14 @@ describe('recoverStalledReviews', () => {
       vi.setSystemTime(NOW);
     }
 
-    it('re-requests a first pipeline failure once, so a transient error gets another try', async () => {
+    it('re-requests a first pipeline failure once through the door, never by relaunching an earlier run', async () => {
+      // The file default: saved parent state from an earlier round, whose lanes recovery would relaunch.
       journal([{ type: 'review.requested', minutesAgo: 90 }]);
       pipelineFailure(80, 'Command failed: git push origin feature/pan-3705');
-      mocks.recoverMissingConvoyReviewers.mockResolvedValue({ success: false, message: 'no review parent state for PAN-3705' });
 
       const actions = await recoverStalledReviews(NOW);
+
+      expect(mocks.recoverMissingConvoyReviewers).not.toHaveBeenCalled();
 
       expect(mocks.requestReviewThroughRoute).toHaveBeenCalledWith('PAN-3705', expect.objectContaining({
         source: 'deacon-lite',
@@ -188,7 +190,6 @@ describe('recoverStalledReviews', () => {
       pipelineFailure(190, 'Command failed: git push', 'abcd1234');
       journal([{ type: 'review.requested', minutesAgo: 100 }]);
       pipelineFailure(90, 'Command failed: git push', 'ef015678');
-      mocks.recoverMissingConvoyReviewers.mockResolvedValue({ success: false, message: 'no review parent state for PAN-3705' });
 
       await recoverStalledReviews(NOW);
 

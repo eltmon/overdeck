@@ -471,7 +471,7 @@ describe('a conflict on a workspace with no xBRIEF (PAN-5619)', () => {
     return { deps: { ...real, probeMergeability: () => mergeability }, spawnRun, journal };
   }
 
-  it('the old resolver spawn throws the xBRIEF guard error out of the gate', async () => {
+  it('with a plan, a spawn error still escapes the gate (only the no-xBRIEF case is handled here)', async () => {
     const spawnRun = vi.fn(async () => { throw new Error(GUARD_ERROR); });
     const real = buildRealConflictGateDeps({ spawnRun, emitActivityEntry: vi.fn(), hasPlan: () => true, getFacts: () => blockedFacts('PAN-5601') });
 

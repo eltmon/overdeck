@@ -537,10 +537,14 @@ export async function recoverStalledReviews(now = Date.now()): Promise<string[]>
     let outcome: string;
     let journalData: Record<string, unknown> = { reason };
     try {
+      // PAN-5619: a failed review-request pipeline started no run, so any saved
+      // parent state belongs to an earlier round. Relaunching its lanes would
+      // not review this head: re-request through the door instead.
+      const failedPipeline = last.type === 'review.dispatch-failed';
       const { recoverMissingConvoyReviewers } = await import('./review-convoy.js');
-      const recovery = await recoverMissingConvoyReviewers(issueId, { source: 'deacon-lite' });
-      outcome = recovery.message;
-      if (!recovery.success && /no review parent state|missing workspace\/runId/i.test(recovery.message)) {
+      const recovery = failedPipeline ? null : await recoverMissingConvoyReviewers(issueId, { source: 'deacon-lite' });
+      outcome = recovery?.message ?? reason;
+      if (!recovery || (!recovery.success && /no review parent state|missing workspace\/runId/i.test(recovery.message))) {
         // The cooldown starts BEFORE the request so a refused or unreachable
         // route is not retried every tick.
         lastReviewRedispatchAt.set(issueId, now);
