@@ -13,6 +13,7 @@ src/App/__tests__/countAgreement.test.tsx
 src/App/api.test.ts
 src/App/appChromeLabels.test.ts
 src/App/hooks/pendingInputNotification.test.ts
+src/App/hooks/usePendingInputDialogs.permission-notify.test.tsx
 src/App/routes.linked.test.ts
 src/App/topbar/AgentsMenu.test.tsx
 src/App/topbar/Breadcrumb.test.tsx

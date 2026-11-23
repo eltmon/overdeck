@@ -86,6 +86,8 @@ export function usePermissionNotifications(rows: PermissionNotificationRow[], on
       if (live.has(key)) continue;
       timers.forEach(clearTimeout);
       timersRef.current.delete(key);
+      dismissPendingInputNotification(key);
+      for (const after of PERMISSION_RENOTIFY_AFTER_MS) dismissPendingInputNotification(`${key}::${after}`);
     }
   }, [rows]);
 
