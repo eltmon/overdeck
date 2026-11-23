@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-23T06:23:08Z · model: claude-opus-5-5 · open: 954_
+_Last sequenced: 2026-11-23T07:18:58Z · model: claude-opus-5-5 · open: 955_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -8,6 +8,7 @@ _Last sequenced: 2026-11-23T06:23:08Z · model: claude-opus-5-5 · open: 954_
 | 1 | PAN-5598 | M | medium | ok |  |  | Order-book CLI/MCP parity: route scopes for /api/orders*, ten MCP tools, new pan orders verbs. In pipeline (planning). |
 | 1 | PAN-5611 | S | medium | ok |  |  | Idle-settled conversations stay in Settled after the operator resumes them, hiding them from their project group. |
 | 1 | PAN-5615 | S | high | ok |  |  | Role prompts escalate via pan tell flywheel-orchestrator, a dead name; the Flywheel is conv-flywheel, so blockers are lost. |
+| 1 | PAN-5617 | S | critical | ok |  |  | npm run typecheck admits each of its 12 tsc lanes separately; under memory pressure one run takes ~1h and stalls agent pushes. |
 | 2 | PAN-5600 | XS | critical | ok |  |  | Dashboard start route hardcodes overdeck-feature-<id>, so every MYN post-planning hand-off 422s; swap in the PAN-3049 resolver. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 3 | PAN-5614 | M | critical | ok |  |  | specialists done falls back to GitHub in remote-less polyrepo roots, so GitLab review verdicts are lost and MYN merges stall. |
@@ -974,6 +975,10 @@ New bug already in the pipeline with a verified root cause (only Unsettle and sc
 
 New substrate bug already in the pipeline: every agent escalation to the Flywheel fails silently (MIN-1144 lost a blocker for two hours). Pinned at rank 1 per the in-pipeline rule; the fix is a prompt rename, a cost-attribution alias and a guard test.
 
+### PAN-5617 (rank 1)
+
+New substrate-improvement bug already in the pipeline, pinned at rank 1 per the in-pipeline rule. It is critical because every agent quality gate runs npm run typecheck: on 2026-11-23 two Flywheel handoffs (PAN-5601, PAN-5614) could not push for about an hour, which in turn held MYN merges. FR-1..FR-4 are concrete (admit the chain once, reuse OVERDECK_GATE_ADMITTED, keep the slot cap).
+
 ### PAN-5600 (rank 2)
 
 New substrate bug that breaks the automatic plan-to-work hand-off and the dashboard Start button for every non-Overdeck docker project (MYN today); the CLI pan start workaround hides it only for CLI users. The fix is a one-call swap to requireComposeProjectNameForWorkspace with a named test, so it is tiny and unblocks the pipeline for a whole project.
@@ -1278,10 +1283,6 @@ Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback thi
 
 New planning bug placed in a freed high-tier slot. It blocks pan plan finalize for every epic child with a stub draft on main; the fix is a candidate-order change plus one test.
 
-### PAN-2940 (rank 73)
-
-Three red-mains in one day from direct-push series bypassing PR CI — conversations need a pre-merge CI surface.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1289,10 +1290,10 @@ Three red-mains in one day from direct-push series bypassing PR CI — conversat
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-23T06:23:08Z",
+  "generatedAt": "2026-11-23T07:18:58Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 954,
+  "openCount": 955,
   "nodes": [
     {
       "issue": "PAN-5598",
@@ -1330,6 +1331,19 @@ Three red-mains in one day from direct-push series bypassing PR CI — conversat
       "dependsOn": [],
       "why": "Role prompts escalate via pan tell flywheel-orchestrator, a dead name; the Flywheel is conv-flywheel, so blockers are lost.",
       "rationale": "New substrate bug already in the pipeline: every agent escalation to the Flywheel fails silently (MIN-1144 lost a blocker for two hours). Pinned at rank 1 per the in-pipeline rule; the fix is a prompt rename, a cost-attribution alias and a guard test.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5617",
+      "rank": 1,
+      "size": "S",
+      "importance": "critical",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "npm run typecheck admits each of its 12 tsc lanes separately; under memory pressure one run takes ~1h and stalls agent pushes.",
+      "rationale": "New substrate-improvement bug already in the pipeline, pinned at rank 1 per the in-pipeline rule. It is critical because every agent quality gate runs npm run typecheck: on 2026-11-23 two Flywheel handoffs (PAN-5601, PAN-5614) could not push for about an hour, which in turn held MYN merges. FR-1..FR-4 are concrete (admit the chain once, reuse OVERDECK_GATE_ADMITTED, keep the slot cap).",
       "gate": "auto",
       "planning": "auto"
     },
@@ -14591,6 +14605,20 @@ Three red-mains in one day from direct-push series bypassing PR CI — conversat
     {
       "from": "PAN-5614",
       "to": "PAN-2954",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-5617",
+      "to": "PAN-5601",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-5617",
+      "to": "PAN-5614",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
