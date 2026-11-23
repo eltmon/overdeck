@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5623",
   "created": "2026-11-23T20:20:25.006Z",
-  "updated": "2026-11-23T20:53:03.574Z",
+  "updated": "2026-11-23T20:53:08.495Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -118,6 +118,11 @@
     "wi5-restore-door.ac5": {
       "status": "completed",
       "doneAt": "2026-11-23T20:53:03.574Z"
+    },
+    "wi6-spawn-restore": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5623",
+      "claimedAt": "2026-11-23T20:53:08.495Z"
     }
   }
 }
