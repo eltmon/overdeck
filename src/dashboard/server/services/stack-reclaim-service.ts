@@ -40,8 +40,8 @@ import { evaluateIssueMergeGate } from '../../../lib/cloister/merge-gate.js';
 import {
   appendPipelineEntry,
   openStackReclaim,
-  readPipelineJournal,
   reclaimedInEpisode,
+  tryReadPipelineJournal,
   type PipelineJournalEntry,
 } from '../../../lib/cloister/pipeline-journal.js';
 import {
@@ -104,7 +104,8 @@ export interface StackReclaimServiceDeps {
   listPanes: () => Promise<BackendPane[] | null>;
   turnState: (agentId: string) => TurnState;
   verificationBusy: (issueId: string) => boolean;
-  readJournal: (workspacePath: string) => PipelineJournalEntry[];
+  /** `null` when the journal exists but cannot be read; every call site fails closed on it. */
+  readJournal: (workspacePath: string) => PipelineJournalEntry[] | null;
   readMemoryBytes: (names: readonly string[]) => Promise<Map<string, number> | null>;
   mergeReady: (issueId: string) => Promise<boolean>;
   appendEntry: typeof appendPipelineEntry;
@@ -149,7 +150,7 @@ function resolveDeps(deps: Partial<StackReclaimServiceDeps> = {}): StackReclaimS
     turnState: deps.turnState ?? defaultTurnState,
     verificationBusy: deps.verificationBusy
       ?? ((issueId) => isVerificationWorkerActive(issueId) || readVerificationDispatchOwed(issueId) !== null),
-    readJournal: deps.readJournal ?? ((workspacePath) => readPipelineJournal(workspacePath)),
+    readJournal: deps.readJournal ?? ((workspacePath) => tryReadPipelineJournal(workspacePath)),
     readMemoryBytes: deps.readMemoryBytes ?? readContainerMemoryBytes,
     mergeReady: deps.mergeReady ?? (async (issueId) => (await evaluateIssueMergeGate(issueId)).ready),
     appendEntry: deps.appendEntry ?? appendPipelineEntry,
@@ -224,7 +225,9 @@ function buildCandidates(
     if (containers.length === 0) continue;
     if (issueInGateQueue(snapshot, issueId, workspace.path)) continue;
     if (deps.verificationBusy(issueId)) continue;
-    if (reclaimedInEpisode(deps.readJournal(workspace.path), record.since)) continue;
+    const journal = deps.readJournal(workspace.path);
+    if (journal === null) continue;
+    if (reclaimedInEpisode(journal, record.since)) continue;
     if (!panesAllowReclaim(issuePanes(panes, issueId, workspace.path), deps.turnState).ok) continue;
     seen.add(issueId);
     candidates.push({ issueId, workspacePath: workspace.path, composeProject, containers });
@@ -234,7 +237,9 @@ function buildCandidates(
 
 /** FR-2 rule 8 (D7): an unresolved blocker declaration first, then the merge gate's own `ready`. */
 async function isParked(deps: StackReclaimServiceDeps, candidate: ReclaimCandidate): Promise<boolean> {
-  if (pendingDeclarations(deps.readJournal(candidate.workspacePath)).length > 0) return true;
+  const journal = deps.readJournal(candidate.workspacePath);
+  if (journal === null) return false;
+  if (pendingDeclarations(journal).length > 0) return true;
   try {
     return await deps.mergeReady(candidate.issueId);
   } catch {
@@ -358,7 +363,8 @@ export async function runStackReclaimPoll(
         },
       });
       // D5: appendPipelineEntry swallows write errors, so stop nothing unless the entry landed.
-      const open = openStackReclaim(deps.readJournal(chosen.workspacePath));
+      const readBack = deps.readJournal(chosen.workspacePath);
+      const open = readBack === null ? null : openStackReclaim(readBack);
       if (!open || open.at !== written.at || open.containers.join('\n') !== names.join('\n')) {
         return { kind: 'idle' as const, reason: 'journal-unwritable' };
       }
@@ -392,15 +398,26 @@ export async function runStackReclaimPoll(
   return { kind: 'reclaimed', issueId: chosen.issueId, stopped: outcome.stopped, failed: outcome.failed };
 }
 
-/** D15: seed the index once from every workspace journal, so open reclaims survive a restart (FR-7). */
+/**
+ * D15: seed the index once from every workspace journal, so open reclaims
+ * survive a restart (FR-7). A journal that cannot be read yet leaves
+ * `state.seeded` false so a later tick retries every workspace, rather than
+ * permanently missing the reclaim an unreadable journal was hiding.
+ */
 function seedRestoreIndex(deps: StackReclaimServiceDeps, state: StackReclaimState): void {
+  let allReadable = true;
   for (const workspace of deps.listWorkspaces()) {
     if (!workspace.issueId || !deps.pathExists(workspace.path)) continue;
-    if (openStackReclaim(deps.readJournal(workspace.path))) {
+    const journal = deps.readJournal(workspace.path);
+    if (journal === null) {
+      allReadable = false;
+      continue;
+    }
+    if (openStackReclaim(journal)) {
       state.restoreIndex.set(workspace.issueId.toUpperCase(), workspace.path);
     }
   }
-  state.seeded = true;
+  if (allReadable) state.seeded = true;
 }
 
 /** The restore poll (D15, WI-13): restores an open reclaim when its issue's agent is working or mid-turn. */
@@ -411,7 +428,14 @@ export async function runStackRestorePoll(deps: StackReclaimServiceDeps, state: 
   if (!panes) return;
   const now = deps.now();
   for (const [issueId, workspacePath] of [...state.restoreIndex]) {
-    if (!deps.pathExists(workspacePath) || !openStackReclaim(deps.readJournal(workspacePath))) {
+    if (!deps.pathExists(workspacePath)) {
+      state.restoreIndex.delete(issueId);
+      state.restoreRetryAt.delete(issueId);
+      continue;
+    }
+    const journal = deps.readJournal(workspacePath);
+    if (journal === null) continue; // unreadable this tick — keep the entry, try again next tick.
+    if (!openStackReclaim(journal)) {
       state.restoreIndex.delete(issueId);
       state.restoreRetryAt.delete(issueId);
       continue;

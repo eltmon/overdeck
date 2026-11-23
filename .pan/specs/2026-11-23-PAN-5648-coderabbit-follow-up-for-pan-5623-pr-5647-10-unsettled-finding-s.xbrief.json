@@ -4,17 +4,17 @@
     "created": "2026-11-23T22:49:19Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5648: CodeRabbit follow-up for PAN-5623 (PR #5647): 10 unsettled finding(s)",
-    "updated": "2026-11-23T23:02:09.388Z"
+    "updated": "2026-11-23T23:03:15.733Z"
   },
   "plan": {
     "id": "pan-5648",
     "title": "CodeRabbit follow-up for PAN-5623 (PR #5647): 10 unsettled finding(s)",
-    "status": "proposed",
+    "status": "running",
     "uid": "f538ca32-4c86-4940-9b8d-8253ae52425a",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-23T22:49:19Z",
-    "updated": "2026-11-23T23:02:09.388Z",
+    "updated": "2026-11-23T23:03:15.733Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5648",
@@ -793,5 +793,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }

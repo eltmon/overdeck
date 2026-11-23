@@ -236,6 +236,13 @@ describe('runStackReclaimPoll (PAN-5623 WI-12)', () => {
     await expect(runStackReclaimPoll(deps, createStackReclaimState())).resolves.toEqual({ kind: 'idle', reason: 'no-candidates' });
   });
 
+  it('skips a candidate whose journal is unreadable (PAN-5648 journal-read-null.ac4)', async () => {
+    const { deps } = world();
+    deps.readJournal.mockReturnValue(null);
+    await expect(runStackReclaimPoll(deps, createStackReclaimState())).resolves.toEqual({ kind: 'idle', reason: 'no-candidates' });
+    expect(deps.stopContainer).not.toHaveBeenCalled();
+  });
+
   it('reclaims an issue with an idle work pane and a finished review pane', async () => {
     const { deps } = world({
       listPanes: vi.fn(async () => [
@@ -377,6 +384,25 @@ describe('runStackRestorePoll (PAN-5623 WI-13)', () => {
     expect(state.seeded).toBe(true);
   });
 
+  it('leaves seeded false when one workspace journal is unreadable, and indexes it once a later tick can read it (PAN-5648 journal-read-null.ac3)', async () => {
+    const { deps, journals } = world({ listWorkspaces: vi.fn(() => [workspace('MIN-1144'), workspace('MIN-1146')]) });
+    journals.set(wsPath('MIN-1144'), [RECLAIMED]);
+    journals.set(wsPath('MIN-1146'), [{ ...RECLAIMED, issueId: 'MIN-1146' }]);
+    deps.readJournal.mockImplementation((path: string) => (path === wsPath('MIN-1146') ? null : [...(journals.get(path) ?? [])]));
+    const state = createStackReclaimState();
+
+    await runStackRestorePoll(deps, state);
+
+    expect(state.seeded).toBe(false);
+    expect([...state.restoreIndex]).toEqual([['MIN-1144', wsPath('MIN-1144')]]);
+
+    deps.readJournal.mockImplementation((path: string) => [...(journals.get(path) ?? [])]);
+    await runStackRestorePoll(deps, state);
+
+    expect(state.seeded).toBe(true);
+    expect(state.restoreIndex.has('MIN-1146')).toBe(true);
+  });
+
   it('restores with trigger turn when a work pane is mid-turn, then drops the issue', async () => {
     const { deps, journals } = world({
       listPanes: vi.fn(async () => [pane({ issue: 'MIN-1144', agentId: 'agent-min-1144' })]),
@@ -413,6 +439,27 @@ describe('runStackRestorePoll (PAN-5623 WI-13)', () => {
 
     expect(deps.restore).not.toHaveBeenCalled();
     expect(state.restoreIndex.size).toBe(0);
+  });
+
+  it('keeps an indexed reclaim when its journal is unreadable this tick, then restores once it is readable (PAN-5648 journal-read-null.ac2)', async () => {
+    const { deps, journals } = world({
+      listPanes: vi.fn(async () => [pane({ issue: 'MIN-1144', agentId: 'agent-min-1144' })]),
+      turnState: vi.fn((): TurnState => 'in-turn'),
+    });
+    journals.set(wsPath('MIN-1144'), [RECLAIMED]);
+    deps.readJournal.mockReturnValueOnce(null);
+    const state = createStackReclaimState();
+    state.seeded = true;
+    state.restoreIndex.set('MIN-1144', wsPath('MIN-1144'));
+
+    await runStackRestorePoll(deps, state);
+
+    expect(deps.restore).not.toHaveBeenCalled();
+    expect(state.restoreIndex.has('MIN-1144')).toBe(true);
+
+    await runStackRestorePoll(deps, state);
+
+    expect(deps.restore).toHaveBeenCalledExactlyOnceWith({ issueId: 'MIN-1144', workspacePath: wsPath('MIN-1144'), trigger: 'turn' });
   });
 
   it('never reads the pane inventory with an empty index', async () => {

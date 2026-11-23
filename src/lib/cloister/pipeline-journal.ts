@@ -123,19 +123,24 @@ function endsWithoutNewline(path: string): boolean {
 
 /**
  * Read the journal, oldest entry first. A malformed line is skipped rather
- * than throwing — a half-written line must not blind every reader.
+ * than throwing — a half-written line must not blind every reader. Returns
+ * `null` when the journal exists but cannot be read (e.g. it is a directory,
+ * or a permissions error), so a caller that must fail closed can tell that
+ * apart from a workspace that simply has no journal yet. Use
+ * `readPipelineJournal` when an empty result is an acceptable stand-in for
+ * "unreadable".
  */
-export function readPipelineJournal(
+export function tryReadPipelineJournal(
   workspacePath: string,
   opts: { limit?: number } = {},
-): PipelineJournalEntry[] {
+): PipelineJournalEntry[] | null {
   const path = pipelineJournalPath(workspacePath);
   if (!existsSync(path)) return [];
   let raw: string;
   try {
     raw = readFileSync(path, 'utf-8');
   } catch {
-    return [];
+    return null;
   }
   const entries: PipelineJournalEntry[] = [];
   for (const line of raw.split('\n')) {
@@ -148,6 +153,14 @@ export function readPipelineJournal(
     }
   }
   return opts.limit !== undefined && opts.limit >= 0 ? entries.slice(-opts.limit) : entries;
+}
+
+/** `tryReadPipelineJournal`, with an unreadable journal treated as empty. */
+export function readPipelineJournal(
+  workspacePath: string,
+  opts: { limit?: number } = {},
+): PipelineJournalEntry[] {
+  return tryReadPipelineJournal(workspacePath, opts) ?? [];
 }
 
 /**
