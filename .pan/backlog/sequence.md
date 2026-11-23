@@ -1,13 +1,16 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-23T05:53:21Z · model: claude-opus-5-5 · open: 951_
+_Last sequenced: 2026-11-23T06:23:08Z · model: claude-opus-5-5 · open: 954_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-5598 | M | medium | ok |  |  | Order-book CLI/MCP parity: route scopes for /api/orders*, ten MCP tools, new pan orders verbs. In pipeline (planning). |
+| 1 | PAN-5611 | S | medium | ok |  |  | Idle-settled conversations stay in Settled after the operator resumes them, hiding them from their project group. |
+| 1 | PAN-5615 | S | high | ok |  |  | Role prompts escalate via pan tell flywheel-orchestrator, a dead name; the Flywheel is conv-flywheel, so blockers are lost. |
 | 2 | PAN-5600 | XS | critical | ok |  |  | Dashboard start route hardcodes overdeck-feature-<id>, so every MYN post-planning hand-off 422s; swap in the PAN-3049 resolver. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
+| 3 | PAN-5614 | M | critical | ok |  |  | specialists done falls back to GitHub in remote-less polyrepo roots, so GitLab review verdicts are lost and MYN merges stall. |
 | 4 | PAN-5430 | S | medium | ok |  |  | Markdown Preview prints raw HTML (README logo <div>/<picture>) as text; render it via rehype-raw + rehype-sanitize in doc previews. |
 | 5 | PAN-5567 | S | high | ok |  |  | Codex app-server threads hardcode on-request/workspace-write, so Read-only and Full access settings never apply. |
 | 6 | PAN-5489 | S | high | ok |  |  | pan plan from an agent shell fails workspace creation without HUME_API_KEY, leaves a half-built workspace and hides the cause. |
@@ -955,13 +958,21 @@ _Last sequenced: 2026-11-23T05:53:21Z · model: claude-opus-5-5 · open: 951_
 | 903 | PAN-5444 | XS | low | ok |  |  | Two Minor CodeRabbit findings left on merged PR #5443: semgrep repo rules resolve from event cwd; hook tests not isolated from Docker. |
 | 904 | PAN-5405 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5403: changes-query refetch after turns, Send menu keyboard/scheduling guard, tab-menu focus. |
 | 905 | PAN-2423 | XS | low | stale |  |  | Likely fixed: rebuild now uses the PAN-3049 resolver (docker.ts:181) and reap has no hardcoded prefix; confirm and close. |
-| 906 | PAN-5610 | XS | low | needs-refinement |  |  | Duplicate of PAN-5523 (move/heal Missing origin, rank 10), which covers this plus heal. Close as duplicate. |
+| 906 | PAN-5610 | XS | low | ok |  |  | Duplicate of PAN-5523 (move/heal Missing origin, rank 10), which covers this plus heal. Close as duplicate. |
 
 ## Rationale detail
 
 ### PAN-5598 (rank 1)
 
 New issue already in the pipeline with a PRD; pinned at the free rank 1 slot per the in-pipeline rule. Related to PAN-5597 but independent of its code.
+
+### PAN-5611 (rank 1)
+
+New bug already in the pipeline with a verified root cause (only Unsettle and schedule firing clear a settle). Pinned at rank 1 per the in-pipeline rule.
+
+### PAN-5615 (rank 1)
+
+New substrate bug already in the pipeline: every agent escalation to the Flywheel fails silently (MIN-1144 lost a blocker for two hours). Pinned at rank 1 per the in-pipeline rule; the fix is a prompt rename, a cost-attribution alias and a guard test.
 
 ### PAN-5600 (rank 2)
 
@@ -970,6 +981,10 @@ New substrate bug that breaks the automatic plan-to-work hand-off and the dashbo
 ### PAN-5013 (rank 3)
 
 Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.
+
+### PAN-5614 (rank 3)
+
+New substrate bug that blocks every GitLab polyrepo review from reaching merge (MIN-1144 and MIN-1146 are stuck now). Root cause and fix are pinned in the body, so it ranks with the top critical merge-path fixes, beside PAN-2954 (the other GitLab merge-path refusal).
 
 ### PAN-5430 (rank 4)
 
@@ -1267,18 +1282,6 @@ New planning bug placed in a freed high-tier slot. It blocks pan plan finalize f
 
 Three red-mains in one day from direct-push series bypassing PR CI — conversations need a pre-merge CI surface.
 
-### PAN-3708 (rank 74)
-
-New this pass. pan strike dies at git worktree list --porcelain on a polyrepo wrapper root, which is not a git repository, so the urgent-strike escape hatch is simply unavailable for MYN-class projects. pan swarm already understands nested repos; strike must use the same project repository inventory. Duplicate of PAN-3040 — close one when this lands.
-
-### PAN-3605 (rank 75)
-
-New this pass and the only supply-chain finding in the batch. A stale node_modules made npx fall back to the registry, where the unscoped effect-language-service name is claimed by a third party, and npm installed and executed it non-interactively. The payload was benign this time; the name stays third-party-controlled, so a malicious patch release would run on any machine in the same state. The fix is small and the downside is unbounded.
-
-### PAN-5133 (rank 76)
-
-New substrate bug placed in a freed high-tier slot. Under memory pressure the operator has no supported way to stop a deferred start, and the Flywheel had to write the journal directly.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1286,10 +1289,10 @@ New substrate bug placed in a freed high-tier slot. Under memory pressure the op
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-23T05:53:21Z",
+  "generatedAt": "2026-11-23T06:23:08Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 951,
+  "openCount": 954,
   "nodes": [
     {
       "issue": "PAN-5598",
@@ -1301,6 +1304,32 @@ New substrate bug placed in a freed high-tier slot. Under memory pressure the op
       "dependsOn": [],
       "why": "Order-book CLI/MCP parity: route scopes for /api/orders*, ten MCP tools, new pan orders verbs. In pipeline (planning).",
       "rationale": "New issue already in the pipeline with a PRD; pinned at the free rank 1 slot per the in-pipeline rule. Related to PAN-5597 but independent of its code.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5611",
+      "rank": 1,
+      "size": "S",
+      "importance": "medium",
+      "score": 60,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Idle-settled conversations stay in Settled after the operator resumes them, hiding them from their project group.",
+      "rationale": "New bug already in the pipeline with a verified root cause (only Unsettle and schedule firing clear a settle). Pinned at rank 1 per the in-pipeline rule.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5615",
+      "rank": 1,
+      "size": "S",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Role prompts escalate via pan tell flywheel-orchestrator, a dead name; the Flywheel is conv-flywheel, so blockers are lost.",
+      "rationale": "New substrate bug already in the pipeline: every agent escalation to the Flywheel fails silently (MIN-1144 lost a blocker for two hours). Pinned at rank 1 per the in-pipeline rule; the fix is a prompt rename, a cost-attribution alias and a guard test.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1327,6 +1356,19 @@ New substrate bug placed in a freed high-tier slot. Under memory pressure the op
       "dependsOn": [],
       "why": "Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned.",
       "rationale": "Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5614",
+      "rank": 3,
+      "size": "M",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "specialists done falls back to GitHub in remote-less polyrepo roots, so GitLab review verdicts are lost and MYN merges stall.",
+      "rationale": "New substrate bug that blocks every GitLab polyrepo review from reaching merge (MIN-1144 and MIN-1146 are stuck now). Root cause and fix are pinned in the body, so it ranks with the top critical merge-path fixes, beside PAN-2954 (the other GitLab merge-path refusal).",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13172,7 +13214,7 @@ New substrate bug placed in a freed high-tier slot. Under memory pressure the op
       "size": "XS",
       "importance": "low",
       "score": 20,
-      "condition": "needs-refinement",
+      "condition": "ok",
       "dependsOn": [],
       "why": "Duplicate of PAN-5523 (move/heal Missing origin, rank 10), which covers this plus heal. Close as duplicate.",
       "rationale": "New issue that repeats PAN-5523; ranked last so the Flywheel does not pick the same fix twice.",
@@ -14545,6 +14587,13 @@ New substrate bug placed in a freed high-tier slot. Under memory pressure the op
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
+    },
+    {
+      "from": "PAN-5614",
+      "to": "PAN-2954",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     },
     {
       "from": "PAN-750",
