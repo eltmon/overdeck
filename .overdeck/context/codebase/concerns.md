@@ -662,6 +662,12 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   (`getOverdeckHome()` reads env). A test that authenticates with an env token
   must `rmSync(join(getOverdeckHome(), 'internal-token'), { force: true })`
   before resetting the token cache, or a sibling file's token 401s it.
+- **The idle-stack reaper's full-stack tier never matches** (found planning PAN-5621) —
+  `listComposeContainers` (`cloister/idle-stack-reaper.ts`) JSON-parses `{{json .Labels}}`, which
+  Docker prints as one comma-joined string, so `composeProject` is always undefined and the 2 h
+  full-stack reap never runs (reported on #3050). Read labels with
+  `{{.Label "com.docker.compose.project"}}` / `{{.Label "com.docker.compose.service"}}`. Also: the
+  UI tier matches agents by substring (`pan-12` matches `pan-1234`); use `hasIssueToken`.
 - **Docker's bridge pool caps live workspace stacks** (PAN-4663) — the host fits
   ~31 bridge networks (`DEFAULT_DOCKER_BRIDGE_POOL_LIMIT`, `docker-bridge-pool.ts`);
   past that, every stack create/rebuild fails "all predefined address pools have been

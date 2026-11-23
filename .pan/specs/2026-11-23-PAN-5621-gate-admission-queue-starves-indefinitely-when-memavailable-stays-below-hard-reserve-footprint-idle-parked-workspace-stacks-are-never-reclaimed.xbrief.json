@@ -4,17 +4,17 @@
     "created": "2026-11-23T09:42:54Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5621: Gate admission queue starves indefinitely when MemAvailable stays below hard reserve + footprint; idle parked workspace stacks are never reclaimed",
-    "updated": "2026-11-23T18:10:07.534Z"
+    "updated": "2026-11-23T18:11:17.033Z"
   },
   "plan": {
     "id": "pan-5621",
     "title": "Gate admission queue starves indefinitely when MemAvailable stays below hard reserve + footprint; idle parked workspace stacks are never reclaimed",
-    "status": "proposed",
+    "status": "running",
     "uid": "2a2d805e-1157-42e0-be7b-f3e2fc659180",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-23T09:42:54Z",
-    "updated": "2026-11-23T18:10:07.534Z",
+    "updated": "2026-11-23T18:11:17.033Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5621",
@@ -537,5 +537,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
