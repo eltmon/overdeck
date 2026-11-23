@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5611",
   "created": "2026-11-23T06:14:33.904Z",
-  "updated": "2026-11-23T09:35:38.941Z",
+  "updated": "2026-11-23T09:55:13.741Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,9 +32,18 @@
       "doneAt": "2026-11-23T09:35:32.238Z"
     },
     "store-idle-clock-reason": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5611",
-      "claimedAt": "2026-11-23T09:35:38.941Z"
+      "claimedAt": "2026-11-23T09:35:38.941Z",
+      "doneAt": "2026-11-23T09:55:13.741Z"
+    },
+    "store-idle-clock-reason.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:55:13.741Z"
+    },
+    "store-idle-clock-reason.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:55:13.741Z"
     }
   }
 }
