@@ -1,12 +1,13 @@
 /**
- * The running order book in the Flywheel rail (PAN-3964 FR-12). Reads
- * `GET /api/orders` and renders the book's live `ProgressPanel`; renders
- * nothing when no book is running.
+ * The active order book in the Flywheel rail (PAN-3964 FR-12, PAN-5597).
+ * Reads `GET /api/orders` and renders the active book — the one the server
+ * marks `phase: 'active'`, which is the book dispatch works from — with its
+ * read-only issue list. Renders nothing when no book is active.
  */
 import { useQuery } from '@tanstack/react-query';
 
+import { BookIssueList } from '../orders/BookIssueList';
 import type { OrderBookView } from '../orders/types';
-import { ProgressPanel } from '../orders/ProgressPanel';
 import { RailCard } from './primitives';
 
 interface OrdersPayload {
@@ -23,17 +24,19 @@ async function fetchOrders(): Promise<OrdersPayload> {
 export function FlywheelOrderBookCard({ bookId }: { bookId?: string | null }) {
   const { data } = useQuery({ queryKey: ['flywheel', 'orders'], queryFn: fetchOrders, refetchInterval: 15_000 });
   const books = data?.books ?? [];
-  const book = (bookId ? books.find((b) => b.id === bookId) : undefined) ?? books.find((b) => b.status === 'running');
+  const book = (bookId ? books.find((b) => b.id === bookId) : undefined) ?? books.find((b) => b.phase === 'active');
   if (!book) return null;
 
-  const href = data?.project ? `/orders?project=${encodeURIComponent(data.project)}` : '/orders';
+  const params = new URLSearchParams();
+  if (data?.project) params.set('project', data.project);
+  params.set('book', book.id);
   return (
     <RailCard
       label={`Order book · ${book.name}`}
-      ariaLabel="Running order book"
-      actions={<a href={href} className="text-[11px] text-primary hover:underline">Open in Order Book</a>}
+      ariaLabel="Active order book"
+      actions={<a href={`/orders?${params.toString()}`} className="text-[11px] text-primary hover:underline">Open in Order books</a>}
     >
-      <ProgressPanel book={book} />
+      <BookIssueList book={book} readOnly flywheelRunning />
     </RailCard>
   );
 }
