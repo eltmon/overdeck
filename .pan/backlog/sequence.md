@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-23T17:22:08Z · model: claude-opus-5-5 · open: 952_
+_Last sequenced: 2026-11-23T17:44:05Z · model: claude-opus-5-5 · open: 952_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -9,7 +9,7 @@ _Last sequenced: 2026-11-23T17:22:08Z · model: claude-opus-5-5 · open: 952_
 | 1 | PAN-5617 | S | critical | ok |  |  | npm run typecheck admits each of its 12 tsc lanes separately; under memory pressure one run takes ~1h and stalls agent pushes. |
 | 1 | PAN-5621 | M | critical | ok |  |  | Gate admission queue starves while MemAvailable < hard reserve + footprint; parked workspace stacks never reclaimed, no gate runs. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
-| 3 | PAN-5619 | M | critical | ok |  |  | Review never dispatches for adopted handoff PRs on the resume path: a work-agent xBRIEF guard throws, only logged; PAN-5601 stuck. |
+| 3 | PAN-5619 | M | critical | ok |  |  | Merged via PR #5631 (17:24Z), closed out: resume-path review dispatch no longer throws on adopted PRs without an xBRIEF. |
 | 4 | PAN-5430 | S | medium | ok |  |  | Markdown Preview prints raw HTML (README logo <div>/<picture>) as text; render it via rehype-raw + rehype-sanitize in doc previews. |
 | 5 | PAN-5567 | S | high | ok |  |  | Codex app-server threads hardcode on-request/workspace-write, so Read-only and Full access settings never apply. |
 | 6 | PAN-5489 | S | high | ok |  |  | pan plan from an agent shell fails workspace creation without HUME_API_KEY, leaves a half-built workspace and hides the cause. |
@@ -978,7 +978,7 @@ Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat 
 
 ### PAN-5619 (rank 3)
 
-Rank holds. A 09:37Z comment confirms the xBRIEF throw is specific to the resume path (fresh pan review request works). PAN-5601 has since merged, but every adopted handoff PR re-dispatched via resume (PAN-5614's next) still hits it.
+Rank holds pending removal: PR #5631 merged at 17:24Z and the issue closed via close-out with main checks green, so nothing remains to pick up; it drops from the backlog on the next manifest.
 
 ### PAN-5430 (rank 4)
 
@@ -1287,7 +1287,7 @@ Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback thi
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-23T17:22:08Z",
+  "generatedAt": "2026-11-23T17:44:05Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 952,
@@ -1352,8 +1352,8 @@ Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback thi
       "score": 86,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Review never dispatches for adopted handoff PRs on the resume path: a work-agent xBRIEF guard throws, only logged; PAN-5601 stuck.",
-      "rationale": "Rank holds. A 09:37Z comment confirms the xBRIEF throw is specific to the resume path (fresh pan review request works). PAN-5601 has since merged, but every adopted handoff PR re-dispatched via resume (PAN-5614's next) still hits it.",
+      "why": "Merged via PR #5631 (17:24Z), closed out: resume-path review dispatch no longer throws on adopted PRs without an xBRIEF.",
+      "rationale": "Rank holds pending removal: PR #5631 merged at 17:24Z and the issue closed via close-out with main checks green, so nothing remains to pick up; it drops from the backlog on the next manifest.",
       "gate": "auto",
       "planning": "auto"
     },
