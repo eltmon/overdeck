@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5604",
   "created": "2026-11-23T18:14:56.256Z",
-  "updated": "2026-11-23T19:22:17.008Z",
+  "updated": "2026-11-23T19:22:22.298Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -130,6 +130,11 @@
     "announcements-dismiss.ac6": {
       "status": "completed",
       "doneAt": "2026-11-23T19:22:17.008Z"
+    },
+    "docs-changelog": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5604",
+      "claimedAt": "2026-11-23T19:22:22.298Z"
     }
   }
 }
