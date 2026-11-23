@@ -40,7 +40,7 @@ already holds that registration:
       "command": "npx",
       "args": [
         "-y",
-        "@overdeck/core@0.77.0",
+        "@overdeck/core@0.90.1",
         "mcp",
         "connector",
         "serve",

@@ -148,3 +148,16 @@ describe('sync-core-pins.mjs (fixture root)', () => {
     expect(result.stderr).toContain('usage:');
   });
 });
+
+// PAN-5486 W-2 (FR-2, FR-6): CI and the release workflow's full-suite gate fail on a stale pin.
+describe('integrations/ in this repository', () => {
+  it('every committed core pin matches the root package.json version', () => {
+    const rootVersion = JSON.parse(readFileSync(new URL('../../../package.json', import.meta.url), 'utf-8'))
+      .version as string;
+
+    const result = run(['--check']);
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toMatch(new RegExp(`^✓ \\d+ core pins match ${rootVersion.replace(/\./g, '\\.')}\\n`));
+  });
+});

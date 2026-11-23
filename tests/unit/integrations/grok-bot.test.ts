@@ -15,6 +15,8 @@ const skillPath = new URL('../../../integrations/grok-bot/skills/overdeck/SKILL.
 const rootLicensePath = new URL('../../../integrations/LICENSE', import.meta.url);
 const readmePath = new URL('../../../integrations/grok-bot/README.md', import.meta.url);
 const grokBotDir = fileURLToPath(new URL('../../../integrations/grok-bot/', import.meta.url));
+// PAN-5486: the release flow stamps the pin from the root package.json version.
+const ROOT_VERSION = JSON.parse(readFileSync(new URL('../../../package.json', import.meta.url), 'utf-8')).version as string;
 
 describe('integrations/grok-bot manifest', () => {
   it('plugin.json carries the expected keys', () => {
@@ -34,14 +36,11 @@ describe('integrations/grok-bot manifest', () => {
     expect(existsSync(skillPath)).toBe(true);
   });
 
-  it('mcp.json is the connector registration connect prints for its pinned version', () => {
+  it('mcp.json is the connector registration connect prints for the root package version', () => {
     const text = readFileSync(mcpJsonPath, 'utf-8');
-    const pin = text.match(/@overdeck\/core@(\d+)\.(\d+)\.(\d+)"/);
-    expect(pin).not.toBeNull();
-    const [major, minor] = [Number(pin![1]), Number(pin![2])];
-    expect(major > 0 || minor >= 75).toBe(true); // 0.75.0 is the first release with `connect`
-    const version = `${pin![1]}.${pin![2]}.${pin![3]}`;
-    expect(text).toBe(registrationLines('grok-bot', registrationFor({ version, env: {} })).slice(1).join('\n') + '\n');
+    expect(text).toBe(
+      registrationLines('grok-bot', registrationFor({ version: ROOT_VERSION, env: {} })).slice(1).join('\n') + '\n',
+    );
   });
 
   it('LICENSE is a byte copy of integrations/LICENSE', () => {

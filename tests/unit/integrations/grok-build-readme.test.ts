@@ -18,7 +18,7 @@ const grokBuildDir = fileURLToPath(new URL('../../../integrations/grok-build/', 
 
 function readPin(): string {
   const text = readFileSync(scriptPath, 'utf-8');
-  const match = text.match(/OVERDECK_CORE_VERSION:-(\d+\.\d+\.\d+)\}/);
+  const match = text.match(/OVERDECK_CORE_VERSION:-(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)\}/);
   if (!match) throw new Error('could not find the OVERDECK_CORE_VERSION pin in scripts/run-mcp.sh');
   return match[1];
 }
