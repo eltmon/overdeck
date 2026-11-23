@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5617",
   "created": "2026-11-23T18:07:48.377Z",
-  "updated": "2026-11-23T18:11:59.948Z",
+  "updated": "2026-11-23T18:12:21.249Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -42,6 +42,11 @@
     "runner-unadmitted-env.ac7": {
       "status": "completed",
       "doneAt": "2026-11-23T18:11:59.948Z"
+    },
+    "gate-admitted-wrapper": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5617",
+      "claimedAt": "2026-11-23T18:12:21.249Z"
     }
   }
 }
