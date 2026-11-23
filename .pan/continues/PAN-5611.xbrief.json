@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5611",
   "created": "2026-11-23T06:14:33.904Z",
-  "updated": "2026-11-23T10:07:56.268Z",
+  "updated": "2026-11-23T10:08:00.621Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -66,6 +66,11 @@
     "display-root-helper.ac4": {
       "status": "completed",
       "doneAt": "2026-11-23T10:07:56.268Z"
+    },
+    "message-route-resurface": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5611",
+      "claimedAt": "2026-11-23T10:08:00.621Z"
     }
   }
 }
