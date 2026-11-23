@@ -6,6 +6,9 @@
 import type { BackendPane } from '@overdeck/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const idleStop = vi.hoisted(() => ({ startStackIdleStopService: vi.fn(), stopStackIdleStopService: vi.fn() }));
+vi.mock('../stack-idle-stop-service.js', () => idleStop);
+
 import type { GateStarvationRecord } from '../../../../lib/cloister/gate-starvation.js';
 import type { PipelineJournalEntry } from '../../../../lib/cloister/pipeline-journal.js';
 import type { QualityGateQueueSnapshot } from '../../../../lib/cloister/quality-gate-admission.js';
@@ -509,5 +512,23 @@ describe('reclaim reasons and pins (PAN-5250 WI-5)', () => {
     const result = await runStackReclaimPoll(deps, createStackReclaimState());
     expect(result).toEqual({ kind: 'reclaimed', issueId: 'MIN-1144', stopped: [API, FE], failed: [] });
     expect(stoppedIds(deps)).toEqual([`id-${API}`, `id-${FE}`]);
+  });
+});
+
+describe('idle-stop service wiring (PAN-5250 WI-7)', () => {
+  it('starts the idle-stop service once with the reclaim service\'s pane, queue and verification reads', () => {
+    idleStop.startStackIdleStopService.mockClear();
+    idleStop.stopStackIdleStopService.mockClear();
+    const { deps } = world();
+    startStackReclaimService(deps);
+    startStackReclaimService(deps);
+    expect(idleStop.startStackIdleStopService).toHaveBeenCalledOnce();
+    expect(idleStop.startStackIdleStopService).toHaveBeenCalledWith({
+      listPanes: deps.listPanes,
+      readQueue: deps.readQueue,
+      verificationBusy: deps.verificationBusy,
+    });
+    stopStackReclaimService();
+    expect(idleStop.stopStackIdleStopService).toHaveBeenCalled();
   });
 });

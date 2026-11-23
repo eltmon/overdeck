@@ -80,6 +80,7 @@ import {
 import { restoreReclaimedStack, stackLockPath, withStackLock } from '../../../lib/workspace/stack-restore.js';
 import { listWorkspaces } from '../../../lib/workspaces/resolver.js';
 import type { WorkspaceRow } from '../../../lib/workspaces/types.js';
+import { startStackIdleStopService, stopStackIdleStopService } from './stack-idle-stop-service.js';
 
 export const STACK_RECLAIM_POLL_MS = 30_000;
 export const STACK_RESTORE_POLL_MS = 5_000;
@@ -482,6 +483,8 @@ export function startStackReclaimService(deps: Partial<StackReclaimServiceDeps> 
   reclaimTimer.unref?.();
   restoreTimer = setInterval(() => { void restoreOnce(s); }, STACK_RESTORE_POLL_MS);
   restoreTimer.unref?.();
+  // PAN-5250: the idle stop shares this service's pane, queue and verification reads.
+  startStackIdleStopService({ listPanes: s.deps.listPanes, readQueue: s.deps.readQueue, verificationBusy: s.deps.verificationBusy });
 }
 
 export function stopStackReclaimService(): void {
@@ -490,6 +493,7 @@ export function stopStackReclaimService(): void {
   reclaimTimer = null;
   restoreTimer = null;
   service = null;
+  stopStackIdleStopService();
 }
 
 /** Exported for tests: the running service's state, or null. */
