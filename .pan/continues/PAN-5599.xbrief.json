@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5599",
   "created": "2026-11-23T05:24:22.748Z",
-  "updated": "2026-11-23T09:29:21.168Z",
+  "updated": "2026-11-23T09:29:29.695Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -156,6 +156,11 @@
     "list-finished-queued-placement.ac3": {
       "status": "completed",
       "doneAt": "2026-11-23T09:29:21.168Z"
+    },
+    "page-drop-finished-active-notice": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5599",
+      "claimedAt": "2026-11-23T09:29:29.694Z"
     }
   }
 }
