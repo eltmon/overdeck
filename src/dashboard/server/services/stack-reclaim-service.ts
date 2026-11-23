@@ -214,6 +214,7 @@ function buildCandidates(
 ): Omit<ReclaimCandidate, 'memoryBytes'>[] {
   const candidates: Omit<ReclaimCandidate, 'memoryBytes'>[] = [];
   const seen = new Set<string>();
+  const runningNames = new Set(running.map((container) => container.name));
   for (const workspace of deps.listWorkspaces()) {
     if (workspace.kind === 'main' || !workspace.issueId) continue;
     const issueId = workspace.issueId.toUpperCase();
@@ -228,6 +229,13 @@ function buildCandidates(
     const journal = deps.readJournal(workspace.path);
     if (journal === null) continue;
     if (reclaimedInEpisode(journal, record.since)) continue;
+    // PAN-5648 r4672667681: an open reclaim (any episode) still holding a
+    // stopped container means Overdeck is mid-reclaim-or-restore for this
+    // issue, so it must not be reclaimed again. One whose containers are ALL
+    // running again is effectively closed in practice — don't let it block
+    // the issue forever just because no `stack.restored` entry was written.
+    const open = openStackReclaim(journal);
+    if (open && open.containers.some((name) => !runningNames.has(name))) continue;
     if (!panesAllowReclaim(issuePanes(panes, issueId, workspace.path), deps.turnState).ok) continue;
     seen.add(issueId);
     candidates.push({ issueId, workspacePath: workspace.path, composeProject, containers });

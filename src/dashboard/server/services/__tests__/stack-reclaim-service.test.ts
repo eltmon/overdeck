@@ -243,6 +243,44 @@ describe('runStackReclaimPoll (PAN-5623 WI-12)', () => {
     expect(deps.stopContainer).not.toHaveBeenCalled();
   });
 
+  it('excludes a candidate whose open reclaim still names a stopped container (PAN-5648 skip-open-reclaim.ac1)', async () => {
+    const olderSince = new Date(T0 - 3600_000).toISOString();
+    const { deps, journals } = world({
+      listRunningContainers: vi.fn(async () => [stackContainer('MIN-1144', 'api')]),
+    });
+    journals.set(wsPath('MIN-1144'), [{
+      at: olderSince, type: 'stack.reclaimed', issueId: 'MIN-1144',
+      data: { containers: [`${project('MIN-1144')}-api-1`, `${project('MIN-1144')}-fe-1`], episodeSince: olderSince },
+    }]);
+    await expect(runStackReclaimPoll(deps, createStackReclaimState())).resolves.toEqual({ kind: 'idle', reason: 'no-candidates' });
+    expect(deps.stopContainer).not.toHaveBeenCalled();
+  });
+
+  it('reclaims again once a stack.restored entry closes the older open reclaim (PAN-5648 skip-open-reclaim.ac2)', async () => {
+    const olderSince = new Date(T0 - 3600_000).toISOString();
+    const { deps, journals } = world();
+    journals.set(wsPath('MIN-1144'), [
+      {
+        at: olderSince, type: 'stack.reclaimed', issueId: 'MIN-1144',
+        data: { containers: [`${project('MIN-1144')}-api-1`, `${project('MIN-1144')}-fe-1`], episodeSince: olderSince },
+      },
+      { at: olderSince, type: 'stack.restored', issueId: 'MIN-1144' },
+    ]);
+    await expect(runStackReclaimPoll(deps, createStackReclaimState())).resolves.toMatchObject({ kind: 'reclaimed', issueId: 'MIN-1144' });
+    expect(journals.get(wsPath('MIN-1144'))!.at(-1)).toMatchObject({ type: 'stack.reclaimed', issueId: 'MIN-1144' });
+  });
+
+  it('reclaims again when an older open reclaim only names the container whose stop failed and is running again (PAN-5648 skip-open-reclaim.ac3)', async () => {
+    const olderSince = new Date(T0 - 3600_000).toISOString();
+    const { deps, journals } = world();
+    journals.set(wsPath('MIN-1144'), [{
+      at: olderSince, type: 'stack.reclaimed', issueId: 'MIN-1144',
+      data: { containers: [`${project('MIN-1144')}-api-1`], episodeSince: olderSince },
+    }]);
+    await expect(runStackReclaimPoll(deps, createStackReclaimState())).resolves.toMatchObject({ kind: 'reclaimed', issueId: 'MIN-1144' });
+    expect(journals.get(wsPath('MIN-1144'))!.at(-1)).toMatchObject({ type: 'stack.reclaimed', issueId: 'MIN-1144' });
+  });
+
   it('reclaims an issue with an idle work pane and a finished review pane', async () => {
     const { deps } = world({
       listPanes: vi.fn(async () => [
