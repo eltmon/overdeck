@@ -25,6 +25,7 @@ import { resolve } from 'node:path';
 
 import type { ProjectConfig } from '../../../lib/projects.js';
 import type { PrFacts } from '../../../lib/cloister/pr-facts.js';
+import { checksPass } from '../../../lib/cloister/member-ci.js';
 import type { PipelineJournalEntry } from '../../../lib/cloister/pipeline-journal.js';
 import type { PendingAutoMerge, UatGeneration } from '../../../lib/overdeck/merge-types.js';
 import type { TrackerType } from '../../../lib/tracker/interface.js';
@@ -291,7 +292,7 @@ async function boardProject(
     const blockers = blockersOf(facts, unresolved);
     const routing = routingFor(issueId, branch, config, root, trainOn, deps);
     const live = liveBatchOf(issueId);
-    const inReadySet = !!facts && facts.approved && facts.checks === 'green' && facts.mergeable === true;
+    const inReadySet = !!facts && facts.approved && checksPass(facts) && facts.mergeable === true;
     const failure = run?.phase === 'failed' ? (run.notes ?? 'the last merge failed')
       : row?.status === 'failed' && rowAtHead(row, head) ? (row.failureReason ?? 'the last merge failed')
       // A row re-armed as pending after the journaled failure is newer evidence.
@@ -421,7 +422,7 @@ async function strikeOf(
     reviewSummary = stringField(lastVerdict(journal, 'CHANGES_REQUESTED'), 'summary');
   } else if (blockers.length > 0) {
     state = 'blocked';
-  } else if (facts?.checks !== 'green') {
+  } else if (!facts || !checksPass(facts)) {
     state = 'checks-pending';
   } else if (row?.status === 'pending') {
     state = 'queued';

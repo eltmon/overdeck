@@ -237,6 +237,64 @@ describe('listReadyIssuesForProject — polyrepo', () => {
   });
 });
 
+describe('ci: none members (PAN-5637)', () => {
+  const INFRA_REPOS_PLAIN: ReadySetRepo[] = [
+    { repoKey: 'api', repoPath: '/repos/myn/api', forge: 'gitlab', branchPrefix: 'feature/' },
+    { repoKey: 'infra', repoPath: '/repos/myn/infra', forge: 'gitlab', branchPrefix: 'feature/' },
+  ];
+  const INFRA_CI_NONE_REPOS: ReadySetRepo[] = [
+    INFRA_REPOS_PLAIN[0]!,
+    { ...INFRA_REPOS_PLAIN[1]!, ciNone: true },
+  ];
+
+  function min1144(infraChecks: PrFacts['checks']) {
+    return poly(
+      {
+        '/repos/myn/api': [mr('feature/min-1144', 108)],
+        '/repos/myn/infra': [mr('feature/min-1144', 19)],
+      },
+      {},
+      async (issueId, row) => mrFacts(issueId, { checks: row.iid === 19 ? infraChecks : 'green' }),
+    );
+  }
+
+  it('admits an issue whose ci: none member MR reports no checks', async () => {
+    const ready = await listReadyIssuesForProject('/repos/myn', { ...min1144('none'), memberRepos: () => INFRA_CI_NONE_REPOS });
+    expect(ready).toEqual([{ issueId: 'MIN-1144', title: 'MR 108', pr: 108 }]);
+  });
+
+  it('refuses the same issue when the member does not declare ci: none', async () => {
+    const ready = await listReadyIssuesForProject('/repos/myn', { ...min1144('none'), memberRepos: () => INFRA_REPOS_PLAIN });
+    expect(ready).toEqual([]);
+  });
+
+  it('still refuses a ci: none member MR with red checks', async () => {
+    const ready = await listReadyIssuesForProject('/repos/myn', { ...min1144('red'), memberRepos: () => INFRA_CI_NONE_REPOS });
+    expect(ready).toEqual([]);
+  });
+
+  it('still refuses a ci: none member MR with pending checks', async () => {
+    const ready = await listReadyIssuesForProject('/repos/myn', { ...min1144('pending'), memberRepos: () => INFRA_CI_NONE_REPOS });
+    expect(ready).toEqual([]);
+  });
+
+  it('memberReposForProject carries ciNone from the config', () => {
+    const config = {
+      name: 'myn', path: '/repos/myn', gitlab_repo: 'eltmon/mind-your-now',
+      workspace: {
+        type: 'polyrepo',
+        repos: [
+          { name: 'infra', path: 'infra', ci: 'none' },
+          { name: 'api', path: 'api' },
+        ],
+      },
+    } as unknown as ProjectConfig;
+    const repos = memberReposForProject('/repos/myn', config);
+    expect(repos.find((r) => r.repoKey === 'infra')?.ciNone).toBe(true);
+    expect('ciNone' in (repos.find((r) => r.repoKey === 'api') ?? {})).toBe(false);
+  });
+});
+
 describe('mergedIssueIdsForProject', () => {
   it('GitHub monorepo: merged feature PRs only', async () => {
     const ids = await mergedIssueIdsForProject('/repos/gh', {

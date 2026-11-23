@@ -24,6 +24,7 @@ import { listOpenGitLabMergeRequests, type GitLabMergeRequestRow } from '../gitl
 import { bumpIssuePrTabCacheGeneration } from '../../dashboard/server/services/pr-tab-cache.js';
 import { fetchIssuePullRequest, type IssuePullRequestData } from '../overdeck/pull-requests.js';
 import { resolveProjectReposForIssue, type ResolvedProjectRepo } from '../project-repos.js';
+import { checksPass, withMemberCi } from './member-ci.js';
 import { approvalProvenAtHead, recordReadApprovalAtHead } from './approval-at-head.js';
 import {
   NO_TRUSTED_AUTHORS,
@@ -86,6 +87,8 @@ export interface PrFacts {
   mergeable: boolean | null;
   mergeableState: string | null;
   checks: ChecksVerdict;
+  /** PAN-5637: read from a member repo that declares `ci: none`; `none` checks pass (`checksPass`). */
+  ciNone?: boolean;
   /**
    * PAN-3965: the verdict over just the CI test job's checks (`test`, `test (22)`).
    * With `verification.tests: ci` this is the verification gate's test gate.
@@ -682,7 +685,7 @@ async function readPrFacts(issueId: string, deps: PrFactsDeps, options: PrFactsO
       const rows = await listGitLabMrs(repo.repoPath);
       const branch = repo.sourceBranch;
       const row = rows.find((candidate) => candidate.source_branch === branch);
-      if (row?.iid) return await readGitLabMrFacts(issueId, row, deps);
+      if (row?.iid) return withMemberCi(await readGitLabMrFacts(issueId, row, deps), repo);
     } catch (cause) {
       return emptyPrFacts(issueId, `GitLab MR lookup failed: ${cause instanceof Error ? cause.message : String(cause)}`);
     }
@@ -957,10 +960,10 @@ export function evaluateMergeReadiness(facts: PrFacts, policy: MergeReadinessPol
   // FR-9 is a positive test on both: `none` (no checks reported for the head
   // commit) and `null` (the forge has not computed mergeability yet) are the
   // absence of evidence, not evidence of readiness. Merging on either is how a
-  // red or conflicting branch reaches main.
+  // red or conflicting branch reaches main. PAN-5637: `none` passes only for a `ci: none` member (`checksPass`).
   if (facts.checks === 'red') return { ready: false, reason: `CI checks failing on PR HEAD ${head}` };
   if (facts.checks === 'pending') return { ready: false, reason: `CI checks still pending on PR HEAD ${head}` };
-  if (facts.checks !== 'green') return { ready: false, reason: `no CI checks reported on PR HEAD ${head}` };
+  if (!checksPass(facts)) return { ready: false, reason: `no CI checks reported on PR HEAD ${head}` };
   // #4021: with tests on CI, "every present check is green" is not enough. A
   // workflow change that renames or drops the test job, or a path filter or
   // job-level `if:` that skips it, would otherwise merge code no test ran on.

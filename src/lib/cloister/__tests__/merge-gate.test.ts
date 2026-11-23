@@ -404,3 +404,16 @@ describe('evaluateIssueMergeGate — operator-started strike merge (PAN-4750)', 
     expect(getFacts).toHaveBeenCalledWith('PAN-9', { preferBranch: 'strike/pan-9' });
   });
 });
+
+describe('evaluateIssueMergeGate — ci: none member CI waiver (PAN-5637)', () => {
+  it('evaluateIssueMergeGate answers ready for ciNone facts with no checks', async () => {
+    const facts = readyFacts('MIN-9', { forge: 'gitlab', checks: 'none', ciNone: true });
+    const result = await evaluateIssueMergeGate('MIN-9', { getFacts: async () => facts, ciTestsRequired: () => false });
+    expect(result.ready).toBe(true);
+
+    const withoutCiNone = readyFacts('MIN-9', { forge: 'gitlab', checks: 'none' });
+    const refused = await evaluateIssueMergeGate('MIN-9', { getFacts: async () => withoutCiNone, ciTestsRequired: () => false });
+    expect(refused.ready).toBe(false);
+    expect(refused.reason).toContain('no CI checks reported');
+  });
+});

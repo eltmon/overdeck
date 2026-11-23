@@ -257,6 +257,19 @@ describe('getMergeTrainBoard strikes', () => {
     const board = await getMergeTrainBoard({}, deps({ open: [strike('PAN-9')], facts: { 'PAN-9': facts('PAN-9') } }));
     expect(board.projects[0]!.strikes[0]).toMatchObject({ state: 'ready', route: 'auto-merge' });
   });
+
+  it('a ci: none member strike with no checks is not checks-pending; the same without ciNone is (PAN-5637)', async () => {
+    const board = await getMergeTrainBoard({}, deps({
+      open: [strike('PAN-10'), strike('PAN-11')],
+      facts: {
+        'PAN-10': facts('PAN-10', { checks: 'none', ciNone: true }),
+        'PAN-11': facts('PAN-11', { checks: 'none' }),
+      },
+    }));
+    const byId = Object.fromEntries(board.projects[0]!.strikes.map((s) => [s.issueId, s]));
+    expect(byId['PAN-10']!.state).not.toBe('checks-pending');
+    expect(byId['PAN-11']!.state).toBe('checks-pending');
+  });
 });
 
 describe('getMergeTrainBoard projects', () => {
