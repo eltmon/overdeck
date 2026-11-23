@@ -90,4 +90,17 @@ describe('CodexAuthBanner', () => {
     expect(CODEX_AUTH_REFETCH_MS).toBe(30_000);
     expect(CODEX_AUTH_STALE_MS).toBe(15_000);
   });
+
+  it('PAN-5633: shows Re-authenticate for expired and burned, and renders nothing for valid', () => {
+    for (const status of ['expired', 'burned'] as const) {
+      mockAuthStatus.mockReturnValue({ data: { status } } as ReturnType<typeof useCodexAuthStatus>);
+      const { unmount } = render(<CodexAuthBanner />);
+      expect(screen.getByRole('button', { name: /re-authenticate/i })).toBeTruthy();
+      unmount();
+    }
+
+    mockAuthStatus.mockReturnValue({ data: { status: 'valid' } } as ReturnType<typeof useCodexAuthStatus>);
+    const { container } = render(<CodexAuthBanner />);
+    expect(container.textContent).toBe('');
+  });
 });
