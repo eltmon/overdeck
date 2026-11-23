@@ -1,7 +1,7 @@
 /**
  * Tests for httpHandler — typed error-to-HTTP mapping wrapper (PAN-470)
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { Effect } from 'effect';
 import { HttpServerResponse as HttpServerResponseModule } from 'effect/unstable/http';
 import { httpHandler } from '../http-handler.js';
@@ -85,10 +85,18 @@ describe('httpHandler', () => {
     expect(status).toBe(502);
   });
 
-  it('maps WorkspaceCreateError to 500', async () => {
-    const effect = Effect.fail(new WorkspaceCreateError({ id: 'PAN-5', message: 'disk full' }));
-    const { status } = await runRoute(effect as Effect.Effect<HttpServerResponse, WorkspaceCreateError, never>);
-    expect(status).toBe(500);
+  it('maps WorkspaceCreateError to 500 and logs it (PAN-5489)', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const effect = Effect.fail(new WorkspaceCreateError({ id: 'PAN-5', message: 'disk full' }));
+      const { status, body } = await runRoute(effect as Effect.Effect<HttpServerResponse, WorkspaceCreateError, never>);
+      expect(status).toBe(500);
+      expect((body as { error: string }).error).toContain('disk full');
+      expect(errorSpy).toHaveBeenCalledTimes(1);
+      expect(String(errorSpy.mock.calls[0]?.[0])).toContain('disk full');
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 
   it('maps AgentStartError to 500', async () => {
