@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5489",
   "created": "2026-11-23T06:59:21.851Z",
-  "updated": "2026-11-23T08:10:31.938Z",
+  "updated": "2026-11-23T08:10:32.990Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -88,6 +88,11 @@
     "spawn-workspace-create-error.ac3": {
       "status": "completed",
       "doneAt": "2026-11-23T08:10:31.938Z"
+    },
+    "issue-start-routes-errors": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5489",
+      "claimedAt": "2026-11-23T08:10:32.990Z"
     }
   }
 }
