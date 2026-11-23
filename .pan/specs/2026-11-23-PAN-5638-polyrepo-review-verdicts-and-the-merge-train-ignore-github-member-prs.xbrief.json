@@ -4,17 +4,17 @@
     "created": "2026-11-23T19:35:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5638: Polyrepo review verdicts and the merge train ignore GitHub member PRs",
-    "updated": "2026-11-23T19:36:55.893Z"
+    "updated": "2026-11-23T19:38:15.760Z"
   },
   "plan": {
     "id": "pan-5638",
     "title": "Polyrepo review verdicts and the merge train ignore GitHub member PRs",
-    "status": "proposed",
+    "status": "running",
     "uid": "90d2237d-a243-461c-9556-251761066f75",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-23T19:35:00Z",
-    "updated": "2026-11-23T19:36:55.893Z",
+    "updated": "2026-11-23T19:38:15.760Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5638",
@@ -516,5 +516,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
