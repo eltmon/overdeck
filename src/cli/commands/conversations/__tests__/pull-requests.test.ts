@@ -96,6 +96,18 @@ describe('linkPrAction', () => {
     expect(logs.join('\n')).toContain('Linked eltmon/overdeck#42 to pr-conv (agent)');
   });
 
+  it('sends the dashboard URL as the Origin header (PAN-5610)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(LINK, 201));
+    vi.stubGlobal('fetch', fetchMock);
+    const { linkPrAction } = await import('../pull-requests.js');
+    captureConsole();
+
+    await linkPrAction('pr-conv', '#42');
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect((init.headers as Record<string, string>).Origin).toBe('http://dashboard.test');
+  });
+
   it('defaults to manual outside an agent and honours --source', async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse(LINK, 201));
     vi.stubGlobal('fetch', fetchMock);
@@ -156,6 +168,7 @@ describe('unlinkPrAction', () => {
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe('http://dashboard.test/api/conversations/pr-conv/pull-requests?ref=%2342');
     expect(init.method).toBe('DELETE');
+    expect((init.headers as Record<string, string>).Origin).toBe('http://dashboard.test');
     expect(logs.join('\n')).toContain('Unlinked eltmon/overdeck#42 from pr-conv');
   });
 

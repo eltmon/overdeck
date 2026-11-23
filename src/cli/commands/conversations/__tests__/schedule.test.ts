@@ -105,6 +105,7 @@ describe('scheduleAddAction', () => {
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe('http://dashboard.test/api/conversations/sched-conv/schedules');
     expect(init.method).toBe('POST');
+    expect((init.headers as Record<string, string>).Origin).toBe('http://dashboard.test');
     expect(JSON.parse(String(init.body))).toEqual({ cron: '0 21 * * *', timeZone: 'America/New_York', prompt: 'hi', enabled: true });
     expect(logs.join('\n')).toContain('✓ Schedule 3 on sched-conv: 0 21 * * * (America/New_York) — next run 2026-11-01 21:00 EST');
   });
@@ -217,6 +218,7 @@ describe('pause / resume / rm', () => {
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe(`http://dashboard.test/api/conversations/sched-conv/schedules/${id}`);
     expect(init.method).toBe('PATCH');
+    expect((init.headers as Record<string, string>).Origin).toBe('http://dashboard.test');
     expect(JSON.parse(String(init.body))).toEqual({ enabled: false });
     expect(logs.join('\n')).toContain(`✓ Paused schedule ${id} on sched-conv`);
   });
