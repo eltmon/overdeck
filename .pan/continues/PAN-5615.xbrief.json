@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5615",
   "created": "2026-11-23T18:07:00.473Z",
-  "updated": "2026-11-23T18:24:26.720Z",
+  "updated": "2026-11-23T18:24:58.361Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -137,6 +137,11 @@
     "conv-tell-harness-lookup.ac3": {
       "status": "completed",
       "doneAt": "2026-11-23T18:24:26.719Z"
+    },
+    "flywheel-cost-attribution": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5615",
+      "claimedAt": "2026-11-23T18:24:58.361Z"
     }
   }
 }
