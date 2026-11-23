@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5637",
+  "created": "2026-11-23T19:37:34.841Z",
+  "updated": "2026-11-23T19:37:34.841Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "repo-ci-config": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5637",
+      "claimedAt": "2026-11-23T19:37:34.841Z"
+    }
+  }
+}
