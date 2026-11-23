@@ -126,6 +126,7 @@ const TELEMETRY_CHANNEL_ROUTES = ["lan", "tailnet", "ssh", "public", "direct", "
 
 /** PAN-5083: the Overdeck MCP tool names (ALL_TOOLS in src/lib/mcp/server.ts); a unit test keeps them in step. */
 const TELEMETRY_MCP_TOOLS = [
+  "add_order_book_issues",
   "add_skills",
   "answer_agent_permission",
   "answer_agent_plan",
@@ -135,6 +136,7 @@ const TELEMETRY_MCP_TOOLS = [
   "answer_pi_ask",
   "answer_plan",
   "answer_question",
+  "create_order_book",
   "delegate_task",
   "delete_scheduled",
   "done",
@@ -161,6 +163,7 @@ const TELEMETRY_MCP_TOOLS = [
   "memory_search",
   "preview_order_book_brief",
   "read_conversation",
+  "remove_order_book_issue",
   "request_secret",
   "resume_conversation",
   "schedule_message",
@@ -170,6 +173,7 @@ const TELEMETRY_MCP_TOOLS = [
   "send_message",
   "start_conversation",
   "start_issue",
+  "start_order_book",
   "start_worker",
   "stop_conversation",
   "task_block",
@@ -179,6 +183,8 @@ const TELEMETRY_MCP_TOOLS = [
   "task_status",
   "task_wait",
   "unwatch_pull_request",
+  "update_order_book",
+  "update_order_book_issue",
   "update_scheduled",
   "wait_job",
   "watch_pull_request",
