@@ -1,10 +1,11 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-23T02:21:36Z · model: claude-opus-5-5 · open: 942_
+_Last sequenced: 2026-11-23T02:52:51Z · model: claude-opus-5-5 · open: 944_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
+| 1 | PAN-5598 | M | medium | ok |  |  | Order-book CLI/MCP parity: route scopes for /api/orders*, ten MCP tools, new pan orders verbs. In pipeline (planning). |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 4 | PAN-5430 | S | medium | ok |  |  | Markdown Preview prints raw HTML (README logo <div>/<picture>) as text; render it via rehype-raw + rehype-sanitize in doc previews. |
 | 5 | PAN-5567 | S | high | ok |  |  | Codex app-server threads hardcode on-request/workspace-write, so Read-only and Full access settings never apply. |
@@ -282,8 +283,9 @@ _Last sequenced: 2026-11-23T02:21:36Z · model: claude-opus-5-5 · open: 942_
 | 264 | PAN-3533 | L | high | ok |  |  | No per-project resource partitioning, so one project's docker stacks and installs starve another project's pipeline and the dashboard. |
 | 265 | PAN-3107 | S | high | ok |  |  | OOM spikes are unattributable after the fact; productize the machine-local memory-attribution census stopgap. |
 | 266 | PAN-4512 | M | medium | needs-refinement |  |  | Tier escalation config is shown but nothing fires it since the Cut; choose a trigger, persist tierOverrides, re-dispatch |
-| 266 | PAN-5597 | M | medium | needs-refinement |  |  | Order books page rework: show the live book, simpler build/run. Body is a placeholder; PRD and mockup pending. |
+| 266 | PAN-5597 | M | medium | ok |  |  | Order books page rework: show the live book, simpler build/run. Body is a placeholder; PRD and mockup pending. |
 | 267 | PAN-1666 | XL | medium | ok | ✓ |  | Pipeline Throughput Hardening |
+| 267 | PAN-5599 | S | medium | ok |  | PAN-5597 | Flywheel queue skips fully landed order books instead of holding the slot until archived. Blocked on PAN-5597 (creates phase.ts). |
 | 268 | PAN-1556 | S | high | ok |  |  | Session/activity feed: coalesce review-spawn spam, supersede re-reviews per issue, keep active conversations most-recent |
 | 269 | PAN-4510 | S | medium | ok |  |  | Show effort on issue-view agent rows, conversation rows and Agents-page conversation entries; split from closed PAN-4259 |
 | 270 | PAN-2190 | L | high | ok |  |  | Decompose routes/workspaces/merge-ops.ts (1,925 lines) |
@@ -950,6 +952,10 @@ _Last sequenced: 2026-11-23T02:21:36Z · model: claude-opus-5-5 · open: 942_
 
 ## Rationale detail
 
+### PAN-5598 (rank 1)
+
+New issue already in the pipeline with a PRD; pinned at the free rank 1 slot per the in-pipeline rule. Related to PAN-5597 but independent of its code.
+
 ### PAN-5013 (rank 3)
 
 Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.
@@ -1266,10 +1272,6 @@ New bug found while planning PAN-4738: the tmux paste guard misses Claude Code's
 
 New this pass. Post-merge label application has no retry, so a rate-limited 403 leaves a merged issue without its verifying-on-main label — and the verify-on-main phase enumerates by that label, which makes the issue invisible to the phase that owns it. Lifecycle reported 'completed' throughout, so nothing noticed for 45 minutes.
 
-### PAN-3543 (rank 79)
-
-New this pass. A completed-handoff agent owed rework after a blocked verdict cannot be started at all: pan start refuses and recommends --fresh, --fresh gives the identical refusal, and reset-session is refused too because the durable plane reconstructs the session pointer. The refusal message names an action the operator cannot take, which is the self-contradictory-deadlock family PAN-3526 opened.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1277,11 +1279,24 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-23T02:21:36Z",
+  "generatedAt": "2026-11-23T02:52:51Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 942,
+  "openCount": 944,
   "nodes": [
+    {
+      "issue": "PAN-5598",
+      "rank": 1,
+      "size": "M",
+      "importance": "medium",
+      "score": 55,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Order-book CLI/MCP parity: route scopes for /api/orders*, ten MCP tools, new pan orders verbs. In pipeline (planning).",
+      "rationale": "New issue already in the pipeline with a PRD; pinned at the free rank 1 slot per the in-pipeline rule. Related to PAN-5597 but independent of its code.",
+      "gate": "auto",
+      "planning": "auto"
+    },
     {
       "issue": "PAN-5013",
       "rank": 3,
@@ -4825,8 +4840,8 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "rank": 266,
       "size": "M",
       "importance": "medium",
-      "score": 52,
-      "condition": "needs-refinement",
+      "score": 55,
+      "condition": "ok",
       "dependsOn": [],
       "why": "Order books page rework: show the live book, simpler build/run. Body is a placeholder; PRD and mockup pending.",
       "rationale": "New issue. The body is still a placeholder awaiting its PRD, so it is needs-refinement; it ranks with other medium UI-discoverability work.",
@@ -4846,6 +4861,21 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "gate": "blocked",
       "planning": "skip",
       "isEpic": true
+    },
+    {
+      "issue": "PAN-5599",
+      "rank": 267,
+      "size": "S",
+      "importance": "medium",
+      "score": 54,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-5597"
+      ],
+      "why": "Flywheel queue skips fully landed order books instead of holding the slot until archived. Blocked on PAN-5597 (creates phase.ts).",
+      "rationale": "New issue with a PRD; it removes a manual archive step from Flywheel dispatch but must wait for PAN-5597, so it ranks just after its dependency.",
+      "gate": "auto",
+      "planning": "auto"
     },
     {
       "issue": "PAN-1556",
@@ -14348,6 +14378,20 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-5597",
+      "to": "PAN-5598",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
+    },
+    {
+      "from": "PAN-5597",
+      "to": "PAN-5599",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
     },
     {
       "from": "PAN-750",
