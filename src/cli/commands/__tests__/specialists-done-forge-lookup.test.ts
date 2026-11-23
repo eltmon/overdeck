@@ -20,6 +20,14 @@ const mocks = vi.hoisted(() => ({
   ancestors: [] as string[],
 }));
 
+// PAN-5614: one GitHub target at the workspace, independent of this host's projects.yaml.
+vi.mock('../../../lib/cloister/review-artifact-targets.js', () => ({
+  resolveReviewArtifactTargets: vi.fn(async (issueId: string, cwd: string) => ({
+    polyrepo: false,
+    targets: [{ repoKey: 'repo', forge: 'github', cwd, sourceBranch: `feature/${issueId.toLowerCase()}` }],
+  })),
+  readMemberMrFacts: vi.fn(),
+}));
 vi.mock('../../../lib/forge.js', () => ({
   discoverArtifact: mocks.discoverArtifact,
   commentOnArtifact: vi.fn(() => Effect.succeed(undefined)),

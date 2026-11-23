@@ -12,10 +12,8 @@
  */
 
 import { exitCli } from '../../exit.js';
-import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { promisify } from 'node:util';
 
 import chalk from 'chalk';
 import { Effect } from 'effect';
@@ -38,8 +36,12 @@ import { getIssueWorkspacePath } from '../../../lib/overdeck/issue-projects.js';
 import { resolveReviewTarget } from '../../../lib/cloister/review-target.js';
 import { appendPipelineEntry } from '../../../lib/cloister/pipeline-journal.js';
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
-
-const execFileAsync = promisify(execFile);
+import {
+  readMemberMrFacts,
+  resolveReviewArtifactTargets,
+  type ReviewArtifactTarget,
+  type ReviewArtifactTargets,
+} from '../../../lib/cloister/review-artifact-targets.js';
 
 export type SpecialistRole = 'review' | 'test' | 'uat';
 
@@ -89,16 +91,6 @@ async function withFeedbackDeadline<T>(
   }
 }
 
-/** The forge that owns a workspace's review artifact, read from its origin remote. */
-export async function forgeForWorkspace(cwd: string): Promise<ForgeType> {
-  try {
-    const { stdout } = await execFileAsync('git', ['remote', 'get-url', 'origin'], { cwd });
-    return /gitlab/i.test(stdout) ? 'gitlab' : 'github';
-  } catch {
-    return 'github';
-  }
-}
-
 /** The verdict body posted to the PR — the durable record of a specialist run. */
 export function formatVerdictBody(
   role: SpecialistRole,
@@ -116,6 +108,55 @@ export function formatVerdictBody(
   // back from this marker, so a failure blocks only the head it was run on.
   if (uatMarker) lines.push('', formatUatMarker(uatMarker.status, uatMarker.sha));
   return lines.join('\n');
+}
+
+type PolyrepoPostOutcome =
+  | { ok: true; result: Awaited<ReturnType<typeof postReviewVerdict>> }
+  | { ok: false; url: string; reason: string };
+
+/**
+ * PAN-5614: post a review verdict on every member MR of a polyrepo issue. Each
+ * MR's facts are read first, so a GitHub member PR (which this path cannot
+ * approve) fails before anything is posted. An MR that is already approved is
+ * skipped on a pass, so a re-run or a deferred replay never approves twice.
+ */
+async function postPolyrepoReviewVerdict(
+  issueId: string,
+  found: ReadonlyArray<{ target: ReviewArtifactTarget; artifact: { url: string } }>,
+  input: { verdict: 'approve' | 'request-changes'; body: string; reviewedHead: string | null | undefined },
+): Promise<PolyrepoPostOutcome> {
+  const github = found.find((entry) => entry.target.forge !== 'gitlab');
+  if (github) {
+    return {
+      ok: false,
+      url: github.artifact.url,
+      reason: `${github.target.repoKey} is a GitHub member of a polyrepo project; record its verdict there by hand`,
+    };
+  }
+  const members: Array<{ url: string; facts: PrFacts }> = [];
+  for (const { target, artifact } of found) {
+    const facts = await readMemberMrFacts(issueId, target.sourceBranch, artifact.url);
+    if (facts.error) return { ok: false, url: artifact.url, reason: facts.error };
+    members.push({ url: artifact.url, facts });
+  }
+  let last: Awaited<ReturnType<typeof postReviewVerdict>> | null = null;
+  for (const { url, facts } of members) {
+    if (input.verdict === 'approve' && facts.approved) {
+      console.log(chalk.dim(`${url} is already approved; leaving it as it is.`));
+      last ??= { posted: true, forge: 'gitlab', url, verdict: 'approve' };
+      continue;
+    }
+    const result = await postReviewVerdict({
+      issueId,
+      verdict: input.verdict,
+      body: input.body,
+      facts,
+      ...(input.reviewedHead ? { reviewedHead: input.reviewedHead } : {}),
+    });
+    if (!result.posted) return { ok: false, url, reason: result.reason };
+    last = result;
+  }
+  return { ok: true, result: last! };
 }
 
 export async function doneCommand(
@@ -222,8 +263,25 @@ export async function doneCommand(
     }
   }
 
-  const forge = await forgeForWorkspace(workspacePath);
-  const sourceBranch = strike ? reviewTarget.branch : `feature/${normalizedIssueId.toLowerCase()}`;
+  // PAN-5614: the forge comes from the project configuration. A polyrepo
+  // workspace root has no remote; its artifacts live in the member repos.
+  let resolved: ReviewArtifactTargets;
+  try {
+    resolved = await resolveReviewArtifactTargets(normalizedIssueId, workspacePath);
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    console.error(chalk.red(`Can't tell which forge holds ${normalizedIssueId}'s review artifact: ${reason}`));
+    return exitCli(1);
+  }
+  if (resolved.targets.length === 0) {
+    console.error(chalk.red(`${normalizedIssueId}'s project configures no writable repo to hold a review artifact.`));
+    return exitCli(1);
+  }
+  const targets: ReviewArtifactTarget[] = strike
+    ? [{ ...resolved.targets[0]!, sourceBranch: reviewTarget.branch }]
+    : resolved.targets;
+  const forge: ForgeType = targets[0]!.forge;
+  const sourceBranch = targets[0]!.sourceBranch;
   // A strike PR is read on its own branch, so a stray feature PR never stands in for it.
   const prRead = strike ? { preferBranch: sourceBranch } : {};
   // PAN-4263: a transient forge failure on a review verdict is saved for
@@ -242,22 +300,33 @@ export async function doneCommand(
     ));
     return true;
   };
-  let artifact: CreateReviewArtifactResult | null;
-  try {
-    artifact = await Effect.runPromise(discoverArtifact(forge, { sourceBranch, cwd: workspacePath }));
-  } catch (err) {
-    // A failed lookup is not an absent PR: say which, so nobody opens a second PR.
-    const reason = err instanceof Error ? err.message : String(err);
-    console.error(chalk.red(`Couldn't reach ${forge} to find the review artifact for ${sourceBranch}: ${reason}`));
-    if (!deferIfTransient(reason)) console.error(chalk.dim('Retry this command once the forge is reachable.'));
-    return exitCli(1);
+  // A polyrepo issue has an artifact in each member repo it changed.
+  const found: Array<{ target: ReviewArtifactTarget; artifact: CreateReviewArtifactResult & { url: string } }> = [];
+  for (const target of targets) {
+    let discovered: CreateReviewArtifactResult | null;
+    try {
+      discovered = await Effect.runPromise(
+        discoverArtifact(target.forge, { sourceBranch: target.sourceBranch, cwd: target.cwd }),
+      );
+    } catch (err) {
+      // A failed lookup is not an absent PR: say which, so nobody opens a second PR.
+      const reason = err instanceof Error ? err.message : String(err);
+      const where = resolved.polyrepo ? ` in ${target.repoKey}` : '';
+      console.error(chalk.red(
+        `Couldn't reach ${target.forge} to find the review artifact for ${target.sourceBranch}${where}: ${reason}`,
+      ));
+      if (!deferIfTransient(reason)) console.error(chalk.dim('Retry this command once the forge is reachable.'));
+      return exitCli(1);
+    }
+    if (discovered?.url) found.push({ target, artifact: { ...discovered, url: discovered.url } });
   }
-  if (!artifact?.url) {
+  if (found.length === 0) {
     console.error(chalk.red(
       `No open review artifact for ${sourceBranch}; run \`pan done ${normalizedIssueId}\` to open one before recording a verdict.`,
     ));
     return exitCli(1);
   }
+  const { artifact, target: artifactTarget } = found[0]!;
 
   // PAN-4030 / #4036: a browser UAT result is observed here and nowhere else —
   // the test role's `--uat-status`, or the uat role's own status. It is
@@ -343,14 +412,28 @@ export async function doneCommand(
       }
       pinHead = live;
     }
-    const result = await postReviewVerdict({
-      issueId: normalizedIssueId,
-      verdict: options.status === 'passed' ? 'approve' : 'request-changes',
-      body,
-      ...(verdictFacts ? { facts: verdictFacts } : {}),
-      ...(pinHead ? { pinHead } : {}),
-      ...(reviewedHead ? { reviewedHead } : {}),
-    });
+    const verdict = options.status === 'passed' ? 'approve' : 'request-changes';
+    let result: Awaited<ReturnType<typeof postReviewVerdict>>;
+    if (resolved.polyrepo && !strike) {
+      // PAN-5614: the polyrepo ready set wants every open MR approved, so the
+      // verdict goes on each member's MR, read on its own.
+      const posted = await postPolyrepoReviewVerdict(normalizedIssueId, found, { verdict, body, reviewedHead });
+      if (!posted.ok) {
+        console.error(chalk.red(`Could not post the review verdict on ${posted.url}: ${posted.reason}`));
+        deferIfTransient(posted.reason);
+        return exitCli(1);
+      }
+      result = posted.result;
+    } else {
+      result = await postReviewVerdict({
+        issueId: normalizedIssueId,
+        verdict,
+        body,
+        ...(verdictFacts ? { facts: verdictFacts } : {}),
+        ...(pinHead ? { pinHead } : {}),
+        ...(reviewedHead ? { reviewedHead } : {}),
+      });
+    }
     if (!result.posted) {
       console.error(chalk.red(
         `Could not post the review verdict on ${artifact.url}: ${result.reason}`,
@@ -380,11 +463,11 @@ export async function doneCommand(
       ? 'verdict comment posted (self-review refused by forge)'
       : 'review posted';
     console.log(tint(
-      `${options.status === 'passed' ? '✓' : '✗'} review ${options.status} — ${result.verdict}: ${how} on ${artifact.url}`,
+      `${options.status === 'passed' ? '✓' : '✗'} review ${options.status} — ${result.verdict}: ${how} on ${found.map((f) => f.artifact.url).join(', ')}`,
     ));
   } else {
     await Effect.runPromise(
-      commentOnArtifact(forge, { forge, url: artifact.url, body, cwd: workspacePath }),
+      commentOnArtifact(artifactTarget.forge, { forge: artifactTarget.forge, url: artifact.url, body, cwd: artifactTarget.cwd }),
     );
     if (uatOutcome) {
       // #4036: merge readiness reads this comment. The anchor lookup above
