@@ -742,7 +742,10 @@ worker already ran:
   marker is cleared and the gates run. So "consumed at most once" means a
   second request on the same head re-runs the gates only after review was
   dispatched for the first. The marker is cache state about one run, not
-  pipeline status; the pipeline journal stays the record.
+  pipeline status; the pipeline journal stays the record. Before either
+  reuse, the supervisor moves a workspace whose worker has finished to the
+  PR head (PAN-5619), so "this head" is always the PR head, never a stale
+  local one; a workspace it cannot move reuses nothing.
 - **A resumed request skips the dirty-tree refusal.** Boot adoption also
   re-enters the door for a consumed pass whose dispatch is still owed, and it
   passes `resume`, so the door does not refuse a dirty tree at the start. A
@@ -2134,7 +2137,7 @@ One piece of stored pipeline state came back, and it is not a status.
 | `review.stalled` | deacon-lite's `recoverSilentReviewers`, before it re-dispatches a silent reviewer (`data.reviewer`, `runId`, `paneState`, `silentForMs`) |
 | `review.stall-escalated` | deacon-lite's `recoverSilentReviewers`, when a re-dispatched reviewer fails again or the re-dispatch itself fails; the issue needs you (`data.reviewer`, `runId`, `paneState`, `reason`) |
 | `review.resume-declined` | `cloister/verification-resume-dispatch.ts` `confirmResumedDispatch`, when a request boot adoption resumed (PAN-4622) reaches dispatch with a moved head or a dirty or unreadable tree; nothing was pushed or dispatched (`data.reason`, `data.head`), and `recoverUndispatchedReviews` re-requests it like an undispatched `verification.passed` |
-| `review.dispatch-failed` | `cloister/review-dispatch-failure.ts` `recordReviewDispatchFailure`, when the terminal backend rejected a review kickoff outright (`invalid_request`, e.g. a lone surrogate on the wire); the issue needs you (`data.reviewer`, `data.error`) — there was never a reviewer to recover, so no deacon-lite routine re-dispatches it |
+| `review.dispatch-failed` | `cloister/review-dispatch-failure.ts` `recordReviewDispatchFailure`, when the terminal backend rejected a review kickoff outright (`invalid_request`, e.g. a lone surrogate on the wire); the issue needs you (`data.reviewer`, `data.error`) — there was never a reviewer to recover, so no deacon-lite routine re-dispatches it. Also `recordReviewPipelineFailure` (source `request-review`, PAN-5619), when the background review-request pipeline (verify, push, dispatch) throws (`data.error`, `data.head`); deacon-lite re-requests it once, and a second failure with the same error at the same head needs you and is not retried. Also `conflict-gate.ts` (source `conflict-gate`, PAN-5619), when a confirmed conflict has no resolver because the workspace has no xBRIEF; never retried |
 | `merge.attempted` | the MERGE door in `routes/workspaces/merge-ops.ts`, once the merge holds the project's merge slot |
 | `merge.failed` | merge-ops' own `setStatus`, the single funnel every failing exit of `triggerMerge` passes through |
 | `merge.completed` | `cloister/merge-agent.ts` `postMergeLifecycle`, right after the forge answers "merged" |
@@ -2215,6 +2218,32 @@ the branch into a pipeline workspace and then starts the review.
 An adopted PR usually has no xBRIEF, so verification skips the plan checklist
 for it (PAN-4786) and still runs typecheck, lint and tests; the review judges
 the PR against the issue's acceptance criteria. See step 12 above.
+
+Review dispatch for an adopted PR needs no xBRIEF either (PAN-5619). Three
+rules keep it from stalling:
+
+- **Verification reuses a result only at the PR head.** The handoff agent
+  keeps pushing from its own worktree, so the pipeline workspace falls behind
+  the PR. Before the supervisor reuses an earlier result (an unconsumed
+  result, or a pass whose review dispatch is still owed), it moves the
+  workspace to the PR head with the PAN-4810 rule (`syncWorkspaceRootsToPrHead`):
+  fast-forward when behind, reset when the only local-only commits are machine
+  merges, refuse when the tree is dirty or both sides have real commits. A
+  moved head is a new head, so the gates run on it. A refusal reuses nothing:
+  a fresh run reports it as a failed `sync-target-branch` check. The move
+  never runs while a worker is still verifying (no result on disk yet).
+  Before this, a stale workspace "passed" on its own old head, and the push
+  of that head was refused as a non-fast-forward.
+- **The conflict gate spawns no resolver it cannot spawn.** Its resolver is a
+  work agent, and a work agent needs an xBRIEF. For a workspace with no
+  xBRIEF the gate stays gated and spawns nothing, and the reason tells you to
+  merge `origin/main` into the PR branch, push, and run
+  `pan review request <id>`. A confirmed conflict is journaled as
+  `review.dispatch-failed` (source `conflict-gate`); a probe that could not
+  answer is not. Before this, the spawn threw the xBRIEF guard error out of
+  the review dispatch on every retry, after rebuilding the workspace stack.
+- **A failed review pipeline is journaled.** See the `review.dispatch-failed`
+  row in the journal table and deacon-lite step 5.
 
 Adoption (`cloister/pr-workspace-adoption.ts`) takes only the exact branch
 `feature/<issue>` (case-sensitive) and only at the head the PR reports. A
@@ -2381,7 +2410,11 @@ leaves a trace:
    parent run state, its fallback re-requests the review through the guarded
    route (`requestReviewThroughRoute`, `POST /api/review/:id/request`, source
    `deacon-lite`), because the deacon child has no in-process review starter
-   (PAN-4623).
+   (PAN-4623). A `review.dispatch-failed` tail from the review-request
+   pipeline (source `request-review`, PAN-5619) is re-requested once, so a
+   transient failure gets another try; when the retry fails with the same
+   error at the same head, it is not re-requested again until someone asks
+   for review. Other `review.dispatch-failed` tails are never re-requested.
 6. `retryDeferredHandoffs` (`cloister/deferred-handoff.ts`, PAN-4155) —
    re-sends a planning hand-off a spawn guardrail refused.
 7. `recoverUndispatchedReviews` (`cloister/undispatched-review-recovery.ts`,

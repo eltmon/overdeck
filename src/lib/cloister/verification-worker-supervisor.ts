@@ -10,6 +10,7 @@ import { primaryShaFromAnchor } from './verified-head.js';
 import { classifyWorkspaceVerificationHead, isSameVerificationHead } from './verification-head.js';
 import type { VerificationRunnerOptions, VerificationRunnerOutcome, WorkspaceInfo } from './verification-types.js';
 import { buildVerificationWorkerLaunch, launchVerificationWorker } from './verification-worker-launcher.js';
+import { syncWorkspaceRootsToPrHead } from './workspace-pr-head-sync.js';
 
 type SupervisedOptions = Pick<VerificationRunnerOptions, 'syncTargetBranch' | 'skipPlanChecklist'>;
 
@@ -389,6 +390,35 @@ async function resumeOwedDispatch(
   return null;
 }
 
+/**
+ * PAN-5619 (FR-4): an earlier result is the answer only for the PR head. The
+ * runner moves the workspace to the PR head (PAN-4810), but the reuse paths
+ * above answer before any runner starts, so a workspace left behind by commits
+ * pushed from elsewhere (a handoff worktree) matched its own stale head,
+ * "passed", and the push was refused as a non-fast-forward. Move it first with
+ * the same rule. Never while a worker runs: that would move HEAD under its
+ * gates. Returns true when the workspace could not be moved (diverged, dirty,
+ * fetch failed); then no earlier result is reused, and a fresh run reports
+ * the refusal as its `sync-target-branch` failure.
+ */
+async function syncBeforeReusingResult(
+  existing: WorkerState | null,
+  issueId: string,
+  workspacePath: string,
+  logPrefix: string,
+  options: SupervisedOptions,
+): Promise<boolean> {
+  // Both reuse paths need the worker's result on disk, and a worker writes it
+  // only after its gates finish: no result means nothing to reuse, or a
+  // worker still running.
+  if (!existing || options.syncTargetBranch === false) return false;
+  if (existing.workspacePath !== workspacePath || !existsSync(existing.resultPath)) return false;
+  const refused = await syncWorkspaceRootsToPrHead(issueId, workspacePath, logPrefix);
+  if (refused.length === 0) return false;
+  console.log(`[${logPrefix}] ${issueId}: the workspace is not at the PR head — not reusing an earlier verification result`);
+  return true;
+}
+
 /** PAN-4531: fresh workers started for a head that moved under verification, before giving up. */
 const MAX_SUPERSEDED_RESTARTS = 3;
 
@@ -425,14 +455,15 @@ async function runSupervisedVerificationOnce(
   logPrefix: string,
   options: SupervisedOptions,
 ): Promise<VerificationRunnerOutcome> {
-  const headAnchor = await snapshotWorkspaceHeads(issueId, workspacePath);
   const existing = readVerificationWorkerState(issueId);
-  const adopted = existing ? await adoptUnconsumedResult(existing, issueId, workspacePath, headAnchor, options) : null;
+  const notAtPrHead = await syncBeforeReusingResult(existing, issueId, workspacePath, logPrefix, options);
+  const headAnchor = await snapshotWorkspaceHeads(issueId, workspacePath);
+  const adopted = existing && !notAtPrHead ? await adoptUnconsumedResult(existing, issueId, workspacePath, headAnchor, options) : null;
   if (adopted) {
     console.log(`[${logPrefix}] Adopting the unconsumed ${adopted.outcome} result of verification worker ${existing!.pid} for ${issueId}`);
     return adopted;
   }
-  const owed = existing && logPrefix === 'request-review'
+  const owed = existing && !notAtPrHead && logPrefix === 'request-review'
     ? await resumeOwedDispatch(existing, workspacePath, headAnchor, options)
     : null;
   if (owed) {

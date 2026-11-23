@@ -3,6 +3,8 @@ import { promisify } from 'node:util';
 import { emitActivityEntry } from '../activity-logger.js';
 import { messageAgent } from '../agents/messaging.js';
 import { spawnRun } from '../agents/spawn.js';
+import { readWorkspacePlanSync } from '../xbrief/io.js';
+import { appendPipelineEntry } from './pipeline-journal.js';
 import { getPrFacts, type PrFacts } from './pr-facts.js';
 
 const execAsync = promisify(exec);
@@ -26,7 +28,12 @@ export interface CheckBranchMergeabilityDeps {
   exec?: ExecRunner;
 }
 
-export type ResolverDispatchState = 'dispatched' | 'already_running' | 'throttled';
+/**
+ * `unavailable` (PAN-5619): no work agent can resolve the conflict, because the
+ * workspace has no xBRIEF (an adopted handoff PR or a strike). Nothing was
+ * spawned; whoever owns the PR branch resolves it.
+ */
+export type ResolverDispatchState = 'dispatched' | 'already_running' | 'throttled' | 'unavailable';
 
 export interface ConflictGateResult {
   gated: boolean;
@@ -42,6 +49,8 @@ export interface DispatchResolverInput {
   /** What the forge says blocks the merge, for the resolver prompt. */
   blockerSummary: string;
   reason: string;
+  /** The local probe's answer; `unknown` is not a confirmed conflict. */
+  mergeability?: BranchMergeability;
 }
 
 export interface ResolveConflictGateDeps {
@@ -58,6 +67,9 @@ interface RealConflictGateDepsOverrides {
   messageAgent?: typeof messageAgent;
   getFacts?: (issueId: string) => PrFacts | Promise<PrFacts>;
   emitActivityEntry?: typeof emitActivityEntry;
+  /** PAN-5619: whether a work agent could be spawned here (the spawn guard's xBRIEF check). */
+  hasPlan?: (workspacePath: string) => boolean;
+  journal?: typeof appendPipelineEntry;
   now?: () => Date;
   log?: (message: string) => void;
 }
@@ -147,6 +159,10 @@ export function buildRealConflictGateDeps(overrides: RealConflictGateDepsOverrid
   const runSpawn = overrides.spawnRun ?? spawnRun;
   const deliverMessage = overrides.messageAgent ?? messageAgent;
   const emitActivity = overrides.emitActivityEntry ?? emitActivityEntry;
+  const hasPlan = overrides.hasPlan ?? ((workspacePath: string) => {
+    try { return readWorkspacePlanSync(workspacePath) !== null; } catch { return false; }
+  });
+  const journal = overrides.journal ?? appendPipelineEntry;
   const now = overrides.now ?? (() => new Date());
 
   return {
@@ -155,6 +171,25 @@ export function buildRealConflictGateDeps(overrides: RealConflictGateDepsOverrid
     now,
     log: overrides.log,
     dispatchResolver: async (input) => {
+      // PAN-5619: the resolver is a work agent, and a work agent needs an
+      // xBRIEF. Without one the spawn throws after tearing down and rebuilding
+      // the workspace stack, and the throw escaped the review dispatch on every
+      // retry. Check first, the same way the spawn guard does, and spawn nothing.
+      if (!hasPlan(input.workspacePath)) {
+        const error = noResolverMessage(input.issueId, input.targetBranch);
+        // A probe that could not answer (`unknown`) is not a dead end: a
+        // failed fetch may pass next time, so it is not journalled.
+        if (input.mergeability === 'conflicts') {
+          journal(input.workspacePath, {
+            type: 'review.dispatch-failed',
+            issueId: input.issueId.toUpperCase(),
+            source: 'conflict-gate',
+            data: { reviewer: 'review', error },
+          });
+        }
+        emitActivity({ source: 'review', level: 'warn', issueId: input.issueId, message: `Review deferred for ${input.issueId}: ${error}`, details: input.reason });
+        return 'unavailable';
+      }
       const prompt = buildConflictResolverPrompt(input);
       let dispatchState: ResolverDispatchState = 'dispatched';
       try {
@@ -216,10 +251,13 @@ export async function resolveConflictGate(
       targetBranch,
       blockerSummary,
       reason,
+      mergeability,
     }) ?? 'dispatched';
     // The throttle is read here, so it is stamped here — an injected
     // dispatcher gets the same one-per-window behaviour as the real one.
-    lastResolverDispatchMs.set(issueId.toUpperCase(), checkedAtMs);
+    // Nothing was dispatched for `unavailable`, so a later request explains
+    // the refusal again instead of reporting a throttle.
+    if (resolverDispatchState !== 'unavailable') lastResolverDispatchMs.set(issueId.toUpperCase(), checkedAtMs);
   } else {
     resolverDispatchState = 'throttled';
     deps.log?.(`[conflict-gate] ${issueId}: conflict resolver dispatch is throttled`);
@@ -227,7 +265,9 @@ export async function resolveConflictGate(
 
   return {
     gated: true,
-    reason: `${reason}; ${formatResolverDispatchState(resolverDispatchState)}`,
+    reason: resolverDispatchState === 'unavailable'
+      ? `${reason}; ${noResolverMessage(issueId, targetBranch)}`
+      : `${reason}; ${formatResolverDispatchState(resolverDispatchState)}`,
     resolverDispatchState,
   };
 }
@@ -309,7 +349,16 @@ function formatResolverDispatchState(state: ResolverDispatchState): string {
       return 'conflict resolver dispatch throttled';
     case 'dispatched':
       return 'conflict resolver dispatched';
+    case 'unavailable':
+      return 'no conflict resolver available';
   }
+}
+
+/** PAN-5619: who resolves a conflict that no work agent can. */
+function noResolverMessage(issueId: string, targetBranch: string): string {
+  const id = issueId.toUpperCase();
+  return `no conflict resolver: ${id} has no xBRIEF, so no work agent can be spawned to resolve it. `
+    + `Merge origin/${targetBranch} into the PR branch, push, then run pan review request ${id}`;
 }
 
 function sweepExpiredProbeCache(nowMs: number): void {

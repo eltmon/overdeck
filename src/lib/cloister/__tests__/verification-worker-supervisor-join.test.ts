@@ -593,3 +593,52 @@ describe('a review dispatch owed across a restart (PAN-4622)', () => {
     expect(readVerificationWorkerState('PAN-1')?.dispatchOwed).toBeDefined();
   });
 });
+
+describe('reusing a result only at the PR head (PAN-5619 FR-4)', () => {
+  /** Push a commit to the PR branch from another checkout, as a handoff worktree does. */
+  function pushFromElsewhere(file: string): string {
+    const other = join(root, 'handoff');
+    execFileSync('git', ['clone', '-q', '-b', 'feature/pan-1', join(root, 'origin.git'), other], { stdio: 'ignore' });
+    const run = (...args: string[]) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd: other, encoding: 'utf-8' }).trim();
+    writeFileSync(join(other, file), file);
+    run('add', file);
+    run('commit', '-q', '-m', file);
+    run('push', '-q', 'origin', 'feature/pan-1');
+    return run('rev-parse', 'HEAD');
+  }
+
+  /** The PAN-5601 sequence: a pass at A is owed a dispatch, then the PR head moves to B from elsewhere. */
+  async function owedPassThenRemotePush(): Promise<{ headA: string; headB: string }> {
+    const headA = commit('a');
+    git('push', '-q', 'origin', 'feature/pan-1');
+    registerFinishedWorker(headA);
+    expect(await review()).toEqual({ outcome: 'passed' });
+    expect(readVerificationWorkerState('PAN-1')?.dispatchOwed?.head).toBe(headA);
+    return { headA, headB: pushFromElsewhere('b') };
+  }
+
+  it('fast-forwards a stale workspace and verifies the PR head instead of "already passed" on the stale one', async () => {
+    const { headB } = await owedPassThenRemotePush();
+
+    expect(await review()).toEqual({ outcome: 'passed' });
+
+    expect(git('rev-parse', 'HEAD')).toBe(headB);
+    expect(mocks.launches).toHaveLength(1);
+    expect(readVerificationWorkerState('PAN-1')?.dispatchOwed?.head).toBe(headB);
+    const logged = vi.mocked(console.log).mock.calls.map((call) => String(call[0]));
+    expect(logged.some((line) => line.includes('verification already passed on this head'))).toBe(false);
+  });
+
+  it('reuses nothing when the workspace has diverged from the PR head, and leaves it where it is', async () => {
+    const { headA } = await owedPassThenRemotePush();
+    const local = commit('c');
+
+    await review();
+
+    expect(git('rev-parse', 'HEAD')).toBe(local);
+    expect(local).not.toBe(headA);
+    expect(mocks.launches).toHaveLength(1);
+    const logged = vi.mocked(console.log).mock.calls.map((call) => String(call[0]));
+    expect(logged.some((line) => line.includes('not at the PR head'))).toBe(true);
+  });
+});

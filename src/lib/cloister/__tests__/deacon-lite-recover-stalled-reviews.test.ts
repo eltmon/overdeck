@@ -136,8 +136,8 @@ describe('recoverStalledReviews', () => {
   });
 
   // PAN-4506: a rejected kickoff never started a reviewer, so there is
-  // nothing to re-dispatch — stalledReviewReason has no case for this tail
-  // type, so the routine already skips it without any code change.
+  // nothing to re-dispatch. Only a review-request pipeline failure
+  // (source `request-review`, PAN-5619) is retried; this one has no source.
   it('re-requests nothing when a review.dispatch-failed entry tails a review.requested', async () => {
     journal([
       { type: 'review.requested', minutesAgo: 60 },
@@ -146,6 +146,62 @@ describe('recoverStalledReviews', () => {
 
     expect(await recoverStalledReviews(NOW)).toEqual([]);
     expect(mocks.recoverMissingConvoyReviewers).not.toHaveBeenCalled();
+  });
+
+  describe('review-request pipeline failures (PAN-5619)', () => {
+    function pipelineFailure(minutesAgo: number, error: string, head = 'abcd1234', source = 'request-review'): void {
+      vi.setSystemTime(NOW - minutesAgo * MINUTE);
+      appendPipelineEntry(workspace, {
+        type: 'review.dispatch-failed', issueId: 'PAN-3705', source, data: { reviewer: 'review', error, head },
+      });
+      vi.setSystemTime(NOW);
+    }
+
+    it('re-requests a first pipeline failure once, so a transient error gets another try', async () => {
+      journal([{ type: 'review.requested', minutesAgo: 90 }]);
+      pipelineFailure(80, 'Command failed: git push origin feature/pan-3705');
+      mocks.recoverMissingConvoyReviewers.mockResolvedValue({ success: false, message: 'no review parent state for PAN-3705' });
+
+      const actions = await recoverStalledReviews(NOW);
+
+      expect(mocks.requestReviewThroughRoute).toHaveBeenCalledWith('PAN-3705', expect.objectContaining({
+        source: 'deacon-lite',
+        message: expect.stringContaining('retrying once'),
+      }));
+      expect(actions).toHaveLength(1);
+    });
+
+    it('stops when the retry fails with the same error at the same head', async () => {
+      const error = 'The required xBRIEF checklist for PAN-3705 is missing or unreadable. Run planning before spawning a work agent.';
+      journal([{ type: 'review.requested', minutesAgo: 200 }]);
+      pipelineFailure(190, error);
+      journal([{ type: 'review.requested', minutesAgo: 100 }]);
+      pipelineFailure(90, error);
+
+      expect(await recoverStalledReviews(NOW)).toEqual([]);
+      expect(mocks.recoverMissingConvoyReviewers).not.toHaveBeenCalled();
+      expect(mocks.requestReviewThroughRoute).not.toHaveBeenCalled();
+    });
+
+    it('retries again when the failure changed (a new head or a new error)', async () => {
+      journal([{ type: 'review.requested', minutesAgo: 200 }]);
+      pipelineFailure(190, 'Command failed: git push', 'abcd1234');
+      journal([{ type: 'review.requested', minutesAgo: 100 }]);
+      pipelineFailure(90, 'Command failed: git push', 'ef015678');
+      mocks.recoverMissingConvoyReviewers.mockResolvedValue({ success: false, message: 'no review parent state for PAN-3705' });
+
+      await recoverStalledReviews(NOW);
+
+      expect(mocks.requestReviewThroughRoute).toHaveBeenCalledTimes(1);
+    });
+
+    it('never retries a conflict that no work agent can resolve', async () => {
+      journal([{ type: 'review.requested', minutesAgo: 90 }]);
+      pipelineFailure(80, 'no conflict resolver: PAN-3705 has no xBRIEF', 'abcd1234', 'conflict-gate');
+
+      expect(await recoverStalledReviews(NOW)).toEqual([]);
+      expect(mocks.recoverMissingConvoyReviewers).not.toHaveBeenCalled();
+    });
   });
 
   it('leaves a fresh request alone', async () => {

@@ -56,6 +56,7 @@ import { clearVerificationDispatchOwed } from '../../../../lib/cloister/verifica
 import { confirmResumedDispatch } from '../../../../lib/cloister/verification-resume-dispatch.js';
 import { parseRequestedReviewMode } from './review-mode-param.js';
 import { appendPipelineEntry } from '../../../../lib/cloister/pipeline-journal.js';
+import { recordReviewPipelineFailure } from '../../../../lib/cloister/review-dispatch-failure.js';
 import { isDeftPipelineIssue } from '../../../../lib/deft/issue-pipeline.js';
 import { refreshIssuePullRequestStateNow } from '../../services/issue-pr-refresh.js';
 import { jsonResponse } from '../../http-helpers.js';
@@ -327,10 +328,8 @@ export async function startRequestReviewPipeline(
       console.warn(`[request-review] Dispatch failed for ${issueId}: ${dispatchError}`);
       completePendingOperation(issueId, `Dispatch failed: ${dispatchError}`);
     },
-    onError: (error) => {
-      const detail = errorMessage(error) || String(error);
-      console.error(`[request-review] Background pipeline failed for ${issueId}: ${detail}`);
-      completePendingOperation(issueId, `Review pipeline error: ${detail}`);
+    onError: (error) => { // PAN-5619: journalled, so `pan show` and deacon-lite see it
+      completePendingOperation(issueId, `Review pipeline error: ${recordReviewPipelineFailure(issueId, workspacePath, error)}`);
     },
   });
 
