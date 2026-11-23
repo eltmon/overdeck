@@ -4,17 +4,17 @@
     "created": "2026-11-23T02:51:58Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5598: Order books: every action available from pan orders and as MCP tools",
-    "updated": "2026-11-23T02:54:37.018Z"
+    "updated": "2026-11-23T02:55:44.603Z"
   },
   "plan": {
     "id": "pan-5598",
     "title": "Order books: every action available from pan orders and as MCP tools",
-    "status": "proposed",
+    "status": "running",
     "uid": "687d1581-9f6d-46a1-b56c-c2e1d495d754",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-23T02:51:58Z",
-    "updated": "2026-11-23T02:54:37.018Z",
+    "updated": "2026-11-23T02:55:44.603Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5598",
@@ -858,5 +858,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
