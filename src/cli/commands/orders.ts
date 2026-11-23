@@ -3,7 +3,9 @@ import chalk from 'chalk';
 import { Command, InvalidArgumentError } from 'commander';
 import { dirname, join } from 'node:path';
 
-import { getBookAsync, listBooks, normalizeOrderIssueId } from '../../lib/orders/resolver.js';
+import { deriveBookPhases, type OrderBookPhaseView } from '../../lib/orders/phase.js';
+import { computeBookProgress, getBookAsync, listBooks, liveOrderIssueLookup, normalizeOrderIssueId } from '../../lib/orders/resolver.js';
+import type { OrderIssueLookup } from '../../lib/orders/types.js';
 import {
   addItems,
   assertRestorable,
@@ -25,6 +27,12 @@ interface OrdersCommandDeps {
   now?: () => Date;
   actor?: string;
   startOrderBook?: (bookId: string) => Promise<{ runId: string }>;
+  issueLookup?: OrderIssueLookup;
+}
+
+export interface OrdersListing {
+  books: OrderBook[];
+  phases: Map<string, OrderBookPhaseView>;
 }
 
 interface OrdersAddOptions {
@@ -118,15 +126,22 @@ export function formatBook(book: OrderBook): string {
   return JSON.stringify(book, null, 2);
 }
 
-export function formatBookList(books: readonly OrderBook[]): string {
+/** `active`, `queued #<n>`, `draft` or `archived`, with ` (finished)` when every issue is terminal. */
+function phaseLabel(view: OrderBookPhaseView | undefined, book: OrderBook): string {
+  if (!view) return book.status;
+  const base = view.phase === 'queued' && view.queuePosition !== null ? `queued #${view.queuePosition}` : view.phase;
+  return view.finished ? `${base} (finished)` : base;
+}
+
+export function formatBookList(books: readonly OrderBook[], phases: ReadonlyMap<string, OrderBookPhaseView>): string {
   if (books.length === 0) return 'No order books found.';
   const rows = books.map((book) => [
     book.id,
-    book.status,
+    phaseLabel(phases.get(book.id), book),
     String(book.items.length),
     book.name,
   ]);
-  const headers = ['ID', 'Status', 'Items', 'Name'];
+  const headers = ['ID', 'Phase', 'Items', 'Name'];
   const widths = headers.map((header, index) => Math.max(
     header.length,
     ...rows.map((row) => row[index]!.length),
@@ -158,8 +173,16 @@ export async function runOrdersCreate(name: string, deps: OrdersCommandDeps = {}
   return book;
 }
 
-export function runOrdersList(deps: OrdersCommandDeps = {}): OrderBook[] {
-  return listBooks(panDirFor(deps));
+export function runOrdersList(deps: OrdersCommandDeps = {}): OrdersListing {
+  const books = listBooks(panDirFor(deps));
+  // One issue-state read for every book, not one per book.
+  const issueIds = [...new Set(books.flatMap((book) => book.items.map((item) => item.issue.toUpperCase())))];
+  const state = (deps.issueLookup ?? liveOrderIssueLookup)(issueIds);
+  const issueLookup: OrderIssueLookup = (requested) => new Map(requested.flatMap((issueId) => {
+    const found = state.get(issueId.toUpperCase());
+    return found ? [[issueId.toUpperCase(), found] as const] : [];
+  }));
+  return { books, phases: deriveBookPhases(books, (book) => computeBookProgress(book, issueLookup)) };
 }
 
 export async function runOrdersShow(bookId: string, deps: OrdersCommandDeps = {}): Promise<OrderBook> {
@@ -314,7 +337,8 @@ export function createOrdersCommand(): Command {
     .description('List order books')
     .option('--project <key>', 'Resolve the order book in another registered project')
     .action((options: { project?: string }) => commandAction(async () => {
-      console.log(formatBookList(runOrdersList({ projectKey: options.project })));
+      const { books, phases } = runOrdersList({ projectKey: options.project });
+      console.log(formatBookList(books, phases));
     }));
 
   orders

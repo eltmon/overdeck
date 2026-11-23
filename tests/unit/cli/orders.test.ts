@@ -111,7 +111,8 @@ describe('pan orders commands', () => {
 
     const shown = await runOrdersShow(created.id, deps);
     expect(formatBook(shown)).toContain('"issue": "PAN-2"');
-    expect(formatBookList(runOrdersList(deps))).toContain('2026-07-18-refactor-campaign');
+    const listing = runOrdersList({ ...deps, issueLookup: () => new Map() });
+    expect(formatBookList(listing.books, listing.phases)).toContain('2026-07-18-refactor-campaign');
 
     const moved = await runOrdersMove(created.id, 'PAN-3', { lane: 'A', order: 1 }, deps);
     expect(moved.items).toEqual(expect.arrayContaining([
@@ -181,7 +182,8 @@ describe('pan orders commands', () => {
       now: () => new Date(at),
     });
     expect(created.id).toBe('2026-07-18-cross-project');
-    expect(formatBookList(runOrdersList({ projectKey: 'other-project' }))).toContain('2026-07-18-cross-project');
+    const listing = runOrdersList({ projectKey: 'other-project', issueLookup: () => new Map() });
+    expect(formatBookList(listing.books, listing.phases)).toContain('2026-07-18-cross-project');
   });
 
   it('throws Unknown project for an unregistered --project key', () => {
@@ -267,6 +269,40 @@ describe('pan orders commands', () => {
     await expect(runOrdersUnarchive(old.id, deps))
       .rejects.toThrow(`Order book ${old.id} cannot be restored: PAN-1 already belongs to order book ${fresh.id}`);
     expect((await runOrdersShow(old.id, deps)).status).toBe('complete');
+  });
+
+  it('list shows active, queued #2, draft and archived', async () => {
+    const panDir = gitFixture();
+    const deps = { panDir, now: () => new Date(at) };
+    const ids: string[] = [];
+    for (const [name, issue] of [['First', 'PAN-1'], ['Second', 'PAN-2'], ['Third', 'PAN-3'], ['Fourth', 'PAN-4']] as const) {
+      const created = await runOrdersCreate(name, deps);
+      await runOrdersAdd(created.id, [issue], {}, deps);
+      ids.push(created.id);
+    }
+    await runOrdersQueue(ids[0]!, deps);
+    await runOrdersQueue(ids[1]!, deps);
+    await runOrdersArchive(ids[3]!, deps);
+    const lookupWithClosed = (closed: string[]) => (requested: string[]) => new Map(requested.map((issue) => [
+      issue.toUpperCase(),
+      { issue: issue.toUpperCase(), open: !closed.includes(issue.toUpperCase()), parked: false },
+    ] as const));
+    const listLines = (closed: string[]) => {
+      const { books, phases } = runOrdersList({ ...deps, issueLookup: lookupWithClosed(closed) });
+      return formatBookList(books, phases).split('\n');
+    };
+    const phaseOf = (lines: string[], id: string) =>
+      lines.find((line) => line.startsWith(id))!.slice(id.length).trim().split(/\s{2,}/)[0];
+
+    const lines = listLines([]);
+    expect(lines[0]).toMatch(/^ID\s+Phase\s+Items\s+Name/);
+    expect(lines[0]).not.toContain('Status');
+    expect(phaseOf(lines, ids[0]!)).toBe('active');
+    expect(phaseOf(lines, ids[1]!)).toBe('queued #2');
+    expect(phaseOf(lines, ids[2]!)).toBe('draft');
+    expect(phaseOf(lines, ids[3]!)).toBe('archived');
+
+    expect(phaseOf(listLines(['PAN-1']), ids[0]!)).toBe('active (finished)');
   });
 
   it('queues a book in another registered project via --project from an unrelated cwd', async () => {
