@@ -4,17 +4,17 @@
     "created": "2026-11-23T02:30:37Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5597: Order books page: show which book is live, and make building and running a book simple",
-    "updated": "2026-11-23T02:37:25.869Z"
+    "updated": "2026-11-23T02:38:24.055Z"
   },
   "plan": {
     "id": "pan-5597",
     "title": "Order books page: show which book is live, and make building and running a book simple",
-    "status": "proposed",
+    "status": "running",
     "uid": "f29e5a31-ea5e-4bcb-b700-fbe85503251f",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-23T02:30:37Z",
-    "updated": "2026-11-23T02:37:25.869Z",
+    "updated": "2026-11-23T02:38:24.055Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5597",
@@ -1697,5 +1697,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
