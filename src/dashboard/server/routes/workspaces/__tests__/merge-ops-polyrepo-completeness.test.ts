@@ -9,6 +9,9 @@ const mocks = vi.hoisted(() => ({
   mergeReviewArtifact: vi.fn(),
   mergeSet: null as any,
   postMergeLifecycle: vi.fn(),
+  qualityGates: {} as Record<string, unknown>,
+  restoreReclaimedStack: vi.fn(),
+  runQualityGates: vi.fn(),
   setMergeRun: vi.fn(),
   upsertMergeSet: vi.fn(),
 }));
@@ -69,7 +72,7 @@ vi.mock('../../../../../lib/projects.js', () => ({
         { name: 'repo-b', path: 'repo-b' },
       ],
     },
-    quality_gates: {},
+    get quality_gates() { return mocks.qualityGates; },
   })),
   findProjectByPath: vi.fn(() => null),
   listProjectsSync: vi.fn(() => []),
@@ -162,6 +165,14 @@ vi.mock('../../../../../lib/forge.js', () => ({
   })),
 }));
 
+vi.mock('../../../../../lib/workspace/stack-restore.js', () => ({
+  restoreReclaimedStack: mocks.restoreReclaimedStack,
+}));
+
+vi.mock('../../../../../lib/cloister/validation.js', () => ({
+  runQualityGates: mocks.runQualityGates,
+}));
+
 import { triggerMerge } from '../merge-ops.js';
 
 function repo(repoKey: string, patch: Record<string, unknown> = {}) {
@@ -200,6 +211,9 @@ function mergeSet(repos: ReturnType<typeof repo>[]) {
 describe('coordinated polyrepo merge completeness gate', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.qualityGates = {};
+    mocks.restoreReclaimedStack.mockResolvedValue({ kind: 'none' });
+    mocks.runQualityGates.mockResolvedValue([{ name: 'typecheck', passed: true }]);
     mocks.discoverArtifact.mockResolvedValue(null);
     mocks.findMergedArtifact.mockResolvedValue(null);
     mocks.mergeReviewArtifact.mockResolvedValue(undefined);
@@ -338,5 +352,32 @@ describe('coordinated polyrepo merge completeness gate', () => {
       expect.objectContaining({ repoKey: 'repo-a', repoVerification: 'passed', repoMerge: 'merged' }),
       expect.objectContaining({ repoKey: 'repo-b', repoVerification: 'skipped', repoMerge: 'merged' }),
     ]);
+  });
+
+  it('restores an idle-stopped stack before post-rebase verification runs its gates (PAN-5250)', async () => {
+    mocks.qualityGates = { typecheck: { command: 'npm run typecheck', path: 'repo-b' } };
+    mocks.mergeSet = mergeSet([
+      repo('repo-b', { artifactUrl: 'https://github.com/org/repo-b/pull/2', repoMerge: 'pending' }),
+    ]);
+
+    const result = await triggerMerge('PAN-2467');
+
+    expect(result).toEqual(expect.objectContaining({ success: true, outcome: 'merged' }));
+    expect(mocks.restoreReclaimedStack).toHaveBeenCalledExactlyOnceWith({ issueId: 'PAN-2467', workspacePath: '/workspace', trigger: 'verification' });
+    expect(mocks.runQualityGates).toHaveBeenCalledOnce();
+    expect(mocks.restoreReclaimedStack.mock.invocationCallOrder[0]).toBeLessThan(mocks.runQualityGates.mock.invocationCallOrder[0]!);
+    expect(mocks.mergeSet.repos).toEqual([expect.objectContaining({ repoKey: 'repo-b', repoVerification: 'passed', repoMerge: 'merged' })]);
+  });
+
+  it('still runs the gates when the restore door fails (PAN-5250)', async () => {
+    mocks.qualityGates = { typecheck: { command: 'npm run typecheck', path: 'repo-b' } };
+    mocks.restoreReclaimedStack.mockResolvedValue({ kind: 'failed', failed: [], error: 'docker listing unavailable' });
+    mocks.mergeSet = mergeSet([
+      repo('repo-b', { artifactUrl: 'https://github.com/org/repo-b/pull/2', repoMerge: 'pending' }),
+    ]);
+
+    await triggerMerge('PAN-2467');
+
+    expect(mocks.runQualityGates).toHaveBeenCalledOnce();
   });
 });

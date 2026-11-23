@@ -35,6 +35,7 @@ import { appendPipelineEntry } from '../../../../lib/cloister/pipeline-journal.j
 import { getIssueWorkspacePath } from '../../../../lib/overdeck/issue-projects.js';
 import { toFeatureIdent } from '../../../../lib/workspace-config.js';
 import { loadWorkspaceEnvForProject } from '../../../../lib/workspace-env.js';
+import { restoreReclaimedStack } from '../../../../lib/workspace/stack-restore.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { EventStoreService } from '../../services/domain-services.js';
 import { clearMergeRun, getMergeRun, listMergeRuns, setMergeRun, setMergeQueueAdvanceHandler, type MergeRunPatch } from '../../services/merge-queue-service.js';
@@ -683,6 +684,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
           continue;
         }
 
+        await restoreReclaimedStack({ issueId, workspacePath, trigger: 'verification' }); // PAN-5250: container gates exec into the stack
         const gateResults = await runQualityGates(gates, workspacePath, 'pre_push', {
           placeholders: { ...gatePlaceholders, CHANGED_BASE: `origin/${repo.targetBranch}` },
           workspaceEnv: loadWorkspaceEnvForProject(projectConfig, workspacePath),
