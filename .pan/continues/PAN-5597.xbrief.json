@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5597",
   "created": "2026-11-23T02:38:35.270Z",
-  "updated": "2026-11-23T04:08:18.695Z",
+  "updated": "2026-11-23T04:08:25.366Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -396,6 +396,11 @@
     "frontend-cleanup.ac3": {
       "status": "completed",
       "doneAt": "2026-11-23T04:08:18.694Z"
+    },
+    "docs-cli-reference": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5597",
+      "claimedAt": "2026-11-23T04:08:25.366Z"
     }
   }
 }
