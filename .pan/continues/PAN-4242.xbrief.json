@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4242",
   "created": "2026-11-23T08:46:31.743Z",
-  "updated": "2026-11-23T09:33:37.622Z",
+  "updated": "2026-11-23T09:34:13.799Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,9 +32,10 @@
       "doneAt": "2026-11-23T09:31:45.385Z"
     },
     "settings-copy-permissions": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4242",
-      "claimedAt": "2026-11-23T09:32:49.082Z"
+      "claimedAt": "2026-11-23T09:32:49.082Z",
+      "doneAt": "2026-11-23T09:34:13.798Z"
     },
     "trust-dialog-parse": {
       "status": "in_progress",
@@ -45,6 +46,18 @@
       "status": "in_progress",
       "claimedBy": "agent-pan-4242",
       "claimedAt": "2026-11-23T09:33:37.622Z"
+    },
+    "settings-copy-permissions.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:34:13.798Z"
+    },
+    "settings-copy-permissions.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:34:13.798Z"
+    },
+    "settings-copy-permissions.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:34:13.798Z"
     }
   }
 }
