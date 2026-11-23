@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5623",
   "created": "2026-11-23T20:20:25.006Z",
-  "updated": "2026-11-23T21:33:41.670Z",
+  "updated": "2026-11-23T21:34:53.515Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -267,9 +267,26 @@
       "doneAt": "2026-11-23T21:33:40.357Z"
     },
     "wi13-restore-poll": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5623",
-      "claimedAt": "2026-11-23T21:33:41.669Z"
+      "claimedAt": "2026-11-23T21:33:41.669Z",
+      "doneAt": "2026-11-23T21:34:53.515Z"
+    },
+    "wi13-restore-poll.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T21:34:53.515Z"
+    },
+    "wi13-restore-poll.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T21:34:53.515Z"
+    },
+    "wi13-restore-poll.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T21:34:53.515Z"
+    },
+    "wi13-restore-poll.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T21:34:53.515Z"
     }
   }
 }
