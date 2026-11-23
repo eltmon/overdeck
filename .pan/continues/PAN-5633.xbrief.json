@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5633",
   "created": "2026-11-23T19:06:23.391Z",
-  "updated": "2026-11-23T19:08:15.807Z",
+  "updated": "2026-11-23T19:08:21.230Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,6 +34,11 @@
     "wi1-last-turn-reader.ac5": {
       "status": "completed",
       "doneAt": "2026-11-23T19:08:15.806Z"
+    },
+    "wi2-parser-turn-end": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5633",
+      "claimedAt": "2026-11-23T19:08:21.230Z"
     }
   }
 }
