@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5623",
   "created": "2026-11-23T20:20:25.006Z",
-  "updated": "2026-11-23T21:08:14.083Z",
+  "updated": "2026-11-23T21:12:20.013Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -205,9 +205,10 @@
       "doneAt": "2026-11-23T20:55:42.533Z"
     },
     "wi10-workspace-data-reclaim-aware": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5623",
-      "claimedAt": "2026-11-23T20:55:43.618Z"
+      "claimedAt": "2026-11-23T20:55:43.618Z",
+      "doneAt": "2026-11-23T21:12:20.012Z"
     },
     "wi7-verification-restore": {
       "status": "completed",
@@ -226,6 +227,14 @@
     "wi7-verification-restore.ac3": {
       "status": "completed",
       "doneAt": "2026-11-23T21:08:14.083Z"
+    },
+    "wi10-workspace-data-reclaim-aware.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T21:12:20.012Z"
+    },
+    "wi10-workspace-data-reclaim-aware.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T21:12:20.012Z"
     }
   }
 }
