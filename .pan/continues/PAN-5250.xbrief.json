@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5250",
   "created": "2026-11-23T23:10:09.644Z",
-  "updated": "2026-11-23T23:21:42.322Z",
+  "updated": "2026-11-23T23:22:01.170Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -156,6 +156,11 @@
     "wi6-idle-stop-rules.ac5": {
       "status": "completed",
       "doneAt": "2026-11-23T23:21:42.322Z"
+    },
+    "wi7-idle-stop-service": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5250",
+      "claimedAt": "2026-11-23T23:22:01.169Z"
     }
   }
 }
