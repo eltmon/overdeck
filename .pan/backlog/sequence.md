@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-23T19:15:32Z · model: claude-opus-5-5 · open: 953_
+_Last sequenced: 2026-11-23T19:27:04Z · model: claude-opus-5-5 · open: 954_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -8,6 +8,8 @@ _Last sequenced: 2026-11-23T19:15:32Z · model: claude-opus-5-5 · open: 953_
 | 1 | PAN-5615 | S | high | ok |  |  | Role prompts escalate via pan tell flywheel-orchestrator, a dead name; the Flywheel is conv-flywheel, so blockers are lost. |
 | 1 | PAN-5617 | S | critical | ok |  |  | npm run typecheck admits each of its 12 tsc lanes separately; under memory pressure one run takes ~1h and stalls agent pushes. |
 | 1 | PAN-5621 | M | critical | ok |  |  | Gate admission queue starves while MemAvailable < hard reserve + footprint; parked workspace stacks never reclaimed, no gate runs. |
+| 1 | PAN-5637 | S | critical | ok |  |  | In pipeline. Merge train never admits polyrepo issues touching CI-less member repos; add ci: none per repo so MYN infra/docs MRs merge |
+| 1 | PAN-5638 | M | critical | ok |  |  | In pipeline. Polyrepo review verdicts refuse GitHub member PRs and the ready set ignores verdict markers; MIN-1142 can't merge |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 4 | PAN-5430 | S | medium | ok |  |  | Markdown Preview prints raw HTML (README logo <div>/<picture>) as text; render it via rehype-raw + rehype-sanitize in doc previews. |
 | 5 | PAN-5567 | S | high | ok |  |  | Codex app-server threads hardcode on-request/workspace-write, so Read-only and Full access settings never apply. |
@@ -56,7 +58,6 @@ _Last sequenced: 2026-11-23T19:15:32Z · model: claude-opus-5-5 · open: 953_
 | 40 | PAN-2954 | XS | critical | ok |  |  | postMergeLifecycle refuses GitLab projects |
 | 41 | PAN-3935 | S | critical | ok |  |  | PRD draft promotion writes the draft into the primary main checkout and deletes the feature-branch copy; PRDs are stranded untracked |
 | 42 | PAN-3657 | S | critical | ok |  |  | Merge-train queues endpoint runs the monorepo queue builder for polyrepo projects, so MYN/Auricle trains are permanently empty. |
-| 43 | PAN-5097 | S | critical | ok |  |  | Polyrepo GitLab review verdicts never record: forge probe runs at the non-git root, falls back to GitHub; MYN merges stall till hand-merged |
 | 44 | PAN-4240 | S | critical | ok |  |  | Reaper rm -rf's workspaces of closed issues: unmerged polyrepo branches, and (Nov 4) untracked evidence after a merged MR. |
 | 45 | PAN-3565 | M | critical | ok |  |  | Failed review spawn wedges 'starting', and an all-lanes infra failure is synthesized as a real CHANGES REQUESTED verdict. |
 | 46 | PAN-3554 | M | critical | needs-refinement |  |  | Red main has no mechanical owner: it hid for ~5h because the merge gate renders red main as an empty queue, not an alarm. |
@@ -973,6 +974,14 @@ New substrate-improvement bug already in the pipeline, pinned at rank 1 per the 
 
 New substrate-improvement bug already in the pipeline, pinned at rank 1 per the in-pipeline rule. It is critical because a starved admission queue stops every agent quality gate: on 2026-11-23 no gate ran while 7 waiters queued and the PAN-5601 and PAN-5614 substrate fixes sat behind it. FR-1..FR-3 are concrete (starvation detection, reclaiming idle Overdeck-owned stack containers, fake-timer tests); it shares the admission queue with PAN-5617.
 
+### PAN-5637 (rank 1)
+
+New since the prior run and already in the pipeline, so it is pinned at rank 1. The ready set requires green checks on every member MR, and MYN's infra and docs repos have no CI, so MIN-1144 and MIN-1146 can never queue; the fix site and a safe opt-in field are named, so it is ok and S-sized.
+
+### PAN-5638 (rank 1)
+
+New since the prior run and already in the pipeline, so it is pinned at rank 1. It replaces the PAN-5614 stopgap that refuses GitHub-member verdicts and teaches githubRows to read verdict markers, which unblocks polyrepo issues like MIN-1142 from reaching the merge train.
+
 ### PAN-5013 (rank 3)
 
 Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.
@@ -1165,10 +1174,6 @@ The PAN-2858 defect in a new shape: complete-planning promotes to the primary ch
 
 New this pass. The merge-train queues endpoint correctly gathers eligible candidates and then hands them to the monorepo queue builder, which does git rev-parse against a polyrepo project root that is not a git repository — so every polyrepo project's train is permanently empty while monorepo projects populate fine. MYN and Auricle cannot use merge trains at all until this lands.
 
-### PAN-5097 (rank 43)
-
-New since the prior run. forgeForWorkspace in src/cli/commands/specialists/done.ts probes the polyrepo wrapper root, which is not a git repo, so every MYN review verdict fails and test/merge never start; the last six MYN merges were done by hand. The root cause and fix site are named, so it is ok and S-sized, and it ranks beside the other polyrepo merge-path blockers (PAN-3657, PAN-4240) because it stops the whole review-to-merge pipeline for a project.
-
 ### PAN-4240 (rank 44)
 
 A second incident on 2026-11-04 (MIN-1135) widened the bug: after a merged MR the reaper removed the whole workspace, destroying untracked evidence files and nested worktrees that the merged-branch check never covers. Rank holds at 39 because it is already critical; the fix must now gate on untracked/nested content, not only branch merge state.
@@ -1277,10 +1282,6 @@ New issue from the Deft adoption PRD. Its dependency PAN-3308 has closed. The ma
 
 Found cutting v0.65.0: CI was green but the local release check failed on two host-dependent tests. XS fix that removes false reds from the release verb, so it sits above routine medium work.
 
-### PAN-4566 (rank 71)
-
-Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback this fix routes failures to is on main and work can start.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1288,10 +1289,10 @@ Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback thi
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-23T19:15:32Z",
+  "generatedAt": "2026-11-23T19:27:04Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 953,
+  "openCount": 954,
   "nodes": [
     {
       "issue": "PAN-5615",
@@ -1329,6 +1330,32 @@ Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback thi
       "dependsOn": [],
       "why": "Gate admission queue starves while MemAvailable < hard reserve + footprint; parked workspace stacks never reclaimed, no gate runs.",
       "rationale": "New substrate-improvement bug already in the pipeline, pinned at rank 1 per the in-pipeline rule. It is critical because a starved admission queue stops every agent quality gate: on 2026-11-23 no gate ran while 7 waiters queued and the PAN-5601 and PAN-5614 substrate fixes sat behind it. FR-1..FR-3 are concrete (starvation detection, reclaiming idle Overdeck-owned stack containers, fake-timer tests); it shares the admission queue with PAN-5617.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5637",
+      "rank": 1,
+      "size": "S",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline. Merge train never admits polyrepo issues touching CI-less member repos; add ci: none per repo so MYN infra/docs MRs merge",
+      "rationale": "New since the prior run and already in the pipeline, so it is pinned at rank 1. The ready set requires green checks on every member MR, and MYN's infra and docs repos have no CI, so MIN-1144 and MIN-1146 can never queue; the fix site and a safe opt-in field are named, so it is ok and S-sized.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5638",
+      "rank": 1,
+      "size": "M",
+      "importance": "critical",
+      "score": 85,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline. Polyrepo review verdicts refuse GitHub member PRs and the ready set ignores verdict markers; MIN-1142 can't merge",
+      "rationale": "New since the prior run and already in the pipeline, so it is pinned at rank 1. It replaces the PAN-5614 stopgap that refuses GitHub-member verdicts and teaches githubRows to read verdict markers, which unblocks polyrepo issues like MIN-1142 from reaching the merge train.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1957,19 +1984,6 @@ Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback thi
       "dependsOn": [],
       "why": "Merge-train queues endpoint runs the monorepo queue builder for polyrepo projects, so MYN/Auricle trains are permanently empty.",
       "rationale": "New this pass. The merge-train queues endpoint correctly gathers eligible candidates and then hands them to the monorepo queue builder, which does git rev-parse against a polyrepo project root that is not a git repository — so every polyrepo project's train is permanently empty while monorepo projects populate fine. MYN and Auricle cannot use merge trains at all until this lands.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5097",
-      "rank": 43,
-      "size": "S",
-      "importance": "critical",
-      "score": 88,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Polyrepo GitLab review verdicts never record: forge probe runs at the non-git root, falls back to GitHub; MYN merges stall till hand-merged",
-      "rationale": "New since the prior run. forgeForWorkspace in src/cli/commands/specialists/done.ts probes the polyrepo wrapper root, which is not a git repo, so every MYN review verdict fails and test/merge never start; the last six MYN merges were done by hand. The root cause and fix site are named, so it is ok and S-sized, and it ranks beside the other polyrepo merge-path blockers (PAN-3657, PAN-4240) because it stops the whole review-to-merge pipeline for a project.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13848,6 +13862,20 @@ Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback thi
       "confidence": 0.4
     },
     {
+      "from": "PAN-3657",
+      "to": "PAN-5637",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-3657",
+      "to": "PAN-5638",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
+    },
+    {
       "from": "PAN-3771",
       "to": "PAN-2981",
       "type": "informs",
@@ -14296,20 +14324,6 @@ Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback thi
       "confidence": 1
     },
     {
-      "from": "PAN-5097",
-      "to": "PAN-2954",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
-    },
-    {
-      "from": "PAN-5097",
-      "to": "PAN-4391",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
       "from": "PAN-5201",
       "to": "PAN-5202",
       "type": "unblocks",
@@ -14574,6 +14588,13 @@ Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback thi
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-5637",
+      "to": "PAN-5638",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
     },
     {
       "from": "PAN-750",
