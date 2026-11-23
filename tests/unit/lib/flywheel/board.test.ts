@@ -74,6 +74,7 @@ describe('activity labels (FR-5)', () => {
       'handoff.requested', 'handoff.deferred', 'handoff.retried', 'handoff.started', 'handoff.abandoned',
       'workspace.adopted', 'workspace.adoption-failed', 'workspace.synced-to-pr-head',
       'operator.decision-requested', 'operator.decision-answered', 'operator.decision-withdrawn',
+      'stack.reclaimed', 'stack.restored',
     ];
     expect(Object.keys(JOURNAL_ACTIVITY_LABELS).sort()).toEqual([...types].sort());
     for (const label of Object.values(JOURNAL_ACTIVITY_LABELS)) {
