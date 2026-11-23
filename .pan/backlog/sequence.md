@@ -1,15 +1,13 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-23T07:18:58Z · model: claude-opus-5-5 · open: 955_
+_Last sequenced: 2026-11-23T08:03:55Z · model: claude-opus-5-5 · open: 952_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
-| 1 | PAN-5598 | M | medium | ok |  |  | Order-book CLI/MCP parity: route scopes for /api/orders*, ten MCP tools, new pan orders verbs. In pipeline (planning). |
 | 1 | PAN-5611 | S | medium | ok |  |  | Idle-settled conversations stay in Settled after the operator resumes them, hiding them from their project group. |
 | 1 | PAN-5615 | S | high | ok |  |  | Role prompts escalate via pan tell flywheel-orchestrator, a dead name; the Flywheel is conv-flywheel, so blockers are lost. |
 | 1 | PAN-5617 | S | critical | ok |  |  | npm run typecheck admits each of its 12 tsc lanes separately; under memory pressure one run takes ~1h and stalls agent pushes. |
-| 2 | PAN-5600 | XS | critical | ok |  |  | Dashboard start route hardcodes overdeck-feature-<id>, so every MYN post-planning hand-off 422s; swap in the PAN-3049 resolver. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 3 | PAN-5614 | M | critical | ok |  |  | specialists done falls back to GitHub in remote-less polyrepo roots, so GitLab review verdicts are lost and MYN merges stall. |
 | 4 | PAN-5430 | S | medium | ok |  |  | Markdown Preview prints raw HTML (README logo <div>/<picture>) as text; render it via rehype-raw + rehype-sanitize in doc previews. |
@@ -733,7 +731,7 @@ _Last sequenced: 2026-11-23T07:18:58Z · model: claude-opus-5-5 · open: 955_
 | 680 | PAN-2449 | M | low | ok |  |  | start-planning: GITHUB_REPOS env shadows projects.yaml github_repo; unknown IDs fall through to Linear and plan the wrong issue |
 | 681 | PAN-4769 | XS | low | ok |  |  | Two-sentence wording fix in features/skill-packs.mdx; PAN-4759 created the page and closed, so this is unblocked. |
 | 682 | PAN-3940 | XL | low | ok | ✓ |  | Parked epic: event-driven plugin/hook system on pipeline-notifier + hygiene-scheduler; do not pick up until the journal has soaked |
-| 682 | PAN-5608 | S | low | ok |  | PAN-5598 | Orders routes resolve .pan from raw project.path, CLI via issue_routing; latent split for routed projects. Never fired yet. |
+| 682 | PAN-5608 | S | low | ok |  |  | Orders routes resolve .pan from raw project.path, CLI via issue_routing; latent split for routed projects. Never fired yet. |
 | 683 | PAN-2424 | L | low | ok | ✓ |  | Epic: the Order Book |
 | 684 | PAN-2406 | S | low | ok |  |  | Remaining scope: findAllWorkspacePaths must also enumerate -strike-wt and named-suffix worktrees; gaps 1 and 3 are moot. |
 | 685 | PAN-2394 | M | low | ok |  |  | Incident: conv-* agent-dir cleanup destroyed ohmypi/codex conversation transcripts ("no saved history") |
@@ -959,13 +957,8 @@ _Last sequenced: 2026-11-23T07:18:58Z · model: claude-opus-5-5 · open: 955_
 | 903 | PAN-5444 | XS | low | ok |  |  | Two Minor CodeRabbit findings left on merged PR #5443: semgrep repo rules resolve from event cwd; hook tests not isolated from Docker. |
 | 904 | PAN-5405 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5403: changes-query refetch after turns, Send menu keyboard/scheduling guard, tab-menu focus. |
 | 905 | PAN-2423 | XS | low | stale |  |  | Likely fixed: rebuild now uses the PAN-3049 resolver (docker.ts:181) and reap has no hardcoded prefix; confirm and close. |
-| 906 | PAN-5610 | XS | low | ok |  |  | Duplicate of PAN-5523 (move/heal Missing origin, rank 10), which covers this plus heal. Close as duplicate. |
 
 ## Rationale detail
-
-### PAN-5598 (rank 1)
-
-New issue already in the pipeline with a PRD; pinned at the free rank 1 slot per the in-pipeline rule. Related to PAN-5597 but independent of its code.
 
 ### PAN-5611 (rank 1)
 
@@ -978,10 +971,6 @@ New substrate bug already in the pipeline: every agent escalation to the Flywhee
 ### PAN-5617 (rank 1)
 
 New substrate-improvement bug already in the pipeline, pinned at rank 1 per the in-pipeline rule. It is critical because every agent quality gate runs npm run typecheck: on 2026-11-23 two Flywheel handoffs (PAN-5601, PAN-5614) could not push for about an hour, which in turn held MYN merges. FR-1..FR-4 are concrete (admit the chain once, reuse OVERDECK_GATE_ADMITTED, keep the slot cap).
-
-### PAN-5600 (rank 2)
-
-New substrate bug that breaks the automatic plan-to-work hand-off and the dashboard Start button for every non-Overdeck docker project (MYN today); the CLI pan start workaround hides it only for CLI users. The fix is a one-call swap to requireComposeProjectNameForWorkspace with a named test, so it is tiny and unblocks the pipeline for a whole project.
 
 ### PAN-5013 (rank 3)
 
@@ -1283,6 +1272,14 @@ Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback thi
 
 New planning bug placed in a freed high-tier slot. It blocks pan plan finalize for every epic child with a stub draft on main; the fix is a candidate-order change plus one test.
 
+### PAN-2940 (rank 73)
+
+Three red-mains in one day from direct-push series bypassing PR CI — conversations need a pre-merge CI surface.
+
+### PAN-3708 (rank 74)
+
+New this pass. pan strike dies at git worktree list --porcelain on a polyrepo wrapper root, which is not a git repository, so the urgent-strike escape hatch is simply unavailable for MYN-class projects. pan swarm already understands nested repos; strike must use the same project repository inventory. Duplicate of PAN-3040 — close one when this lands.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1290,24 +1287,11 @@ New planning bug placed in a freed high-tier slot. It blocks pan plan finalize f
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-23T07:18:58Z",
+  "generatedAt": "2026-11-23T08:03:55Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 955,
+  "openCount": 952,
   "nodes": [
-    {
-      "issue": "PAN-5598",
-      "rank": 1,
-      "size": "M",
-      "importance": "medium",
-      "score": 55,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Order-book CLI/MCP parity: route scopes for /api/orders*, ten MCP tools, new pan orders verbs. In pipeline (planning).",
-      "rationale": "New issue already in the pipeline with a PRD; pinned at the free rank 1 slot per the in-pipeline rule. Related to PAN-5597 but independent of its code.",
-      "gate": "auto",
-      "planning": "auto"
-    },
     {
       "issue": "PAN-5611",
       "rank": 1,
@@ -1344,19 +1328,6 @@ New planning bug placed in a freed high-tier slot. It blocks pan plan finalize f
       "dependsOn": [],
       "why": "npm run typecheck admits each of its 12 tsc lanes separately; under memory pressure one run takes ~1h and stalls agent pushes.",
       "rationale": "New substrate-improvement bug already in the pipeline, pinned at rank 1 per the in-pipeline rule. It is critical because every agent quality gate runs npm run typecheck: on 2026-11-23 two Flywheel handoffs (PAN-5601, PAN-5614) could not push for about an hour, which in turn held MYN merges. FR-1..FR-4 are concrete (admit the chain once, reuse OVERDECK_GATE_ADMITTED, keep the slot cap).",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5600",
-      "rank": 2,
-      "size": "XS",
-      "importance": "critical",
-      "score": 85,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Dashboard start route hardcodes overdeck-feature-<id>, so every MYN post-planning hand-off 422s; swap in the PAN-3049 resolver.",
-      "rationale": "New substrate bug that breaks the automatic plan-to-work hand-off and the dashboard Start button for every non-Overdeck docker project (MYN today); the CLI pan start workaround hides it only for CLI users. The fix is a one-call swap to requireComposeProjectNameForWorkspace with a named test, so it is tiny and unblocks the pipeline for a whole project.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -10431,11 +10402,9 @@ New planning bug placed in a freed high-tier slot. It blocks pan plan finalize f
       "importance": "low",
       "score": 35,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-5598"
-      ],
+      "dependsOn": [],
       "why": "Orders routes resolve .pan from raw project.path, CLI via issue_routing; latent split for routed projects. Never fired yet.",
-      "rationale": "New latent bug deferred from PAN-5598 review; no registered project sets issue_routing, so it ranks with low-impact correctness fixes after PAN-5598 lands.",
+      "rationale": "Rank unchanged: its prerequisite PAN-5598 merged 2026-11-23, so the dependency is cleared; still a latent split that no registered project triggers.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13221,19 +13190,6 @@ New planning bug placed in a freed high-tier slot. It blocks pan plan finalize f
       "rationale": "Demoted: a 2026-11-23 comment and a code check show both the rebuild and reap hardcodes are gone, so only an operator close remains.",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-5610",
-      "rank": 906,
-      "size": "XS",
-      "importance": "low",
-      "score": 20,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Duplicate of PAN-5523 (move/heal Missing origin, rank 10), which covers this plus heal. Close as duplicate.",
-      "rationale": "New issue that repeats PAN-5523; ranked last so the Flywheel does not pick the same fix twice.",
-      "gate": "auto",
-      "planning": "auto"
     }
   ],
   "edges": [
@@ -14526,13 +14482,6 @@ New planning bug placed in a freed high-tier slot. It blocks pan plan finalize f
       "confidence": 1
     },
     {
-      "from": "PAN-5523",
-      "to": "PAN-5610",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.95
-    },
-    {
       "from": "PAN-5532",
       "to": "PAN-2344",
       "type": "informs",
@@ -14576,31 +14525,10 @@ New planning bug placed in a freed high-tier slot. It blocks pan plan finalize f
     },
     {
       "from": "PAN-5597",
-      "to": "PAN-5598",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
-    },
-    {
-      "from": "PAN-5597",
       "to": "PAN-5599",
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-5598",
-      "to": "PAN-5608",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-5600",
-      "to": "PAN-2423",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
     },
     {
       "from": "PAN-5614",
