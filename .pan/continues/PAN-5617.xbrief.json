@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5617",
   "created": "2026-11-23T18:07:48.377Z",
-  "updated": "2026-11-23T18:12:21.249Z",
+  "updated": "2026-11-23T18:14:09.232Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,9 +44,34 @@
       "doneAt": "2026-11-23T18:11:59.948Z"
     },
     "gate-admitted-wrapper": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5617",
-      "claimedAt": "2026-11-23T18:12:21.249Z"
+      "claimedAt": "2026-11-23T18:12:21.249Z",
+      "doneAt": "2026-11-23T18:14:09.232Z"
+    },
+    "gate-admitted-wrapper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:14:09.232Z"
+    },
+    "gate-admitted-wrapper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:14:09.232Z"
+    },
+    "gate-admitted-wrapper.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:14:09.232Z"
+    },
+    "gate-admitted-wrapper.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:14:09.232Z"
+    },
+    "gate-admitted-wrapper.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:14:09.232Z"
+    },
+    "gate-admitted-wrapper.ac6": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:14:09.232Z"
     }
   }
 }
