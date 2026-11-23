@@ -55,7 +55,9 @@ export function BookIssueList({ book, project, onBookChange, onError, readOnly =
 
   const mutate = async (suffix: string, method: 'POST' | 'PATCH' | 'DELETE', body?: unknown) => {
     try {
-      onBookChange?.(await orderBookRequest(bookPath(book.id, suffix), project, { method, body }));
+      // Await first: `onBookChange?.(await …)` would skip the request when no callback is passed.
+      const updated = await orderBookRequest(bookPath(book.id, suffix), project, { method, body });
+      onBookChange?.(updated);
     } catch (cause) {
       onError?.(errorMessage(cause));
       throw cause;
