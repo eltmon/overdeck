@@ -271,13 +271,21 @@ pan orders start my-order-book
 | Command | What it does | Options |
 | --- | --- | --- |
 | `pan orders create <name>` | Creates a draft order book | `--project <key>` |
-| `pan orders list` | Lists order books | `--project <key>` |
-| `pan orders show <id>` | Shows an order book | `--project <key>` |
-| `pan orders add <id> <issues...>` | Adds issues to an order book | `--lane A\|B` (default `A`), `--after <issue>`, `--reverify` (requires PRD re-verification before pickup), `--project <key>` |
+| `pan orders list` | Lists order books | `--project <key>`, `--json` (prints the books as JSON) |
+| `pan orders show <id>` | Shows an order book | `--project <key>`, `--json` (prints JSON; the default) |
+| `pan orders add <id> <issues...>` | Adds issues to an order book | `--lane A\|B` (default `A`), `--after <issue>`, `--reverify` (requires PRD re-verification before pickup), `--prereqs <issues>` (comma-separated issues that must land first), `--plan-at-pickup` (write the plan when the issue starts), `--project <key>` |
 | `pan orders remove <id> <issue>` | Removes an issue from an order book | `--project <key>` |
 | `pan orders move <id> <issue>` | Moves an issue within or between lanes | `--lane A\|B`, `--order <n>` (one-based position in the target lane), `--project <key>` |
+| `pan orders rename <id> <name>` | Renames an order book | `--project <key>` |
+| `pan orders set <id>` | Changes the parallel limit or extra instructions file | `--parallel <n>` (1 to 8), `--brief <path>` (a `.md` path), `--no-brief` (clear it), `--project <key>` |
+| `pan orders pause <id>` | Pauses new pickup | `--reason <text>`, `--project <key>` |
+| `pan orders resume <id>` | Resumes pickup | `--reason <text>`, `--project <key>` |
+| `pan orders item <id> <issue>` | Changes an issue's prerequisites, re-verify, or plan-at-pickup requirement | `--prereqs <issues>` (`""` clears the list), `--reverify`/`--no-reverify`, `--plan-at-pickup`/`--no-plan-at-pickup`, `--project <key>` |
 | `pan orders queue <id>` | Marks a draft order book ready for dispatch | `--project <key>` |
 | `pan orders start <id>` | Starts a Flywheel run bound to an order book | `--project <key>` |
+| `pan orders preview <id>` | Prints the brief the Flywheel receives for an order book | `--project <key>` |
+| `pan orders candidates` | Lists the top backlog issues that are in no order book | `--limit <n>` (1 to 100, default 10), `--project <key>` |
+| `pan orders check <id>` | Prints the blocking problems and warnings for an order book, through the running dashboard | `--project <key>` |
 
 See [Use the CLI](/configuration/order-books#use-the-cli).
 
