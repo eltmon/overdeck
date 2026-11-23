@@ -485,6 +485,15 @@ validation (FR-9). A browser cannot attach an `Authorization` header to a
 cross-site request without a CORS preflight the server does not grant. Device
 and root-session requests keep both checks.
 
+A route that calls `validateOrigin(request)` directly (for example the
+`/api/conversations/:name/move`, `clear-fork-state`, `pull-requests`,
+`triage` and `schedules` routes) does not exempt the internal token. A CLI
+verb that writes to such a route sends `Origin: getDashboardApiUrl()`, as
+`plan-finalize.ts` and `lane.ts` do. Without it the route answers 403
+`Missing origin` (PAN-5610). Routes behind
+`rejectUnsafeDashboardMutationRequest` or `crossSiteWriteRefusal` accept the
+internal token instead, which `callDashboard` sends.
+
 ## Session mint
 
 `POST /api/dashboard/session` (`routes/dashboard-session.ts`,
