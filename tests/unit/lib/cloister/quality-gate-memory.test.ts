@@ -14,6 +14,7 @@ import { computeGovernorReserveDefaultsGb } from '../../../../src/lib/config-yam
 import {
   DEFAULT_GATE_FOOTPRINT_BYTES,
   evaluateMemoryHeadroom,
+  fitsAloneAboveHardReserve,
   footprintStoreDir,
   ownerReservationBytes,
   readGateFootprintEstimate,
@@ -110,6 +111,29 @@ describe('evaluateMemoryHeadroom (PAN-5248)', () => {
   it('clamps the footprint to 0 when the soft reserve exceeds total memory', () => {
     const verdict = evaluateMemoryHeadroom({ ...base, memTotalBytes: 8 * GiB, memAvailableBytes: 20 * GiB })
     expect(verdict.footprintBytes).toBe(0)
+  })
+})
+
+describe('fitsAloneAboveHardReserve (PAN-5621)', () => {
+  const base = {
+    memTotalBytes: 62 * GiB,
+    hardReserveBytes: 8 * GiB,
+    estimateBytes: 2_864_852_992,
+  }
+
+  it('is not ok when the hard reserve would be breached', () => {
+    expect(fitsAloneAboveHardReserve({ ...base, memAvailableBytes: 10.4e9 })).toEqual({ ok: false, footprintBytes: base.estimateBytes })
+  })
+
+  it('is ok once MemAvailable leaves the hard reserve free', () => {
+    expect(fitsAloneAboveHardReserve({ ...base, memAvailableBytes: 11.5e9 })).toEqual({ ok: true, footprintBytes: base.estimateBytes })
+  })
+
+  it('clamps an estimate larger than memTotal minus the hard reserve', () => {
+    const verdict = fitsAloneAboveHardReserve({
+      memAvailableBytes: 60 * GiB, memTotalBytes: 10 * GiB, hardReserveBytes: 8 * GiB, estimateBytes: 50 * GiB,
+    })
+    expect(verdict.footprintBytes).toBe(2 * GiB)
   })
 })
 

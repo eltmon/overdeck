@@ -14,6 +14,7 @@ import {
 import type { DockerContainerLifecycle } from '../../lib/docker-stats.js';
 import { detectConcurrentRestartWriters, readRestartEvents, readRestartStatus, type RestartStatus } from '../../lib/restart-status.js';
 import { readRestartGate, type RestartGateSnapshot } from '../../lib/restart-gate-client.js';
+import { gateStarvationStatusLine } from '../../lib/cloister/gate-starvation.js';
 
 interface StatusOptions {
   json?: boolean;
@@ -219,6 +220,12 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
   const restartGateLine = formatRestartGateLine(await readRestartGate({}, 250));
   if (restartGateLine) {
     console.log(restartGateLine);
+    console.log('');
+  }
+
+  const starvationLine = await gateStarvationStatusLine();
+  if (starvationLine) {
+    console.log(chalk.yellow(starvationLine));
     console.log('');
   }
 

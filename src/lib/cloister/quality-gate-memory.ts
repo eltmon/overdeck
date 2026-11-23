@@ -149,6 +149,24 @@ export function evaluateMemoryHeadroom(input: MemoryHeadroomInput): MemoryHeadro
   return { ok: headroomBytes >= input.softReserveBytes, footprintBytes, headroomBytes }
 }
 
+export interface FitsAloneInput {
+  memAvailableBytes: number
+  memTotalBytes: number
+  hardReserveBytes: number
+  estimateBytes: number
+}
+
+/**
+ * PAN-5285 alone rule, shared with starvation detection (PAN-5621): admitted
+ * alone, the gate must still leave the hard reserve free. The footprint is
+ * clamped to what the host could give it above the hard reserve, so a large
+ * estimate is never under-counted.
+ */
+export function fitsAloneAboveHardReserve(input: FitsAloneInput): { ok: boolean; footprintBytes: number } {
+  const footprintBytes = Math.min(input.estimateBytes, Math.max(0, input.memTotalBytes - input.hardReserveBytes))
+  return { ok: input.memAvailableBytes - footprintBytes >= input.hardReserveBytes, footprintBytes }
+}
+
 /**
  * D4: memory a live owner has been promised but has not allocated yet. Growth
  * above its baseline counts as allocated; without a baseline or a tree read,

@@ -25,6 +25,8 @@ export interface CpuResourcesYamlConfig {
   quality_gate_psi_start_avg10?: number;
   /** minutes the admission queue may stay blocked on CPU pressure before its head starts alone once the slots are empty; counted per queue episode; under 30 (PAN-5520, PAN-5588) */
   quality_gate_cpu_bypass_minutes?: number;
+  /** minutes the admission queue may stay blocked on memory starvation before its head starts alone; counted per queue episode; above 0 and under 30 (PAN-5621) */
+  quality_gate_starvation_minutes?: number;
 }
 
 /** Resolved CPU resource settings (always defined). */
@@ -39,4 +41,5 @@ export interface CpuResourcesConfig {
   qualityGateSlots: number;
   qualityGatePsiStartAvg10: number;
   qualityGateCpuBypassMinutes: number;
+  qualityGateStarvationMinutes: number;
 }

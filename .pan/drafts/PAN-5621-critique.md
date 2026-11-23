@@ -1,0 +1,17 @@
+plan-digest: bb91ec2dfd0d84b79bf4b74aa43c83c74678e650017a41c5582609e8d7be5746
+
+## blocks-the-design: queue read failures close a live episode
+
+The WI-4 close rule treats an empty snapshot as recovery (`.pan/drafts/PAN-5621.md`, lines 288-305). The production `readQualityGateQueue()` catches every queue read error and returns `{ owners: [], waiters: [] }` (`src/lib/cloister/quality-gate-admission.ts`, lines 519-545); `readJson()` also turns unreadable files into `null` (`src/lib/cloister/quality-gate-admission-files.ts`, lines 54-59). Thus a transient `readdir` failure clears `starvation.json` and emits “the queue emptied” while the queue may still be stalled. The planned rejected-`readQueue` test cannot exercise this production behavior. Make the service use a queue read that distinguishes a confirmed empty queue from an unreadable queue, and keep the record unchanged on an unknown result. Test the actual read failure path.
+
+## blocks-the-design: the record can suppress every alert
+
+WI-4 writes `starvation.json` before the warning and phone push, then skips both whenever that record exists (`.pan/drafts/PAN-5621.md`, lines 288-303). A crash between the write and either send leaves a lasting “announced” record with no alert; clearing the record before the recovery emit similarly loses that message. `emitActivityEntry()` is fire-and-forget and swallows persistence failures (`src/lib/activity-logger.ts`, lines 241-246), while `pushNeedsYouEdge()` returns `void` and can be a no-op (`src/dashboard/server/services/needs-you-push-service.ts`, lines 237-240). The repository already provides settled, idempotent activity emission through `emitActivityEntryOnce()` (`src/lib/activity-logger.ts`, lines 185-221). Track pending delivery separately from episode existence, retry with stable IDs/tags, and specify an outcome-bearing push path or explicitly weaken the phone-delivery guarantee. Add a test for failure or restart after the record write and before notification.
+
+## blocks-the-design: a short admitted gate never closes the episode
+
+The plan ends an episode only when a 30-second poll observes an owner or an empty queue (`.pan/drafts/PAN-5621.md`, lines 92, 99, 288-303). Admission publishes an owner file and later removes it on release (`src/lib/cloister/quality-gate-admission.ts`, lines 850-866 and 934-939). A gate can start and finish between polls while other waiters remain; the next snapshot again has no owner and a new head, so the record stays open and suppresses future warnings even though the defined episode ended at admission. Add a durable admission/progress signal that the service can observe across polls, or revise the episode boundary and alert guarantee to account for missed owner intervals. Test a completed gate between two polls with another waiter still queued.
+
+## blocks-the-design: head rotation keeps the previous gate's memory figures
+
+The continue branch rewrites `record.head` when the ticket changes but keeps the old footprint, hard reserve and MemAvailable numbers (`.pan/drafts/PAN-5621.md`, lines 103-113 and 288-292). `formatGateStarvationLine()` then names the new head while saying it “needs” the old head's footprint (lines 124-133); two gates with different estimates produce a materially wrong instruction in `pan status`. Refresh the new head's estimate and memory figures before updating the record, or keep the original head in the display and label the figures as an opening snapshot. Test rotation between gates with different footprint estimates.

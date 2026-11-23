@@ -340,6 +340,7 @@ api_keys:
         qualityGateSlots: 2,
         qualityGatePsiStartAvg10: 25,
         qualityGateCpuBypassMinutes: 10,
+        qualityGateStarvationMinutes: 15,
       });
     });
 
@@ -356,6 +357,7 @@ api_keys:
           quality_gate_slots: 3,
           quality_gate_psi_start_avg10: 40,
           quality_gate_cpu_bypass_minutes: 5,
+          quality_gate_starvation_minutes: 20,
         },
       }).config.resources).toMatchObject({
         dashboardCpuWeight: 400,
@@ -368,6 +370,7 @@ api_keys:
         qualityGateSlots: 3,
         qualityGatePsiStartAvg10: 40,
         qualityGateCpuBypassMinutes: 5,
+        qualityGateStarvationMinutes: 20,
       });
     });
 
@@ -384,6 +387,7 @@ api_keys:
           quality_gate_slots: 0,
           quality_gate_psi_start_avg10: 0,
           quality_gate_cpu_bypass_minutes: 30,
+          quality_gate_starvation_minutes: 0,
         },
       }).config.resources).toMatchObject({
         dashboardCpuWeight: 1000,
@@ -396,7 +400,14 @@ api_keys:
         qualityGateSlots: 2,
         qualityGatePsiStartAvg10: 25,
         qualityGateCpuBypassMinutes: 10,
+        qualityGateStarvationMinutes: 15,
       });
+    });
+
+    it.each([0, 30])('ignores quality_gate_starvation_minutes %s and keeps the default of 15 (PAN-5621)', (minutes) => {
+      expect(mergeConfigs({
+        resources: { quality_gate_starvation_minutes: minutes },
+      }).config.resources.qualityGateStarvationMinutes).toBe(15);
     });
 
     it.each([1.5, 17])('ignores quality_gate_slots %s and keeps the default of 2 (PAN-4546)', (slots) => {

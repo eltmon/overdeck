@@ -1,0 +1,541 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-23T09:42:54Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5621: Gate admission queue starves indefinitely when MemAvailable stays below hard reserve + footprint; idle parked workspace stacks are never reclaimed",
+    "updated": "2026-11-23T18:11:17.033Z"
+  },
+  "plan": {
+    "id": "pan-5621",
+    "title": "Gate admission queue starves indefinitely when MemAvailable stays below hard reserve + footprint; idle parked workspace stacks are never reclaimed",
+    "status": "running",
+    "uid": "2a2d805e-1157-42e0-be7b-f3e2fc659180",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-23T09:42:54Z",
+    "updated": "2026-11-23T18:11:17.033Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5621",
+        "label": "PAN-5621",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5623",
+        "label": "PAN-5623 (FR-2 sibling: reclaim parked stacks)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5621.md",
+        "label": "PRD",
+        "type": "document"
+      }
+    ],
+    "tags": [
+      "quality-gates",
+      "admission-queue",
+      "memory-governor",
+      "observability",
+      "substrate"
+    ],
+    "metadata": {
+      "sizeJustification": "The plan touches 20 files. The lint counts 8 subsystems only because each top-level doc file (docs/PIPELINE-GATES.md, configuration/memory-governor.mdx, changelog.d/pan-5621.md) and each test root (tests/lib, tests/unit) is its own subsystem. The code surface is src/lib (cloister and config-yaml), one primary-dashboard service and one pan status line. The separable half of the issue (FR-2, reclaiming parked stacks) is already split to PAN-5623.",
+      "canonicalFilename": "2026-11-23-PAN-5621-gate-admission-queue-starves-indefinitely-when-memavailable-stays-below-hard-reserve-footprint-idle-parked-workspace-stacks-are-never-reclaimed.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The quality-gate admission queue can stall indefinitely and silently. When no gate holds a slot and MemAvailable stays below the governor's hard reserve plus the head gate's footprint, the PAN-5285 alone-admission can never fire, so no gate ever starts. On 2026-11-23 the PAN-5489 typecheck head waited 52 minutes with 7 waiters behind it (MemAvailable 8.5-10.4 GB, hard reserve 8 GiB, footprint 2,864,852,992 bytes). Nothing reported it until the Flywheel read the waiter files and stopped containers by hand.",
+      "Proposal": "A primary-dashboard service, src/dashboard/server/services/gate-starvation-service.ts, polls every 30 s. It reads the read-only queue snapshot, which gains three things: ticketId, footprintKey and memoryBlockedSince on entries; readError (an unreadable queue is unknown, never empty); and lastAdmittedAt, from a best-effort last-admitted.json marker that every admission writes. It evaluates a pure predicate in src/lib/cloister/gate-starvation.ts: starved iff there is no owner, the head has been memory-blocked for at least resources.quality_gate_starvation_minutes (default 15), and the head does not fit alone above the hard reserve, using the same helper admission now uses. The first starved poll opens an episode in ~/.overdeck/verification-workers/admission/starvation.json with announced:false, sends one phone push (best-effort, stable tag) and one settled emitActivityEntryOnce warning (stable id). The warning is retried until it settles, even across restarts. A new head hands the episode over with refreshed figures. The episode closes on progress (an owner, or a marker at or after opening) or on a confirmed empty queue: the record is marked closing, a settled recovery entry is sent, and only then is the record deleted. pan status prints one line while the episode is open. Docs: docs/PIPELINE-GATES.md, configuration/memory-governor.mdx, changelog.d/pan-5621.md. FR-2 (reclaiming parked workspace stacks) moved to PAN-5623.",
+      "NonGoals": "- No automatic stopping, restarting or reclaiming of any container or process; that is PAN-5623\n- No dashboard Needs-you card, new HTTP route, contracts type or frontend change\n- No change to any admission decision (FIFO, passing, alone-admission, CPU bypass, reserve arithmetic)\n- No starvation detection while any gate holds a slot; a stuck or long-running owner is not starvation\n- No starvation for tickets older than PAN-5285 (no memoryBlockedSince) or heads without a footprintKey\n- No change to the pan status --json output shape\n- No change to src/lib/cloister/idle-stack-reaper.ts (its full-stack label bug is reported on #3050)\n- No detection on remote (Fly) machines\n- No allowlist cap raise in scripts/file-size-allowlist.txt\n- No guaranteed phone delivery and no new push outcome API (the push is best-effort; the settled activity entry, the record and pan status are the guaranteed surfaces)\n- No close on a short admission by a pre-PAN-5621 checkout that writes no admission marker"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Split FR-2 (reclaim parked workspace stacks) into sibling issue PAN-5623",
+        "rationale": "No path restarts a stack for a live parked pane: rebuildWorkspaceStack runs only at spawn, on infraUnavailable gates and from the CLI. Stopped containers read as STACK BROKEN. The work overlaps PAN-5250's restart-on-demand. Combined with FR-1 it exceeds the 25-file plan limit."
+      },
+      {
+        "summary": "Surface the episode through pan status, one activity entry and one phone push (pushNeedsYouEdge), not a new dashboard Needs-you card",
+        "rationale": "A card needs a route, a contracts type and frontend components (about 12 files) for a rare event that the existing Needs-you push channel already delivers."
+      },
+      {
+        "summary": "Run detection in a primary-dashboard service, not in waiters or the deacon child",
+        "rationale": "It gives a single writer for the announcement. pushNeedsYouEdge works only in the primary. PAN-5623's reclaim needs the runtime mirror that only the main process holds."
+      },
+      {
+        "summary": "A live slot owner suppresses detection, and an episode ends only when an owner appears or the queue empties",
+        "rationale": "A running gate means the queue moves, and alone-admission needs empty slots anyway. Tying the end to progress stops head rotation (30-minute wrapper timeouts) and flapping MemAvailable from re-announcing."
+      },
+      {
+        "summary": "resources.quality_gate_starvation_minutes is valid above 0 and under 30, default 15, global config only",
+        "rationale": "It mirrors quality_gate_cpu_bypass_minutes and stays under the 30-minute wrapper admission wait, so a wrapper-run head is reported before it times out."
+      }
+    ],
+    "items": [
+      {
+        "id": "wi1-starvation-config-key",
+        "title": "Add resources.quality_gate_starvation_minutes (default 15, valid above 0 and under 30)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T09:42:54Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5621",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/config-yaml/schema-cpu.ts",
+            "src/lib/config-yaml/merge-cpu.ts",
+            "src/lib/config-yaml/defaults.ts",
+            "src/lib/config-yaml/merge.ts",
+            "tests/lib/config-yaml.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/config-yaml.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "tests/lib/config-yaml.test.ts passes, including the new quality_gate_starvation_minutes cases",
+            "typecheck completes without errors",
+            "lint-file-size.sh reports no file over its count (merge.ts at most 1042 lines)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In schema-cpu.ts, add `quality_gate_starvation_minutes?: number` to CpuResourcesYamlConfig and `qualityGateStarvationMinutes: number` to CpuResourcesConfig. In merge-cpu.ts, after the quality_gate_cpu_bypass_minutes line, accept a finite number > 0 and < 30, else keep the value so far. In defaults.ts, set `qualityGateStarvationMinutes: 15`. In merge.ts, add exactly one line `qualityGateStarvationMinutes: DEFAULT_CONFIG.resources.qualityGateStarvationMinutes,` after line 275 (the file is 1041 lines against cap 1045; never raise the cap). Do not touch schema.ts. Extend the existing defaults, valid-override and out-of-range cases in tests/lib/config-yaml.test.ts."
+        },
+        "items": [
+          {
+            "id": "wi1-starvation-config-key.ac1",
+            "title": "Given an empty config, mergeConfigs({}).config.resources.qualityGateStarvationMinutes returns 15",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-starvation-config-key.ac2",
+            "title": "Given resources.quality_gate_starvation_minutes: 20, the resolved value is 20; given 0 or 30, the resolved value falls back to 15",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-starvation-config-key.ac3",
+            "title": "git diff origin/main -- src/lib/config-yaml/merge.ts shows exactly one added line and src/lib/config-yaml/schema.ts is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi2-snapshot-fields-and-alone-helper",
+        "title": "Queue snapshot exposes head starvation inputs, readError and the last-admitted marker; move the alone rule into fitsAloneAboveHardReserve",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T09:42:54Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5621",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/quality-gate-memory.ts",
+            "src/lib/cloister/quality-gate-admission.ts",
+            "tests/unit/lib/cloister/quality-gate-memory.test.ts",
+            "tests/unit/lib/cloister/quality-gate-admission.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/quality-gate-memory.test.ts tests/unit/lib/cloister/quality-gate-admission.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass, including every pre-existing PAN-5285 alone-admission test",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1"
+          ],
+          "foundationFor": [
+            "wi3-starvation-module",
+            "wi4-starvation-service"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. (1) Add fitsAloneAboveHardReserve to quality-gate-memory.ts, with arithmetic identical to the fitsAlone closure at quality-gate-admission.ts:704-707, and make the closure call it. (2) Add optional ticketId, footprintKey and memoryBlockedSince to QualityGateQueueEntry and copy them in queueEntry(). (3) Add optional readError and lastAdmittedAt to QualityGateQueueSnapshot. readQualityGateQueue reads <root>/last-admitted.json (QUALITY_GATE_LAST_ADMITTED_FILE). Its catch returns the bare empty snapshot only for ENOENT; any other error returns the empty arrays plus readError. (4) Right after `await unlinkIfExists(ownTicketPath)` in acquireQualityGateAdmission, write `{ at: owner.acquiredAt }` to last-admitted.json with replaceFile(...).catch(() => undefined). Change no admission decision. The file must stay at or under 1000 lines. Update the owner-shape assertion near quality-gate-admission.test.ts:1497."
+        },
+        "items": [
+          {
+            "id": "wi2-snapshot-fields-and-alone-helper.ac1",
+            "title": "Given a waiter ticket with memoryBlockedSince 1234 and footprintKey 'gate:typecheck:npm run typecheck', readQualityGateQueue returns an entry carrying ticketId, footprintKey and memoryBlockedSince 1234",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-snapshot-fields-and-alone-helper.ac2",
+            "title": "Given a root path that is a regular file, readQualityGateQueue returns readError set with empty owners and waiters; given a missing root, it returns exactly { slots, owners: [], waiters: [] } with no readError key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-snapshot-fields-and-alone-helper.ac3",
+            "title": "After acquireQualityGateAdmission resolves, last-admitted.json holds at = Date.parse(handle.admittedAt) and readQualityGateQueue returns lastAdmittedAt with that value; with last-admitted.json pre-created as a directory, acquire still resolves with a handle",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-snapshot-fields-and-alone-helper.ac4",
+            "title": "fitsAloneAboveHardReserve returns ok false at MemAvailable 10.4e9 and ok true at 11.5e9 for hard reserve 8 GiB, estimate 2,864,852,992 bytes and memTotal 62 GiB",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-snapshot-fields-and-alone-helper.ac5",
+            "title": "Every pre-existing test in tests/unit/lib/cloister/quality-gate-admission.test.ts passes with its assertions unchanged, except the owner-shape assertion that now includes ticketId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi3-starvation-module",
+        "title": "Pure starvation module: evaluateGateStarvation, episode-open rule, starvation.json record, status line",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T09:42:54Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5621",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "wi4-starvation-service",
+            "wi5-status-line"
+          ],
+          "files_scope": [
+            "src/lib/cloister/gate-starvation.ts",
+            "tests/unit/lib/cloister/gate-starvation.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/gate-starvation.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "gate-starvation.test.ts passes",
+            "typecheck completes without errors",
+            "lint passes, including lint:circular"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3 with design D3-D6, D9, D10 and D11. Create src/lib/cloister/gate-starvation.ts exporting: GATE_STARVATION_FILE; DEFAULT_QUALITY_GATE_STARVATION_MINUTES (15); gateAdmissionRoot(); the GateStarvationHolder and GateStarvationRecord types (version 1, with since, openedAtMs, announced, optional closing {at, reason}, head, memAvailableBytes, hardReserveBytes, footprintBytes number|null, holders); evaluateGateStarvation (reasons in order: empty, owner-running, head-not-memory-blocked, under-threshold, memory-unreadable, fits-alone); starvationEpisodeCloseReason(snapshot, openedAtMs): null on readError, 'admitted' for an owner or lastAdmittedAt >= openedAtMs, 'emptied' for no waiters, else null; read, write and clear of starvation.json; resolveQualityGateStarvationMs (never throws); formatGateStarvationLine (D9: 'Top memory at opening:', 'needs' omitted when footprintBytes is null; private formatClock/formatWaitAge copies); gateStarvationStatusLine (never throws; null unless an open, non-closing record exists and the fresh snapshot has no readError and no close reason; passes live MemAvailable). Do not import memory-governor, memory-pressure-patrol, flywheel/board or src/dashboard modules."
+        },
+        "items": [
+          {
+            "id": "wi3-starvation-module.ac1",
+            "title": "Given no owner, a head with footprintKey, ticketId and memoryBlockedSince 15 min ago, MemAvailable 10.4e9, hard reserve 8 GiB and estimate 2,864,852,992, evaluateGateStarvation returns starved true; at 14 min 59.999 s it returns reason under-threshold",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-starvation-module.ac2",
+            "title": "evaluateGateStarvation returns reason empty, owner-running, head-not-memory-blocked, memory-unreadable and fits-alone for inputs built to trigger each one",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-starvation-module.ac3",
+            "title": "starvationEpisodeCloseReason returns null for a snapshot with readError and zero waiters, 'admitted' when lastAdmittedAt equals openedAtMs, null when lastAdmittedAt is 1 ms earlier with waiters present, and 'emptied' for a confirmed empty queue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-starvation-module.ac4",
+            "title": "formatGateStarvationLine returns one line containing the gate name, the issue id, 'needs 2.7 GiB above the 8.0 GiB hard reserve' and 'Top memory at opening: java 3.1 GiB (pid 1234)', and omits 'needs' when footprintBytes is null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-starvation-module.ac5",
+            "title": "gateStarvationStatusLine returns null for no record, an owner, a newer admission marker, an empty queue, a readError snapshot, a closing record or a throwing readQueue, and returns the line for an open record with waiters and no progress",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi4-starvation-service",
+        "title": "Primary-dashboard gate-starvation service: one warning and push per episode, one recovery entry",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T09:42:54Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5621",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/gate-starvation-service.ts",
+            "src/dashboard/server/services/__tests__/gate-starvation-service.test.ts",
+            "src/dashboard/server/main.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/gate-starvation-service.test.ts",
+            "npm run typecheck",
+            "npm run lint",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "gate-starvation-service.test.ts passes under fake timers",
+            "typecheck completes without errors",
+            "lint passes",
+            "main.ts stays at or under 1000 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 with D1, D2, D4, D5, D7 and D8. Create gate-starvation-service.ts, mirroring disk-alert-service.ts: injectable deps (emitOnce = emitActivityEntryOnce, push = pushNeedsYouEdge), a 30 s interval, an in-flight guard and timer.unref(). Poll: (1) a snapshot with readError returns, leaving the record untouched. (2) A closing record: if never announced, clear; else emitOnce the recovery (id gate-starvation:<since>:recovered) and clear only when the outcome is not 'failed'. (3) An open record: on a close reason, write closing and settle as in (2). Else, if not announced, push (tag gate-starvation:<since>) and emitOnce the warning (id gate-starvation:<since>:opened), and set announced:true when settled. On a changed head ticket, refresh that head's estimate, MemAvailable and hard reserve and rewrite the record without emitting. (4) No record: evaluate; when starved, collect holders (failure gives []), write the record with announced:false, then announce. Wire start and stop next to the disk-alert service in main.ts (primary only). Tests use fake timers only."
+        },
+        "items": [
+          {
+            "id": "wi4-starvation-service.ac1",
+            "title": "Under fake timers, a head memory-blocked for 14 min produces no emit; past 15 min, exactly one emitOnce with id gate-starvation:<since>:opened and one push with tag gate-starvation:<since> occur, the record ends announced:true, and five further polls add none",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-starvation-service.ac2",
+            "title": "When emitOnce returns 'failed' then 'appended', the record stays announced:false after poll 1 and becomes announced:true after poll 2 with the same id; a restarted service finding an announced:false record emits the opening id once and marks it announced",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-starvation-service.ac3",
+            "title": "Given the real readQualityGateQueue pointed at a regular-file root and an open record, when the service polls several times, then it preserves the record file unchanged and emits no activity entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-starvation-service.ac4",
+            "title": "A snapshot with no owner, a new head and lastAdmittedAt after openedAtMs writes closing.reason 'admitted', emits the recovery id saying 'a gate was admitted', and clears the record; a failed recovery emit keeps the closing record until a later poll settles it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-starvation-service.ac5",
+            "title": "Given a head handover from a 2,864,852,992-byte estimate to a 1,073,741,824-byte estimate, when the service polls, then it persists the new head with footprintBytes 1,073,741,824, its formatted line returns 'needs 1.0 GiB', and it emits no entry or push",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi5-status-line",
+        "title": "pan status prints the starvation line before 'No running agents.'",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T09:42:54Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5621",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/status.ts",
+            "tests/unit/cli/gate-starvation-status-line.test.ts",
+            "src/cli/commands/__tests__/status-harness.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/gate-starvation-status-line.test.ts src/cli/commands/__tests__/status-harness.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both status test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5 with D10. In status.ts, import gateStarvationStatusLine from ../../lib/cloister/gate-starvation.js. After the restart-gate line block and before the `agents.length === 0` early return, await it and print the non-null line in chalk.yellow, followed by a blank line. The --json path is untouched. New test tests/unit/cli/gate-starvation-status-line.test.ts reuses the vi.mock set from status-harness.test.ts plus a mock of gate-starvation.js. Add a gate-starvation.js mock returning null to status-harness.test.ts so that it never reads the real admission root."
+        },
+        "items": [
+          {
+            "id": "wi5-status-line.ac1",
+            "title": "Given gateStarvationStatusLine resolves to a line and no agents run, statusCommand({}) logs that line at an index lower than the 'No running agents.' line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-status-line.ac2",
+            "title": "Given gateStarvationStatusLine resolves to null, statusCommand({}) logs no line containing 'Gate queue starved'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-status-line.ac3",
+            "title": "Given a starvation line exists, statusCommand({ json: true }) logs one value that parses as a JSON array and contains no 'Gate queue starved' text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi6-docs-changelog",
+        "title": "Document gate-queue starvation in PIPELINE-GATES.md and memory-governor.mdx; add changelog.d/pan-5621.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T09:42:54Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5621",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md",
+            "configuration/memory-governor.mdx",
+            "changelog.d/pan-5621.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs passes with changelog.d/pan-5621.md present"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. In docs/PIPELINE-GATES.md, section 'CPU and memory admission', add PAN-5621 to the heading list. After the 'Admitted alone (PAN-5285)' bullet, add a '**Starvation (PAN-5621).**' bullet stating: the predicate; the 30 s primary-dashboard check; the record path ~/.overdeck/verification-workers/admission/starvation.json; the one-warning/one-recovery rule (a new head or a dashboard restart does not re-announce); the pan status line, the activity entry linking /flywheel and the phone push tagged gate-starvation:<since>; that detection never changes admission; and that automatic reclaim is PAN-5623. In 'Status readers', name the new snapshot fields ticketId, footprintKey and memoryBlockedSince. In configuration/memory-governor.mdx, add the resources.quality_gate_starvation_minutes table row (default 15, above 0 and under 30, global config only) after the quality_gate_cpu_bypass_minutes row, and one sentence after the PAN-5285 paragraph. Create changelog.d/pan-5621.md with an '#### Improved' bullet in the changelog.d/README.md format. The Starvation bullet must also name last-admitted.json (a gate that finishes between polls still ends the episode), the handover with refreshed figures, the retry-until-settled rule, that an unreadable queue is unknown rather than empty, and that the phone push is best-effort; 'Status readers' also names readError and lastAdmittedAt."
+        },
+        "items": [
+          {
+            "id": "wi6-docs-changelog.ac1",
+            "title": "docs/PIPELINE-GATES.md contains a '**Starvation (PAN-5621).**' bullet that names resources.quality_gate_starvation_minutes, starvation.json, last-admitted.json, gate-starvation:<since> and PAN-5623",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-docs-changelog.ac2",
+            "title": "configuration/memory-governor.mdx renders a table row for resources.quality_gate_starvation_minutes with default 15 that states the above-0, under-30 range",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-docs-changelog.ac3",
+            "title": "changelog.d/pan-5621.md exists with an '#### Improved' heading and a bullet linking issue #5621, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wi1-starvation-config-key",
+        "to": "wi3-starvation-module",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-snapshot-fields-and-alone-helper",
+        "to": "wi3-starvation-module",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-starvation-module",
+        "to": "wi4-starvation-service",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-starvation-module",
+        "to": "wi5-status-line",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}
