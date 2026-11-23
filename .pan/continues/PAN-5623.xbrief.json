@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5623",
   "created": "2026-11-23T20:20:25.006Z",
-  "updated": "2026-11-23T21:33:40.357Z",
+  "updated": "2026-11-23T21:33:41.670Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -265,6 +265,11 @@
     "wi12-reclaim-poll.ac6": {
       "status": "completed",
       "doneAt": "2026-11-23T21:33:40.357Z"
+    },
+    "wi13-restore-poll": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5623",
+      "claimedAt": "2026-11-23T21:33:41.669Z"
     }
   }
 }
