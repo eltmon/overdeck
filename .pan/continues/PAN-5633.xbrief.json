@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5633",
   "created": "2026-11-23T19:06:23.391Z",
-  "updated": "2026-11-23T19:27:15.816Z",
+  "updated": "2026-11-23T19:28:07.996Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -164,9 +164,26 @@
       "doneAt": "2026-11-23T19:27:14.073Z"
     },
     "wi8-panel-working": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5633",
-      "claimedAt": "2026-11-23T19:27:15.816Z"
+      "claimedAt": "2026-11-23T19:27:15.816Z",
+      "doneAt": "2026-11-23T19:28:07.995Z"
+    },
+    "wi8-panel-working.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:28:07.995Z"
+    },
+    "wi8-panel-working.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:28:07.995Z"
+    },
+    "wi8-panel-working.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:28:07.995Z"
+    },
+    "wi8-panel-working.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:28:07.995Z"
     }
   }
 }
