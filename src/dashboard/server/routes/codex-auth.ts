@@ -156,7 +156,8 @@ const getCodexAuthRoute = HttpRouter.add(
     Effect.gen(function* () {
       // PAN-5633: the burned signal is a failed turn in a live Codex session's rollout.
       yield* Effect.promise(() => rebridgeCodexAuthIfNativeNewer());
-      const authFailures = yield* Effect.promise(() => scanCodexAuthFailures());
+      // A failed scan (a database error) degrades to the static status instead of a 500.
+      const authFailures = yield* Effect.promise(() => scanCodexAuthFailures().catch(() => []));
       const status = yield* checkCodexAuth({ authFailures });
       return jsonResponse(status);
     }),
@@ -245,7 +246,7 @@ const postCodexReauthStatusRoute = HttpRouter.add(
         (beforeCredential.accessToken !== null && afterCredential.accessToken !== beforeCredential.accessToken) ||
         (afterCredential.mtimeMs !== null && afterCredential.mtimeMs >= session.createdAt)
       );
-      const authFailures = yield* Effect.promise(() => scanCodexAuthFailures());
+      const authFailures = yield* Effect.promise(() => scanCodexAuthFailures().catch(() => []));
       const authStatus = yield* checkCodexAuth({
         ...(refreshedCredential ? { ignoreBurnBefore: session.createdAt } : {}),
         authFailures,

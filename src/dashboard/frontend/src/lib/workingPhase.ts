@@ -174,6 +174,13 @@ export function getPendingToolEntry(workLog: WorkLogEntry[]): WorkLogEntry | und
 export const TURN_STALL_MS = 4 * 60_000;
 
 /**
+ * PAN-5633: labels of the error rows parsers write when a turn ends without a reply —
+ * Codex and Prime `Turn failed`, Prime `Turn aborted`, ACP `Prompt failed` / `Prompt stalled`.
+ * Failed tool rows (Claude, ACP) are also tone 'error' but come mid-turn, so they are not listed.
+ */
+const TURN_END_ERROR_LABELS = new Set(['Turn failed', 'Turn aborted', 'Prompt failed', 'Prompt stalled']);
+
+/**
  * Whether the conversation's transcript implies the agent is mid-turn.
  *
  * Two signals, in priority order:
@@ -199,10 +206,9 @@ export function isConversationWorking(
 
   const msgTs = Date.parse(lastMsg?.completedAt || lastMsg?.createdAt || '');
   const msgRecent = !lastMsg || Number.isNaN(msgTs) || nowMs - msgTs < TURN_STALL_MS;
-  // PAN-5633: a turn-end error row (Codex "Turn failed", ACP "Prompt failed", Prime "Turn failed")
-  // at or after the last message ends the turn, even though the last message is the user's.
-  // Claude Code failed tool results are also tone 'error' but carry toolInput; they are mid-turn.
-  if (lastWork?.tone === 'error' && !lastWork.toolInput) {
+  // PAN-5633: a turn-end error row at or after the last message ends the turn,
+  // even though the last message is the user's.
+  if (lastWork?.tone === 'error' && TURN_END_ERROR_LABELS.has(lastWork.label)) {
     const errorTs = Date.parse(lastWork.createdAt || '');
     if (!Number.isNaN(errorTs) && (!lastMsg || Number.isNaN(msgTs) || errorTs >= msgTs)) return false;
   }

@@ -98,6 +98,21 @@ describe('isConversationWorking', () => {
     const log = [work({ tone: 'error', toolInput: { command: 'x' }, createdAt: new Date(NOW - 5_000).toISOString(), sequence: 2 })];
     expect(isConversationWorking(true, messages, log, NOW)).toBe(true);
   });
+
+  it('an ACP failed tool row without toolInput mid-turn stays working', () => {
+    // acp-conversation-parser marks a failed tool call tone 'error' with command/result but no toolInput.
+    const messages = [
+      msg({ role: 'assistant', createdAt: new Date(NOW - 10_000).toISOString(), completedAt: new Date(NOW - 10_000).toISOString(), sequence: 1 }),
+    ];
+    const log = [work({ tone: 'error', label: 'Shell', command: 'npm test', result: 'exit 1', createdAt: new Date(NOW - 5_000).toISOString(), sequence: 2 })];
+    expect(isConversationWorking(true, messages, log, NOW)).toBe(true);
+  });
+
+  it('an ACP Prompt failed row after a user message is not working', () => {
+    const messages = [msg({ role: 'user', createdAt: new Date(NOW - 10_000).toISOString(), sequence: 1 })];
+    const log = [work({ tone: 'error', label: 'Prompt failed', createdAt: new Date(NOW - 9_000).toISOString(), sequence: 2 })];
+    expect(isConversationWorking(true, messages, log, NOW)).toBe(false);
+  });
 });
 
 describe('elided tool results (PAN-4558)', () => {
