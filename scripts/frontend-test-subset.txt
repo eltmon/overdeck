@@ -14,6 +14,7 @@ src/App/api.test.ts
 src/App/appChromeLabels.test.ts
 src/App/hooks/pendingInputNotification.test.ts
 src/App/hooks/useLivePendingAgentInputs.test.tsx
+src/App/hooks/usePendingInputAnnouncements.test.tsx
 src/App/hooks/usePendingInputDialogs.permission-notify.test.tsx
 src/App/routes.linked.test.ts
 src/App/topbar/AgentsMenu.test.tsx

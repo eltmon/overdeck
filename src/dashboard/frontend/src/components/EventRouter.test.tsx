@@ -1,13 +1,17 @@
 import { act, cleanup, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { Schema } from 'effect'
+import { toast } from 'sonner'
 import type { DashboardSnapshot, DomainEvent } from '@overdeck/contracts'
-import { INITIAL_READ_MODEL_STATE } from '@overdeck/contracts'
+import { applyEvent, DomainEvent as DomainEventSchema, INITIAL_READ_MODEL_STATE } from '@overdeck/contracts'
 import { BOOTSTRAP_TIMEOUT_MS, EventRouter, eventRouterReconnectDelayMs } from './EventRouter'
 import { useDashboardStore } from '../lib/store'
 import { deriveConnectionPhase, useConnectionState } from '../lib/connectionState'
 import { installStrictFetchMock } from '../test-utils/strictFetchMock'
 import { BACKEND_RECONNECTED_EVENT, BACKEND_RECONNECTING_EVENT } from '../lib/backendConnectionEvents'
 import { NOTHING_SETTLED, useAgentPendingInputGate } from '../lib/agentPendingInputGate'
+import { useLivePendingAgentInputs } from '../App/hooks/useLivePendingAgentInputs'
+import { usePendingInputAnnouncements } from '../App/hooks/usePendingInputAnnouncements'
 
 const wsTransport = vi.hoisted(() => {
   const request = vi.fn()
@@ -112,6 +116,48 @@ function systemHeartbeatEvent(): DomainEvent {
     timestamp: '2026-05-16T12:00:15.000Z',
     payload: { ts: 1780792215000 },
   } as DomainEvent
+}
+
+/** PAN-5604: an agent fixture built from the reducer, so its shape matches production. */
+function agentWithAskUserQuestionFixture(agentId: string, toolUseId: string) {
+  const created = applyEvent(INITIAL_READ_MODEL_STATE, Schema.decodeUnknownSync(DomainEventSchema)({
+    type: 'agent.created',
+    sequence: 0,
+    timestamp: '2026-05-16T11:59:00.000Z',
+    payload: { agentId, issueId: 'PAN-5058', agent: { id: agentId, issueId: 'PAN-5058', status: 'running' } },
+  }))
+  const enriched = applyEvent(created, Schema.decodeUnknownSync(DomainEventSchema)({
+    type: 'agent.enrichment_changed',
+    sequence: 1,
+    timestamp: '2026-05-16T11:59:30.000Z',
+    payload: {
+      agentId,
+      pendingAskUserQuestion: {
+        toolUseId,
+        askedAt: '2026-05-16T11:59:30.000Z',
+        questions: [{ question: 'Ship it?', options: [{ label: 'Yes' }, { label: 'No' }] }],
+      },
+    },
+  }))
+  return enriched.agentsById[agentId]!
+}
+
+/** PAN-5604: clears an agent's pendingAskUserQuestion (the server's answer-received event). */
+function agentEnrichmentClearedEvent(sequence: number, agentId: string): DomainEvent {
+  return Schema.decodeUnknownSync(DomainEventSchema)({
+    type: 'agent.enrichment_changed',
+    sequence,
+    timestamp: '2026-05-16T12:00:02.000Z',
+    payload: { agentId },
+  }) as DomainEvent
+}
+
+/** PAN-5604: mounted next to <EventRouter /> to watch agent pending input through the gate. */
+function PendingInputProbe(props: { askLengths: number[] }) {
+  const inputs = useLivePendingAgentInputs()
+  props.askLengths.push(inputs.agentsWithAskUserQuestion.length)
+  usePendingInputAnnouncements({ ...inputs, convRows: [], issueTitleById: {}, onOpen: () => undefined })
+  return null
 }
 
 /** PAN-4559: the RPC method name each `request()` call targeted, in call order. */
@@ -926,6 +972,98 @@ describe('EventRouter memory updates', () => {
     })
 
     expect(useAgentPendingInputGate.getState().held).toBeNull()
+  })
+
+  it('never shows a question that the post-snapshot replay clears', async () => {
+    const infoSpy = vi.spyOn(toast, 'info')
+    const dismissSpy = vi.spyOn(toast, 'dismiss')
+    const askLengths: number[] = []
+    const agentQ1 = agentWithAskUserQuestionFixture('agent-pan-5058', 'tool-1')
+    let resolveSnapshot: (value: DashboardSnapshot) => void = () => undefined
+    const snapshotPromise = new Promise<DashboardSnapshot>((resolve) => {
+      resolveSnapshot = resolve
+    })
+    request.mockReturnValueOnce(snapshotPromise)
+    request.mockResolvedValueOnce([agentEnrichmentClearedEvent(11, 'agent-pan-5058')])
+
+    try {
+      render(<><EventRouter /><PendingInputProbe askLengths={askLengths} /></>)
+
+      await act(async () => {
+        await Promise.resolve()
+      })
+      expect(wsTransport.subscribed).not.toBeNull()
+
+      act(() => {
+        wsTransport.subscribed!(agentEnrichmentClearedEvent(11, 'agent-pan-5058'))
+      })
+
+      await act(async () => {
+        resolveSnapshot({ ...snapshot, sequence: 10, agents: [agentQ1] })
+        await vi.advanceTimersByTimeAsync(0)
+      })
+
+      expect(askLengths.every((n) => n === 0)).toBe(true)
+      expect(infoSpy).not.toHaveBeenCalled()
+    } finally {
+      infoSpy.mockRestore()
+      dismissSpy.mockRestore()
+    }
+  })
+
+  it('keeps an announced question through a reconnect and ignores a question its replay clears', async () => {
+    const infoSpy = vi.spyOn(toast, 'info')
+    const dismissSpy = vi.spyOn(toast, 'dismiss')
+    const askLengths: number[] = []
+    const agentQ1 = agentWithAskUserQuestionFixture('agent-pan-5058', 'tool-1')
+    const agentQ2 = agentWithAskUserQuestionFixture('agent-pan-5058-q2', 'tool-2')
+
+    try {
+      request.mockResolvedValueOnce({ ...snapshot, sequence: 10, agents: [agentQ1] })
+
+      render(<><EventRouter /><PendingInputProbe askLengths={askLengths} /></>)
+
+      await act(async () => {
+        await Promise.resolve()
+      })
+
+      expect(infoSpy).toHaveBeenCalledTimes(1)
+      expect(infoSpy).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ id: 'agent::agent-pan-5058::tool-1' }),
+      )
+
+      let resolveSnapshot2: (value: DashboardSnapshot) => void = () => undefined
+      const snapshot2Promise = new Promise<DashboardSnapshot>((resolve) => {
+        resolveSnapshot2 = resolve
+      })
+      request.mockReturnValueOnce(snapshot2Promise)
+      request.mockResolvedValueOnce([agentEnrichmentClearedEvent(21, 'agent-pan-5058-q2')])
+
+      act(() => {
+        useConnectionState.getState().requestReconnect()
+      })
+      expect(wsTransport.subscribed).not.toBeNull()
+
+      act(() => {
+        wsTransport.subscribed!(agentEnrichmentClearedEvent(21, 'agent-pan-5058-q2'))
+      })
+
+      await act(async () => {
+        resolveSnapshot2({ ...snapshot, sequence: 20, agents: [agentQ1, agentQ2] })
+        await vi.advanceTimersByTimeAsync(0)
+      })
+
+      expect(useAgentPendingInputGate.getState().held).toBeNull()
+      expect(infoSpy).toHaveBeenCalledTimes(1)
+      expect(dismissSpy).not.toHaveBeenCalled()
+      for (const call of infoSpy.mock.calls) {
+        expect(call[1]).not.toMatchObject({ id: expect.stringContaining('tool-2') })
+      }
+    } finally {
+      infoSpy.mockRestore()
+      dismissSpy.mockRestore()
+    }
   })
 })
 
