@@ -115,24 +115,20 @@ type PolyrepoPostOutcome =
   | { ok: false; url: string; reason: string };
 
 /**
- * PAN-5614: post a review verdict on every member MR of a polyrepo issue. Each
- * MR's facts are read first, so a GitHub member PR (which this path cannot
- * approve) fails before anything is posted. An MR that is already approved is
+ * PAN-5614, PAN-5638: post a review verdict on every member PR/MR of a
+ * polyrepo issue. Every member's facts are read first, so nothing is posted
+ * unless all of them could be read. A member that is already approved is
  * skipped on a pass, so a re-run or a deferred replay never approves twice.
+ * On a GitHub member PR the operator opened, GitHub refuses a self-review
+ * and `postReviewVerdict` posts an `overdeck-verdict` marker comment
+ * instead; polyrepo markers carry no `sha=` because a polyrepo run id is a
+ * composite anchor, not a commit.
  */
 async function postPolyrepoReviewVerdict(
   issueId: string,
   found: ReadonlyArray<{ target: ReviewArtifactTarget; artifact: { url: string } }>,
   input: { verdict: 'approve' | 'request-changes'; body: string; reviewedHead: string | null | undefined },
 ): Promise<PolyrepoPostOutcome> {
-  const github = found.find((entry) => entry.target.forge !== 'gitlab');
-  if (github) {
-    return {
-      ok: false,
-      url: github.artifact.url,
-      reason: `${github.target.repoKey} is a GitHub member of a polyrepo project; record its verdict there by hand`,
-    };
-  }
   const members: Array<{ url: string; facts: PrFacts }> = [];
   for (const { target, artifact } of found) {
     const facts = await readMemberMrFacts(issueId, target.sourceBranch, artifact.url);
@@ -143,7 +139,7 @@ async function postPolyrepoReviewVerdict(
   for (const { url, facts } of members) {
     if (input.verdict === 'approve' && facts.approved) {
       console.log(chalk.dim(`${url} is already approved; leaving it as it is.`));
-      last ??= { posted: true, forge: 'gitlab', url, verdict: 'approve' };
+      last ??= { posted: true, forge: facts.forge === 'github' ? 'github' : 'gitlab', url, verdict: 'approve' };
       continue;
     }
     const result = await postReviewVerdict({
@@ -157,6 +153,23 @@ async function postPolyrepoReviewVerdict(
     last = result;
   }
   return { ok: true, result: last! };
+}
+
+/** The forge reports a review rejection: changes requested, or an open GitLab MR left unapproved. */
+function rejectionVisibleIn(facts: PrFacts): boolean {
+  return facts.changesRequested || (facts.forge === 'gitlab' && facts.open && !facts.approved);
+}
+
+/** PAN-5638: a polyrepo rejection is visible once any member PR/MR, read again now, reports it. */
+async function polyrepoRejectionVisible(
+  issueId: string,
+  found: ReadonlyArray<{ target: ReviewArtifactTarget; artifact: { url: string } }>,
+): Promise<boolean> {
+  for (const { target, artifact } of found) {
+    const facts = await readMemberMrFacts(issueId, target.sourceBranch, artifact.url);
+    if (!facts.error && rejectionVisibleIn(facts)) return true;
+  }
+  return false;
 }
 
 export async function doneCommand(
@@ -493,12 +506,14 @@ export async function doneCommand(
     // `postReviewVerdict` read the forge a moment ago and both read caches
     // (pr-facts' own 60s TTL and the generation-keyed PR-tab cache) now hold
     // the PRE-verdict answer. Without dropping them this "fresh read" is a
-    // cache hit that can never see the verdict that was just posted.
+    // cache hit that can never see the verdict that was just posted. A
+    // polyrepo issue re-reads each member, because `getPrFacts` cannot see a
+    // GitHub member of a GitLab project.
     resetPrFactsCache();
     bumpIssuePrTabCacheGeneration(normalizedIssueId);
-    const facts = await getPrFacts(normalizedIssueId);
-    const rejectionVisible = facts.changesRequested
-      || (facts.forge === 'gitlab' && facts.open && !facts.approved);
+    const rejectionVisible = resolved.polyrepo && !strike
+      ? await polyrepoRejectionVisible(normalizedIssueId, found)
+      : rejectionVisibleIn(await getPrFacts(normalizedIssueId));
     if (!rejectionVisible) {
       console.warn(chalk.yellow(
         `${artifact.url} does not report the rejection yet — not driving the work agent. `

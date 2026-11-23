@@ -1,0 +1,164 @@
+{
+  "version": "1",
+  "issueId": "PAN-5638",
+  "created": "2026-11-23T19:38:42.567Z",
+  "updated": "2026-11-23T21:25:25.388Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-23T21:02Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-23T21:02:50.978Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-23T21:25Z] ci-monitor → FAILED — seq 2",
+      "timestamp": "2026-11-23T21:25:25.388Z"
+    }
+  ],
+  "items": {
+    "wi1-github-member-reader": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5638",
+      "claimedAt": "2026-11-23T19:38:42.567Z",
+      "doneAt": "2026-11-23T19:57:10.902Z"
+    },
+    "wi1-github-member-reader.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:57:10.902Z"
+    },
+    "wi1-github-member-reader.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:57:10.902Z"
+    },
+    "wi1-github-member-reader.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:57:10.902Z"
+    },
+    "wi1-github-member-reader.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:57:10.902Z"
+    },
+    "wi1-github-member-reader.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:57:10.902Z"
+    },
+    "wi2-member-facts-dispatch": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5638",
+      "claimedAt": "2026-11-23T19:57:18.243Z",
+      "doneAt": "2026-11-23T20:16:09.626Z"
+    },
+    "wi2-member-facts-dispatch.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:16:09.626Z"
+    },
+    "wi2-member-facts-dispatch.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:16:09.626Z"
+    },
+    "wi3-polyrepo-verdict-post": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5638",
+      "claimedAt": "2026-11-23T20:16:16.469Z",
+      "doneAt": "2026-11-23T20:23:26.562Z"
+    },
+    "wi3-polyrepo-verdict-post.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:23:26.562Z"
+    },
+    "wi3-polyrepo-verdict-post.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:23:26.562Z"
+    },
+    "wi3-polyrepo-verdict-post.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:23:26.562Z"
+    },
+    "wi3-polyrepo-verdict-post.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:23:26.562Z"
+    },
+    "wi4-polyrepo-rejection-visible": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5638",
+      "claimedAt": "2026-11-23T20:23:35.608Z",
+      "doneAt": "2026-11-23T20:32:45.956Z"
+    },
+    "wi4-polyrepo-rejection-visible.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:32:45.956Z"
+    },
+    "wi4-polyrepo-rejection-visible.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:32:45.956Z"
+    },
+    "wi4-polyrepo-rejection-visible.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:32:45.956Z"
+    },
+    "wi5-ready-set-github-members": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5638",
+      "claimedAt": "2026-11-23T20:32:51.117Z",
+      "doneAt": "2026-11-23T20:41:43.718Z"
+    },
+    "wi5-ready-set-github-members.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:41:43.718Z"
+    },
+    "wi5-ready-set-github-members.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:41:43.718Z"
+    },
+    "wi5-ready-set-github-members.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:41:43.718Z"
+    },
+    "wi5-ready-set-github-members.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:41:43.718Z"
+    },
+    "wi5-ready-set-github-members.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:41:43.718Z"
+    },
+    "wi6-docs-changelog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5638",
+      "claimedAt": "2026-11-23T20:41:49.565Z",
+      "doneAt": "2026-11-23T20:48:41.311Z"
+    },
+    "wi6-docs-changelog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:48:41.311Z"
+    },
+    "wi6-docs-changelog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:48:41.311Z"
+    },
+    "wi6-docs-changelog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:48:41.311Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-23T21:02:50Z",
+      "markdownBody": "# CodeRabbit findings for PAN-5638 (PR #5645)\n\nCodeRabbit posted 4 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4671973874 · src/cli/commands/specialists/done.ts:145 [Major]: Apply the verdict guard to every GitHub member before posting.\n  https://github.com/eltmon/overdeck/pull/5645#discussion_r4671973874\n- Thread 4671973900 · src/lib/cloister/__tests__/github-member-pr-facts.test.ts:84 [Minor]: Inject identity lookups in the untrusted-marker test.\n  https://github.com/eltmon/overdeck/pull/5645#discussion_r4671973900\n- Thread 4671973915 · src/lib/cloister/github-member-pr-facts.ts:45 [Major]: A failed standing-review read leaves the ready set silent instead of unavailable.\n  https://github.com/eltmon/overdeck/pull/5645#discussion_r4671973915\n- Thread 4671973927 · src/lib/overdeck/ready-set.ts:178 [Minor]: Check the member facts' checks and mergeability before the ready-set approval.\n  https://github.com/eltmon/overdeck/pull/5645#discussion_r4671973927\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5645/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-5638 -m \"CodeRabbit <thread ids>: <what you changed>\"`.\n   If you only replied, you are done.\n5. If PR #5645 has already merged when you read this, stop: after the merge Overdeck files a follow-up issue\n   for every thread with no reply, no later commit to its file, and no re-review request naming its thread id."
+    },
+    {
+      "seq": 2,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-23T21:25:25Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5638\n\nPull request: https://github.com/eltmon/overdeck/pull/5645 (head `9463760b`)\n\nSource: check_run:test-shard (1/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-shard (1/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/138021759742/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/45268451049/job/138021759742  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/cli/commands/__tests__/setup-hooks.test.ts\u001b[2m > \u001b[22msetup hooks\u001b[2m > \u001b[22mregisters restored tool-event hooks globally during setup\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/cli/commands/__tests__/setup-hooks.test.ts\u001b[2m > \u001b[22msetup hooks\u001b[2m > \u001b[22mregisters restored tool-event hooks globally during setup\n\u001b[31m\u001b[1mError\u001b[22m: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m src/cli/commands/__tests__/setup-hooks.test.ts:\u001b[2m106:3\u001b[22m\u001b[39m\n    \u001b[90m104|\u001b[39m   })\u001b[33m;\u001b[39m\n    \u001b[90m105|\u001b[39m\n    \u001b[90m106|\u001b[39m   it('registers restored tool-event hooks globally during setup', asyn…\n    \u001b[90m   |\u001b[39m   \u001b[31m^\u001b[39m\n    \u001b[90m107|\u001b[39m     \u001b[35mconst\u001b[39m home \u001b[33m=\u001b[39m \u001b[34mmkdtempSync\u001b[39m(\u001b[34mjoin\u001b[39m(\u001b[34mtmpdir\u001b[39m()\u001b[33m,\u001b[39m \u001b[32m'pan-setup-hooks-'\u001b[39m))\u001b[33m;\u001b[39m\n    \u001b[90m108|\u001b[39m     process\u001b[33m.\u001b[39menv\u001b[33m.\u001b[39m\u001b[33mHOME\u001b[39m \u001b[33m=\u001b[39m home\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\u001b[22m\u001b[39m\n\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m710 passed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[33m2 skipped\u001b[39m\u001b[90m (713)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ]
+}
