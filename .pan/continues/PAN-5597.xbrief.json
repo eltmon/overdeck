@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5597",
   "created": "2026-11-23T02:38:35.270Z",
-  "updated": "2026-11-23T03:12:11.981Z",
+  "updated": "2026-11-23T03:22:00.553Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -237,6 +237,11 @@
       "status": "in_progress",
       "claimedBy": "agent-pan-5597",
       "claimedAt": "2026-11-23T03:12:11.980Z"
+    },
+    "book-issue-list": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5597",
+      "claimedAt": "2026-11-23T03:22:00.552Z"
     }
   }
 }
