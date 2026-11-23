@@ -1,0 +1,520 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-23T19:35:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5638: Polyrepo review verdicts and the merge train ignore GitHub member PRs",
+    "updated": "2026-11-23T19:38:15.760Z"
+  },
+  "plan": {
+    "id": "pan-5638",
+    "title": "Polyrepo review verdicts and the merge train ignore GitHub member PRs",
+    "status": "running",
+    "uid": "90d2237d-a243-461c-9556-251761066f75",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-23T19:35:00Z",
+    "updated": "2026-11-23T19:38:15.760Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5638",
+        "label": "PAN-5638",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5641",
+        "label": "PAN-5641 (sibling: polyrepo promote eligibility and board)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "polyrepo",
+      "review",
+      "merge-train",
+      "ready-set",
+      "github"
+    ],
+    "narratives": {
+      "Problem": "A polyrepo issue that changes a GitHub member repo cannot record its review verdict or enter the ready set. postPolyrepoReviewVerdict (src/cli/commands/specialists/done.ts) refuses when any member artifact is on GitHub. githubRows (src/lib/overdeck/ready-set.ts) judges a GitHub member row only by the listing's reviewDecision, which GitHub leaves empty on unprotected branches; the MYN member PRs are self-authored, so the verdict lands as an overdeck-verdict marker comment the ready set never reads. A blocked verdict on a GitHub-only polyrepo issue also never reaches the work agent, because getPrFacts cannot see GitHub members of a Linear/GitLab project.",
+      "Proposal": "Add one trusted reader, readGitHubMemberPrFacts (new src/lib/cloister/github-member-pr-facts.ts), that reads a GitHub PR by URL and builds PrFacts through a newly exported pr-facts gitHubPrFacts, so marker trust rules apply. readMemberMrFacts dispatches GitHub URLs to it. The polyrepo verdict write drops its GitHub refusal and posts on every member; rejection visibility re-reads every member. The ready set reads an undecided, green, mergeable GitHub member row's own facts (dated trusted marker, or a standing review at head via readGitHubMemberReadyFacts), cached per PR head for 60 s, throwing ReadySetUnavailableError on a failed read. Docs and changelog follow. PRD: .pan/drafts/PAN-5638.md.",
+      "NonGoals": "- Polyrepo UAT promote eligibility (getDerivedIssueState reads the non-git project root) and the merge-train board's polyrepo cars; tracked in PAN-5641\n- Any change to the GitHub monorepo ready-set loop in listReadyIssuesForProject or the single-repo merge gate's sha-proven approval rule\n- Making getPrFacts(issueId) polyrepo-aware\n- Changing the verdict guard's getPrFacts read for agent callers (reviewVerdictRefusal input)\n- Parsing verdict markers anywhere outside pr-facts' trust rules\n- Per-member reviewed heads or a sha= on polyrepo markers\n- Installing the GitHub App on mindyournow or adding branch protection\n- Raising any file-size allowlist cap\n- Test and UAT verdicts (pan admin specialists done test|uat) keep commenting on the first member artifact only"
+    },
+    "autoDecisions": [
+      {
+        "summary": "The ready set counts a GitHub member PR approved by pr-facts' dated rule (facts.approved: forge decision, or newest trusted marker no older than the head commit), plus a trusted standing review at head; it does not require a sha= marker.",
+        "rationale": "Polyrepo review run ids hash a composite anchor (review-agent.ts line 471), so reviewedHeadSha never matches a member head and every polyrepo marker is posted without sha=. A sha-required rule could never be met. The GitLab member rule (facts.approved) is not head-pinned either."
+      },
+      {
+        "summary": "Use pr-facts' trusted reader instead of the issue's suggestion to call parseVerdictMarkerWithSha directly in githubRows.",
+        "rationale": "All three MYN member repos are public; a bare marker parse would let any commenter approve a PR. gitHubPrFacts applies the author-association and App-bot rules."
+      },
+      {
+        "summary": "Include rejection-visibility for polyrepo verdicts (WI-4), which the issue did not list.",
+        "rationale": "Without it, a blocked review of a GitHub-only polyrepo issue posts the marker but never drives the work agent, because getPrFacts cannot see GitHub members of a Linear-tracked project. Recording the verdict without delivering it is a partial feature."
+      },
+      {
+        "summary": "Promote eligibility and the merge-train board stay out of scope; filed as PAN-5641.",
+        "rationale": "Both read one PR from the non-git polyrepo root and break every polyrepo issue, not just GitHub members. No MYN batch has been created since 2026-08-14, so that path is unexercised and deserves its own plan."
+      },
+      {
+        "summary": "Keep the readMemberMrFacts name and add GitHub dispatch rather than renaming.",
+        "rationale": "Three test files mock that export; a rename adds churn with no behavior change. The doc comment states it reads a PR or an MR."
+      },
+      {
+        "summary": "Put the new reader in a new module and change pr-facts.ts by one extracted export only.",
+        "rationale": "pr-facts.ts is 996 lines against the 1000-line ceiling; the extraction nets +2 lines."
+      }
+    ],
+    "items": [
+      {
+        "id": "wi1-github-member-reader",
+        "title": "Add readGitHubMemberPrFacts: one GitHub member PR's facts by URL under the marker trust rules",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T19:35:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5638",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "wi2-member-facts-dispatch",
+            "wi5-ready-set-github-members"
+          ],
+          "files_scope": [
+            "src/lib/cloister/pr-facts.ts",
+            "src/lib/overdeck/pull-requests.ts",
+            "src/lib/cloister/github-member-pr-facts.ts",
+            "src/lib/cloister/__tests__/github-member-pr-facts.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/github-member-pr-facts.test.ts src/lib/cloister/__tests__/pr-facts-verdict-marker.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "github-member-pr-facts.test.ts and pr-facts-verdict-marker.test.ts pass",
+            "typecheck completes without errors",
+            "lint-file-size.sh exits 0 and wc -l src/lib/cloister/pr-facts.ts prints at most 1000"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 exactly. (1) In src/lib/cloister/pr-facts.ts extract the GitHub branch of readPrFacts (search 'const pr = await withCommentAuthorKinds(gh.pr, deps);') into an exported async function gitHubPrFacts(issueId, view: IssuePullRequestData, deps: PrFactsDeps = {}) placed directly above readPrFacts, and make readPrFacts call it ('if (gh.pr) return gitHubPrFacts(issueId, gh.pr, deps);'). Change nothing else in pr-facts.ts (net +2 lines; must stay <= 1000). (2) In src/lib/overdeck/pull-requests.ts export fetchPullRequestByNumber(issueId, repoArg, prNumber) that delegates to fetchIssuePullRequestFromRef and never caches. (3) Create src/lib/cloister/github-member-pr-facts.ts exporting readGitHubMemberPrFacts(issueId, url, deps) (parse owner/repo/number from the URL, fetch, return gitHubPrFacts; an unparseable URL, a null pr or a thrown fetch returns emptyPrFacts(issueId, reason) with error set; never throws) and readGitHubMemberReadyFacts(issueId, url, deps) (same facts, and when there is no error, no approval, no changes requested, open and not a draft, folds deps.standingApproval ?? forgeApprovalAtHead returning true into approved: true). Deps type GitHubMemberPrFactsDeps extends PrFactsDeps with fetchPr and standingApproval. (4) Write the tests listed in PRD WI-1 with every forge read injected."
+        },
+        "items": [
+          {
+            "id": "wi1-github-member-reader.ac1",
+            "title": "Given a gh pr view payload whose OWNER comment carries '<!-- overdeck-verdict: APPROVED -->' posted after the head commit's committedDate and no GitHub App configured, when readGitHubMemberPrFacts reads it, then it returns facts with forge 'github' and approved true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-github-member-reader.ac2",
+            "title": "Given the same marker from an author with authorAssociation 'NONE', or posted before the head commit, when readGitHubMemberPrFacts reads it, then it returns approved false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-github-member-reader.ac3",
+            "title": "Given an unparseable URL or a fetchPr that rejects or returns pr null, when readGitHubMemberPrFacts runs, then it returns facts with error set and exists false and does not throw; and for 'https://github.com/mindyournow/myn-skills/pull/4' fetchPr is called with ('MIN-1142', 'mindyournow/myn-skills', 4)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-github-member-reader.ac4",
+            "title": "Given unapproved open facts, when readGitHubMemberReadyFacts runs with standingApproval resolving true, then it returns approved true; with standingApproval resolving undefined it returns approved false; and standingApproval is not called when a marker already approves",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-github-member-reader.ac5",
+            "title": "wc -l src/lib/cloister/pr-facts.ts produces a count of at most 1000 and bash scripts/lint-file-size.sh exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi2-member-facts-dispatch",
+        "title": "readMemberMrFacts routes GitHub member PR URLs to readGitHubMemberPrFacts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T19:35:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5638",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/review-artifact-targets.ts",
+            "src/lib/cloister/__tests__/review-artifact-targets.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/review-artifact-targets.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "review-artifact-targets.test.ts passes, including the new GitHub dispatch case",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. In src/lib/cloister/review-artifact-targets.ts, add a fifth parameter readGitHubFacts (default readGitHubMemberPrFacts imported from ./github-member-pr-facts.js) to readMemberMrFacts. Compute ref = parseArtifactRef(url); when ref?.forge === 'github' return readGitHubFacts(issueId, url); otherwise keep the existing GitLab call. Replace the doc comment with the PRD's 'member repo's merge request or pull request' text. Keep the export name. Add the 'reads a GitHub member PR through the GitHub reader' test to the existing describe('readMemberMrFacts')."
+        },
+        "items": [
+          {
+            "id": "wi2-member-facts-dispatch.ac1",
+            "title": "Given url 'https://github.com/mindyournow/myn-skills/pull/4', when readMemberMrFacts('MIN-1142', 'feature/min-1142', url, gitlabSpy, githubSpy) runs, then githubSpy is called with ('MIN-1142', url), gitlabSpy is not called, and the GitHub facts are returned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-member-facts-dispatch.ac2",
+            "title": "Given a GitLab MR URL, when readMemberMrFacts runs, then it calls the GitLab reader with iid, web_url, source_branch and state 'opened' as before, and the existing review-artifact-targets tests pass unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi3-polyrepo-verdict-post",
+        "title": "Polyrepo verdict write posts on GitHub member PRs instead of refusing",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T19:35:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5638",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/specialists/done.ts",
+            "src/cli/commands/__tests__/specialists-done-polyrepo.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/specialists-done-polyrepo.test.ts src/cli/commands/__tests__/specialists-done-forge-lookup.test.ts",
+            "npm run typecheck",
+            "git grep -n \"GitHub member of a polyrepo project\" src"
+          ],
+          "expected_outputs": [
+            "both specialists-done test files pass",
+            "typecheck completes without errors",
+            "git grep prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. In postPolyrepoReviewVerdict (src/cli/commands/specialists/done.ts) delete the 'const github = found.find(...)' refusal block. Keep the read-every-member-then-post loop (it calls readMemberMrFacts, which reads GitHub members after wi2). Change the already-approved skip to 'last ??= { posted: true, forge: facts.forge === \"github\" ? \"github\" : \"gitlab\", url, verdict: \"approve\" };'. Replace the function's doc comment with the PRD text (PAN-5614, PAN-5638; marker fallback; no sha= on polyrepo markers). In specialists-done-polyrepo.test.ts replace the 'refuses before posting when a GitHub member has an open PR' test with the three PRD WI-3 tests and update the file header to cover GitHub members."
+        },
+        "items": [
+          {
+            "id": "wi3-polyrepo-verdict-post.ac1",
+            "title": "Given a passing review on a polyrepo issue with an open GitLab MR (api) and an open GitHub PR (skills), when doneCommand runs, then postReviewVerdict is called with the facts of API_MR and SKILLS_PR, the command exits without code 1, and stderr does not contain 'GitHub member of a polyrepo project'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-polyrepo-verdict-post.ac2",
+            "title": "Given the GitHub member's facts report approved true, when a passing review runs, then postReviewVerdict is not called for SKILLS_PR",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-polyrepo-verdict-post.ac3",
+            "title": "Given the GitHub member's facts carry an error, when a passing review runs, then the command exits 1, stderr contains 'Could not post the review verdict on <SKILLS_PR>', and postReviewVerdict is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-polyrepo-verdict-post.ac4",
+            "title": "git grep -n 'GitHub member of a polyrepo project' src produces no output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi4-polyrepo-rejection-visible",
+        "title": "Rejection visibility for a polyrepo verdict re-reads every member PR/MR",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T19:35:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5638",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/specialists/done.ts",
+            "src/cli/commands/__tests__/specialists-done-polyrepo.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/specialists-done-polyrepo.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "specialists-done-polyrepo.test.ts passes, including both rejection-visibility tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4. In doneCommand's 'role === review && (blocked || failed)' branch, replace 'const facts = await getPrFacts(normalizedIssueId); const rejectionVisible = ...' with 'const rejectionVisible = resolved.polyrepo && !strike ? await polyrepoRejectionVisible(normalizedIssueId, found) : rejectionVisibleIn(await getPrFacts(normalizedIssueId));'. Add module-level helpers rejectionVisibleIn(facts) and polyrepoRejectionVisible(issueId, found) (re-reads each member through readMemberMrFacts; a read with error does not count). Keep resetPrFactsCache and bumpIssuePrTabCacheGeneration before the read, and add the one-sentence comment from the PRD. In specialists-done-polyrepo.test.ts mock '../../../lib/cloister/review-verdict-feedback.js' with a deliverReviewVerdictFeedback spy and add the two PRD WI-4 tests."
+        },
+        "items": [
+          {
+            "id": "wi4-polyrepo-rejection-visible.ac1",
+            "title": "Given a blocked review on a polyrepo issue whose only artifact is a GitHub member PR and whose re-read member facts report changesRequested true, when doneCommand runs, then deliverReviewVerdictFeedback is called once with prUrl SKILLS_PR",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-polyrepo-rejection-visible.ac2",
+            "title": "Given every re-read member reports changesRequested false (forge github), when a blocked review runs, then deliverReviewVerdictFeedback is not called and console.warn emits a message containing 'does not report the rejection yet'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-polyrepo-rejection-visible.ac3",
+            "title": "Given a single-repo (non-polyrepo) blocked review, when doneCommand runs, then rejection visibility falls back to getPrFacts(issueId) as before and the existing specialists-done tests pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi5-ready-set-github-members",
+        "title": "Ready set reads an undecided GitHub member PR's own facts, cached per head",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T19:35:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5638",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/ready-set.ts",
+            "src/lib/overdeck/__tests__/ready-set.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/ready-set.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ready-set.test.ts passes, including the new 'polyrepo GitHub members (PAN-5638)' describe block",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5 exactly. Add ReadySetDeps.githubPrFacts?: (issueId, row: GhPrRow) => Promise<PrFacts>. Rename GITLAB_MR_FACTS_TTL_MS to MEMBER_FACTS_TTL_MS and add githubPrFactsCache (same TTL; errors kept 0 ms) keyed '<repoPath>|<number>|<headRefOid>'; invalidate it in _resetReadySetCacheForTests. Add defaultGithubPrFacts that dynamically imports readGitHubMemberReadyFacts from ../cloister/github-member-pr-facts.js. In githubRows make ready an async thunk: false for a draft, non-green or non-mergeable listing row; true when the listing reviewState is 'approved'; false when 'changes-requested'; otherwise read cached facts, throw ReadySetUnavailableError(repo.repoPath, facts.error) on error, return false when facts.headSha differs from row.headRefOid, else return open && !draft && !changesRequested && approved. Update the module header's polyrepo bullet. In the test file give poly() an optional githubPrFacts parameter defaulting to a not-approved stub (hazard: otherwise the existing MIN-2 test calls real gh), then add the PRD WI-5 tests; the cache test uses vi.useFakeTimers and vi.advanceTimersByTimeAsync."
+        },
+        "items": [
+          {
+            "id": "wi5-ready-set-github-members.ac1",
+            "title": "Given a polyrepo GitHub member row with reviewDecision null, green checks and MERGEABLE, and githubPrFacts returning approved true at the row's head, when listReadyIssuesForProject runs, then the issue is returned in the ready set and githubPrFacts was called once with ('MIN-1', row)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-ready-set-github-members.ac2",
+            "title": "Given githubPrFacts returns approved false, or approved true with a headSha different from the row's headRefOid, when listReadyIssuesForProject runs, then the issue is not returned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-ready-set-github-members.ac3",
+            "title": "Given member rows that are a draft, have a FAILURE check, are CONFLICTING, or have reviewDecision CHANGES_REQUESTED or APPROVED, when listReadyIssuesForProject runs, then the APPROVED row is ready, the others are not, and githubPrFacts is never called; and the GitHub monorepo path never calls githubPrFacts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-ready-set-github-members.ac4",
+            "title": "Given githubPrFacts returns facts with error set, when listReadyIssuesForProject runs, then it rejects with ReadySetUnavailableError",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-ready-set-github-members.ac5",
+            "title": "Given fake timers, when the ready set is read twice within 60 s, then githubPrFacts is called once; after advancing 60 s, or after the row's headRefOid changes, it is called again; and a read that returned an error is not served from cache on the next call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi6-docs-changelog",
+        "title": "Document polyrepo GitHub member verdicts and ready-set approval; add changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T19:35:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5638",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/REVIEW-AGENT-ARCHITECTURE.md",
+            "docs/MERGE-TRAIN.md",
+            "changelog.d/pan-5638.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n \"readGitHubMemberReadyFacts\" docs/MERGE-TRAIN.md",
+            "grep -n \"PAN-5638\" docs/REVIEW-AGENT-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "grep finds readGitHubMemberReadyFacts in docs/MERGE-TRAIN.md",
+            "grep finds PAN-5638 in docs/REVIEW-AGENT-ARCHITECTURE.md"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-6. (1) docs/REVIEW-AGENT-ARCHITECTURE.md, section 'How the verdict reaches the forge': after the paragraph starting 'GitLab: approval is `glab mr approve`', add a bold 'Polyrepo' paragraph covering: verdict on every writable member's open PR/MR (PAN-5614, PAN-5638); every member read first, nothing posted if any read fails; a GitHub member PR the operator opened gets the overdeck-verdict marker; polyrepo markers carry no sha= because the run id is a composite anchor; a rejection is delivered once any member, read again, reports it. (2) docs/MERGE-TRAIN.md 'The ready set': extend the Polyrepo row's 'Ready when' cell with the GitHub member rule (readGitHubMemberReadyFacts: trusted overdeck-verdict APPROVED marker no older than the head commit, or a trusted standing review of the head), add the paragraph on when the read runs, its per-head 60 s cache and ReadySetUnavailableError, and one sentence pointing at PAN-5641 for promote eligibility. (3) Create changelog.d/pan-5638.md with the '#### Fixed' bullet from the PRD."
+        },
+        "items": [
+          {
+            "id": "wi6-docs-changelog.ac1",
+            "title": "docs/MERGE-TRAIN.md renders a Polyrepo ready-set row that names readGitHubMemberReadyFacts, the trusted dated marker and the standing review at head, and a paragraph that names ReadySetUnavailableError and PAN-5641",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-docs-changelog.ac2",
+            "title": "docs/REVIEW-AGENT-ARCHITECTURE.md renders a Polyrepo paragraph in 'How the verdict reaches the forge' that mentions PAN-5638, the marker fallback on GitHub members, the missing sha= on polyrepo markers, and rejection delivery from any member",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-docs-changelog.ac3",
+            "title": "changelog.d/pan-5638.md exists with a single '#### Fixed' section linking #5638, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wi1-github-member-reader",
+        "to": "wi2-member-facts-dispatch",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-github-member-reader",
+        "to": "wi5-ready-set-github-members",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-member-facts-dispatch",
+        "to": "wi3-polyrepo-verdict-post",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-member-facts-dispatch",
+        "to": "wi4-polyrepo-rejection-visible",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-polyrepo-verdict-post",
+        "to": "wi4-polyrepo-rejection-visible",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-23-PAN-5638-polyrepo-review-verdicts-and-the-merge-train-ignore-github-member-prs.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

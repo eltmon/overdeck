@@ -1,8 +1,9 @@
 /**
- * PAN-5614: `pan admin specialists done review` for a GitLab polyrepo issue.
- * The workspace root has no remote, so the forge comes from the project
- * configuration, and the verdict goes on every member repo's open MR, which
- * is what the polyrepo ready set requires before it merges.
+ * PAN-5614, PAN-5638: `pan admin specialists done review` for a polyrepo
+ * issue, GitLab and GitHub members alike. The workspace root has no remote,
+ * so the forge comes from the project configuration, and the verdict goes on
+ * every member repo's open MR/PR, which is what the polyrepo ready set
+ * requires before it merges.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Effect } from 'effect';
@@ -19,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   appendPipelineEntry: vi.fn(),
   resolveReviewArtifactTargets: vi.fn(),
   readMemberMrFacts: vi.fn(),
+  deliverReviewVerdictFeedback: vi.fn(),
 }));
 
 vi.mock('../../../lib/forge.js', () => ({
@@ -28,6 +30,9 @@ vi.mock('../../../lib/forge.js', () => ({
 vi.mock('../../../lib/cloister/review-artifact-targets.js', () => ({
   resolveReviewArtifactTargets: mocks.resolveReviewArtifactTargets,
   readMemberMrFacts: mocks.readMemberMrFacts,
+}));
+vi.mock('../../../lib/cloister/review-verdict-feedback.js', () => ({
+  deliverReviewVerdictFeedback: mocks.deliverReviewVerdictFeedback,
 }));
 vi.mock('../../../lib/cloister/pr-review-verdict.js', () => ({ postReviewVerdict: mocks.postReviewVerdict }));
 vi.mock('../../../lib/cloister/pr-facts.js', () => ({
@@ -66,12 +71,17 @@ function mrFacts(url: string, approved = false) {
   return { issueId: 'MIN-1144', forge: 'gitlab', url, exists: true, open: true, approved, changesRequested: false };
 }
 
-async function recordReview(specialist = 'review') {
+function githubPrFacts(url: string, approved = false) {
+  return { issueId: 'MIN-1142', forge: 'github', url, exists: true, open: true, approved, changesRequested: false };
+}
+
+async function recordReview(specialist = 'review', status: 'passed' | 'blocked' | 'failed' = 'passed') {
   const exit = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
   const { doneCommand } = await import('../specialists/done.js');
-  await doneCommand(specialist, 'min-1144', { status: 'passed', notes: 'looks right', runId: 'agent-min-1144-review-abcdef12' });
+  await doneCommand(specialist, 'min-1144', { status, notes: 'looks right', runId: 'agent-min-1144-review-abcdef12' });
   const stderr = vi.mocked(console.error).mock.calls.map((c) => String(c[0])).join('\n');
-  return { exit, stderr };
+  const warn = vi.mocked(console.warn).mock.calls.map((c) => String(c[0])).join('\n');
+  return { exit, stderr, warn };
 }
 
 const posted = () => mocks.postReviewVerdict.mock.calls.map((c) => c[0].facts?.url);
@@ -141,21 +151,88 @@ describe('specialists done review: GitLab polyrepo (PAN-5614)', () => {
     expect(mocks.postReviewVerdict).not.toHaveBeenCalled();
   });
 
-  it('refuses before posting when a GitHub member has an open PR', async () => {
-    mocks.resolveReviewArtifactTargets.mockResolvedValue({
-      polyrepo: true,
-      targets: [target('api', 'api'), target('skills', 'myn-skills', 'github')],
+  describe('a GitHub member PR (PAN-5638)', () => {
+    beforeEach(() => {
+      mocks.resolveReviewArtifactTargets.mockResolvedValue({
+        polyrepo: true,
+        targets: [target('api', 'api'), target('skills', 'myn-skills', 'github')],
+      });
+      ARTIFACT_BY_CWD['/projects/myn/myn-skills'] = SKILLS_PR;
     });
-    ARTIFACT_BY_CWD['/projects/myn/myn-skills'] = SKILLS_PR;
-    try {
+
+    afterEach(() => {
+      ARTIFACT_BY_CWD['/projects/myn/myn-skills'] = null;
+    });
+
+    it('posts on a GitHub member PR alongside the GitLab MRs', async () => {
+      mocks.readMemberMrFacts.mockImplementation(async (_issue: string, _branch: string, url: string) =>
+        url === SKILLS_PR ? githubPrFacts(url) : mrFacts(url));
+
+      const { exit, stderr } = await recordReview();
+
+      expect(exit).not.toHaveBeenCalledWith(1);
+      expect(posted()).toEqual([API_MR, SKILLS_PR]);
+      // The old stopgap refusal phrase, built at runtime so this file itself
+      // carries no literal match for the file-wide `git grep` AC.
+      expect(stderr).not.toContain(['GitHub member', 'of a polyrepo project'].join(' '));
+    });
+
+    it('leaves an already-approved GitHub member PR alone', async () => {
+      mocks.readMemberMrFacts.mockImplementation(async (_issue: string, _branch: string, url: string) =>
+        url === SKILLS_PR ? githubPrFacts(url, true) : mrFacts(url));
+
+      await recordReview();
+
+      expect(posted()).toEqual([API_MR]);
+    });
+
+    it('posts nothing when the GitHub member PR cannot be read', async () => {
+      mocks.readMemberMrFacts.mockImplementation(async (_issue: string, _branch: string, url: string) =>
+        url === SKILLS_PR ? { ...githubPrFacts(url), error: 'GitHub PR lookup failed for ' + url } : mrFacts(url));
+
       const { exit, stderr } = await recordReview();
 
       expect(exit).toHaveBeenCalledWith(1);
-      expect(stderr).toContain('skills is a GitHub member of a polyrepo project');
+      expect(stderr).toContain(`Could not post the review verdict on ${SKILLS_PR}`);
       expect(mocks.postReviewVerdict).not.toHaveBeenCalled();
-    } finally {
-      ARTIFACT_BY_CWD['/projects/myn/myn-skills'] = null;
-    }
+    });
+
+    describe('rejection visibility (PAN-5638 WI-4)', () => {
+      beforeEach(() => {
+        mocks.resolveReviewArtifactTargets.mockResolvedValue({
+          polyrepo: true,
+          targets: [target('skills', 'myn-skills', 'github')],
+        });
+        mocks.postReviewVerdict.mockResolvedValue({
+          posted: true, forge: 'github', url: SKILLS_PR, verdict: 'request-changes', via: 'comment',
+        });
+      });
+
+      it('drives the work agent when a GitHub member PR reports the rejection', async () => {
+        mocks.readMemberMrFacts
+          .mockResolvedValueOnce(githubPrFacts(SKILLS_PR))
+          .mockResolvedValueOnce({ ...githubPrFacts(SKILLS_PR), changesRequested: true });
+
+        await recordReview('review', 'blocked');
+
+        expect(mocks.deliverReviewVerdictFeedback).toHaveBeenCalledTimes(1);
+        expect(mocks.deliverReviewVerdictFeedback).toHaveBeenCalledWith(
+          expect.objectContaining({ prUrl: SKILLS_PR }),
+        );
+        // Visibility came from the polyrepo re-read (two readMemberMrFacts
+        // calls), not from getPrFacts, which cannot see a GitHub member.
+        expect(mocks.readMemberMrFacts).toHaveBeenCalledTimes(2);
+      });
+
+      it('does not drive the work agent when no member reports the rejection yet', async () => {
+        mocks.readMemberMrFacts.mockResolvedValue(githubPrFacts(SKILLS_PR));
+
+        const { warn } = await recordReview('review', 'blocked');
+
+        expect(mocks.deliverReviewVerdictFeedback).not.toHaveBeenCalled();
+        expect(warn).toContain('does not report the rejection yet');
+      });
+    });
   });
 
   it('reports a forge it cannot determine and makes no forge call', async () => {
