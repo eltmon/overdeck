@@ -66,9 +66,8 @@ export function MoreSettings({ book, project, onBookChange, onError }: OrderBook
       setPreview(payload.brief);
     } catch (cause) {
       onError?.(errorMessage(cause));
-    } finally {
-      setLoadingPreview(false);
     }
+    setLoadingPreview(false);
   };
 
   const status = briefStatus(briefOverlay);

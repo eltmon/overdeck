@@ -82,9 +82,8 @@ export function BookList({ books, selectedId, onSelect, onCreate, creating, onCr
       onCreatingChange(false);
     } catch (cause) {
       setError(errorMessage(cause));
-    } finally {
-      setSubmitting(false);
     }
+    setSubmitting(false);
   };
 
   const row = (book: OrderBookView) => {

@@ -67,18 +67,19 @@ export function BookHeader({ book, project, onBookChange, onError, activeBookNam
   const menuTrigger = useRef<HTMLButtonElement | null>(null);
 
   const patch = async (body: Record<string, unknown>): Promise<boolean> => {
+    // No `finally`: the React Compiler cannot compile a try with a finalizer.
     setBusy(true);
+    let ok = true;
     try {
       // Await first: `onBookChange?.(await …)` would skip the request when no callback is passed.
       const updated = await orderBookRequest(bookPath(book.id), project, { method: 'PATCH', body });
       onBookChange?.(updated);
-      return true;
     } catch (cause) {
       onError?.(errorMessage(cause));
-      return false;
-    } finally {
-      setBusy(false);
+      ok = false;
     }
+    setBusy(false);
+    return ok;
   };
 
   const startRename = () => {
@@ -101,9 +102,8 @@ export function BookHeader({ book, project, onBookChange, onError, activeBookNam
       onStarted?.(result.runId);
     } catch (cause) {
       onError?.(errorMessage(cause));
-    } finally {
-      setBusy(false);
     }
+    setBusy(false);
   };
 
   const confirmPause = async () => {

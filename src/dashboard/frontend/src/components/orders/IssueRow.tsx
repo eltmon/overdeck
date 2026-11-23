@@ -82,9 +82,8 @@ export function IssueRow({
       setEditing(false);
     } catch {
       // The list reports the error; keep the block open so the operator can correct it.
-    } finally {
-      setSaving(false);
     }
+    setSaving(false);
   };
 
   const draggable = !readOnly && !editing;

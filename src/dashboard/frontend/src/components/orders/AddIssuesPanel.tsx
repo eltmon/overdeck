@@ -84,9 +84,8 @@ export function AddIssuesPanel({ book, books, project, onBookChange, onError, on
       onBookChange?.(updated);
     } catch (cause) {
       onError?.(errorMessage(cause));
-    } finally {
-      setAdding(null);
     }
+    setAdding(null);
   };
 
   return (
