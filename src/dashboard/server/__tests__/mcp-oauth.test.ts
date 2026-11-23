@@ -135,6 +135,53 @@ describe('discovery and registration (PAN-4945)', () => {
   });
 });
 
+describe('registration refusal audit (PAN-5058 W-1)', () => {
+  let entries: Array<{ source: string; level: string; message: string; details?: string }>;
+  const JSON_TYPE = { 'content-type': 'application/json' };
+
+  beforeEach(() => {
+    entries = [];
+    app = Layer.mergeAll(
+      remoteRequestGateLayer,
+      makeMcpOAuthRouteLayer({ service, issuerFor, audit: (entry) => { entries.push(entry); } }),
+    );
+  });
+
+  function onlyEntryDetails(): { error: string; redirectOrigins: string[] } {
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ source: 'dashboard', level: 'warn', message: 'MCP client registration refused' });
+    return JSON.parse(entries[0]!.details ?? '{}') as { error: string; redirectOrigins: string[] };
+  }
+
+  it('logs only the scheme://host of a refused redirect URI', async () => {
+    const response = await send('POST', '/oauth/mcp/register', JSON_TYPE, JSON.stringify({ client_name: 'Cursor', redirect_uris: ['cursor://anysphere.cursor-mcp/oauth/callback?x=1'] }));
+    expect(response.status).toBe(400);
+    expect(onlyEntryDetails().redirectOrigins).toEqual(['cursor://anysphere.cursor-mcp']);
+    expect(entries[0]!.details).not.toContain('/oauth/callback');
+    expect(entries[0]!.details).not.toContain('x=1');
+  });
+
+  it('logs [] for a refusal made before the body was parsed', async () => {
+    const bodies: Array<[Record<string, string>, string]> = [
+      [{ 'content-type': 'text/plain' }, JSON.stringify({ redirect_uris: [REDIRECT] })],
+      [JSON_TYPE, JSON.stringify({ redirect_uris: [REDIRECT], pad: 'x'.repeat(17 * 1024) })],
+      [JSON_TYPE, '{nope'],
+    ];
+    for (const [headers, body] of bodies) {
+      entries = [];
+      const response = await send('POST', '/oauth/mcp/register', headers, body);
+      expect(response.status).toBe(400);
+      expect(onlyEntryDetails()).toEqual({ error: 'invalid_client_metadata', redirectOrigins: [] });
+    }
+  });
+
+  it('writes no entry for an accepted registration', async () => {
+    const response = await send('POST', '/oauth/mcp/register', JSON_TYPE, JSON.stringify({ client_name: 'Claude', redirect_uris: ['https://claude.ai/api/mcp/auth_callback'] }));
+    expect(response.status).toBe(201);
+    expect(entries).toEqual([]);
+  });
+});
+
 function authorizePath(clientId: string, extra: Record<string, string> = {}): string {
   const query = new URLSearchParams({ client_id: clientId, redirect_uri: REDIRECT, response_type: 'code', code_challenge: CHALLENGE, code_challenge_method: 'S256', ...extra });
   return `/oauth/mcp/authorize?${query.toString()}`;
