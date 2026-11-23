@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5623",
   "created": "2026-11-23T20:20:25.006Z",
-  "updated": "2026-11-23T20:55:42.533Z",
+  "updated": "2026-11-23T20:55:43.618Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -203,6 +203,11 @@
     "wi9-status-reclaim-line.ac2": {
       "status": "completed",
       "doneAt": "2026-11-23T20:55:42.533Z"
+    },
+    "wi10-workspace-data-reclaim-aware": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5623",
+      "claimedAt": "2026-11-23T20:55:43.618Z"
     }
   }
 }
