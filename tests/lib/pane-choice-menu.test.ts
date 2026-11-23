@@ -11,6 +11,7 @@ import {
   buildChoiceKeystrokes,
   paneHasBlockingChoiceMenu,
 } from '../../src/lib/pane-choice-menu.js'
+import { CLAUDE_TRUST_DIALOG_BACKSTOP, CLAUDE_TRUST_DIALOG_PLAIN } from '../fixtures/claude-trust-dialog.js'
 
 /** Verbatim resume-gate menu as rendered in the operator's pane. */
 const RESUME_GATE_MENU = [
@@ -286,5 +287,58 @@ describe('paneChoiceMenuSignature', () => {
     const changed = RESUME_GATE_MENU.replace("Don't ask me again", 'Never ask again')
     expect(paneChoiceMenuSignature(parsePaneChoiceMenu(changed)!))
       .not.toBe(paneChoiceMenuSignature(parsePaneChoiceMenu(RESUME_GATE_MENU)!))
+  })
+})
+
+describe('parsePaneChoiceMenu — Claude Code folder-trust dialog (PAN-4242)', () => {
+  it('parses the plain dialog as two options in rendered order', () => {
+    const menu = parsePaneChoiceMenu(CLAUDE_TRUST_DIALOG_PLAIN)
+    expect(menu).not.toBeNull()
+    expect(menu!.options).toEqual([
+      { number: 1, label: 'No, exit', recommended: false },
+      { number: 2, label: 'Yes, I trust this folder', recommended: false },
+    ])
+    expect(menu!.selectedIndex).toBe(0)
+    expect(menu!.title).toBe('Accessing workspace:')
+    expect(menu!.contextLines).toContain('/dev/shm/pan4242-plain')
+    expect(menu!.contextLines).not.toContain('Security guide')
+    expect(menu!.footerHint).toBe('Enter to confirm · Esc to cancel')
+    expect(menu!.confidence).toBe('high')
+  })
+
+  it('parses the backstop dialog with its pre-approved rules as context', () => {
+    const menu = parsePaneChoiceMenu(CLAUDE_TRUST_DIALOG_BACKSTOP)
+    expect(menu!.options.map((option) => option.label))
+      .toEqual(['No, continue without these permissions', 'Yes, I trust this folder'])
+    expect(menu!.selectedIndex).toBe(0)
+    expect(menu!.title).toBe('Accessing workspace:')
+    expect(menu!.contextLines).toContain('Bash(gh issue create:*)')
+  })
+
+  it('parses in guard mode and with blank filler below the footer', () => {
+    for (const fixture of [CLAUDE_TRUST_DIALOG_PLAIN, CLAUDE_TRUST_DIALOG_BACKSTOP]) {
+      expect(parsePaneChoiceMenu(`${fixture}\n\n\n\n`, { mode: 'guard' })).not.toBeNull()
+      expect(paneHasBlockingChoiceMenu(fixture)).toBe(true)
+    }
+  })
+
+  it('answers "Yes, I trust this folder" with Down then Enter', () => {
+    for (const fixture of [CLAUDE_TRUST_DIALOG_PLAIN, CLAUDE_TRUST_DIALOG_BACKSTOP]) {
+      expect(buildChoiceKeystrokes(parsePaneChoiceMenu(fixture)!, 1)).toEqual(['Down', 'Enter'])
+    }
+  })
+
+  it('rejects the dialog when real output follows the footer', () => {
+    expect(parsePaneChoiceMenu(`${CLAUDE_TRUST_DIALOG_PLAIN}\n● Reading src/index.ts`)).toBeNull()
+  })
+
+  it('rejects two unnumbered rows without "Yes, I trust this folder"', () => {
+    const lookalike = CLAUDE_TRUST_DIALOG_PLAIN.replace('Yes, I trust this folder', 'Yes, continue')
+    expect(parsePaneChoiceMenu(lookalike)).toBeNull()
+    expect(paneHasBlockingChoiceMenu(lookalike)).toBe(false)
+  })
+
+  it('rejects the rows when no cursor marks one of them', () => {
+    expect(parsePaneChoiceMenu(CLAUDE_TRUST_DIALOG_PLAIN.replace('❯ No, exit', '  No, exit'))).toBeNull()
   })
 })
