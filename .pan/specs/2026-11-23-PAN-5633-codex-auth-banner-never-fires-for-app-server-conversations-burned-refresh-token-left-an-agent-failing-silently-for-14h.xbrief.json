@@ -4,17 +4,17 @@
     "created": "2026-11-23T18:59:06Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5633: Codex auth banner never fires for app-server conversations: burned refresh token left an agent failing silently for 14h",
-    "updated": "2026-11-23T19:04:57.186Z"
+    "updated": "2026-11-23T19:06:09.049Z"
   },
   "plan": {
     "id": "pan-5633",
     "title": "Codex auth banner never fires for app-server conversations: burned refresh token left an agent failing silently for 14h",
-    "status": "proposed",
+    "status": "running",
     "uid": "c7e4d459-9659-4cdf-ab5c-79c9e5d6b88e",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-23T18:59:06Z",
-    "updated": "2026-11-23T19:04:57.186Z",
+    "updated": "2026-11-23T19:06:09.049Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5633",
@@ -780,5 +780,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
