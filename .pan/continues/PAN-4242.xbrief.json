@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4242",
   "created": "2026-11-23T08:46:31.743Z",
-  "updated": "2026-11-23T09:35:07.831Z",
+  "updated": "2026-11-23T09:35:28.592Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -90,9 +90,22 @@
       "doneAt": "2026-11-23T09:35:06.750Z"
     },
     "startup-stall-flag": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4242",
-      "claimedAt": "2026-11-23T09:35:07.831Z"
+      "claimedAt": "2026-11-23T09:35:07.831Z",
+      "doneAt": "2026-11-23T09:35:28.592Z"
+    },
+    "startup-stall-flag.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:35:28.592Z"
+    },
+    "startup-stall-flag.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:35:28.592Z"
+    },
+    "startup-stall-flag.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:35:28.592Z"
     }
   }
 }
