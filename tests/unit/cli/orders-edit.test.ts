@@ -4,7 +4,17 @@ import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { runOrdersAdd, runOrdersCreate } from '../../../src/cli/commands/orders.js';
-import { runOrdersItem, runOrdersPause, runOrdersResume, runOrdersRename, runOrdersSet } from '../../../src/cli/commands/orders-edit.js';
+import {
+  runOrdersCandidates,
+  runOrdersCheck,
+  runOrdersItem,
+  runOrdersPause,
+  runOrdersPreview,
+  runOrdersResume,
+  runOrdersRename,
+  runOrdersSet,
+} from '../../../src/cli/commands/orders-edit.js';
+import { DashboardUnreachableError } from '../../../src/cli/commands/dashboard-call.js';
 
 const { mockGetProjectSync, mockGetProjectPanPaths, mockStartFlywheelRun } = vi.hoisted(() => ({
   mockGetProjectSync: vi.fn(),
@@ -171,5 +181,80 @@ describe('pan orders item (PAN-5598 WI-8)', () => {
     await runOrdersAdd(created.id, ['PAN-2'], {}, deps);
     await expect(runOrdersItem(created.id, 'PAN-2', {}, deps))
       .rejects.toThrow('--prereqs, --reverify, --no-reverify, --plan-at-pickup or --no-plan-at-pickup is required');
+  });
+});
+
+function writeBacklogSequence(root: string): void {
+  mkdirSync(join(root, 'backlog'), { recursive: true });
+  const nodes = ['PAN-1', 'PAN-2'].map((issue, index) => ({
+    issue,
+    rank: index + 1,
+    size: 'S',
+    importance: 'medium',
+    score: 50,
+    condition: 'ok',
+    dependsOn: [],
+    why: `candidate ${issue}`,
+    gate: 'auto',
+    planning: 'auto',
+  }));
+  const doc = {
+    version: 1,
+    project: 'overdeck',
+    generatedAt: at,
+    model: 'test',
+    pass: 'creation',
+    openCount: nodes.length,
+    nodes,
+    edges: [],
+  };
+  writeFileSync(join(root, 'backlog', 'sequence.md'), `# Backlog\n\n\`\`\`json\n${JSON.stringify(doc)}\n\`\`\`\n`, 'utf8');
+}
+
+describe('pan orders preview, candidates, check (PAN-5598 WI-9)', () => {
+  it('preview prints the brief', async () => {
+    const panDir = gitFixture();
+    const deps = { panDir, now: () => new Date(at), actor: 'operator' };
+    const created = await runOrdersCreate('Preview Book', deps);
+    const brief = await runOrdersPreview(created.id, deps);
+    expect(brief.startsWith(`# Special orders: ${created.name}`)).toBe(true);
+  });
+
+  it('candidates prints rank, issue and why', async () => {
+    const panDir = gitFixture();
+    writeBacklogSequence(panDir);
+    const candidates = runOrdersCandidates(10, { panDir });
+    expect(candidates.map(({ rank, issue, why }) => ({ rank, issue, why }))).toEqual([
+      { rank: 1, issue: 'PAN-1', why: 'candidate PAN-1' },
+      { rank: 2, issue: 'PAN-2', why: 'candidate PAN-2' },
+    ]);
+  });
+
+  it('check prints blocks and sets exit code 1', async () => {
+    const callDashboard = vi.fn(async () => new Response(
+      JSON.stringify({ validation: { blocks: [{ issue: 'PAN-1', message: 'is not open' }], warns: [{ issue: 'PAN-2', message: 'stale' }] } }),
+      { status: 200 },
+    ));
+    const { blocks, warns } = await runOrdersCheck('b', { projectKey: 'p', callDashboard });
+    expect(blocks).toEqual([{ issue: 'PAN-1', message: 'is not open' }]);
+    expect(warns).toEqual([{ issue: 'PAN-2', message: 'stale' }]);
+  });
+
+  it('check sends the project key it resolved', async () => {
+    const calls: Array<{ path: string }> = [];
+    const callDashboard = vi.fn(async (path: string) => {
+      calls.push({ path });
+      return new Response(JSON.stringify({ validation: { blocks: [], warns: [] } }), { status: 200 });
+    });
+    await runOrdersCheck('b', { projectKey: 'p', callDashboard });
+    expect(calls).toEqual([{ path: '/api/orders/b?project=p' }]);
+  });
+
+  it('check reports an unreachable dashboard', async () => {
+    const callDashboard = vi.fn(async () => {
+      throw new DashboardUnreachableError('refused');
+    });
+    await expect(runOrdersCheck('b', { projectKey: 'p', callDashboard }))
+      .rejects.toThrow('The dashboard is not reachable. Start it with pan up, then retry.');
   });
 });

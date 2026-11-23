@@ -6,8 +6,13 @@
 import type { OrderBook } from '@overdeck/contracts';
 import { Command, InvalidArgumentError } from 'commander';
 
+import type { SequenceNode } from '../../lib/backlog/types.js';
+import { previewBrief } from '../../lib/orders/brief.js';
+import { backlogCandidates } from '../../lib/orders/resolver.js';
 import { renameBook, setItemRequirements, setSettings } from '../../lib/orders/writer.js';
-import { commandAction, commitOrders, formatBook, type OrdersCommandDeps, panDirFor } from './orders.js';
+import { findProjectByPath, listProjectsSync } from '../../lib/projects.js';
+import { callDashboard, errorText, isDashboardUnreachable } from './dashboard-call.js';
+import { commandAction, commitOrders, formatBook, type OrdersCommandDeps, panDirFor, requireBook } from './orders.js';
 
 interface OrdersSetOptions {
   parallel?: number;
@@ -27,9 +32,20 @@ interface OrdersItemOptions {
   project?: string;
 }
 
+/** `check`'s dashboard caller is injected so tests need no running server. */
+export interface OrdersCheckDeps extends OrdersCommandDeps {
+  callDashboard?: typeof callDashboard;
+}
+
 function parseParallel(value: string): number {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed < 1 || parsed > 8) throw new InvalidArgumentError('must be an integer from 1 to 8');
+  return parsed;
+}
+
+function parseCandidatesLimit(value: string): number {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 100) throw new InvalidArgumentError('must be an integer from 1 to 100');
   return parsed;
 }
 
@@ -112,6 +128,45 @@ export async function runOrdersItem(
   return book;
 }
 
+export async function runOrdersPreview(bookId: string, deps: OrdersCommandDeps = {}): Promise<string> {
+  return previewBrief(await requireBook(panDirFor(deps), bookId));
+}
+
+export function runOrdersCandidates(limit: number, deps: OrdersCommandDeps = {}): SequenceNode[] {
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new Error('--limit must be an integer from 1 to 100');
+  return backlogCandidates(panDirFor(deps), limit);
+}
+
+/** D8: resolves the project key on the CLI side (the same rule as every other verb) and always sends it. */
+function resolveCheckProjectKey(deps: OrdersCheckDeps): string {
+  if (deps.projectKey !== undefined) return deps.projectKey;
+  const cwd = deps.cwd ?? process.cwd();
+  const project = findProjectByPath(cwd);
+  const key = project ? listProjectsSync().find((entry) => entry.config.path === project.path)?.key : undefined;
+  if (!key) throw new Error(`No configured project contains ${cwd}`);
+  return key;
+}
+
+export async function runOrdersCheck(
+  bookId: string,
+  deps: OrdersCheckDeps = {},
+): Promise<{ blocks: ReadonlyArray<{ issue: string; message: string }>; warns: ReadonlyArray<{ issue: string; message: string }> }> {
+  const projectKey = resolveCheckProjectKey(deps);
+  const call = deps.callDashboard ?? callDashboard;
+  let response: Response;
+  try {
+    response = await call(`/api/orders/${encodeURIComponent(bookId)}?project=${encodeURIComponent(projectKey)}`, { method: 'GET' });
+  } catch (error) {
+    if (isDashboardUnreachable(error)) throw new Error('The dashboard is not reachable. Start it with pan up, then retry.');
+    throw error;
+  }
+  if (!response.ok) throw new Error(await errorText(response));
+  const body = await response.json() as {
+    validation?: { blocks?: Array<{ issue: string; message: string }>; warns?: Array<{ issue: string; message: string }> };
+  };
+  return { blocks: body.validation?.blocks ?? [], warns: body.validation?.warns ?? [] };
+}
+
 export function registerOrdersEditCommands(orders: Command): void {
   orders
     .command('rename <id> <name>')
@@ -161,5 +216,42 @@ export function registerOrdersEditCommands(orders: Command): void {
     .option('--project <key>', 'Resolve the order book in another registered project')
     .action((id: string, issue: string, options: OrdersItemOptions) => commandAction(async () => {
       console.log(formatBook(await runOrdersItem(id, issue, options, { projectKey: options.project })));
+    }));
+
+  orders
+    .command('preview <id>')
+    .description('Print the brief the Flywheel receives for an order book')
+    .option('--project <key>', 'Resolve the order book in another registered project')
+    .action((id: string, options: { project?: string }) => commandAction(async () => {
+      console.log(await runOrdersPreview(id, { projectKey: options.project }));
+    }));
+
+  orders
+    .command('candidates')
+    .description('List the top backlog issues that are in no order book')
+    .option('--limit <n>', 'Max candidates to print (1-100); default 10', parseCandidatesLimit)
+    .option('--project <key>', 'Resolve the backlog sequence in another registered project')
+    .action((options: { limit?: number; project?: string }) => commandAction(async () => {
+      const candidates = runOrdersCandidates(options.limit ?? 10, { projectKey: options.project });
+      if (candidates.length === 0) {
+        console.log('No backlog candidates.');
+        return;
+      }
+      for (const candidate of candidates) console.log(`${candidate.rank}  ${candidate.issue}  ${candidate.why}`);
+    }));
+
+  orders
+    .command('check <id>')
+    .description('Print the problems that block an order book from starting')
+    .option('--project <key>', 'Resolve the order book in another registered project')
+    .action((id: string, options: { project?: string }) => commandAction(async () => {
+      const { blocks, warns } = await runOrdersCheck(id, { projectKey: options.project });
+      if (blocks.length === 0 && warns.length === 0) {
+        console.log('No problems.');
+      } else {
+        for (const block of blocks) console.log(`BLOCK ${block.issue} ${block.message}`);
+        for (const warn of warns) console.log(`WARN ${warn.issue} ${warn.message}`);
+      }
+      if (blocks.length > 0) process.exitCode = 1;
     }));
 }
