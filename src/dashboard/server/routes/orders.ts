@@ -8,6 +8,7 @@ import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { backlogCandidates, computeBookProgress, getBookAsync, listBooks, liveOrderIssueLookup, normalizeOrderIssueId } from '../../../lib/orders/resolver.js';
+import { deriveBookPhases, type OrderBookPhaseView } from '../../../lib/orders/phase.js';
 import type { OrderIssueLookup, OrderIssueState } from '../../../lib/orders/types.js';
 import { createOrderPrdLookup, hasOrderIssuePrd, validateBookForStart } from '../../../lib/orders/validate.js';
 import {
@@ -224,16 +225,38 @@ function buildOrdersReadSnapshot(deps: OrdersRouteDeps, projectKey?: string): Or
   };
 }
 
-function enrichedBook(book: OrderBook, deps: OrdersRouteDeps, snapshot?: OrdersReadSnapshot, projectKey?: string) {
+/** Phase, queue position and finished for every book in the project, from the same rule dispatch uses. */
+function bookPhases(books: readonly OrderBook[], issueLookup?: OrderIssueLookup): Map<string, OrderBookPhaseView> {
+  return deriveBookPhases(books, (candidate) => computeBookProgress(candidate, issueLookup));
+}
+
+/** Used only when the book is missing from the list it was derived from (a concurrent write raced the read). */
+function fallbackPhase(book: OrderBook): OrderBookPhaseView {
+  return {
+    phase: book.status === 'complete' ? 'archived' : book.status === 'draft' ? 'draft' : 'queued',
+    queuePosition: null,
+    finished: false,
+  };
+}
+
+function enrichedBook(
+  book: OrderBook,
+  deps: OrdersRouteDeps,
+  snapshot?: OrdersReadSnapshot,
+  projectKey?: string,
+  phases?: Map<string, OrderBookPhaseView>,
+) {
   const resolved = snapshot ?? resolveOrdersStateRoot(deps, projectKey);
   const stateRoot = resolved.stateRoot;
   const hasPrd = snapshot?.hasPrd ?? deps.hasPrd ?? ((issueId: string) => hasOrderIssuePrd(stateRoot, issueId));
   const issueLookup = snapshot?.issueLookup ?? deps.issueLookup;
   const prerequisiteIds = [...new Set(book.items.flatMap((item) => item.prereqs.map((prereq) => prereq.toUpperCase())))];
   const prerequisiteState = snapshot?.issueState ?? issueLookup?.(prerequisiteIds) ?? new Map();
+  const phaseMap = phases ?? bookPhases(snapshot?.books ?? listBooks(stateRoot), issueLookup);
   return {
     ...book,
     ...(resolved.project !== undefined ? { project: resolved.project } : {}),
+    ...(phaseMap.get(book.id) ?? fallbackPhase(book)),
     progress: computeBookProgress(book, issueLookup),
     validation: validateBookForStart(stateRoot, book, {
       issueLookup,
@@ -311,9 +334,10 @@ async function defaultStartOrderBook(book: OrderBook, project: ProjectConfig): P
 export async function getOrdersPayload(deps: OrdersRouteDeps = {}, projectKey?: string): Promise<RouteResult> {
   return routeResult(async () => {
     const snapshot = buildOrdersReadSnapshot(deps, projectKey);
+    const phases = bookPhases(snapshot.books, snapshot.issueLookup);
     return {
       ...(snapshot.project !== undefined ? { project: snapshot.project } : {}),
-      books: snapshot.books.map((book) => enrichedBook(book, deps, snapshot)),
+      books: snapshot.books.map((book) => enrichedBook(book, deps, snapshot, undefined, phases)),
     };
   });
 }

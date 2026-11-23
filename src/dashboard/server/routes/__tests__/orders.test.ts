@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { _resetInternalTokenCacheForTests, INTERNAL_TOKEN_HEADER } from '../../../../lib/internal-token.js';
 import type { OrderIssueLookup, OrderIssueState } from '../../../../lib/orders/types.js';
+import { setStatus } from '../../../../lib/orders/writer.js';
 import type { ProjectConfig } from '../../../../lib/projects.js';
 import { makeOrdersRouteLayer } from '../orders.js';
 
@@ -312,6 +313,42 @@ describe('/api/orders routes', () => {
     expect(lookup).toHaveBeenCalledWith(['PAN-1', 'PAN-2']);
   });
 
+  it('returns phase active for the first ready book and queued with queuePosition 2 for the next', async () => {
+    const root = gitFixture();
+    const states = new Map<string, OrderIssueState>([
+      ['PAN-1', { issue: 'PAN-1', open: true, parked: false }],
+      ['PAN-2', { issue: 'PAN-2', open: true, parked: false }],
+      ['PAN-3', { issue: 'PAN-3', open: false, parked: false }],
+      ['PAN-4', { issue: 'PAN-4', open: false, parked: false }],
+    ]);
+    const layer = makeOrdersRouteLayer({ stateRoot: () => root, issueLookup: issueLookup(states), hasPrd: () => true });
+    const books = [
+      ['2026-07-18-first', 'PAN-1', 'ready'],
+      ['2026-07-18-second', 'PAN-2', 'ready'],
+      ['2026-07-18-draft', 'PAN-3', 'draft'],
+      ['2026-07-18-archived', 'PAN-4', 'complete'],
+    ] as const;
+    for (const [id, issue, status] of books) {
+      await requestOrdersRoute(layer, '/api/orders', mutation('POST', { id, name: id }));
+      await requestOrdersRoute(layer, `/api/orders/${id}/items`, mutation('POST', { items: [{ issue, lane: 'A' }] }));
+      if (status !== 'draft') await setStatus(root, id, status);
+    }
+
+    await expect(requestOrdersRoute(layer, '/api/orders')).resolves.toMatchObject({
+      status: 200,
+      body: { books: [
+        { id: '2026-07-18-first', phase: 'active', queuePosition: 1, finished: false },
+        { id: '2026-07-18-second', phase: 'queued', queuePosition: 2, finished: false },
+        { id: '2026-07-18-draft', phase: 'draft', queuePosition: null, finished: true },
+        { id: '2026-07-18-archived', phase: 'archived', queuePosition: null, finished: true },
+      ] },
+    });
+    await expect(requestOrdersRoute(layer, '/api/orders/2026-07-18-second')).resolves.toMatchObject({
+      status: 200,
+      body: { id: '2026-07-18-second', phase: 'queued', queuePosition: 2, finished: false },
+    });
+  });
+
   it('returns sequenced backlog candidates excluding every active-book member', async () => {
     const root = gitFixture();
     const layer = makeOrdersRouteLayer({ stateRoot: () => root });
@@ -452,7 +489,7 @@ describe('/api/orders routes', () => {
 
     await expect(requestOrdersRoute(layer, '/api/orders/2026-07-18-scanned')).resolves.toMatchObject({
       status: 200,
-      body: { id: '2026-07-18-scanned', project: 'other-project' },
+      body: { id: '2026-07-18-scanned', project: 'other-project', phase: 'draft', queuePosition: null },
     });
   });
 
