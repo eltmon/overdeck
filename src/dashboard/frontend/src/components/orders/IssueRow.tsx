@@ -98,9 +98,9 @@ export function IssueRow({
       onDrop={readOnly ? undefined : (event) => onDrop?.(event, item.lane, item.order)}
       className={`list-row group border-l-2 border-t border-t-border first:border-t-0 ${LEFT_BORDER[status.kind] ?? 'border-l-transparent'}`}
     >
-      <div className="flex min-w-0 items-center gap-2.5 px-3 py-2 text-xs">
-        {!readOnly && <GripVertical className="h-3.5 w-3.5 shrink-0 cursor-grab text-faint-foreground" aria-hidden="true" />}
-        <span className="w-7 shrink-0 font-mono text-[11px] text-faint-foreground">{item.lane}{item.order}</span>
+      <div className="relative flex min-w-0 items-center gap-2.5 px-3 py-2 text-xs">
+        {!readOnly && <GripVertical className="hidden h-3.5 w-3.5 shrink-0 cursor-grab text-faint-foreground sm:block" aria-hidden="true" />}
+        <span className="hidden w-7 shrink-0 font-mono text-[11px] text-faint-foreground sm:inline">{item.lane}{item.order}</span>
         {url
           ? <a href={url} target="_blank" rel="noreferrer" className="w-[4.75rem] shrink-0 font-mono text-[11px] text-foreground hover:text-primary hover:underline">{item.issue}</a>
           : <span className="w-[4.75rem] shrink-0 font-mono text-[11px] text-foreground">{item.issue}</span>}
@@ -109,7 +109,9 @@ export function IssueRow({
           {!landed && notes.length > 0 && <div className="truncate text-[11px] text-muted-foreground">{notes.join(' · ')}</div>}
         </div>
         {!readOnly && !landed && (
-          <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+          // Overlaid on the right edge so the hidden actions take no width from the title;
+          // still in the tab order, and focusing one reveals them.
+          <div className="absolute inset-y-0 right-3 flex items-center gap-1 bg-card pl-2 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
             <button
               type="button"
               onClick={() => onSwapLane?.(item)}
@@ -137,7 +139,7 @@ export function IssueRow({
             </button>
           </div>
         )}
-        <span className={`shrink-0 whitespace-nowrap rounded-md border px-1.5 py-0.5 text-[11px] ${STATUS_TAG_CLASSES[status.tone]}`}>{status.label}</span>
+        <span title={status.label} className={`max-w-[45%] shrink-0 truncate whitespace-nowrap rounded-md border px-1.5 py-0.5 text-[11px] sm:max-w-none ${STATUS_TAG_CLASSES[status.tone]}`}>{status.label}</span>
       </div>
       {editing && (
         <div className="list-meta grid gap-2.5 border-t border-border px-3 py-3 text-[11px]" aria-label={`Options for ${item.issue}`}>
