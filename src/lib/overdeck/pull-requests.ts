@@ -260,6 +260,11 @@ async function fetchIssuePullRequestFromRef(
   }
 }
 
+/** PAN-5638: one PR by repository and number (a polyrepo member's PR). Never cached. */
+export function fetchPullRequestByNumber(issueId: string, repoArg: string, prNumber: number): Promise<IssuePrEndpointResponse> {
+  return fetchIssuePullRequestFromRef({ issueId: issueId.toUpperCase(), repoArg, prNumber: String(prNumber) });
+}
+
 export async function fetchIssuePullRequest(
   issueId: string,
   options: { preferBranch?: string } = {},

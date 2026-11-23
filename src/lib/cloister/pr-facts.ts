@@ -654,15 +654,18 @@ async function trustedAuthorsFor(pr: IssuePullRequestData, deps: PrFactsDeps): P
   }
 }
 
+/** PAN-5638: one GitHub PR's facts from its `gh pr view` payload, under the marker trust rules. */
+export async function gitHubPrFacts(issueId: string, view: IssuePullRequestData, deps: PrFactsDeps = {}): Promise<PrFacts> {
+  const pr = await withCommentAuthorKinds(view, deps);
+  return gitHubFacts(issueId, pr, await trustedAuthorsFor(pr, deps), await markerApproversFor(pr, deps));
+}
+
 async function readPrFacts(issueId: string, deps: PrFactsDeps, options: PrFactsOptions = {}): Promise<PrFacts> {
   const fetchGitHubPr = deps.fetchGitHubPr ?? fetchIssuePullRequest;
   if (options.fresh) bumpIssuePrTabCacheGeneration(issueId);
   try {
     const gh = await fetchGitHubPr(issueId, options.preferBranch ? { preferBranch: options.preferBranch } : {});
-    if (gh.pr) {
-      const pr = await withCommentAuthorKinds(gh.pr, deps);
-      return gitHubFacts(issueId, pr, await trustedAuthorsFor(pr, deps), await markerApproversFor(pr, deps));
-    }
+    if (gh.pr) return gitHubPrFacts(issueId, gh.pr, deps);
     if (gh.error) return emptyPrFacts(issueId, gh.error);
   } catch (cause) {
     return emptyPrFacts(issueId, `GitHub PR lookup failed: ${cause instanceof Error ? cause.message : String(cause)}`);
