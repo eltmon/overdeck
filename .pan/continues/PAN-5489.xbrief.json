@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5489",
   "created": "2026-11-23T06:59:21.851Z",
-  "updated": "2026-11-23T08:14:53.644Z",
+  "updated": "2026-11-23T08:14:54.836Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -110,6 +110,11 @@
     "issue-start-routes-errors.ac4": {
       "status": "completed",
       "doneAt": "2026-11-23T08:14:53.643Z"
+    },
+    "docs-and-changelog": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5489",
+      "claimedAt": "2026-11-23T08:14:54.835Z"
     }
   }
 }
