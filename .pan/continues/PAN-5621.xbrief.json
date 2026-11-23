@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5621",
   "created": "2026-11-23T18:11:42.737Z",
-  "updated": "2026-11-23T18:53:24.805Z",
+  "updated": "2026-11-23T19:08:47.579Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -54,9 +54,30 @@
       "doneAt": "2026-11-23T18:51:00.232Z"
     },
     "wi3-starvation-module": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5621",
-      "claimedAt": "2026-11-23T18:53:24.805Z"
+      "claimedAt": "2026-11-23T18:53:24.805Z",
+      "doneAt": "2026-11-23T19:08:47.579Z"
+    },
+    "wi3-starvation-module.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:08:47.579Z"
+    },
+    "wi3-starvation-module.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:08:47.579Z"
+    },
+    "wi3-starvation-module.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:08:47.579Z"
+    },
+    "wi3-starvation-module.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:08:47.579Z"
+    },
+    "wi3-starvation-module.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:08:47.579Z"
     }
   }
 }
