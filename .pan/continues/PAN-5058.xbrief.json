@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5058",
   "created": "2026-11-23T02:58:48.676Z",
-  "updated": "2026-11-23T03:56:15.421Z",
+  "updated": "2026-11-23T03:56:17.164Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -64,6 +64,9 @@
       "status": "cancelled"
     },
     "w4-cp2-muse": {
+      "status": "cancelled"
+    },
+    "w5-grok-docs": {
       "status": "cancelled"
     }
   }
