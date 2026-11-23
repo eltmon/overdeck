@@ -11,6 +11,36 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
 
 {/* RELEASE STEP: do not edit this page for an unreleased change. Each PR adds its bullets to changelog.d/<issue>.md (format: changelog.d/README.md), and pan release stable folds them into a dated <Update> block here. See docs/RELEASING.md "Update the public changelog". If a new model needs a newer Claude Code, say so in its entry and confirm its minClaudeCodeVersion is set. */}
 
+<Update label="v0.91.0" description="2026-11-23">
+  #### New
+
+  - **Order-book MCP tools:** ten `overdeck` MCP tools list, read, create, edit and start order books, so agents and bots can do everything the Order books page does. ([#5598](https://github.com/eltmon/overdeck/issues/5598))
+  - **More `pan orders` verbs:** `rename`, `set`, `pause`, `resume`, `item`, `check`, `preview` and `candidates`, plus `--prereqs` and `--plan-at-pickup` on `add` and `--json` on `list`. ([#5598](https://github.com/eltmon/overdeck/issues/5598))
+  - **See conversation-search indexing in the top bar:** while the dashboard indexes transcripts for search, an **Indexing N/M** chip shows in the top bar. Hover it for the kind of indexing, files, chunks and elapsed time; click it for the current file, queue, last error and a link to the Conversation Search settings. ([#5609](https://github.com/eltmon/overdeck/issues/5609))
+
+  #### Improved
+
+  - **The Order books page shows which book is live:** books are grouped Active, Queued, Drafts and Archived, and the selected book says in one sentence what its phase means. Each book has one issue list with full titles and one plain status per issue, such as Working, In review or Waiting for a free slot. Labels replace the old jargon. ([#5597](https://github.com/eltmon/overdeck/issues/5597))
+  - **Archive a book or move it back to draft:** the page and the new `pan orders unqueue`, `pan orders archive` and `pan orders unarchive` commands move a book between phases, and `pan orders list` shows each book's phase. ([#5597](https://github.com/eltmon/overdeck/issues/5597))
+  - **Finished order books no longer hold the queue:** when every issue in the active book has landed or is parked, the Flywheel moves to the next queued book on its own. A book that still has open issues keeps its place. ([#5599](https://github.com/eltmon/overdeck/issues/5599))
+
+  #### Fixed
+
+  - **Agents no longer stall at Claude Code's folder-trust dialog (PAN-4242):** every Claude Code launch now trusts the real path of its folder and its git repository root, so a trailing slash, a symlink or a project whose main checkout was never trusted no longer leaves an agent waiting at "Is this a project you trust?". Workspace settings no longer copy your user-level `permissions`, which made Claude Code ask again. An agent still stuck at a startup menu three minutes after launch now shows in Needs you, `pan answer` lists and answers such menus on Herdr hosts, and a handoff whose kickoff was refused keeps the kickoff, so Start or Resume sends it. ([#4242](https://github.com/eltmon/overdeck/issues/4242))
+  - **Bot plugins install the current Overdeck:** the Grok Build and Grok Bot plugins pinned `@overdeck/core` 0.74.0 and 0.77.0. Every pin now matches the release, and `pan release` stamps them. ([#5486](https://github.com/eltmon/overdeck/issues/5486))
+  - **Grok Bot docs and the Connect a bot dialog agree:** Grok Bot now defaults to Public MCP, because the connector route fails from Grok Bot's sandbox. Public MCP with Grok Bot is not verified live yet. ([#5486](https://github.com/eltmon/overdeck/issues/5486))
+  - **Hume workspace setup:** workspace creation finds `HUME_API_KEY` in the project's secrets file or `~/.overdeck.env` even when the dashboard started without it, shows the failing Hume step in the error, and re-runs the Hume step on the next attempt. ([#5489](https://github.com/eltmon/overdeck/issues/5489))
+  - **Issue start errors:** a failed issue start through the `start_issue` tool now returns the server's error message instead of `request failed`, and the dashboard log records it. ([#5489](https://github.com/eltmon/overdeck/issues/5489))
+  - **Landed issues no longer block a book:** a queued book whose issues have partly or fully landed can be started, and its landed issues are no longer shown as errors. ([#5597](https://github.com/eltmon/overdeck/issues/5597))
+  - **Dashboard start works for projects with their own compose prefix:** the dashboard Start button, the post-planning hand-off and `POST /api/agents` no longer reject a workspace whose dev script names its Docker Compose project something other than `overdeck-feature-<id>`, such as MYN's `myn-feature-<id>`. A declared name that does not end in the feature folder is still refused. ([#5600](https://github.com/eltmon/overdeck/issues/5600))
+  - **Starting an order book reaches a running Flywheel:** `pan orders start` and the order book's Start button used to report success while dropping the book when a Flywheel conversation was already running. The book is now sent to that conversation as `/pan-flywheel <book-id> --project <key>`, the CLI prints `Flywheel already running; sent order book <id> to conversation <name>`, and a failed delivery exits non-zero or returns an error instead of claiming success. ([#5601](https://github.com/eltmon/overdeck/issues/5601))
+  - **Conversation commands reach the dashboard again:** `pan conversations move`, `heal`, `link-pr`, `unlink-pr`, `auto-settle` and `schedule add`/`pause`/`resume`/`rm` failed with "Missing origin". They now send the dashboard URL as the request's Origin. ([#5610](https://github.com/eltmon/overdeck/issues/5610))
+  - **Idle-settled conversations come back when you use them:** a conversation the idle sweep settled now returns to Inbox and its project group as soon as you send it a message, or within about 15 minutes of new activity in its terminal. Conversations you settled yourself, or that settled when their pull requests merged, stay settled. ([#5611](https://github.com/eltmon/overdeck/issues/5611))
+  - **Review verdicts reach GitLab polyrepo merge requests:** `pan admin specialists done` now takes the forge from the project configuration instead of the workspace root's git remote. A polyrepo workspace root has no remote, so the command used to look for a GitHub pull request and lose the verdict. A review verdict now goes on the open merge request in every member repo the issue changed, and the merge gate finds the merge request in whichever member repo holds it. A project with no configured forge and no readable remote now reports an error instead of assuming GitHub. ([#5614](https://github.com/eltmon/overdeck/issues/5614))
+
+  [Compare v0.90.1...v0.91.0](https://github.com/eltmon/overdeck/compare/v0.90.1...v0.91.0)
+</Update>
+
 <Update label="v0.90.1" description="2026-11-21">
   #### New
 

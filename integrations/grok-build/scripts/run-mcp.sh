@@ -6,7 +6,7 @@
 # JSON-RPC. See README.md.
 set -euo pipefail
 
-OVERDECK_CORE_VERSION="${OVERDECK_CORE_VERSION:-0.90.1}"
+OVERDECK_CORE_VERSION="${OVERDECK_CORE_VERSION:-0.91.0}"
 connector_home="${OVERDECK_CONNECTOR_HOME:-$HOME/.overdeck-connector}"
 
 pan_has_connector() {
