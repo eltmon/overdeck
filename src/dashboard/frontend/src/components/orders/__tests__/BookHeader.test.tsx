@@ -50,13 +50,14 @@ describe('BookHeader', () => {
     const fetchMock = stubFetch();
     const { rerender } = render(<BookHeader book={book({ phase: 'queued', queuePosition: 2 })} activeBookName="Hardening" flywheelRunning />);
     expect(screen.getByText('Queued · #2')).toBeInTheDocument();
-    expect(screen.getByText(/Waits behind "Hardening"/)).toBeInTheDocument();
+    expect(screen.getByText('Waits behind "Hardening". It becomes active when the books ahead of it finish, are archived, or are moved back to draft.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Move back to draft' }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
     expect(lastBody(fetchMock)).toEqual({ status: 'draft' });
 
     rerender(<BookHeader book={book({ phase: 'queued', queuePosition: 2, finished: true })} flywheelRunning />);
     expect(screen.getByText('Finished')).toBeInTheDocument();
+    expect(screen.getByText('Every issue has landed. The Flywheel skips this book. Archive it to tidy the list.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Archive' }));
     await waitFor(() => expect(lastBody(fetchMock)).toEqual({ status: 'complete' }));
 
