@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5633",
   "created": "2026-11-23T19:06:23.391Z",
-  "updated": "2026-11-23T19:28:07.996Z",
+  "updated": "2026-11-23T19:28:13.424Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -184,6 +184,11 @@
     "wi8-panel-working.ac4": {
       "status": "completed",
       "doneAt": "2026-11-23T19:28:07.995Z"
+    },
+    "wi9-docs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5633",
+      "claimedAt": "2026-11-23T19:28:13.423Z"
     }
   }
 }
