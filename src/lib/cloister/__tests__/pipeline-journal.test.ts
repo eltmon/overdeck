@@ -20,6 +20,7 @@ const {
   lastPipelineEntry,
   lastPipelineStep,
   openStackReclaim,
+  reclaimRestoresOnTurn,
   reclaimedInEpisode,
   pipelineJournalPath,
   readPipelineJournal,
@@ -184,6 +185,10 @@ describe('openStackReclaim and reclaimedInEpisode (PAN-5623)', () => {
       at: at(0),
       containers: ['myn-feature-min-1144-api-1', 'myn-feature-min-1144-fe-1'],
       composeProject: 'myn-feature-min-1144',
+      reasons: ['gate-starvation'],
+      latestAt: at(0),
+      latestContainers: ['myn-feature-min-1144-api-1', 'myn-feature-min-1144-fe-1'],
+      recordedServices: {},
     });
   });
 
@@ -201,13 +206,80 @@ describe('openStackReclaim and reclaimedInEpisode (PAN-5623)', () => {
       { at: at(1), type: 'stack.restored' as const, issueId: 'PAN-1' },
       reclaim(2, { containers: ['a-fe-1'] }),
     ];
-    expect(openStackReclaim(entries)).toEqual({ at: at(2), containers: ['a-fe-1'], composeProject: null });
+    expect(openStackReclaim(entries)).toEqual({
+      at: at(2),
+      containers: ['a-fe-1'],
+      composeProject: null,
+      reasons: ['gate-starvation'],
+      latestAt: at(2),
+      latestContainers: ['a-fe-1'],
+      recordedServices: {},
+    });
   });
 
   it('is null for a reclaim with no usable container names', () => {
     expect(openStackReclaim([reclaim(0, { containers: [] })])).toBeNull();
     expect(openStackReclaim([reclaim(0, { containers: [1, '', null] })])).toBeNull();
     expect(openStackReclaim([reclaim(0, {})])).toBeNull();
+  });
+
+  it('merges every reclaim after the newest restore, with reasons and the newest entry (PAN-5250)', () => {
+    const entries = [
+      reclaim(0, { containers: ['A'] }),
+      { at: at(1), type: 'stack.restored' as const, issueId: 'PAN-1' },
+      reclaim(2, { containers: ['B'], reason: 'idle' }),
+      reclaim(3, { containers: ['C'], composeProject: 'proj' }),
+    ];
+    const open = openStackReclaim(entries);
+    expect(open?.containers).toEqual(['B', 'C']);
+    expect(open?.reasons).toEqual(expect.arrayContaining(['idle', 'gate-starvation']));
+    expect(open?.reasons).toHaveLength(2);
+    expect(open?.latestContainers).toEqual(['C']);
+    expect(open?.latestAt).toBe(at(3));
+    expect(open?.at).toBe(at(3));
+    expect(open?.composeProject).toBe('proj');
+  });
+
+  it('is null when the newest stack entry is a restore after several reclaims (PAN-5250)', () => {
+    const entries = [
+      reclaim(0, { containers: ['A'], reason: 'idle' }),
+      reclaim(1, { containers: ['B'] }),
+      { at: at(2), type: 'stack.restored' as const, issueId: 'PAN-1' },
+    ];
+    expect(openStackReclaim(entries)).toBeNull();
+  });
+
+  it('skips a reclaim with no usable names and keeps the valid one (PAN-5250)', () => {
+    const open = openStackReclaim([reclaim(0, { containers: [] }), reclaim(1, { containers: ['a-fe-1'], reason: 'idle' })]);
+    expect(open?.containers).toEqual(['a-fe-1']);
+    expect(open?.reasons).toEqual(['idle']);
+  });
+
+  it('lists a container named by two open reclaims once (PAN-5250)', () => {
+    const open = openStackReclaim([
+      reclaim(0, { containers: ['a-fe-1', 'a-dev-1'], reason: 'idle' }),
+      reclaim(1, { containers: ['a-api-1', 'a-fe-1'] }),
+    ]);
+    expect(open?.containers).toEqual(['a-fe-1', 'a-dev-1', 'a-api-1']);
+    expect(open?.latestContainers).toEqual(['a-api-1', 'a-fe-1']);
+  });
+
+  it('reclaimRestoresOnTurn holds idle-only reclaims and restores memory reclaims (PAN-5250)', () => {
+    expect(reclaimRestoresOnTurn(openStackReclaim([reclaim(0, { containers: ['a-fe-1'], reason: 'idle' })]))).toBe(false);
+    expect(reclaimRestoresOnTurn(openStackReclaim([
+      reclaim(0, { containers: ['a-fe-1'], reason: 'idle' }),
+      reclaim(1, { containers: ['a-api-1'] }),
+    ]))).toBe(true);
+    expect(reclaimRestoresOnTurn(openStackReclaim([reclaim(0, { containers: ['a-api-1'], reason: 'gate-starvation' })]))).toBe(true);
+    expect(reclaimRestoresOnTurn(null)).toBe(false);
+  });
+
+  it('records the service each reclaim entry paired with a container name (PAN-5250)', () => {
+    const open = openStackReclaim([
+      reclaim(0, { containers: ['x-dev-1'], services: ['dev'], reason: 'idle' }),
+      reclaim(1, { containers: ['x-api-1'] }),
+    ]);
+    expect(open?.recordedServices).toEqual({ 'x-dev-1': 'dev' });
   });
 
   it('reclaimedInEpisode matches only the same episodeSince', () => {
