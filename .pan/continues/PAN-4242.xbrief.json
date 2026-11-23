@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4242",
   "created": "2026-11-23T08:46:31.743Z",
-  "updated": "2026-11-23T09:36:28.039Z",
+  "updated": "2026-11-23T09:36:39.877Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -150,6 +150,11 @@
     "resume-delivers-kickoff.ac5": {
       "status": "completed",
       "doneAt": "2026-11-23T09:36:28.039Z"
+    },
+    "docs-trust-kickoff": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4242",
+      "claimedAt": "2026-11-23T09:36:39.876Z"
     }
   }
 }
