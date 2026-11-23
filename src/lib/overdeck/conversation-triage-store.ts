@@ -120,6 +120,24 @@ export function clearConversationTriage(name: string, nowMs: number = Date.now()
   return result.changes > 0;
 }
 
+/**
+ * PAN-5611: ends an 'idle' settle (and any snooze) and restarts the idle clock.
+ * Manual, merge and unknown-reason settles stay. With settledAtMs, clears only
+ * that exact settle, so a settle written after the caller read the row wins.
+ */
+export function resurfaceIdleSettledConversation(name: string, nowMs: number = Date.now(), settledAtMs?: number): boolean {
+  const guard = settledAtMs === undefined ? '' : ' AND settled_at = ?';
+  const params = settledAtMs === undefined ? [nowMs, name] : [nowMs, name, settledAtMs];
+  const result = getOverdeckDatabase()
+    .prepare(
+      `UPDATE conversations
+       SET settled_at = NULL, settle_reason = NULL, snoozed_until = NULL, idle_reset_at = ?
+       WHERE name = ? AND settled_at IS NOT NULL AND settle_reason = 'idle'${guard}`,
+    )
+    .run(...params);
+  return result.changes > 0;
+}
+
 export interface IdleClock {
   settledAtMs: number | null;
   snoozedUntilMs: number | null;
