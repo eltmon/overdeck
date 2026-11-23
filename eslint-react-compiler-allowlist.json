@@ -1,6 +1,7 @@
 [
   "src/dashboard/frontend/src/App.tsx",
   "src/dashboard/frontend/src/App/hooks/useAppShortcuts.ts",
+  "src/dashboard/frontend/src/App/hooks/usePendingInputAnnouncements.ts",
   "src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts",
   "src/dashboard/frontend/src/App/hooks/usePermissionNotifications.ts",
   "src/dashboard/frontend/src/App/hooks/useTerminalPermissionDialog.ts",
