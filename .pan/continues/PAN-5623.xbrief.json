@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5623",
   "created": "2026-11-23T20:20:25.006Z",
-  "updated": "2026-11-23T20:37:49.815Z",
+  "updated": "2026-11-23T20:37:54.923Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -70,6 +70,11 @@
     "wi3-tail-readers-skip.ac3": {
       "status": "completed",
       "doneAt": "2026-11-23T20:37:49.815Z"
+    },
+    "wi4-docker-helpers": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5623",
+      "claimedAt": "2026-11-23T20:37:54.923Z"
     }
   }
 }
