@@ -13,10 +13,28 @@ import {
 import { findConversationForCostSession } from '../../overdeck/conversations.js';
 
 describe('classifySessionBucket', () => {
-  it('returns FLYWHEEL for the flywheel-orchestrator conversation', () => {
+  it('returns FLYWHEEL for the legacy flywheel-orchestrator conversation', () => {
     const lookup: ConversationSessionLookup = () => ({ name: 'flywheel-orchestrator' });
 
     expect(classifySessionBucket({ sessionId: 'session-1' }, lookup)).toBe(NO_ISSUE_BUCKETS.flywheel);
+  });
+
+  it('returns FLYWHEEL for the conv-flywheel conversation', () => {
+    const lookup: ConversationSessionLookup = () => ({ name: 'conv-flywheel' });
+
+    expect(classifySessionBucket({ sessionId: 'session-1' }, lookup)).toBe(NO_ISSUE_BUCKETS.flywheel);
+  });
+
+  it('returns FLYWHEEL for a retired conv-flywheel~<suffix> conversation', () => {
+    const lookup: ConversationSessionLookup = () => ({ name: 'conv-flywheel~074a2fec' });
+
+    expect(classifySessionBucket({ sessionId: 'session-1' }, lookup)).toBe(NO_ISSUE_BUCKETS.flywheel);
+  });
+
+  it('returns CONVERSATIONS for a conv-flywheel-prefixed name that is not the Flywheel', () => {
+    const lookup: ConversationSessionLookup = () => ({ name: 'conv-flywheel-notes' });
+
+    expect(classifySessionBucket({ sessionId: 'session-1' }, lookup)).toBe(NO_ISSUE_BUCKETS.conversations);
   });
 
   it('returns CONVERSATIONS for any other matched conversation', () => {
@@ -67,6 +85,22 @@ describe('findConversationForCostSession', () => {
 
     expect(findConversationForCostSession({ agentId: 'conv-operator-chat' })).toEqual({ name: 'operator-chat' });
     expect(findConversationForCostSession({ agentId: 'agent-pan-2387' })).toBeNull();
+  });
+
+  it('classifies the Flywheel conversation as FLYWHEEL through the real lookup', () => {
+    seedConversation(odb, {
+      id: 'conv-uuid-fw',
+      name: 'conv-flywheel',
+      tmuxSession: 'conv-flywheel',
+      locator: 'session-fw',
+    });
+
+    expect(classifySessionBucket({ agentId: 'conv-flywheel' }, findConversationForCostSession)).toBe(
+      NO_ISSUE_BUCKETS.flywheel,
+    );
+    expect(classifySessionBucket({ sessionId: 'session-fw' }, findConversationForCostSession)).toBe(
+      NO_ISSUE_BUCKETS.flywheel,
+    );
   });
 });
 

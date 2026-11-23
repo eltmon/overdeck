@@ -6,7 +6,7 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const stateDir = mkdtempSync(join(tmpdir(), 'messaging-conv-harness-'));
 
@@ -22,7 +22,9 @@ vi.mock('../../paths.js', async (importOriginal) => ({
 vi.mock('../../overdeck/conversations.js', () => ({
   getConversationByName: (name: string) => {
     probe.lookups.push(name);
-    return name === 'brisk-otter' ? { name, harness: 'codex' } : null;
+    if (name === 'brisk-otter') return { name, harness: 'codex' };
+    if (name === 'conv-flywheel') return { name, harness: 'pi' };
+    return null;
   },
 }));
 
@@ -51,9 +53,19 @@ afterAll(() => {
 });
 
 describe('messageAgent conversation harness (PAN-4223 FR-17)', () => {
+  beforeEach(() => {
+    probe.lookups.length = 0;
+  });
+
   it('probes a conv-<name> target with the harness its row declares', async () => {
     await expect(messageAgent('conv-brisk-otter', 'hello', 'pan-tell')).rejects.toThrow('not running');
-    expect(probe.lookups).toContain('brisk-otter');
+    expect(probe.lookups).toEqual(['brisk-otter']);
     expect(probe.harness).toBe('codex');
+  });
+
+  it('probes the Flywheel by its full row name, conv-flywheel (PAN-5615)', async () => {
+    await expect(messageAgent('conv-flywheel', 'hello', 'pan-tell')).rejects.toThrow('not running');
+    expect(probe.lookups).toEqual(['flywheel', 'conv-flywheel']);
+    expect(probe.harness).toBe('pi');
   });
 });

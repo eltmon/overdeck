@@ -1,0 +1,213 @@
+{
+  "version": "1",
+  "issueId": "PAN-5615",
+  "created": "2026-11-23T18:07:00.473Z",
+  "updated": "2026-11-23T18:27:08.136Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "role-plan-escalation-target": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5615",
+      "claimedAt": "2026-11-23T18:07:00.473Z",
+      "doneAt": "2026-11-23T18:08:29.332Z"
+    },
+    "role-plan-escalation-target.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:08:29.332Z"
+    },
+    "role-plan-escalation-target.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:08:29.332Z"
+    },
+    "role-plan-escalation-target.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:08:29.332Z"
+    },
+    "role-plan-escalation-target.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:08:29.332Z"
+    },
+    "role-review-escalation-target": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5615",
+      "claimedAt": "2026-11-23T18:08:58.282Z",
+      "doneAt": "2026-11-23T18:09:39.615Z"
+    },
+    "role-review-escalation-target.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:09:39.615Z"
+    },
+    "role-review-escalation-target.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:09:39.615Z"
+    },
+    "role-review-escalation-target.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:09:39.615Z"
+    },
+    "role-review-escalation-target.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:09:39.615Z"
+    },
+    "role-test-escalation-target": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5615",
+      "claimedAt": "2026-11-23T18:09:44.423Z",
+      "doneAt": "2026-11-23T18:10:25.492Z"
+    },
+    "role-test-escalation-target.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:10:25.492Z"
+    },
+    "role-test-escalation-target.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:10:25.492Z"
+    },
+    "role-test-escalation-target.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:10:25.492Z"
+    },
+    "role-test-escalation-target.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:10:25.492Z"
+    },
+    "role-work-escalation-target": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5615",
+      "claimedAt": "2026-11-23T18:10:29.494Z",
+      "doneAt": "2026-11-23T18:11:13.387Z"
+    },
+    "role-work-escalation-target.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:11:13.387Z"
+    },
+    "role-work-escalation-target.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:11:13.387Z"
+    },
+    "role-work-escalation-target.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:11:13.387Z"
+    },
+    "role-work-escalation-target.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:11:13.387Z"
+    },
+    "role-strike-escalation-target": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5615",
+      "claimedAt": "2026-11-23T18:11:17.884Z",
+      "doneAt": "2026-11-23T18:11:54.625Z"
+    },
+    "role-strike-escalation-target.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:11:54.625Z"
+    },
+    "role-strike-escalation-target.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:11:54.625Z"
+    },
+    "role-strike-escalation-target.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:11:54.625Z"
+    },
+    "conv-tell-harness-lookup": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5615",
+      "claimedAt": "2026-11-23T18:11:59.390Z",
+      "doneAt": "2026-11-23T18:24:26.719Z"
+    },
+    "escalation-target-guard-test": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5615",
+      "claimedAt": "2026-11-23T18:20:46.736Z",
+      "doneAt": "2026-11-23T18:26:02.487Z"
+    },
+    "conv-tell-harness-lookup.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:24:26.719Z"
+    },
+    "conv-tell-harness-lookup.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:24:26.719Z"
+    },
+    "conv-tell-harness-lookup.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:24:26.719Z"
+    },
+    "flywheel-cost-attribution": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5615",
+      "claimedAt": "2026-11-23T18:24:58.361Z",
+      "doneAt": "2026-11-23T18:25:30.412Z"
+    },
+    "flywheel-cost-attribution.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:25:30.412Z"
+    },
+    "flywheel-cost-attribution.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:25:30.412Z"
+    },
+    "flywheel-cost-attribution.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:25:30.412Z"
+    },
+    "flywheel-cost-attribution.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:25:30.412Z"
+    },
+    "escalation-target-guard-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:26:02.487Z"
+    },
+    "escalation-target-guard-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:26:02.487Z"
+    },
+    "escalation-target-guard-test.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:26:02.487Z"
+    },
+    "escalation-target-guard-test.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:26:02.487Z"
+    },
+    "escalation-target-guard-test.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:26:02.487Z"
+    },
+    "flywheel-escalation-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5615",
+      "claimedAt": "2026-11-23T18:26:07.162Z",
+      "doneAt": "2026-11-23T18:26:35.501Z"
+    },
+    "flywheel-escalation-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:26:35.501Z"
+    },
+    "flywheel-escalation-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:26:35.501Z"
+    },
+    "changelog-entry": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5615",
+      "claimedAt": "2026-11-23T18:26:40.250Z",
+      "doneAt": "2026-11-23T18:27:08.136Z"
+    },
+    "changelog-entry.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:27:08.136Z"
+    },
+    "changelog-entry.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:27:08.136Z"
+    }
+  }
+}

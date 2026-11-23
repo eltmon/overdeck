@@ -272,7 +272,10 @@ export async function messageAgent(
     try {
       const { getConversationByName } = await import('../overdeck/conversations.js');
       // Rows are keyed by the bare name; the target carries the conv- prefix (PAN-4223 FR-17).
-      conversationHarness = getConversationByName(normalizedId.slice('conv-'.length))?.harness ?? undefined;
+      // The Flywheel's row keeps the full session name, conv-flywheel (PAN-5615).
+      const row =
+        getConversationByName(normalizedId.slice('conv-'.length)) ?? getConversationByName(normalizedId);
+      conversationHarness = row?.harness ?? undefined;
     } catch {
       // The conversations store may be unavailable in minimal installs or
       // tests — fall through to the agent-state default below.
