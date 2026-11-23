@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5611",
   "created": "2026-11-23T06:14:33.904Z",
-  "updated": "2026-11-23T10:17:52.376Z",
+  "updated": "2026-11-23T10:17:56.897Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -92,6 +92,11 @@
     "message-route-resurface.ac5": {
       "status": "completed",
       "doneAt": "2026-11-23T10:17:52.375Z"
+    },
+    "sweep-resurface-pass": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5611",
+      "claimedAt": "2026-11-23T10:17:56.897Z"
     }
   }
 }
