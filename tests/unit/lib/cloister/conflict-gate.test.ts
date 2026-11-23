@@ -376,6 +376,7 @@ describe('buildRealConflictGateDeps', () => {
     const deps = buildRealConflictGateDeps({
       spawnRun,
       emitActivityEntry,
+      hasPlan: () => true,
       getFacts: () => blockedFacts(),
     });
 
@@ -413,6 +414,7 @@ describe('buildRealConflictGateDeps', () => {
       spawnRun,
       messageAgent,
       emitActivityEntry,
+      hasPlan: () => true,
       getFacts: () => blockedFacts(),
     });
 
@@ -433,6 +435,86 @@ describe('buildRealConflictGateDeps', () => {
       source: 'review',
       message: expect.stringContaining('already running'),
     }));
+  });
+});
+
+/**
+ * PAN-5619: the conflict resolver is a work agent, and a work agent cannot be
+ * spawned without an xBRIEF. An adopted handoff PR has none, so the spawn threw
+ * "The required xBRIEF checklist ... is missing or unreadable" out of the
+ * review dispatch, on every retry, and no reviewer ever started.
+ */
+describe('a conflict on a workspace with no xBRIEF (PAN-5619)', () => {
+  const GUARD_ERROR = 'The required xBRIEF checklist for PAN-5601 is missing or unreadable. Run planning before spawning a work agent.';
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-23T08:45:00.000Z'));
+    __resetConflictGateProbeCacheForTests();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    __resetConflictGateProbeCacheForTests();
+  });
+
+  function noPlanDeps(mergeability: 'conflicts' | 'unknown') {
+    const spawnRun = vi.fn(async () => { throw new Error(GUARD_ERROR); });
+    const journal = vi.fn();
+    const real = buildRealConflictGateDeps({
+      spawnRun,
+      journal,
+      emitActivityEntry: vi.fn(),
+      hasPlan: () => false,
+      getFacts: () => ({ ...blockedFacts('PAN-5601'), mergeable: null, mergeableState: 'blocked' }),
+    });
+    return { deps: { ...real, probeMergeability: () => mergeability }, spawnRun, journal };
+  }
+
+  it('with a plan, a spawn error still escapes the gate (only the no-xBRIEF case is handled here)', async () => {
+    const spawnRun = vi.fn(async () => { throw new Error(GUARD_ERROR); });
+    const real = buildRealConflictGateDeps({ spawnRun, emitActivityEntry: vi.fn(), hasPlan: () => true, getFacts: () => blockedFacts('PAN-5601') });
+
+    await expect(resolveConflictGate('PAN-5601', '/workspace', 'main', { ...real, probeMergeability: () => 'conflicts' }))
+      .rejects.toThrow('Run planning before spawning a work agent');
+  });
+
+  it('stays gated, spawns nothing, says who resolves it, and journals the dead end', async () => {
+    const { deps, spawnRun, journal } = noPlanDeps('conflicts');
+
+    const result = await resolveConflictGate('PAN-5601', '/workspace', 'main', deps);
+
+    expect(result).toMatchObject({ gated: true, resolverDispatchState: 'unavailable' });
+    expect(result.reason).toContain('no conflict resolver: PAN-5601 has no xBRIEF');
+    expect(result.reason).toContain('Merge origin/main into the PR branch, push, then run pan review request PAN-5601');
+    expect(spawnRun).not.toHaveBeenCalled();
+    expect(journal).toHaveBeenCalledWith('/workspace', expect.objectContaining({
+      type: 'review.dispatch-failed',
+      issueId: 'PAN-5601',
+      source: 'conflict-gate',
+      data: expect.objectContaining({ error: expect.stringContaining('no conflict resolver') }),
+    }));
+  });
+
+  it('does not throttle an unavailable resolver: the next request explains it again', async () => {
+    const { deps } = noPlanDeps('conflicts');
+
+    await resolveConflictGate('PAN-5601', '/workspace', 'main', deps);
+    const second = await resolveConflictGate('PAN-5601', '/workspace', 'main', deps);
+
+    expect(second).toMatchObject({ gated: true, resolverDispatchState: 'unavailable' });
+  });
+
+  it('journals nothing when the probe could not answer: a failed fetch is not a dead end', async () => {
+    const { deps, spawnRun, journal } = noPlanDeps('unknown');
+
+    const result = await resolveConflictGate('PAN-5601', '/workspace', 'main', deps);
+
+    expect(result).toMatchObject({ gated: true, resolverDispatchState: 'unavailable' });
+    expect(result.reason).toContain('the mergeability check against origin/main could not run');
+    expect(result.reason).not.toContain('Merge origin/main into the PR branch');
+    expect(spawnRun).not.toHaveBeenCalled();
+    expect(journal).not.toHaveBeenCalled();
   });
 });
 

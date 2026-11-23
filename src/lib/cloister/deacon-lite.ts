@@ -36,6 +36,7 @@ import { listWorkspaces } from '../workspaces/resolver.js';
 import { reconcileClosedIssueAgents } from './closed-issue-reaper.js';
 import { checkApiErrorAgents } from './deacon-api-recovery.js';
 import { appendPipelineEntry, lastPipelineEntry, readPipelineJournal } from './pipeline-journal.js';
+import { isRepeatedPipelineFailure, REVIEW_PIPELINE_FAILURE_SOURCE } from './review-dispatch-failure.js';
 import { retryDeferredHandoffs } from './deferred-handoff.js';
 import { replayDeferredReviewVerdict } from './deferred-verdict-replay.js';
 import { recoverUndispatchedReviews } from './undispatched-review-recovery.js';
@@ -308,7 +309,8 @@ export function __resetStalledReviewCooldownForTests(): void {
  * owes rework, and re-dispatching there would re-run verification every hour
  * forever.
  */
-function stalledReviewReason(type: string): string | null {
+function stalledReviewReason(type: string, workspacePath: string): string | null {
+  if (type === 'review.dispatch-failed') return failedDispatchRetryReason(workspacePath);
   if (type === 'review.dispatched' || type === 'review.redispatched') {
     return 'reviewers were dispatched but none is live and no verdict was posted';
   }
@@ -316,6 +318,23 @@ function stalledReviewReason(type: string): string | null {
     return 'the review was requested but the pipeline never dispatched reviewers';
   }
   return null;
+}
+
+/**
+ * PAN-5619: a review-request pipeline that threw is retried ONCE (after the
+ * usual age and cooldown), so a transient failure gets another try. When the
+ * retry fails with the same error at the same head, the failure is
+ * deterministic: it was reported (journal, needs-you), and nothing re-requests
+ * it until someone asks for review again. Other `review.dispatch-failed`
+ * writers (a rejected reviewer kickoff, a conflict nobody can resolve) are
+ * dead ends and are never retried here.
+ */
+function failedDispatchRetryReason(workspacePath: string): string | null {
+  const entries = readPipelineJournal(workspacePath);
+  const last = entries[entries.length - 1];
+  if (!last || last.source !== REVIEW_PIPELINE_FAILURE_SOURCE) return null;
+  if (isRepeatedPipelineFailure(entries, last)) return null;
+  return `the review pipeline failed (${String(last.data?.['error'] ?? 'unknown error')}); retrying once`;
 }
 
 /**
@@ -477,7 +496,7 @@ export async function recoverStalledReviews(now = Date.now()): Promise<string[]>
       if (action) actions.push(action);
       continue;
     }
-    const reason = stalledReviewReason(last.type);
+    const reason = stalledReviewReason(last.type, workspace.path);
     if (!reason) continue;
     const at = Date.parse(last.at);
     if (Number.isNaN(at) || now - at < STALLED_REVIEW_MIN_AGE_MS) continue;
@@ -518,10 +537,14 @@ export async function recoverStalledReviews(now = Date.now()): Promise<string[]>
     let outcome: string;
     let journalData: Record<string, unknown> = { reason };
     try {
+      // PAN-5619: a failed review-request pipeline started no run, so any saved
+      // parent state belongs to an earlier round. Relaunching its lanes would
+      // not review this head: re-request through the door instead.
+      const failedPipeline = last.type === 'review.dispatch-failed';
       const { recoverMissingConvoyReviewers } = await import('./review-convoy.js');
-      const recovery = await recoverMissingConvoyReviewers(issueId, { source: 'deacon-lite' });
-      outcome = recovery.message;
-      if (!recovery.success && /no review parent state|missing workspace\/runId/i.test(recovery.message)) {
+      const recovery = failedPipeline ? null : await recoverMissingConvoyReviewers(issueId, { source: 'deacon-lite' });
+      outcome = recovery?.message ?? reason;
+      if (!recovery || (!recovery.success && /no review parent state|missing workspace\/runId/i.test(recovery.message))) {
         // The cooldown starts BEFORE the request so a refused or unreachable
         // route is not retried every tick.
         lastReviewRedispatchAt.set(issueId, now);
@@ -537,6 +560,14 @@ export async function recoverStalledReviews(now = Date.now()): Promise<string[]>
         }
         via = 'request-review';
         outcome = `re-requested review (${reason})`;
+        if (!recovery) {
+          // PAN-5619: journal nothing here. The door already wrote
+          // `review.requested`, and a retry that fails again must leave its
+          // own `review.dispatch-failed` as the tail, in either order, so the
+          // repeat check sees it and stops. The cooldown above is in memory.
+          actions.push(`recoverStalledReviews: re-requested ${issueId} after a failed review pipeline — ${reason}`);
+          continue;
+        }
       } else if (!recovery.success) {
         // Nothing was launched: do not journal a re-dispatch that never happened.
         console.warn(`[deacon-lite] Stalled-review recovery declined for ${issueId}: ${recovery.message}`);

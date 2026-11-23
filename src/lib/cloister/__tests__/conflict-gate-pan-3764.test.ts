@@ -30,6 +30,7 @@ describe('PAN-3764 conflict gate', () => {
       spawnRun,
       getFacts: vi.fn(() => facts({ mergeable: false, mergeableState: 'dirty' })),
       emitActivityEntry: vi.fn(),
+      hasPlan: () => true,
     });
 
     await deps.dispatchResolver({
