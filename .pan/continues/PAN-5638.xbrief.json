@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5638",
   "created": "2026-11-23T19:38:42.567Z",
-  "updated": "2026-11-23T19:57:10.903Z",
+  "updated": "2026-11-23T19:57:18.243Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,6 +34,11 @@
     "wi1-github-member-reader.ac5": {
       "status": "completed",
       "doneAt": "2026-11-23T19:57:10.902Z"
+    },
+    "wi2-member-facts-dispatch": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5638",
+      "claimedAt": "2026-11-23T19:57:18.243Z"
     }
   }
 }
