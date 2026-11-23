@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-23T02:52:51Z · model: claude-opus-5-5 · open: 944_
+_Last sequenced: 2026-11-23T03:21:51Z · model: claude-opus-5-5 · open: 944_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -970,7 +970,7 @@ New bug: on the default Codex transport the permission setting is silently ignor
 
 ### PAN-5489 (rank 6)
 
-New pipeline-path bug: the CLI result depends on the caller's environment, so Flywheel-launched planning can fail and strand workspaces; it outranks routine work.
+Unchanged rank: a 2026-11-22 comment adds an unconfirmed related start_issue 500 for MIN-1142; the CLI env-dependence bug still strands Flywheel planning.
 
 ### PAN-5566 (rank 7)
 
@@ -1279,7 +1279,7 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-23T02:52:51Z",
+  "generatedAt": "2026-11-23T03:21:51Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 944,
@@ -1345,7 +1345,7 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
       "condition": "ok",
       "dependsOn": [],
       "why": "pan plan from an agent shell fails workspace creation without HUME_API_KEY, leaves a half-built workspace and hides the cause.",
-      "rationale": "New pipeline-path bug: the CLI result depends on the caller's environment, so Flywheel-launched planning can fail and strand workspaces; it outranks routine work.",
+      "rationale": "Unchanged rank: a 2026-11-22 comment adds an unconfirmed related start_issue 500 for MIN-1142; the CLI env-dependence bug still strands Flywheel planning.",
       "gate": "auto",
       "planning": "auto"
     },
