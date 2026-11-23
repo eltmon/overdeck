@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5604",
   "created": "2026-11-23T18:14:56.256Z",
-  "updated": "2026-11-23T18:28:49.566Z",
+  "updated": "2026-11-23T18:29:17.751Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,6 +34,11 @@
     "agent-input-gate.ac5": {
       "status": "completed",
       "doneAt": "2026-11-23T18:28:49.565Z"
+    },
+    "notification-dismiss-api": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5604",
+      "claimedAt": "2026-11-23T18:29:17.751Z"
     }
   }
 }
