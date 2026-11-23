@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5489",
   "created": "2026-11-23T06:59:21.851Z",
-  "updated": "2026-11-23T07:49:22.197Z",
+  "updated": "2026-11-23T08:10:31.938Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -72,9 +72,22 @@
       "doneAt": "2026-11-23T07:49:16.752Z"
     },
     "spawn-workspace-create-error": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5489",
-      "claimedAt": "2026-11-23T07:49:22.197Z"
+      "claimedAt": "2026-11-23T07:49:22.197Z",
+      "doneAt": "2026-11-23T08:10:31.938Z"
+    },
+    "spawn-workspace-create-error.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T08:10:31.938Z"
+    },
+    "spawn-workspace-create-error.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T08:10:31.938Z"
+    },
+    "spawn-workspace-create-error.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T08:10:31.938Z"
     }
   }
 }
