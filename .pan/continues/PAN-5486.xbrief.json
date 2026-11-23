@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5486",
   "created": "2026-11-23T03:25:55.145Z",
-  "updated": "2026-11-23T03:48:18.987Z",
+  "updated": "2026-11-23T03:51:48.096Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -85,9 +85,22 @@
       "doneAt": "2026-11-23T03:48:12.332Z"
     },
     "grok-bot-dialog": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5486",
-      "claimedAt": "2026-11-23T03:48:18.987Z"
+      "claimedAt": "2026-11-23T03:48:18.987Z",
+      "doneAt": "2026-11-23T03:51:48.095Z"
+    },
+    "grok-bot-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:51:48.095Z"
+    },
+    "grok-bot-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:51:48.095Z"
+    },
+    "grok-bot-dialog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:51:48.095Z"
     }
   }
 }
