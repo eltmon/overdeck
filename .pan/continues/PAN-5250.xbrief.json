@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5250",
   "created": "2026-11-23T23:10:09.644Z",
-  "updated": "2026-11-23T23:27:13.131Z",
+  "updated": "2026-11-23T23:27:17.528Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -200,6 +200,11 @@
     "wi8-merge-ops-restore.ac2": {
       "status": "completed",
       "doneAt": "2026-11-23T23:27:13.130Z"
+    },
+    "wi9-cli-up-pin": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5250",
+      "claimedAt": "2026-11-23T23:27:17.528Z"
     }
   }
 }
