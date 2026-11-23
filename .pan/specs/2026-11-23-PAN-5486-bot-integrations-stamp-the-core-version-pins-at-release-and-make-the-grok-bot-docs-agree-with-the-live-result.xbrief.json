@@ -4,17 +4,17 @@
     "created": "2026-11-23T03:08:57Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5486: Bot integrations: stamp the core version pins at release, and make the Grok Bot docs agree with the live result",
-    "updated": "2026-11-23T03:21:46.965Z"
+    "updated": "2026-11-23T03:25:44.608Z"
   },
   "plan": {
     "id": "pan-5486",
     "title": "Bot integrations: stamp the core version pins at release, and make the Grok Bot docs agree with the live result",
-    "status": "proposed",
+    "status": "running",
     "uid": "a6a51278-1392-47f3-ae0a-bf33240485c0",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-23T03:08:57Z",
-    "updated": "2026-11-23T03:21:46.965Z",
+    "updated": "2026-11-23T03:25:44.608Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5486",
@@ -817,5 +817,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
