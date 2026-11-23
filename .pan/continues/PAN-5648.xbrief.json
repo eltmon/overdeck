@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5648",
   "created": "2026-11-23T23:03:53.057Z",
-  "updated": "2026-11-23T23:39:13.966Z",
+  "updated": "2026-11-23T23:39:22.311Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -166,6 +166,11 @@
     "status-reclaimed-no-agent.ac2": {
       "status": "completed",
       "doneAt": "2026-11-23T23:39:13.965Z"
+    },
+    "pane-known-idle": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5648",
+      "claimedAt": "2026-11-23T23:39:22.311Z"
     }
   }
 }
