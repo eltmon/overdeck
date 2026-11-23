@@ -57,7 +57,7 @@ export function CodexAuthBanner() {
         )}
         {authStatus.affectedAgents && authStatus.affectedAgents.length > 0 && (
           <span className="font-normal ml-1 opacity-80">
-            — {authStatus.affectedAgents.length} agent{authStatus.affectedAgents.length === 1 ? '' : 's'} wedged on a revoked token
+            — {authStatus.affectedAgents.length} Codex session{authStatus.affectedAgents.length === 1 ? '' : 's'} failing on a revoked sign-in
           </span>
         )}
       </p>

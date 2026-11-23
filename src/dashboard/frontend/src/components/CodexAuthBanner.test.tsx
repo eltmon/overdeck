@@ -2,10 +2,11 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CodexAuthBanner } from './CodexAuthBanner';
-import { useCodexAuthStatus } from '../hooks/useCodexAuthStatus';
+import { CODEX_AUTH_REFETCH_MS, CODEX_AUTH_STALE_MS, useCodexAuthStatus } from '../hooks/useCodexAuthStatus';
 import { popoutTerminal } from './TerminalPanel';
 
-vi.mock('../hooks/useCodexAuthStatus', () => ({
+vi.mock('../hooks/useCodexAuthStatus', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../hooks/useCodexAuthStatus')>()),
   useCodexAuthStatus: vi.fn(),
 }));
 
@@ -68,5 +69,25 @@ describe('CodexAuthBanner', () => {
     render(<CodexAuthBanner />);
 
     expect(screen.getByText('(~/.codex)')).toBeTruthy();
+  });
+
+  it('PAN-5633: renders the failing-session count for a burned status', () => {
+    mockAuthStatus.mockReturnValue({
+      data: { status: 'burned', source: 'native', affectedAgents: ['conv-a', 'conv-b'] },
+    } as ReturnType<typeof useCodexAuthStatus>);
+    const { container, unmount } = render(<CodexAuthBanner />);
+    expect(container.textContent).toContain('2 Codex sessions failing on a revoked sign-in');
+    unmount();
+
+    mockAuthStatus.mockReturnValue({
+      data: { status: 'burned', source: 'native', affectedAgents: ['conv-a'] },
+    } as ReturnType<typeof useCodexAuthStatus>);
+    const single = render(<CodexAuthBanner />);
+    expect(single.container.textContent).toContain('1 Codex session failing on a revoked sign-in');
+  });
+
+  it('PAN-5633: polls the auth status every 30 seconds', () => {
+    expect(CODEX_AUTH_REFETCH_MS).toBe(30_000);
+    expect(CODEX_AUTH_STALE_MS).toBe(15_000);
   });
 });
