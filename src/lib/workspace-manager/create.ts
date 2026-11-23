@@ -615,7 +615,9 @@ async function createWorkspaceHoldingReservation(
 
   // Create Hume EVI config and write env file for Docker (before Docker so containers pick up the config ID)
   if (workspaceConfig.hume) {
-    const humeResult = await createHumeConfig(workspaceConfig.hume, placeholders);
+    const humeResult = await createHumeConfig(workspaceConfig.hume, placeholders, {
+      project: { key: projectConfig.name, config: projectConfig },
+    });
     result.steps.push(...humeResult.steps);
     if (humeResult.configId) {
       writeFileSync(

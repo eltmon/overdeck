@@ -37,9 +37,15 @@ function isReservedKey(key: string): boolean {
   return key.startsWith('OVERDECK_') || Object.prototype.hasOwnProperty.call(BLANKED_PROVIDER_ENV, key);
 }
 
+/** The fields readProjectSecrets reads; LaunchProject and a workspace ProjectConfig both fit. */
+export interface SecretsFileOwner {
+  key: string;
+  config: { path?: string; workspace?: { env?: { secrets_file?: string } } };
+}
+
 /** FR-9: the project's secrets file, reserved keys dropped; {} with one warning on any path or read problem. */
 export async function readProjectSecrets(
-  project: LaunchProject,
+  project: SecretsFileOwner,
   warn: (line: string) => void = console.warn,
 ): Promise<Record<string, string>> {
   const raw = project.config.workspace?.env?.secrets_file;
