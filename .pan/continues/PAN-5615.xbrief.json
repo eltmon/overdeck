@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5615",
   "created": "2026-11-23T18:07:00.473Z",
-  "updated": "2026-11-23T18:09:39.615Z",
+  "updated": "2026-11-23T18:09:44.423Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,6 +52,11 @@
     "role-review-escalation-target.ac4": {
       "status": "completed",
       "doneAt": "2026-11-23T18:09:39.615Z"
+    },
+    "role-test-escalation-target": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5615",
+      "claimedAt": "2026-11-23T18:09:44.423Z"
     }
   }
 }
