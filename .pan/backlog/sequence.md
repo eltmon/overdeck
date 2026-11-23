@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-23T19:57:12Z · model: claude-opus-5-5 · open: 954_
+_Last sequenced: 2026-11-23T20:27:21Z · model: claude-opus-5-5 · open: 955_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -101,6 +101,7 @@ _Last sequenced: 2026-11-23T19:57:12Z · model: claude-opus-5-5 · open: 954_
 | 83 | PAN-5636 | S | medium | ok |  | PAN-5633 | UI follow-up to PAN-5633: row state word and composer notice (with Hand off) for failed Codex turns; needs 5633's providerError.kind. |
 | 84 | PAN-3234 | S | critical | needs-refinement |  |  | Agents freeze indefinitely on blocking choice menus and no health surface notices; the detector is wired only to delivery refusal. |
 | 84 | PAN-5467 | XL | high | ok | ✓ |  | Epic: docs overhaul, 16 page issues, 6 accuracy audits (PAN-5499..5504) and an intro rewrite (PAN-5505); order book drives pickup. |
+| 84 | PAN-5642 | M | medium | ok |  |  | Plan-action endpoints accept approval without matching toolUseId; a stale dialog can approve a plan the operator never reviewed. |
 | 85 | PAN-3205 | S | critical | ok |  |  | The deployment gate promises the queued deploy will fire at the next verification boundary; that trigger does not exist. |
 | 86 | PAN-3118 | S | critical | needs-refinement |  |  | Model-specific quota exhaustion is invisible everywhere but the pane: four planning agents read 'running' at $0.00 with no fallback. |
 | 87 | PAN-3106 | S | critical | ok |  |  | auto_merge_default: hold is consulted on one merge path only, so held issues merge individually and defeat the UAT train. |
@@ -1289,10 +1290,10 @@ Found cutting v0.65.0: CI was green but the local release check failed on two ho
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-23T19:57:12Z",
+  "generatedAt": "2026-11-23T20:27:21Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 954,
+  "openCount": 955,
   "nodes": [
     {
       "issue": "PAN-5621",
@@ -2553,6 +2554,19 @@ Found cutting v0.65.0: CI was green but the local release check failed on two ho
       "gate": "auto",
       "planning": "auto",
       "isEpic": true
+    },
+    {
+      "issue": "PAN-5642",
+      "rank": 84,
+      "size": "M",
+      "importance": "medium",
+      "score": 64,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Plan-action endpoints accept approval without matching toolUseId; a stale dialog can approve a plan the operator never reviewed.",
+      "rationale": "New issue: write-side validation gap in both plan-action routes, flagged on PR #5639 (PAN-5604). The fix is concrete (send toolUseId, 409 on mismatch) but CodeRabbit scoped it as heavy; ranked with recent operator-input correctness bugs.",
+      "gate": "auto",
+      "planning": "auto"
     },
     {
       "issue": "PAN-3205",
@@ -14565,6 +14579,13 @@ Found cutting v0.65.0: CI was green but the local release check failed on two ho
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-5604",
+      "to": "PAN-5642",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
     },
     {
       "from": "PAN-5621",
