@@ -4,17 +4,17 @@
     "created": "2026-11-17T12:41:55Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5058: Hosted-bot access without Tailscale: TLS passthrough relay at <name>.mcp.overdeck.ai (relay add-on)",
-    "updated": "2026-11-17T12:52:21.296Z"
+    "updated": "2026-11-23T02:58:40.967Z"
   },
   "plan": {
     "id": "pan-5058",
     "title": "Hosted-bot access without Tailscale: TLS passthrough relay at <name>.mcp.overdeck.ai (relay add-on)",
-    "status": "proposed",
+    "status": "running",
     "uid": "61d1efa2-f074-4450-aab6-0eeec2e9a2ad",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-17T12:41:55Z",
-    "updated": "2026-11-17T12:52:21.296Z",
+    "updated": "2026-11-23T02:58:40.967Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5058",
@@ -594,5 +594,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
