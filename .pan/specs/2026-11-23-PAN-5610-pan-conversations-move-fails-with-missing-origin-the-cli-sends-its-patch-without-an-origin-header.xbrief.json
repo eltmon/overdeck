@@ -1,0 +1,373 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-23T06:00:49.566Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5610: pan conversations move fails with 'Missing origin': the CLI sends its PATCH without an Origin header",
+    "updated": "2026-11-23T06:08:57.259Z"
+  },
+  "plan": {
+    "id": "pan-5610",
+    "title": "pan conversations move fails with 'Missing origin': the CLI sends its PATCH without an Origin header",
+    "status": "proposed",
+    "uid": "e27fa418-6fa7-4823-863c-a433063ad92e",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-23T06:00:49.566Z",
+    "updated": "2026-11-23T06:08:57.259Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5610",
+        "label": "PAN-5610",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5523",
+        "label": "PAN-5523 (overlapping, closed by this PR)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-5610.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "cli",
+      "conversations",
+      "origin-validation",
+      "bugfix"
+    ],
+    "narratives": {
+      "Problem": "Four CLI files write to dashboard routes that call validateOrigin(request) directly, and none of them sends an Origin header. The route answers 403 'Missing origin' before any handler runs. Affected verbs: pan conversations move (move.ts), heal (heal.ts), link-pr / unlink-pr / auto-settle (pull-requests.ts viaDashboard), and schedule add / pause / resume / rm (schedule.ts viaDashboard). All four were reproduced live during planning.",
+      "Proposal": "Add `Origin: getDashboardApiUrl()` to each of the four requests, as plan-finalize.ts:568, lane.ts:134 and fork-client.ts:163 already do. move.ts uses its module constant DASHBOARD_URL. In each viaDashboard helper, Origin goes after the init.headers spread. Each file gets a co-located unit test that asserts headers.Origin === 'http://dashboard.test' (the mocked getDashboardApiUrl). Add a changelog.d entry and a paragraph in docs/DASHBOARD-AUTH.md stating the rule. The PRD at .pan/drafts/pan-5610.md holds exact before/after snippets and the full audit table of every non-GET call in src/cli.",
+      "NonGoals": "- No change to any file under src/dashboard/ (no route, no validateOriginHeaders change, no crossSiteWriteRefusal adoption)\n- No change to callDashboard (src/cli/commands/dashboard-call.ts) or to any CLI verb the audit found already working\n- No new shared header helper\n- No source-scanning test or lint rule for raw fetch calls\n- No handling of an untrusted OVERDECK_DASHBOARD_URL (it now yields 'Invalid origin', as plan-finalize already does)\n- Live verification never moves a conversation to a different project"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fix the client (send Origin) rather than the server (exempt the internal token on these routes).",
+        "rationale": "The PAN-5610 issue body prescribes the client fix, and sibling CLI verbs already use it. PAN-5523 proposed the server pattern from PAN-5516, but it is not an input to this issue, and the client fix changes no security boundary."
+      },
+      {
+        "summary": "Extend scope from move.ts to heal.ts, pull-requests.ts and schedule.ts.",
+        "rationale": "Issue fix step 3 says to find every other src/cli non-GET fetch with no Origin and fix it. The planning audit found exactly these three more, each confirmed live with a 403 'Missing origin' probe."
+      },
+      {
+        "summary": "The PR body says 'Closes #5523'.",
+        "rationale": "PAN-5523 reports the same failure on move and heal, and this PR fixes both. Its proposed server-side fix becomes unnecessary."
+      },
+      {
+        "summary": "Verify FR-5 live with `npx tsx src/cli/index.ts` and a no-op move.",
+        "rationale": "The installed pan runs the deployed dist until pan reload. A move to the conversation's current project returns 200 without changing state."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Five small items, ten files, one subsystem (CLI conversations commands) plus docs.",
+      "canonicalFilename": "2026-11-23-PAN-5610-pan-conversations-move-fails-with-missing-origin-the-cli-sends-its-patch-without-an-origin-header.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "move-origin",
+        "title": "pan conversations move sends the Origin header",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T06:00:49.566Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5610",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/conversations/move.ts",
+            "src/cli/commands/conversations/__tests__/move.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/conversations/__tests__/move.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "move.test.ts passes, including the new 'sends the dashboard URL as the Origin header (PAN-5610)' test",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/conversations/move.ts (the fetch at about line 72), change `headers: { 'Content-Type': 'application/json' }` to `headers: { 'Content-Type': 'application/json', Origin: DASHBOARD_URL }`, with a one-line comment above it: the move route runs validateOrigin, which refuses a write with no Origin (PAN-5610). DASHBOARD_URL is the existing module constant at line 17. In __tests__/move.test.ts, add `it('sends the dashboard URL as the Origin header (PAN-5610)')`. Copy the setup of the first moveAction test (line 80): seed a conversation, stub fetch with a 200 `{ projectKey: 'myn' }` response, call moveAction. Then read `const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]` and assert `(init.headers as Record<string, string>).Origin` is 'http://dashboard.test'. Remove the header once to confirm the test fails, then restore it. Live checkpoint: pick a conversation whose projectKey is panopticon-cli from `curl -s http://localhost:3011/api/conversations`, then run `npx tsx src/cli/index.ts conversations move <name> panopticon-cli` (a no-op move to its current project). Never move a conversation to a different project. Fallback when no dashboard answers on :3011: record that in the item's completion note."
+        },
+        "items": [
+          {
+            "id": "move-origin.ac1",
+            "title": "Given getDashboardApiUrl returns 'http://dashboard.test', when moveAction runs, then the PATCH fetch init carries headers.Origin === 'http://dashboard.test' and the new move.test.ts test passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "move-origin.ac2",
+            "title": "Given the Origin entry is removed from move.ts, when move.test.ts runs, then the new test fails (proves it detects the regression)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "move-origin.ac3",
+            "title": "Given a running dashboard on :3011, when `npx tsx src/cli/index.ts conversations move <name> <its current project key>` runs, then it prints '✓ Moved' and exits 0 instead of printing 'Error: Missing origin'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "heal-origin",
+        "title": "pan conversations heal sends the Origin header",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T06:00:49.566Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-5610",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/conversations/heal.ts",
+            "src/cli/commands/conversations/__tests__/heal.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/conversations/__tests__/heal.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "heal.test.ts passes with the updated init expectation",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/conversations/heal.ts (the fetch at lines 22-25), change the init `{ method: 'POST' }` to `{ method: 'POST', headers: { Origin: getDashboardApiUrl() } }`, with a one-line comment: the route runs validateOrigin, which refuses a write with no Origin (PAN-5610). getDashboardApiUrl is already imported. In __tests__/heal.test.ts, the test 'posts the repair request and prints confirmation' asserts the exact init `{ method: 'POST' }` at line 57. Change it to `{ method: 'POST', headers: { Origin: 'http://dashboard.test' } }`. That updated exact-match assertion is the regression test."
+        },
+        "items": [
+          {
+            "id": "heal-origin.ac1",
+            "title": "Given getDashboardApiUrl returns 'http://dashboard.test', when healAction runs, then fetch is called with init { method: 'POST', headers: { Origin: 'http://dashboard.test' } } and heal.test.ts passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "heal-origin.ac2",
+            "title": "Given the Origin header is removed from heal.ts, when heal.test.ts runs, then 'posts the repair request and prints confirmation' fails",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pull-requests-origin",
+        "title": "pull-requests.ts viaDashboard sends the Origin header",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T06:00:49.566Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5610",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/conversations/pull-requests.ts",
+            "src/cli/commands/conversations/__tests__/pull-requests.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/conversations/__tests__/pull-requests.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "pull-requests.test.ts passes, including the new Origin test and the extended unlink assertion",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/conversations/pull-requests.ts, function viaDashboard (line 55), change `headers: { 'Content-Type': 'application/json', ...(init.headers ?? {}) }` to `headers: { 'Content-Type': 'application/json', ...(init.headers ?? {}), Origin: getDashboardApiUrl() }`. Origin goes after the spread so no caller can drop it. Add a one-line comment: every caller writes to a route that runs validateOrigin (PAN-5610). This covers linkPrAction (POST /pull-requests), unlinkPrAction (DELETE /pull-requests) and autoSettleOverrideAction (POST /api/conversations/triage). In __tests__/pull-requests.test.ts, inside describe('linkPrAction') (line 83), add `it('sends the dashboard URL as the Origin header (PAN-5610)')`: stub fetch with jsonResponse(LINK, 201), call linkPrAction('pr-conv', '#42'), read init from fetchMock.mock.calls[0], and assert `(init.headers as Record<string, string>).Origin` is 'http://dashboard.test'. In the existing 'DELETEs with the ref in the query string' test (line 148), add the same assertion after `expect(init.method).toBe('DELETE')`."
+        },
+        "items": [
+          {
+            "id": "pull-requests-origin.ac1",
+            "title": "Given getDashboardApiUrl returns 'http://dashboard.test', when linkPrAction posts, then the fetch init carries headers.Origin === 'http://dashboard.test'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pull-requests-origin.ac2",
+            "title": "Given the same mock, when unlinkPrAction sends its DELETE, then the fetch init carries headers.Origin === 'http://dashboard.test'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pull-requests-origin.ac3",
+            "title": "Given the Origin entry is removed from viaDashboard, when pull-requests.test.ts runs, then both Origin assertions fail",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "schedule-origin",
+        "title": "schedule.ts viaDashboard sends the Origin header",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T06:00:49.566Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5610",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/conversations/schedule.ts",
+            "src/cli/commands/conversations/__tests__/schedule.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/conversations/__tests__/schedule.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "schedule.test.ts passes with the Origin assertions on the POST and PATCH tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/conversations/schedule.ts, function viaDashboard (line 65), make the same change as the pull-requests-origin item: `headers: { 'Content-Type': 'application/json', ...(init.headers ?? {}), Origin: getDashboardApiUrl() }`, with the same one-line comment. This covers scheduleAddAction (POST /schedules), scheduleSetEnabledAction (PATCH /schedules/:id, the pause and resume verbs) and scheduleRemoveAction (DELETE /schedules/:id). In __tests__/schedule.test.ts, two tests read `const [url, init] = fetchMock.mock.calls[0]`: 'resolves self and POSTs the compiled preset to the dashboard' (line 96) and 'pause PATCHes enabled false to the schedule conversation' (line 208). In each, add `expect((init.headers as Record<string, string>).Origin).toBe('http://dashboard.test');`."
+        },
+        "items": [
+          {
+            "id": "schedule-origin.ac1",
+            "title": "Given getDashboardApiUrl returns 'http://dashboard.test', when scheduleAddAction posts, then the fetch init carries headers.Origin === 'http://dashboard.test'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schedule-origin.ac2",
+            "title": "Given the same mock, when scheduleSetEnabledAction sends its PATCH, then the fetch init carries headers.Origin === 'http://dashboard.test'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schedule-origin.ac3",
+            "title": "Given the Origin entry is removed from viaDashboard, when schedule.test.ts runs, then both Origin assertions fail",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-changelog",
+        "title": "Changelog entry and DASHBOARD-AUTH rule for CLI writes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T06:00:49.566Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5610",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "changelog.d/pan-5610.md",
+            "docs/DASHBOARD-AUTH.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "1) Create changelog.d/pan-5610.md, following changelog.d/README.md. It holds one `#### Fixed` heading and one bullet: '**Conversation commands reach the dashboard again:** `pan conversations move`, `heal`, `link-pr`, `unlink-pr`, `auto-settle` and `schedule add`/`pause`/`resume`/`rm` failed with \"Missing origin\". They now send the dashboard URL as the request\\'s Origin. ([#5610](https://github.com/eltmon/overdeck/issues/5610))'. 2) In docs/DASHBOARD-AUTH.md, insert the paragraph from PRD WI-5 step 2 after the paragraph that ends 'Device and root-session requests keep both checks.' (about line 486, before '## Session mint'). The paragraph says: routes that call validateOrigin(request) directly (move, clear-fork-state, pull-requests, triage, schedules) do not exempt the internal token; a CLI verb writing to one sends `Origin: getDashboardApiUrl()` as plan-finalize.ts and lane.ts do, or the route answers 403 Missing origin (PAN-5610); routes behind rejectUnsafeDashboardMutationRequest or crossSiteWriteRefusal accept the internal token that callDashboard sends. 3) Run npm run lint:docs."
+        },
+        "items": [
+          {
+            "id": "docs-changelog.ac1",
+            "title": "changelog.d/pan-5610.md exists, contains exactly one '#### Fixed' heading, and has a bullet that links https://github.com/eltmon/overdeck/issues/5610",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac2",
+            "title": "docs/DASHBOARD-AUTH.md contains a paragraph that states CLI writes to validateOrigin-guarded routes send `Origin: getDashboardApiUrl()` and names PAN-5610 (grep 'PAN-5610' docs/DASHBOARD-AUTH.md returns a match)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac3",
+            "title": "When `npm run lint:docs` runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  },
+  "status": "proposed"
+}
