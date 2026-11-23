@@ -127,13 +127,15 @@ target-branch sync, skipped when CI is already green on the exact tip commit
   `acquireQualityGateAdmission` for a gate named `vitest` unless the process
   already has `OVERDECK_GATE_ADMITTED=1` or `OVERDECK_GATE_ADMISSION=0`, or
   `CI` is set. An agent's own `npx vitest run <files>` therefore competes with
-  every verification run for the same single slot. Typechecks join the same
-  queue through `scripts/tsc-admitted.mjs`: every lane of the root `typecheck`
-  and `typecheck:*` scripts, and every `tsc` call in
-  `scripts/lint-effect-diagnostics.sh`, `scripts/lint-dashboard-types.sh` and
-  `scripts/lint-frontend-types.sh`, takes its own admission, one per `tsc`
-  process. A hand-typed `npx tsc …` or `node_modules/.bin/tsc …` is not
-  admitted; run `node scripts/tsc-admitted.mjs <tsc args…>` instead.
+  every verification run for the same single slot. `npm run typecheck` and
+  `npm run lint:effect-diagnostics` each take one admission for their whole
+  chain through `scripts/gate-admitted.mjs <footprint-key> -- <command>` and
+  run their lanes in series inside that slot with `OVERDECK_GATE_ADMITTED=1`
+  (PAN-5617); a `typecheck:*` lane run on its own, and each `tsc` call of
+  `bash scripts/lint-effect-diagnostics.sh` run directly, still takes its own
+  admission through `scripts/tsc-admitted.mjs`. A hand-typed `npx tsc …` or
+  `node_modules/.bin/tsc …` is not admitted; run
+  `node scripts/tsc-admitted.mjs <tsc args…>` instead.
 - **Gates yield CPU.** Local host gates run as `nice -n 19`, and the whole
   verification worker runs under a systemd user scope with `CPUWeight=20`
   (default), so gates run slower when the dashboard or other agents are busy.
@@ -499,7 +501,8 @@ CI result on the head (`gh pr checks <pr>`) where tests run on CI.
 
 Before each local gate starts, it waits in a machine-wide FIFO queue under
 `~/.overdeck/verification-workers/admission/`. Direct local Vitest runs and
-every `tsc` lane run through `scripts/tsc-admitted.mjs` join the same queue. Up to `resources.quality_gate_slots` gates hold admission at
+every `tsc` lane run through `scripts/tsc-admitted.mjs` or a whole chain run
+through `scripts/gate-admitted.mjs` join the same queue. Up to `resources.quality_gate_slots` gates hold admission at
 once (default 2; set it in the global `~/.overdeck/config.yaml`, because a
 project `.pan.yaml` value is ignored). A gate is admitted only when its CPU
 sample is unpressured both before and 1.5 s after it takes its slot:
@@ -525,7 +528,11 @@ already queued, without killing them:
   in `~/.overdeck/verification-workers/admission/footprints/`.
 - **Keys.** `tsc:<tsconfig path>` for a typecheck lane,
   `vitest:<cwd relative to the repo root, or .>:<suite|files>` for a local
-  Vitest run, and `gate:<name>:<raw gate command>` for a verification gate.
+  Vitest run, `gate:<name>:<raw gate command>` for a verification gate, and
+  `chain:<npm script>` for an admitted chain (`chain:typecheck`,
+  `chain:lint:effect-diagnostics`, PAN-5617). A chain's peak is its process
+  tree's peak, which is its largest lane's, because its lanes run in series;
+  lanes inside a chain record no peaks of their own.
   Placeholders such as `{{CHANGED_BASE}}` stay literal in the key. A Vitest run
   is `files` only when it names at most 10 filters and every one is an
   existing file (Vitest's `<file>:<line>` location form counts). Vitest matches filters as path substrings, so anything else
@@ -557,6 +564,14 @@ already queued, without killing them:
   local Vitest run stops with the same line. Every other admission failure (a
   CPU or queue timeout, a file-system error) runs the command unadmitted with
   `[gate-admission] proceeding without admission: <reason>`.
+  `scripts/gate-admitted.mjs` exits 75 the same way on any admission timeout,
+  whatever it last waited on (`[gate-admission] refusing to start <key>:
+  waited 60 minutes for admission (last waiting on <kind>)`), because a chain
+  that timed out behind other gates would otherwise start every lane
+  unadmitted. After a setup failure that is not a timeout it runs the chain
+  with `OVERDECK_GATE_ADMISSION=0` so its lanes do not each fail again. A
+  chain waits up to 60 minutes for admission, a single lane 30, because a
+  chain waits once behind holders that keep their slot for a whole chain.
 - **Passing a memory-blocked head (PAN-5285).** FIFO yields only to memory. A
   waiter may pass the waiters ahead of it when every one of them is blocked on
   memory; each waiter judges the ones ahead from their tickets with the same

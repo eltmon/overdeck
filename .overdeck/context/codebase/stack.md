@@ -48,6 +48,8 @@
   dashboard halves, where server and frontend are shrink-only ratchets
   (`scripts/lint-dashboard-types.sh`, `scripts/lint-frontend-types.sh`) — note
   those two ratchets live in the **typecheck** chain, not the lint chain.
+  It takes one gate admission for the whole chain (`scripts/gate-admitted.mjs` →
+  `typecheck:lanes`, PAN-5617); each lane run alone admits itself.
   `packages/effect-acp` is checked by the root `typecheck:acp` lane and `packages/contracts`
   by `typecheck:contracts` (package source). The dashboard server's typecheck resolves
   `@overdeck/contracts` to `packages/contracts/dist/`, so run `npm run build:contracts`
