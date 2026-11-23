@@ -347,6 +347,33 @@ describe('reclaim-aware health (PAN-5623)', () => {
       rmSync(projectRoot, { recursive: true, force: true });
     }
   });
+  it('a reclaim-aware read with the default workspace path records no unhealthy transition (workspace-data line 604)', async () => {
+    const projectRoot = mkdtempSync(join(tmpdir(), 'pan-stack-health-'));
+    try {
+      const workspacePath = join(projectRoot, 'workspaces', 'feature-min-1144');
+      mkdirSync(workspacePath, { recursive: true });
+      appendPipelineEntry(workspacePath, {
+        type: 'stack.reclaimed', issueId: 'MIN-1144', source: 'stack-reclaim', data: { containers: [API] },
+      });
+      resetWorkspaceStackHealthTransitionsForTests();
+      recordWorkspaceStackHealthTransition('MIN-1144', { healthy: true, reasons: [], lastObserved: now.toISOString() });
+
+      const health = await getWorkspaceStackHealth('MIN-1144', {
+        projectConfig: { ...dockerProject, path: projectRoot },
+        containers: [exitedApi()],
+        now,
+        emitTransitionActivity: true,
+        reclaimAware: true,
+      });
+
+      expect(health.healthy).toBe(true);
+      expect(health.reclaimed).toEqual([API]);
+      // The last recorded state is still healthy, so the next unhealthy read is a fresh transition.
+      expect(recordWorkspaceStackHealthTransition('MIN-1144', { healthy: false, reasons: ['broken'], lastObserved: now.toISOString() })).toBe(true);
+    } finally {
+      rmSync(projectRoot, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('collectDockerContainerLifecycleSnapshot host-tools gate (PAN-5168)', () => {
