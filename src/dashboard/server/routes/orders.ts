@@ -7,6 +7,7 @@ import type {
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
+import { previewBrief } from '../../../lib/orders/brief.js';
 import { backlogCandidates, computeBookProgress, getBookAsync, listBooks, liveOrderIssueLookup, normalizeOrderIssueId } from '../../../lib/orders/resolver.js';
 import type { OrderIssueLookup, OrderIssueState } from '../../../lib/orders/types.js';
 import { createOrderPrdLookup, hasOrderIssuePrd, validateBookForStart } from '../../../lib/orders/validate.js';
@@ -271,36 +272,6 @@ function parseItems(book: OrderBook, value: unknown): NewOrderBookItem[] {
       ...(planAtPickup === undefined ? {} : { planAtPickup }),
     };
   });
-}
-
-function previewBrief(book: OrderBook): string {
-  const lines = [
-    `# Special orders: ${book.name}`,
-    '',
-    `Order book: ${book.id}`,
-    `Posture: ${book.settings.posture.toUpperCase()}`,
-    '',
-    'This order book defines the operator-released scope. Standard flywheel doctrine and the standard brief remain in force.',
-  ];
-  for (const laneName of ['A', 'B'] as const) {
-    lines.push('', `## Lane ${laneName}`);
-    const items = book.items
-      .filter((item) => item.lane === laneName)
-      .sort((left, right) => left.order - right.order);
-    if (items.length === 0) {
-      lines.push('- Empty');
-      continue;
-    }
-    for (const item of items) {
-      const flags = [
-        item.prereqs.length > 0 ? `after ${item.prereqs.join(', ')}` : '',
-        item.reVerify ? 're-verify PRD' : '',
-        item.planAtPickup ? 'plan at pickup' : '',
-      ].filter(Boolean);
-      lines.push(`- ${laneName}${item.order} ${item.issue}${flags.length ? ` — ${flags.join('; ')}` : ''}`);
-    }
-  }
-  return `${lines.join('\n')}\n`;
 }
 
 async function defaultStartOrderBook(book: OrderBook, project: ProjectConfig): Promise<StartOrderBookResult> {
