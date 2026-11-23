@@ -4,17 +4,17 @@
     "created": "2026-11-23T07:17:09Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5617: npm run typecheck re-queues for admission on each of its 12 tsc lanes, so one typecheck takes about an hour under memory pressure",
-    "updated": "2026-11-23T18:06:03.192Z"
+    "updated": "2026-11-23T18:07:16.313Z"
   },
   "plan": {
     "id": "pan-5617",
     "title": "npm run typecheck re-queues for admission on each of its 12 tsc lanes, so one typecheck takes about an hour under memory pressure",
-    "status": "proposed",
+    "status": "running",
     "uid": "3436a264-4c3a-47cd-b9c8-5911e6b493b2",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-23T07:17:09Z",
-    "updated": "2026-11-23T18:06:03.192Z",
+    "updated": "2026-11-23T18:07:16.313Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5617",
@@ -551,5 +551,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
