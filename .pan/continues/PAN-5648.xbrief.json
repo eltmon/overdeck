@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5648",
   "created": "2026-11-23T23:03:53.057Z",
-  "updated": "2026-11-23T23:42:20.029Z",
+  "updated": "2026-11-23T23:42:29.099Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -184,6 +184,11 @@
     "pane-known-idle.ac3": {
       "status": "completed",
       "doneAt": "2026-11-23T23:42:20.028Z"
+    },
+    "docs-pipeline-gates": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5648",
+      "claimedAt": "2026-11-23T23:42:29.098Z"
     }
   }
 }
