@@ -4,17 +4,17 @@
     "created": "2026-11-23T19:34:02Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5637: Merge train never admits a polyrepo issue that touches a member repo with no CI",
-    "updated": "2026-11-23T19:35:58.755Z"
+    "updated": "2026-11-23T19:37:10.534Z"
   },
   "plan": {
     "id": "pan-5637",
     "title": "Merge train never admits a polyrepo issue that touches a member repo with no CI",
-    "status": "proposed",
+    "status": "running",
     "uid": "b25fe16d-4624-45bc-9731-98684d16ce49",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-23T19:34:02Z",
-    "updated": "2026-11-23T19:35:58.755Z",
+    "updated": "2026-11-23T19:37:10.534Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5637",
@@ -516,5 +516,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
