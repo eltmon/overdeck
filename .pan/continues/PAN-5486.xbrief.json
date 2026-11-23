@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5486",
   "created": "2026-11-23T03:25:55.145Z",
-  "updated": "2026-11-23T03:51:48.096Z",
+  "updated": "2026-11-23T03:51:50.656Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -101,6 +101,11 @@
     "grok-bot-dialog.ac3": {
       "status": "completed",
       "doneAt": "2026-11-23T03:51:48.095Z"
+    },
+    "grok-bot-bots-mdx": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5486",
+      "claimedAt": "2026-11-23T03:51:50.655Z"
     }
   }
 }
