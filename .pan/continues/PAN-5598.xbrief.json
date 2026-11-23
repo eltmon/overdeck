@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5598",
   "created": "2026-11-23T02:56:35.201Z",
-  "updated": "2026-11-23T03:35:46.960Z",
+  "updated": "2026-11-23T03:35:55.146Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -70,6 +70,11 @@
     "mcp-order-read-tools.ac4": {
       "status": "completed",
       "doneAt": "2026-11-23T03:35:46.960Z"
+    },
+    "mcp-order-write-tools": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5598",
+      "claimedAt": "2026-11-23T03:35:55.146Z"
     }
   }
 }
