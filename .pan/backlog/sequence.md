@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-23T17:44:05Z · model: claude-opus-5-5 · open: 952_
+_Last sequenced: 2026-11-23T18:15:00Z · model: claude-opus-5-5 · open: 952_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -9,13 +9,13 @@ _Last sequenced: 2026-11-23T17:44:05Z · model: claude-opus-5-5 · open: 952_
 | 1 | PAN-5617 | S | critical | ok |  |  | npm run typecheck admits each of its 12 tsc lanes separately; under memory pressure one run takes ~1h and stalls agent pushes. |
 | 1 | PAN-5621 | M | critical | ok |  |  | Gate admission queue starves while MemAvailable < hard reserve + footprint; parked workspace stacks never reclaimed, no gate runs. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
-| 3 | PAN-5619 | M | critical | ok |  |  | Merged via PR #5631 (17:24Z), closed out: resume-path review dispatch no longer throws on adopted PRs without an xBRIEF. |
 | 4 | PAN-5430 | S | medium | ok |  |  | Markdown Preview prints raw HTML (README logo <div>/<picture>) as text; render it via rehype-raw + rehype-sanitize in doc previews. |
 | 5 | PAN-5567 | S | high | ok |  |  | Codex app-server threads hardcode on-request/workspace-write, so Read-only and Full access settings never apply. |
 | 6 | PAN-5489 | S | high | ok |  |  | pan plan from an agent shell fails workspace creation without HUME_API_KEY, leaves a half-built workspace and hides the cause. |
 | 7 | PAN-5566 | M | high | ok |  |  | UI/help text says Auto blocks destructive calls but the hook approves all; repo .pan.yaml can set bypass mode. |
 | 8 | PAN-5385 | S | critical | ok |  |  | Anywhere remote access is down for trickle clients: machine drops ICE candidates sent before session registers; small server fix |
 | 8 | PAN-5623 | L | critical | ok |  | PAN-5621 | While gate admission is starved, stop Overdeck-owned stack containers of parked issues and restart them on demand (FR-2 of PAN-5621). |
+| 9 | PAN-5633 | M | high | ok |  |  | Codex app-server auth burn never flags: banner silent, conv shows isWorking while 578 turns fail over 14h. Detect turn errors. |
 | 10 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 10 | PAN-5523 | S | high | ok |  |  | pan conversations move/heal send raw fetch with no token, so routes refuse with Missing origin; same fix pattern as in-pipeline PAN-5516. |
 | 10 | PAN-5625 | M | critical | ok |  |  | Approved green PR for new standalone project BT-1 sits 'held'; train never batches and per-PR scheduler defers forever. |
@@ -976,10 +976,6 @@ New substrate-improvement bug already in the pipeline, pinned at rank 1 per the 
 
 Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.
 
-### PAN-5619 (rank 3)
-
-Rank holds pending removal: PR #5631 merged at 17:24Z and the issue closed via close-out with main checks green, so nothing remains to pick up; it drops from the backlog on the next manifest.
-
 ### PAN-5430 (rank 4)
 
 New issue, sibling of the just-merged front-matter fix PAN-5427, and already queued in the active workflow-redesign order book, so it takes free rank 4 behind critical PAN-5013. It is a small, well-specified MarkdownTab change with named tests, a sanitising allow-list and a concrete acceptance check on the README preview; its parent epic PAN-5284 is closed, so it carries no contains edge.
@@ -1003,6 +999,10 @@ New issue. Phones (iOS, Android) and the connector cannot reach the machine at a
 ### PAN-5623 (rank 8)
 
 New substrate issue split from in-pipeline PAN-5621: detection alone does not end a starvation, reclaiming parked stacks does (the Flywheel did it by hand on 2026-11-23). The body is a verified, deny-by-default spec, so it ranks right behind its parent among the critical gate-throughput fixes; it overlaps PAN-5250's restart-on-demand path.
+
+### PAN-5633 (rank 9)
+
+New bug with a traced root cause: classifyNativeCodexAuth treats any refresh token as valid and nothing writes the codex-auth-burned flag, so a Codex app-server conversation failed silently for 14 hours. It ranks beside PAN-5567 (the other Codex app-server substrate gap) because silent agent failure undermines every Codex-routed conversation and worker.
 
 ### PAN-4636 (rank 10)
 
@@ -1287,7 +1287,7 @@ Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback thi
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-23T17:44:05Z",
+  "generatedAt": "2026-11-23T18:15:00Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 952,
@@ -1341,19 +1341,6 @@ Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback thi
       "dependsOn": [],
       "why": "Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned.",
       "rationale": "Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5619",
-      "rank": 3,
-      "size": "M",
-      "importance": "critical",
-      "score": 86,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Merged via PR #5631 (17:24Z), closed out: resume-path review dispatch no longer throws on adopted PRs without an xBRIEF.",
-      "rationale": "Rank holds pending removal: PR #5631 merged at 17:24Z and the issue closed via close-out with main checks green, so nothing remains to pick up; it drops from the backlog on the next manifest.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1434,6 +1421,19 @@ Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback thi
       ],
       "why": "While gate admission is starved, stop Overdeck-owned stack containers of parked issues and restart them on demand (FR-2 of PAN-5621).",
       "rationale": "New substrate issue split from in-pipeline PAN-5621: detection alone does not end a starvation, reclaiming parked stacks does (the Flywheel did it by hand on 2026-11-23). The body is a verified, deny-by-default spec, so it ranks right behind its parent among the critical gate-throughput fixes; it overlaps PAN-5250's restart-on-demand path.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5633",
+      "rank": 9,
+      "size": "M",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Codex app-server auth burn never flags: banner silent, conv shows isWorking while 578 turns fail over 14h. Detect turn errors.",
+      "rationale": "New bug with a traced root cause: classifyNativeCodexAuth treats any refresh token as valid and nothing writes the codex-auth-burned flag, so a Codex app-server conversation failed silently for 14 hours. It ranks beside PAN-5567 (the other Codex app-server substrate gap) because silent agent failure undermines every Codex-routed conversation and worker.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -14539,18 +14539,18 @@ Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback thi
       "confidence": 0.6
     },
     {
-      "from": "PAN-5619",
-      "to": "PAN-4636",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
       "from": "PAN-5621",
       "to": "PAN-5623",
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-5633",
+      "to": "PAN-5567",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
     },
     {
       "from": "PAN-750",
