@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5250",
   "created": "2026-11-23T23:10:09.644Z",
-  "updated": "2026-11-23T23:25:34.158Z",
+  "updated": "2026-11-23T23:27:13.131Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -188,9 +188,18 @@
       "doneAt": "2026-11-23T23:25:29.361Z"
     },
     "wi8-merge-ops-restore": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5250",
-      "claimedAt": "2026-11-23T23:25:34.158Z"
+      "claimedAt": "2026-11-23T23:25:34.158Z",
+      "doneAt": "2026-11-23T23:27:13.130Z"
+    },
+    "wi8-merge-ops-restore.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:27:13.130Z"
+    },
+    "wi8-merge-ops-restore.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:27:13.130Z"
     }
   }
 }
