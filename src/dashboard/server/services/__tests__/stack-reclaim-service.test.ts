@@ -538,6 +538,36 @@ describe('runStackRestorePoll (PAN-5623 WI-13)', () => {
     expect(deps.listPanes).not.toHaveBeenCalled();
   });
 
+  it('measures the retry backoff from after the failed restore returns, not from before it (PAN-5648 retry-after-failure.ac1 ac2)', async () => {
+    let clock = T0;
+    const { deps, journals } = world({
+      now: vi.fn(() => clock),
+      listPanes: vi.fn(async () => [pane({ issue: 'MIN-1144', agentId: 'agent-min-1144', state: 'working' })]),
+      restore: vi.fn(async () => {
+        clock += 70_000; // the restore attempt itself took 70 s of wall time
+        return { kind: 'failed' as const, failed: [`${project('MIN-1144')}-api-1`], error: 'port is already allocated' };
+      }),
+    });
+    journals.set(wsPath('MIN-1144'), [RECLAIMED]);
+    const state = createStackReclaimState();
+
+    await runStackRestorePoll(deps, state);
+    expect(deps.restore).toHaveBeenCalledTimes(1);
+    const failedAt = clock; // T0 + 70_000
+
+    clock = failedAt + 5_000;
+    await runStackRestorePoll(deps, state);
+    expect(deps.restore).toHaveBeenCalledTimes(1);
+
+    clock = failedAt + 59_000;
+    await runStackRestorePoll(deps, state);
+    expect(deps.restore).toHaveBeenCalledTimes(1);
+
+    clock = failedAt + 60_000;
+    await runStackRestorePoll(deps, state);
+    expect(deps.restore).toHaveBeenCalledTimes(2);
+  });
+
   it('retries a failed restore no sooner than 60 s later', async () => {
     vi.useFakeTimers();
     const { deps, journals } = world({

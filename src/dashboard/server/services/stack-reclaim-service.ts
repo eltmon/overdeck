@@ -458,7 +458,9 @@ export async function runStackRestorePoll(deps: StackReclaimServiceDeps, state: 
     if (!panesNeedStack(issuePanes(panes, issueId, workspacePath), deps.turnState)) continue;
     const result = await deps.restore({ issueId, workspacePath, trigger: 'turn' });
     if (result.kind === 'failed') {
-      state.restoreRetryAt.set(issueId, now + STACK_RESTORE_RETRY_MS);
+      // PAN-5648 r4672667721: measure the backoff from now, not from the
+      // tick's stale `now` — the restore call itself can take real time.
+      state.restoreRetryAt.set(issueId, deps.now() + STACK_RESTORE_RETRY_MS);
       console.warn(`[stack-reclaim] restore of ${issueId} failed: ${result.error}; retrying in ${STACK_RESTORE_RETRY_MS / 1000} s`);
       continue;
     }
