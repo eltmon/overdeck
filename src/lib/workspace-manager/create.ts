@@ -37,6 +37,7 @@ import {
 import { checkDiskFloor, reserveDiskFloor } from '../disk-floor.js';
 import { estimateWorkspaceDiskCost, invalidateWorkspaceDiskCostMemo } from '../workspace/disk-cost.js';
 import { hasPackageJson, installCommandFor } from './dependency-install.js';
+import { setupStepError } from './step-failure.js';
 import type { WorkspaceCreateOptions, WorkspaceCreateResult } from './types.js';
 import {
   clearWorkspaceSetupIncomplete,
@@ -609,7 +610,7 @@ async function createWorkspaceHoldingReservation(
     const tunnelResult = await addTunnelIngress(workspaceConfig.tunnel, placeholders);
     result.steps.push(...tunnelResult.steps);
     if (!tunnelResult.success) {
-      result.errors.push('Tunnel setup had failures (see steps for details)');
+      result.errors.push(setupStepError('Tunnel setup', tunnelResult.steps));
     }
   }
 
@@ -627,7 +628,7 @@ async function createWorkspaceHoldingReservation(
       result.steps.push('Wrote .hume-config with Hume EVI config ID');
     }
     if (!humeResult.success) {
-      result.errors.push('Hume EVI config setup had failures (see steps for details)');
+      result.errors.push(setupStepError('Hume EVI config setup', humeResult.steps));
     }
   }
 
