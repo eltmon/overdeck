@@ -112,11 +112,12 @@ function gb(bytes: number): string {
 
 // ─── gate queue (D9, D10) ────────────────────────────────────────────────────
 
-/** `vitest` → `tests`; `tsc:tsconfig.json` → `typecheck`; `gate:<name>:…` → `<name>`. */
+/** `vitest` → `tests`; `tsc:tsconfig.json` → `typecheck`; `chain:<script>` → `<script>`; `gate:<name>:…` → `<name>`. */
 export function gateLabel(gateName: string): string {
   if (gateName === 'vitest') return 'tests';
   if (gateName === 'tsc:tsconfig.json') return 'typecheck';
   if (gateName.startsWith('tsc:')) return `typecheck (${gateName.slice(4)})`;
+  if (gateName.startsWith('chain:')) return gateName.slice('chain:'.length);
   const gate = /^gate:([^:]+)/.exec(gateName);
   if (gate?.[1]) return gate[1];
   return gateName;
