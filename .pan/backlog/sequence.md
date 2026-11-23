@@ -1,16 +1,14 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-23T16:21:52Z · model: claude-opus-5-5 · open: 957_
+_Last sequenced: 2026-11-23T16:51:58Z · model: claude-opus-5-5 · open: 951_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
-| 1 | PAN-5611 | S | medium | ok |  |  | Idle-settled conversations stay in Settled after the operator resumes them, hiding them from their project group. |
 | 1 | PAN-5615 | S | high | ok |  |  | Role prompts escalate via pan tell flywheel-orchestrator, a dead name; the Flywheel is conv-flywheel, so blockers are lost. |
 | 1 | PAN-5617 | S | critical | ok |  |  | npm run typecheck admits each of its 12 tsc lanes separately; under memory pressure one run takes ~1h and stalls agent pushes. |
 | 1 | PAN-5621 | M | critical | ok |  |  | Gate admission queue starves while MemAvailable < hard reserve + footprint; parked workspace stacks never reclaimed, no gate runs. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
-| 3 | PAN-5614 | M | critical | ok |  |  | specialists done falls back to GitHub in remote-less polyrepo roots, so GitLab review verdicts are lost and MYN merges stall. |
 | 3 | PAN-5619 | M | critical | ok |  |  | Review never dispatches for adopted handoff PRs on the resume path: a work-agent xBRIEF guard throws, only logged; PAN-5601 stuck. |
 | 4 | PAN-5430 | S | medium | ok |  |  | Markdown Preview prints raw HTML (README logo <div>/<picture>) as text; render it via rehype-raw + rehype-sanitize in doc previews. |
 | 5 | PAN-5567 | S | high | ok |  |  | Codex app-server threads hardcode on-request/workspace-write, so Read-only and Full access settings never apply. |
@@ -98,7 +96,6 @@ _Last sequenced: 2026-11-23T16:21:52Z · model: claude-opus-5-5 · open: 957_
 | 80 | PAN-3522 | S | critical | ok |  |  | Supervisor watchdog restart-churns under CPU storm because the probe timeout budget ignores the boot warm phase. |
 | 81 | PAN-3314 | M | critical | ok |  |  | One cgroup holds every agent pane, so a single hungry agent inflates the unit and oomd kills the whole fleet — twice now. |
 | 82 | PAN-3278 | S | critical | needs-refinement |  |  | A finished work agent with an open PR sat two hours because review was never dispatched and auto-requeue fired none of 25 attempts. |
-| 83 | PAN-5609 | M | medium | ok |  |  | Top-bar indicator for conversation-search indexing with hover/click details. Merged; awaiting on-main verification. |
 | 84 | PAN-3234 | S | critical | needs-refinement |  |  | Agents freeze indefinitely on blocking choice menus and no health surface notices; the detector is wired only to delivery refusal. |
 | 84 | PAN-5467 | XL | high | ok | ✓ |  | Epic: docs overhaul, 16 page issues, 6 accuracy audits (PAN-5499..5504) and an intro rewrite (PAN-5505); order book drives pickup. |
 | 85 | PAN-3205 | S | critical | ok |  |  | The deployment gate promises the queued deploy will fire at the next verification boundary; that trigger does not exist. |
@@ -247,7 +244,6 @@ _Last sequenced: 2026-11-23T16:21:52Z · model: claude-opus-5-5 · open: 957_
 | 225 | PAN-3667 | M | high | ok |  |  | CLIProxy has no cross-family remap, so every Anthropic-pinned subagent dies at spawn in a proxied session; stopgap is hand-written. |
 | 226 | PAN-5435 | M | medium | ok |  |  | React Compiler burn-down for app shell, pages, hooks, lib: 67 skips, 100 memo sites. Do first; hooks feed all groups. Unblocked. |
 | 226 | PAN-5532 | S | medium | ok |  |  | Six dashboard UI bugs where text or filters disagree with code: Experimental copy, Cycle filter, No PR chip, Merging label, palette. |
-| 227 | PAN-4242 | M | high | ok |  |  | pan handoff --cwd skips the folder-trust pre-trust pan start does; successor sits at the trust prompt for hours while shown live |
 | 228 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
 | 228 | PAN-5551 | S | medium | ok |  |  | Emergency stop writes a flywheel pause nothing reads and its toast names a missing control; no CLI clears the Deacon freeze. |
 | 229 | PAN-3778 | S | medium | ok |  |  | Server snapshot cap shipped in #4558 (closed). Resume-from-offset on resubscribe is the remaining open piece; now unblocked. |
@@ -294,7 +290,6 @@ _Last sequenced: 2026-11-23T16:21:52Z · model: claude-opus-5-5 · open: 957_
 | 266 | PAN-4512 | M | medium | needs-refinement |  |  | Tier escalation config is shown but nothing fires it since the Cut; choose a trigger, persist tierOverrides, re-dispatch |
 | 266 | PAN-5597 | M | medium | ok |  |  | Order books page rework: show the live book, simpler build/run. Body is a placeholder; PRD and mockup pending. |
 | 267 | PAN-1666 | XL | medium | ok | ✓ |  | Pipeline Throughput Hardening |
-| 267 | PAN-5599 | S | medium | ok |  | PAN-5597 | Flywheel queue skips fully landed order books instead of holding the slot until archived. Blocked on PAN-5597 (creates phase.ts). |
 | 268 | PAN-1556 | S | high | ok |  |  | Session/activity feed: coalesce review-spawn spam, supersede re-reviews per issue, keep active conversations most-recent |
 | 269 | PAN-4510 | S | medium | ok |  |  | Show effort on issue-view agent rows, conversation rows and Agents-page conversation entries; split from closed PAN-4259 |
 | 270 | PAN-2190 | L | high | ok |  |  | Decompose routes/workspaces/merge-ops.ts (1,925 lines) |
@@ -312,7 +307,6 @@ _Last sequenced: 2026-11-23T16:21:52Z · model: claude-opus-5-5 · open: 957_
 | 282 | PAN-4811 | M | medium | ok |  |  | Lanes on a new Fly VM plus gauntlet.fly.max_vms cap; PAN-4743 landed the Fly target door, so this is now unblocked. |
 | 283 | PAN-5079 | S | high | ok |  |  | pan task claim/cancel/done write any id, so a typo leaves a stray row in the committed continue file an agent can't remove. |
 | 284 | PAN-5446 | S | medium | ok |  |  | 7 CodeRabbit findings on merged PAN-4590 sast gate; 2 Major: dirty scans not bound to tree, incomplete scans reported as scanned |
-| 284 | PAN-5624 | XS | medium | ok |  |  | 2 Major CodeRabbit findings on merged PAN-5601 PR #5613: resolve the Flywheel project key from the selected project and keep it every tick. |
 | 285 | PAN-4778 | S | medium | ok |  |  | Workspace-image CI never published: wrong Fly app, fly not on PATH, no FLY_API_TOKEN (operator). Fly VMs run a June image. |
 | 286 | PAN-4817 | S | medium | ok |  | PAN-4778 | Fly app's cached image predates pan serve --no-open, so every new Fly VM crashes and rolls back; blocks live Fly verification. |
 | 287 | PAN-2211 | M | high | ok |  |  | writeSwarmSlotCompletion has no production caller; pan done in a slot workspace must record it. Swarm is dormant (Cut D11). |
@@ -965,10 +959,6 @@ _Last sequenced: 2026-11-23T16:21:52Z · model: claude-opus-5-5 · open: 957_
 
 ## Rationale detail
 
-### PAN-5611 (rank 1)
-
-New bug already in the pipeline with a verified root cause (only Unsettle and schedule firing clear a settle). Pinned at rank 1 per the in-pipeline rule.
-
 ### PAN-5615 (rank 1)
 
 New substrate bug already in the pipeline: every agent escalation to the Flywheel fails silently (MIN-1144 lost a blocker for two hours). Pinned at rank 1 per the in-pipeline rule; the fix is a prompt rename, a cost-attribution alias and a guard test.
@@ -984,10 +974,6 @@ New substrate-improvement bug already in the pipeline, pinned at rank 1 per the 
 ### PAN-5013 (rank 3)
 
 Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.
-
-### PAN-5614 (rank 3)
-
-New substrate bug that blocks every GitLab polyrepo review from reaching merge (MIN-1144 and MIN-1146 are stuck now). Root cause and fix are pinned in the body, so it ranks with the top critical merge-path fixes, beside PAN-2954 (the other GitLab merge-path refusal).
 
 ### PAN-5619 (rank 3)
 
@@ -1285,6 +1271,14 @@ New issue from the Deft adoption PRD. Its dependency PAN-3308 has closed. The ma
 
 Found cutting v0.65.0: CI was green but the local release check failed on two host-dependent tests. XS fix that removes false reds from the release verb, so it sits above routine medium work.
 
+### PAN-4566 (rank 71)
+
+Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback this fix routes failures to is on main and work can start.
+
+### PAN-5193 (rank 72)
+
+New planning bug placed in a freed high-tier slot. It blocks pan plan finalize for every epic child with a stub draft on main; the fix is a candidate-order change plus one test.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1292,24 +1286,11 @@ Found cutting v0.65.0: CI was green but the local release check failed on two ho
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-23T16:21:52Z",
+  "generatedAt": "2026-11-23T16:51:58Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 957,
+  "openCount": 951,
   "nodes": [
-    {
-      "issue": "PAN-5611",
-      "rank": 1,
-      "size": "S",
-      "importance": "medium",
-      "score": 60,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Idle-settled conversations stay in Settled after the operator resumes them, hiding them from their project group.",
-      "rationale": "New bug already in the pipeline with a verified root cause (only Unsettle and schedule firing clear a settle). Pinned at rank 1 per the in-pipeline rule.",
-      "gate": "auto",
-      "planning": "auto"
-    },
     {
       "issue": "PAN-5615",
       "rank": 1,
@@ -1359,19 +1340,6 @@ Found cutting v0.65.0: CI was green but the local release check failed on two ho
       "dependsOn": [],
       "why": "Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned.",
       "rationale": "Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5614",
-      "rank": 3,
-      "size": "M",
-      "importance": "critical",
-      "score": 86,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "specialists done falls back to GitHub in remote-less polyrepo roots, so GitLab review verdicts are lost and MYN merges stall.",
-      "rationale": "New substrate bug that blocks every GitLab polyrepo review from reaching merge (MIN-1144 and MIN-1146 are stuck now). Root cause and fix are pinned in the body, so it ranks with the top critical merge-path fixes, beside PAN-2954 (the other GitLab merge-path refusal).",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2507,19 +2475,6 @@ Found cutting v0.65.0: CI was green but the local release check failed on two ho
       "dependsOn": [],
       "why": "A finished work agent with an open PR sat two hours because review was never dispatched and auto-requeue fired none of 25 attempts.",
       "rationale": "Triage: the auto-requeue machinery cited targeted the deleted review_status table; verify review-dispatch-after-PR-open against the current mechanism (see PAN-3939 for the post-cut reproduction). Rank held.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5609",
-      "rank": 83,
-      "size": "M",
-      "importance": "medium",
-      "score": 58,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Top-bar indicator for conversation-search indexing with hover/click details. Merged; awaiting on-main verification.",
-      "rationale": "PR merged and the issue is labeled verifying-on-main, so it left the pipeline; rank 83 kept because only on-main verification remains, with no new pickup work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4407,19 +4362,6 @@ Found cutting v0.65.0: CI was green but the local release check failed on two ho
       "planning": "auto"
     },
     {
-      "issue": "PAN-4242",
-      "rank": 227,
-      "size": "M",
-      "importance": "high",
-      "score": 70,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan handoff --cwd skips the folder-trust pre-trust pan start does; successor sits at the trust prompt for hours while shown live",
-      "rationale": "New bug, seen twice (2026-09-21 and 2026-09-27): the handoff spawn path never pre-trusts --cwd, so the successor blocks at the Claude Code trust dialog while the dashboard reports it alive. Handoff chains are a core operator workflow and the failure is silent, so it ranks high among the operator-visible reliability bugs; fix step 1 overlaps PAN-900 (trust devroot for conversations).",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2874",
       "rank": 228,
       "size": "M",
@@ -4996,21 +4938,6 @@ Found cutting v0.65.0: CI was green but the local release check failed on two ho
       "isEpic": true
     },
     {
-      "issue": "PAN-5599",
-      "rank": 267,
-      "size": "S",
-      "importance": "medium",
-      "score": 54,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-5597"
-      ],
-      "why": "Flywheel queue skips fully landed order books instead of holding the slot until archived. Blocked on PAN-5597 (creates phase.ts).",
-      "rationale": "New issue with a PRD; it removes a manual archive step from Flywheel dispatch but must wait for PAN-5597, so it ranks just after its dependency.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1556",
       "rank": 268,
       "size": "S",
@@ -5221,19 +5148,6 @@ Found cutting v0.65.0: CI was green but the local release check failed on two ho
       "dependsOn": [],
       "why": "7 CodeRabbit findings on merged PAN-4590 sast gate; 2 Major: dirty scans not bound to tree, incomplete scans reported as scanned",
       "rationale": "New follow-up to the merged PAN-4590 Semgrep gate. Two findings are correctness issues in an advisory-by-default gate, so it ranks medium, ahead of the low-importance Semgrep UI children.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5624",
-      "rank": 284,
-      "size": "XS",
-      "importance": "medium",
-      "score": 54,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "2 Major CodeRabbit findings on merged PAN-5601 PR #5613: resolve the Flywheel project key from the selected project and keep it every tick.",
-      "rationale": "New CodeRabbit follow-up on a merged substrate fix; small, advisory, placed with other Major follow-ups.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -14086,13 +14000,6 @@ Found cutting v0.65.0: CI was green but the local release check failed on two ho
       "confidence": 0.5
     },
     {
-      "from": "PAN-4242",
-      "to": "PAN-900",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
       "from": "PAN-4297",
       "to": "PAN-5456",
       "type": "unblocks",
@@ -14611,34 +14518,6 @@ Found cutting v0.65.0: CI was green but the local release check failed on two ho
       "confidence": 0.5
     },
     {
-      "from": "PAN-5597",
-      "to": "PAN-5599",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5599",
-      "to": "PAN-5629",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.9
-    },
-    {
-      "from": "PAN-5614",
-      "to": "PAN-2954",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
-      "from": "PAN-5617",
-      "to": "PAN-5614",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
       "from": "PAN-5617",
       "to": "PAN-5621",
       "type": "informs",
@@ -14651,13 +14530,6 @@ Found cutting v0.65.0: CI was green but the local release check failed on two ho
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
-    },
-    {
-      "from": "PAN-5621",
-      "to": "PAN-5614",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
     },
     {
       "from": "PAN-5621",
