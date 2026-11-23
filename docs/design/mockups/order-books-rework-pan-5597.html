@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Order Books Rework</title>
+<style>
+  /* Broadsheet tokens copied from src/dashboard/frontend/src/index.css (four-scope region).
+     Conformance delta: Geist is not embedded here, so the page falls back to the system UI font. */
+  :root {
+    --background: hsl(0 0% 96.5%); --foreground: hsl(35 10% 14%); --card: hsl(30 8% 94.5%);
+    --popover: hsl(0 0% 100%); --muted: hsl(30 8% 92%); --muted-foreground: hsl(35 5% 42%);
+    --border: hsl(30 4% 88.5%); --body-foreground: hsl(35 8% 28%); --faint-foreground: hsl(35 3% 62%);
+    --primary: oklch(0.488 0.217 264); --primary-ink: oklch(0.42 0.19 264); --primary-foreground: #fff;
+    --destructive: #ef4444; --destructive-foreground: #b91c1c;
+    --warning: #f59e0b; --warning-foreground: #b45309;
+    --success: #10b981; --success-foreground: #047857;
+    --info: #3b82f6; --info-foreground: #1d4ed8;
+    --shadow-floating: 0 4px 18px rgba(0,0,0,.12);
+    --radius: 6px;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --background: hsl(0 0% 12.5%); --foreground: hsl(30 8% 94%); --card: hsl(0 0% 17%);
+    --popover: hsl(0 0% 18%); --muted: hsl(0 0% 15%); --muted-foreground: hsl(30 2% 66%);
+    --border: hsl(0 0% 22.7%); --body-foreground: hsl(30 2% 88%); --faint-foreground: hsl(30 1% 48%);
+    --primary: oklch(0.588 0.217 264); --primary-ink: oklch(0.7 0.19 264);
+    --destructive: #f87171; --destructive-foreground: #fca5a5;
+    --warning: #f59e0b; --warning-foreground: #fbbf24;
+    --success: #10b981; --success-foreground: #34d399;
+    --info: #3b82f6; --info-foreground: #60a5fa;
+    --shadow-floating: 0 6px 24px rgba(0,0,0,.5);
+    color-scheme: dark;
+  } }
+  :root[data-theme="dark"] {
+    --background: hsl(0 0% 12.5%); --foreground: hsl(30 8% 94%); --card: hsl(0 0% 17%);
+    --popover: hsl(0 0% 18%); --muted: hsl(0 0% 15%); --muted-foreground: hsl(30 2% 66%);
+    --border: hsl(0 0% 22.7%); --body-foreground: hsl(30 2% 88%); --faint-foreground: hsl(30 1% 48%);
+    --primary: oklch(0.588 0.217 264); --primary-ink: oklch(0.7 0.19 264);
+    --destructive: #f87171; --destructive-foreground: #fca5a5;
+    --warning: #f59e0b; --warning-foreground: #fbbf24;
+    --success: #10b981; --success-foreground: #34d399;
+    --info: #3b82f6; --info-foreground: #60a5fa;
+    --shadow-floating: 0 6px 24px rgba(0,0,0,.5);
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--background); color: var(--foreground);
+    font: 400 13px/1.6 "Geist Variable", Geist, system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+  .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 11.5px; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  button:disabled { cursor: not-allowed; opacity: .45; }
+  input, select { font: inherit; color: inherit; }
+  .eyebrow { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted-foreground); }
+
+  .mockbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 6px 16px; border-bottom: 1px dashed var(--border); color: var(--muted-foreground); font-size: 12px; }
+  .mockbar b { font-weight: 500; color: var(--foreground); }
+  .mockbar .sp { margin-left: auto; }
+  .page { display: flex; flex-direction: column; min-height: calc(100% - 38px); }
+  .ph { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  .ph h1 { margin: 0; font-size: 15px; font-weight: 600; }
+  .ph p { margin: 0; color: var(--muted-foreground); font-size: 12px; }
+  .ph .sp { margin-left: auto; }
+  .body { display: flex; flex: 1; min-height: 0; }
+
+  .btn { border: 1px solid var(--border); background: transparent; border-radius: var(--radius); padding: 5px 10px; font-size: 12px; font-weight: 500; white-space: nowrap; }
+  .btn:hover:not(:disabled) { background: var(--muted); }
+  .btn.primary { background: var(--primary); border-color: var(--primary); color: var(--primary-foreground); }
+  .btn.primary:hover:not(:disabled) { background: var(--primary); filter: brightness(1.08); }
+  .btn.small { padding: 2px 8px; font-size: 11.5px; }
+  .btn.ghost { border-color: transparent; color: var(--muted-foreground); }
+  .btn.danger:hover:not(:disabled) { color: var(--destructive-foreground); }
+  select.btn { padding-right: 6px; background: var(--background); }
+
+  /* book list */
+  .rail { width: 250px; flex: none; border-right: 1px solid var(--border); padding: 12px 10px; overflow: auto; }
+  .rail .newbook { width: 100%; border-style: dashed; margin-bottom: 6px; text-align: left; }
+  .rail h3 { margin: 14px 6px 4px; font-weight: 400; }
+  .bookrow { display: block; width: 100%; text-align: left; border: 1px solid transparent; background: transparent; border-radius: var(--radius); padding: 7px 8px; }
+  .bookrow:hover { background: var(--muted); }
+  .bookrow[aria-current="true"] { background: var(--muted); border-color: color-mix(in srgb, var(--foreground) 40%, transparent); }
+  .bookrow .nm { display: flex; gap: 6px; font-weight: 500; font-size: 13px; }
+  .bookrow .nm span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
+  .bookrow .meta { color: var(--muted-foreground); font-size: 11.5px; }
+  .bar { height: 4px; border-radius: 2px; background: color-mix(in srgb, var(--foreground) 10%, transparent); display: flex; overflow: hidden; margin-top: 5px; }
+  .bar i { display: block; height: 100%; }
+  .bar .l { background: var(--success); } .bar .p { background: var(--info); }
+  .emptyhint { color: var(--faint-foreground); font-size: 11.5px; margin: 0 8px; }
+
+  /* detail */
+  .detail { flex: 1; min-width: 0; padding: 16px 20px 40px; overflow: auto; }
+  .wrap { max-width: 980px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+  .titlerow { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px; }
+  .titlerow h2 { margin: 0; font-size: 20px; font-weight: 600; line-height: 1.25; cursor: text; }
+  .titlerow h2:hover { text-decoration: underline dotted; text-underline-offset: 4px; }
+  .titlerow .acts { margin-left: auto; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .titlerow input { font-size: 20px; font-weight: 600; background: var(--background); border: 1px solid var(--border); border-radius: var(--radius); padding: 0 6px; width: 420px; max-width: 100%; }
+  .idline { color: var(--faint-foreground); display: flex; gap: 8px; align-items: center; }
+  .statusline { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--body-foreground); }
+  .tag { display: inline-flex; align-items: center; border: 1px solid var(--border); border-radius: var(--radius); padding: 0 7px; font-size: 11.5px; line-height: 20px; white-space: nowrap; color: var(--muted-foreground); }
+  .tag.blue { background: color-mix(in srgb, var(--info) 8%, transparent); border-color: color-mix(in srgb, var(--info) 32%, transparent); color: var(--info-foreground); }
+  .tag.amber { background: color-mix(in srgb, var(--warning) 8%, transparent); border-color: color-mix(in srgb, var(--warning) 32%, transparent); color: var(--warning-foreground); }
+  .tag.green { background: color-mix(in srgb, var(--success) 8%, transparent); border-color: color-mix(in srgb, var(--success) 32%, transparent); color: var(--success-foreground); }
+  .tag.red { background: color-mix(in srgb, var(--destructive) 8%, transparent); border-color: color-mix(in srgb, var(--destructive) 32%, transparent); color: var(--destructive-foreground); }
+  .note { border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+  .note.amber { background: color-mix(in srgb, var(--warning) 8%, transparent); border-color: color-mix(in srgb, var(--warning) 32%, transparent); }
+  .note.green { background: color-mix(in srgb, var(--success) 8%, transparent); border-color: color-mix(in srgb, var(--success) 32%, transparent); }
+  .note.red { background: color-mix(in srgb, var(--destructive) 8%, transparent); border-color: color-mix(in srgb, var(--destructive) 32%, transparent); display: block; }
+  .note .grow { flex: 1; min-width: 220px; }
+  .note ul { margin: 6px 0 0; padding: 0; list-style: none; }
+  .note li { display: flex; gap: 8px; align-items: center; padding: 3px 0; }
+  .note li span.grow { min-width: 0; }
+  .progress { display: flex; align-items: center; gap: 12px; }
+  .progress .bar { flex: 1; height: 6px; margin: 0; border-radius: 3px; }
+  .progress .txt { color: var(--muted-foreground); font-size: 12px; white-space: nowrap; }
+
+  .lane { border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); }
+  .lanehead { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+  .lanehead h3 { margin: 0; font-size: 13px; font-weight: 600; }
+  .lanehead .sub { color: var(--muted-foreground); font-size: 12px; }
+  .lanehead .sp { margin-left: auto; }
+  .stepper { display: inline-flex; align-items: center; gap: 4px; }
+  .stepper button { width: 22px; height: 22px; padding: 0; border: 1px solid var(--border); border-radius: var(--radius); background: transparent; line-height: 1; }
+  .stepper b { min-width: 14px; text-align: center; font-weight: 500; }
+  .row { display: flex; align-items: center; gap: 10px; padding: 7px 12px; border-top: 1px solid var(--border); border-left: 2px solid transparent; }
+  .row:first-child { border-top: 0; }
+  .row.working { border-left-color: var(--info); } .row.review { border-left-color: var(--warning); } .row.landed { border-left-color: var(--success); }
+  .row.dragover { box-shadow: inset 0 2px 0 var(--primary); }
+  .row .grip { color: var(--faint-foreground); cursor: grab; user-select: none; }
+  .row .pos { width: 26px; color: var(--faint-foreground); flex: none; }
+  .row .id { width: 70px; flex: none; color: var(--foreground); text-decoration: none; }
+  .row .id:hover { text-decoration: underline; }
+  .row .mid { flex: 1; min-width: 0; }
+  .row .ttl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--body-foreground); }
+  .row.landed .ttl { color: var(--muted-foreground); }
+  .row .subl { color: var(--muted-foreground); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .acts { display: none; gap: 4px; flex: none; }
+  .row:hover .acts, .row:focus-within .acts { display: flex; }
+  .row .state { flex: none; }
+  .opts { border-top: 1px dashed var(--border); padding: 10px 12px 12px 50px; display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: flex-end; background: var(--muted); }
+  .opts label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted-foreground); }
+  .opts label.chk { flex-direction: row; align-items: center; gap: 6px; color: var(--body-foreground); }
+  .opts input[type=text] { background: var(--background); border: 1px solid var(--border); border-radius: var(--radius); padding: 3px 7px; width: 250px; }
+  .opts small { display: block; color: var(--muted-foreground); font-size: 11px; }
+  .lanefoot { padding: 6px 12px; border-top: 1px solid var(--border); color: var(--muted-foreground); font-size: 12px; display: flex; gap: 10px; align-items: center; }
+  .laneempty { padding: 14px 12px; color: var(--muted-foreground); font-size: 12px; text-align: center; }
+  .lane.dropok { outline: 2px dashed color-mix(in srgb, var(--primary) 60%, transparent); outline-offset: 2px; }
+  details.more { border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 12px; }
+  details.more summary { cursor: pointer; color: var(--muted-foreground); font-size: 12px; }
+  details.more .f { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-top: 10px; }
+  details.more input { background: var(--background); border: 1px solid var(--border); border-radius: var(--radius); padding: 3px 7px; width: 300px; max-width: 100%; }
+  pre.brief { margin: 10px 0 0; padding: 10px; background: var(--muted); border-radius: var(--radius); font-size: 11.5px; white-space: pre-wrap; }
+
+  /* add drawer */
+  .drawer { width: 340px; flex: none; border-left: 1px solid var(--border); padding: 14px; overflow: auto; background: var(--card); }
+  .drawer h3 { margin: 0; font-size: 13px; font-weight: 600; }
+  .drawer .hd { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .drawer .hd .sp { margin-left: auto; }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius); padding: 2px; gap: 2px; }
+  .seg button { border: 0; background: transparent; border-radius: 4px; padding: 2px 9px; font-size: 12px; color: var(--muted-foreground); }
+  .seg button[aria-pressed="true"] { background: var(--muted); color: var(--foreground); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--foreground) 25%, transparent); }
+  .drawer input[type=search] { width: 100%; background: var(--background); border: 1px solid var(--border); border-radius: var(--radius); padding: 6px 9px; margin: 10px 0 4px; }
+  .cand { display: flex; gap: 8px; align-items: center; padding: 7px 0; border-top: 1px solid var(--border); cursor: grab; }
+  .cand .mid { flex: 1; min-width: 0; }
+  .cand .ttl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cand .subl { color: var(--muted-foreground); font-size: 11.5px; }
+  .pop { position: fixed; z-index: 20; background: var(--popover); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-floating); padding: 12px; width: 340px; }
+  .pop p { margin: 0 0 8px; }
+  .pop input { width: 100%; background: var(--background); border: 1px solid var(--border); border-radius: var(--radius); padding: 5px 8px; margin-bottom: 10px; }
+  .pop .f { display: flex; gap: 8px; justify-content: flex-end; }
+  .menu { position: fixed; z-index: 20; background: var(--popover); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-floating); padding: 4px; min-width: 190px; }
+  .menu button { display: block; width: 100%; text-align: left; border: 0; background: transparent; padding: 5px 10px; border-radius: 4px; font-size: 12.5px; }
+  .menu button:hover { background: var(--muted); }
+  .toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); background: var(--foreground); color: var(--background); padding: 6px 14px; border-radius: var(--radius); font-size: 12.5px; z-index: 30; }
+  .blank { max-width: 520px; margin: 60px auto; text-align: center; color: var(--muted-foreground); }
+  .blank h2 { color: var(--foreground); font-size: 18px; font-weight: 600; margin: 0 0 6px; }
+  .blank ol { text-align: left; display: inline-block; margin: 10px 0 16px; }
+  @media (max-width: 900px) {
+    .body { flex-direction: column; }
+    .rail, .drawer { width: auto; border: 0; border-bottom: 1px solid var(--border); }
+    .detail { padding: 14px 16px 40px; }
+    .row { flex-wrap: wrap; } .row .mid { flex-basis: 100%; order: 5; }
+  }
+</style>
+</head>
+<body>
+<div class="mockbar">
+  <span><b>Mockup</b> · PAN-5597 · sample data · everything here is clickable</span>
+  <span class="sp"></span>
+  <label>Flywheel is <select id="fw" class="btn small"><option value="1">running</option><option value="0">stopped</option></select></label>
+  <button class="btn small" id="theme">Light / dark</button>
+  <button class="btn small" id="reset">Reset sample data</button>
+</div>
+<div class="page">
+  <header class="ph">
+    <div>
+      <h1>Order books</h1>
+      <p>A book is a list of issues the Flywheel works through, in the order you set.</p>
+    </div>
+    <span class="sp"></span>
+    <label style="color:var(--muted-foreground);font-size:12px">Project <select class="btn small"><option>Overdeck</option><option>Mind Your Now</option><option>okf</option></select></label>
+  </header>
+  <div class="body">
+    <aside class="rail" id="rail" aria-label="Order books"></aside>
+    <main class="detail" id="detail"></main>
+    <aside class="drawer" id="drawer" aria-label="Add issues" hidden></aside>
+  </div>
+</div>
+<div id="float"></div>
+
+<script>
+const TITLES = {
+  'PAN-5281':'Commit attribution: stamp the agent that wrote each commit','PAN-5287':'Workflow redesign S: frame the three-step shell',
+  'PAN-5288':'Workflow redesign A: plan step shows the PRD and its checklist','PAN-5292':'Workflow redesign C: review step lists findings by file',
+  'PAN-5329':'Workflow redesign B follow-up: keep the plan step scroll position','PAN-5413':'Editor bar offers a primary action per step',
+  'PAN-5427':'Diff window "All turns" shows every changed file','PAN-5430':'Workflow redesign E: ship step shows merge readiness in one line',
+  'PAN-5448':'Workflow redesign F: keyboard path through all three steps','PAN-5451':'Workflow redesign G: empty states for each step',
+  'PAN-5460':'Migrate step state to the shared read model','PAN-5466':'Remove the legacy issue cockpit route',
+  'PAN-5185':'File explorer: tree component','PAN-5186':'File explorer: open file in a tab','PAN-5187':'File explorer: search by name',
+  'PAN-3290':'Harden restart: refuse when a gate is running','PAN-3288':'Harden restart: keep sidecars alive','PAN-3297':'Harden reload: verify build commit','PAN-3295':'Harden boot: lenient agent row decode',
+  'PAN-4101':'Anywhere: pair a machine from the phone','PAN-4102':'Anywhere: relay fallback when ICE fails','PAN-4110':'Anywhere: show link health on the Machines page','PAN-4000':'Anywhere: secure channel handshake',
+  'PAN-5470':'Docs: every feature page has a screenshot','PAN-5471':'Docs: CLI reference generated from --help','PAN-5472':'Docs: troubleshooting index',
+  'PAN-2445':'Refactor P3: split agents routes','PAN-2233':'Refactor P3: one liveness module',
+  'PAN-5013':'Finished-turn agents look dead in the Agents list','PAN-5567':'Codex threads ignore Read-only and Full access settings',
+  'PAN-5489':'pan plan from an agent shell leaves a half-built workspace','PAN-5566':'Help text says Auto blocks destructive calls, but the hook approves all',
+  'PAN-5385':'Anywhere remote access is down for trickle clients','PAN-4636':'Adopted outside PRs fail verification with no notice',
+  'PAN-5523':'pan conversations move/heal refuse with "Missing origin"','PAN-4733':'Move four browser specs to a gating e2e lane',
+};
+const BACKLOG = ['PAN-5013','PAN-5567','PAN-5489','PAN-5566','PAN-5385','PAN-4636','PAN-5523','PAN-4733'];
+const it = (issue, lane, st, extra) => Object.assign({ issue, lane, st, prereqs: [], reVerify: false, planAtPickup: false, hasPrd: true }, extra || {});
+function seed() { return {
+  sel: 'wf', showLanded: {}, drawer: false, addLane: 'A', q: '', optsOpen: null, briefOpen: false, archivedOpen: false, renaming: false,
+  books: [
+    { id: 'wf', bookId: '2026-11-14-workflow-redesign-pan-5284', name: 'Workflow redesign', status: 'ready', conc: 2, paused: null, brief: '', items: [
+      it('PAN-5281','A','landed'), it('PAN-5287','A','landed'), it('PAN-5288','A','landed',{prereqs:['PAN-5287']}), it('PAN-5292','A','landed'), it('PAN-5329','A','landed'),
+      it('PAN-5413','A','review'), it('PAN-5430','A','working',{prereqs:['PAN-5288']}), it('PAN-5448','A','queued'), it('PAN-5451','A','queued',{prereqs:['PAN-5448']}),
+      it('PAN-5427','B','landed'), it('PAN-5460','B','working'), it('PAN-5466','B','queued',{reVerify:true}) ] },
+    { id: 'fx', bookId: '2026-11-13-file-explorer-pan-5183', name: 'File explorer', status: 'ready', conc: 2, paused: null, brief: '', items: [
+      it('PAN-5185','A','landed'), it('PAN-5186','A','landed'), it('PAN-5187','A','landed') ] },
+    { id: 'hd', bookId: '2026-07-30-hardening-20260729', name: 'Hardening', status: 'ready', conc: 2, paused: null, brief: '', items: [
+      it('PAN-3295','A','queued'), it('PAN-3290','A','queued'), it('PAN-3288','A','queued'), it('PAN-3297','B','queued') ] },
+    { id: 'aw', bookId: '2026-08-08-overdeck-anywhere', name: 'Overdeck Anywhere', status: 'draft', conc: 3, paused: null, brief: 'docs/briefs/anywhere.md', items: [
+      it('PAN-4101','A','queued'), it('PAN-4102','A','queued',{prereqs:['PAN-4101']}), it('PAN-4000','A','closed'), it('PAN-4110','B','queued',{hasPrd:false}) ] },
+    { id: 'p3', bookId: '2026-07-28-refactor-p3-remainder', name: 'Refactor P3 remainder', status: 'draft', conc: 2, paused: { by: 'operator', at: 'Jul 28', why: 'Waiting for the agents-route split to land.' }, brief: '', items: [
+      it('PAN-2445','A','queued'), it('PAN-2233','B','queued') ] },
+    { id: 'dc', bookId: '2026-11-17-docs-overhaul-pan-5467', name: 'Docs overhaul', status: 'complete', conc: 2, paused: null, brief: '', items: [
+      it('PAN-5470','A','landed'), it('PAN-5471','A','landed'), it('PAN-5472','A','landed') ] },
+  ] }; }
+let S = seed(), flywheel = true;
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+const book = () => S.books.find((b) => b.id === S.sel);
+const landed = (b) => b.items.filter((i) => i.st === 'landed').length;
+const inProg = (b) => b.items.filter((i) => i.st === 'working' || i.st === 'review').length;
+const finished = (b) => b.items.length > 0 && landed(b) === b.items.length;
+function phase(b) { // mirrors the PRD: the first queued book is the active one
+  if (b.status === 'complete') return 'archived';
+  if (b.status === 'draft') return 'draft';
+  return S.books.find((x) => x.status === 'ready') === b ? 'active' : 'queued';
+}
+function problems(b) {
+  const out = [];
+  if (b.items.length === 0) out.push({ text: 'This book has no issues yet. Add at least one.' });
+  for (const i of b.items) {
+    if (i.st === 'closed') out.push({ issue: i.issue, text: 'is already closed.', fix: 'Remove' });
+    if (i.lane === 'B' && !i.hasPrd && !i.planAtPickup) out.push({ issue: i.issue, text: 'is in the one-at-a-time lane but has no PRD.', fix: 'Plan when it starts' });
+  }
+  return out;
+}
+function waitReason(b, i) {
+  const ph = phase(b);
+  if (ph === 'draft') return 'Not queued yet';
+  if (ph === 'queued') return 'Book is not active yet';
+  if (b.paused) return 'Pickup paused';
+  const unmet = i.prereqs.filter((p) => { const x = b.items.find((y) => y.issue === p); return x && x.st !== 'landed'; });
+  if (unmet.length) return 'Waiting for ' + unmet.join(', ');
+  if (i.reVerify) return 'PRD needs a re-check first';
+  const busy = b.items.filter((x) => x.lane === i.lane && (x.st === 'working' || x.st === 'review')).length;
+  if (i.lane === 'B' && busy >= 1) return 'Waiting its turn';
+  if (i.lane === 'A' && busy >= b.conc) return 'Waiting for a free slot (' + busy + ' of ' + b.conc + ' running)';
+  return flywheel ? 'Starts next' : 'Ready, Flywheel is stopped';
+}
+function stateTag(b, i) {
+  if (i.st === 'landed') return '<span class="tag green">Landed</span>';
+  if (i.st === 'working') return '<span class="tag blue">Working</span>';
+  if (i.st === 'review') return '<span class="tag amber">In review</span>';
+  if (i.st === 'closed') return '<span class="tag red">Closed</span>';
+  return '<span class="tag">' + esc(waitReason(b, i)) + '</span>';
+}
+function toast(msg) { const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), 2200); }
+function closeFloat() { $('#float').innerHTML = ''; }
+
+function renderRail() {
+  const groups = { active: [], queued: [], draft: [], archived: [] };
+  S.books.forEach((b) => groups[phase(b)].push(b));
+  const row = (b, n) => {
+    const ph = phase(b), l = landed(b), t = b.items.length, p = problems(b).length;
+    let meta = ph === 'draft' ? 'Draft · ' + t + ' issue' + (t === 1 ? '' : 's') + (p ? ' · ' + p + ' to fix' : '')
+      : finished(b) ? 'Finished · all ' + t + ' landed'
+      : ph === 'queued' ? 'Queued · ' + t + ' issues' : l + ' of ' + t + ' landed' + (b.paused ? ' · paused' : '');
+    const barHtml = ph === 'active' || finished(b) ? '<div class="bar"><i class="l" style="width:' + (t ? l / t * 100 : 0) + '%"></i><i class="p" style="width:' + (t ? inProg(b) / t * 100 : 0) + '%"></i></div>' : '';
+    return '<button class="bookrow" data-book="' + b.id + '" aria-current="' + (b.id === S.sel) + '"><span class="nm"><span>' + esc(b.name) + '</span>' + (n ? '<span class="mono" style="color:var(--faint-foreground)">' + n + '</span>' : '') + '</span><span class="meta">' + meta + '</span>' + barHtml + '</button>';
+  };
+  let h = '<button class="btn newbook" id="newbook">+ New book</button>';
+  h += '<h3 class="eyebrow">Active</h3>' + (groups.active.map((b) => row(b)).join('') || '<p class="emptyhint">No book is queued, so the Flywheel follows the backlog.</p>');
+  if (groups.queued.length) h += '<h3 class="eyebrow">Queued</h3>' + groups.queued.map((b, i) => row(b, '#' + (i + 2))).join('');
+  if (groups.draft.length) h += '<h3 class="eyebrow">Drafts</h3>' + groups.draft.map((b) => row(b)).join('');
+  if (groups.archived.length) h += '<h3 class="eyebrow"><button class="btn ghost small" id="archtoggle" style="padding:0;letter-spacing:inherit;text-transform:inherit;font:inherit">' + (S.archivedOpen ? '▾' : '▸') + ' Archived (' + groups.archived.length + ')</button></h3>' + (S.archivedOpen ? groups.archived.map((b) => row(b)).join('') : '');
+  $('#rail').innerHTML = h;
+}
+
+function laneHtml(b, lane) {
+  const items = b.items.filter((i) => i.lane === lane);
+  const live = items.filter((i) => i.st !== 'landed'), done = items.filter((i) => i.st === 'landed');
+  const show = S.showLanded[b.id + lane] || live.length === 0;
+  const ro = phase(b) === 'archived';
+  const rowHtml = (i) => {
+    const pos = lane + (items.indexOf(i) + 1);
+    const bits = [];
+    if (i.st !== 'landed') {
+      const unmet = i.prereqs.filter((p) => { const x = b.items.find((y) => y.issue === p); return !x || x.st !== 'landed'; });
+      if (unmet.length) bits.push('after ' + unmet.join(', '));
+      if (i.reVerify) bits.push('re-check PRD first');
+      if (i.planAtPickup) bits.push('plan when it starts');
+      if (!i.hasPrd && !i.planAtPickup) bits.push('no PRD');
+    }
+    let h = '<div class="row ' + i.st + '" draggable="' + !ro + '" data-issue="' + i.issue + '">' +
+      (ro ? '' : '<span class="grip" title="Drag to reorder">⠿</span>') +
+      '<span class="pos mono">' + pos + '</span><a class="id mono" href="#" title="Open issue">' + i.issue + '</a>' +
+      '<div class="mid"><div class="ttl" title="' + esc(TITLES[i.issue] || '') + '">' + esc(TITLES[i.issue] || '') + '</div>' + (bits.length ? '<div class="subl">' + esc(bits.join(' · ')) + '</div>' : '') + '</div>' +
+      (ro || i.st === 'landed' ? '' : '<span class="acts"><button class="btn small" data-act="swap">' + (lane === 'A' ? 'Run one at a time' : 'Run in parallel') + '</button><button class="btn small" data-act="opts">Options</button><button class="btn small danger" data-act="rm">Remove</button></span>') +
+      '<span class="state">' + stateTag(b, i) + '</span></div>';
+    if (S.optsOpen === i.issue) h += '<div class="opts" data-issue="' + i.issue + '">' +
+      '<label>Start only after these issues land<input type="text" data-f="prereqs" value="' + esc(i.prereqs.join(', ')) + '" placeholder="PAN-100, PAN-101"><small>Pick from this book or type any issue ID.</small></label>' +
+      '<label class="chk"><input type="checkbox" data-f="reVerify"' + (i.reVerify ? ' checked' : '') + '> Re-check the PRD against main before starting</label>' +
+      '<label class="chk"><input type="checkbox" data-f="planAtPickup"' + (i.planAtPickup ? ' checked' : '') + '> Write the plan when it starts</label>' +
+      '<button class="btn small primary" data-act="saveopts">Save</button><button class="btn small" data-act="closeopts">Cancel</button></div>';
+    return h;
+  };
+  const head = lane === 'A'
+    ? '<h3>Parallel lane</h3><span class="sub">Up to</span><span class="stepper"><button data-conc="-1" aria-label="Fewer at once"' + (b.conc <= 1 || ro ? ' disabled' : '') + '>−</button><b>' + b.conc + '</b><button data-conc="1" aria-label="More at once"' + (b.conc >= 8 || ro ? ' disabled' : '') + '>+</button></span><span class="sub">issues run at the same time.</span>'
+    : '<h3>One-at-a-time lane</h3><span class="sub">Runs top to bottom, one issue at a time. Use it for work that would collide.</span>';
+  let h = '<section class="lane" data-lane="' + lane + '"><div class="lanehead">' + head + '<span class="sp"></span><span class="tag mono" title="CLI name: --lane ' + lane + '">Lane ' + lane + '</span></div>';
+  h += live.map(rowHtml).join('');
+  if (items.length === 0) h += '<div class="laneempty">' + (lane === 'A' ? 'No issues yet. Add issues, or drag them here.' : 'Empty. Drag an issue here when it must not overlap with other work.') + '</div>';
+  if (done.length && live.length) h += '<div class="lanefoot"><button class="btn ghost small" data-landed="' + lane + '">' + (show ? '▾ Hide' : '▸ Show') + ' ' + done.length + ' landed</button></div>';
+  if (show) h += done.map(rowHtml).join('');
+  return h + '</section>';
+}
+
+function renderDetail() {
+  const b = book();
+  if (!b) { $('#detail').innerHTML = '<div class="blank"><h2>No order books yet</h2><p>Use a book when the order of work matters: a migration, a refactor, a release push.</p><ol><li>Create a book and add issues.</li><li>Queue it.</li><li>The Flywheel works through it.</li></ol><br><button class="btn primary" id="newbook2">New book</button></div>'; return; }
+  const ph = phase(b), l = landed(b), t = b.items.length, pr = ph === 'draft' ? problems(b) : [], fin = finished(b);
+  const waiting = t - l - inProg(b);
+  let tagHtml, sentence, acts = '';
+  if (ph === 'draft') { tagHtml = '<span class="tag">Draft</span>'; sentence = 'Nothing starts from a draft. Queue it when the list is right.';
+    acts = '<button class="btn primary" data-act="queue"' + (pr.length ? ' disabled title="Fix the problems below first"' : '') + '>Queue book</button>'; }
+  else if (ph === 'queued') { const n = S.books.filter((x) => x.status === 'ready').indexOf(b) + 1; const ahead = S.books.filter((x) => x.status === 'ready')[0];
+    tagHtml = fin ? '<span class="tag green">Finished</span>' : '<span class="tag">Queued · #' + n + '</span>';
+    sentence = fin ? 'Every issue has landed. Archive it to clear it from the queue.' : 'Waits behind “' + esc(ahead.name) + '”. It becomes active when the books ahead of it are archived or moved back to draft.';
+    acts = fin ? '<button class="btn primary" data-act="archive">Archive</button>' : '<button class="btn" data-act="unqueue">Move back to draft</button>'; }
+  else if (ph === 'active') { tagHtml = fin ? '<span class="tag green">Finished</span>' : b.paused ? '<span class="tag amber">Active · pickup paused</span>' : '<span class="tag blue">Active</span>';
+    sentence = fin ? '' : flywheel ? 'The Flywheel starts work from this book. Issues outside it wait, but <span class="mono">pan start</span> still works for anything.' : 'This book is next, but the Flywheel is stopped.';
+    acts = fin ? '' : (flywheel ? '' : '<button class="btn primary" data-act="startfw">Start Flywheel</button>') + (b.paused ? '' : '<button class="btn" data-act="pause">Pause pickup</button>') + '<button class="btn" data-act="unqueue">Move back to draft</button>'; }
+  else { tagHtml = '<span class="tag">Archived</span>'; sentence = 'Kept for the record. Its issues are free to join another book.'; acts = '<button class="btn" data-act="restore">Restore as draft</button>'; }
+  acts += (ph !== 'archived' ? '<button class="btn' + (ph === 'draft' ? ' primary' : '') + '" data-act="add" style="' + (ph === 'draft' ? 'background:transparent;color:var(--primary-ink)' : '') + '">+ Add issues</button>' : '') + '<button class="btn" data-act="more" aria-label="More actions">⋯</button>';
+
+  let h = '<div class="wrap"><div><div class="titlerow">' +
+    (S.renaming ? '<input id="rename" value="' + esc(b.name) + '" aria-label="Book name">' : '<h2 id="bookname" title="Click to rename">' + esc(b.name) + '</h2>') +
+    '<div class="acts">' + acts + '</div></div>' +
+    '<div class="statusline" style="margin-top:6px">' + tagHtml + '<span>' + sentence + '</span></div></div>';
+
+  if (ph === 'active' && fin) h += '<div class="note green"><div class="grow"><b style="font-weight:600">All ' + t + ' issues have landed.</b> This book still holds the active slot, so queued books cannot start. Archive it to move on.</div><button class="btn primary" data-act="archive">Archive and move on</button></div>';
+  if (b.paused && ph !== 'archived') h += '<div class="note amber"><div class="grow"><b style="font-weight:600">Pickup is paused.</b> Work already running will finish. Nothing new starts from this book.<br><span style="color:var(--muted-foreground)">Paused by ' + esc(b.paused.by) + ' on ' + esc(b.paused.at) + ': “' + esc(b.paused.why) + '”</span></div><button class="btn" data-act="resume">Resume pickup</button></div>';
+  if (pr.length) h += '<div class="note red"><b style="font-weight:600">' + pr.length + (pr.length === 1 ? ' thing' : ' things') + ' to fix before you can queue this book</b><ul>' + pr.map((p, n) => '<li><span class="grow">' + (p.issue ? '<span class="mono">' + p.issue + '</span> ' : '') + esc(p.text) + '</span>' + (p.fix ? '<button class="btn small" data-fix="' + n + '">' + p.fix + '</button>' : '<button class="btn small" data-act="add">Add issues</button>') + '</li>').join('') + '</ul></div>';
+
+  if (t && ph !== 'draft') h += '<div class="progress"><div class="bar"><i class="l" style="width:' + l / t * 100 + '%"></i><i class="p" style="width:' + inProg(b) / t * 100 + '%"></i></div><span class="txt">' + l + ' of ' + t + ' landed' + (inProg(b) ? ' · ' + inProg(b) + ' in progress' : '') + (waiting > 0 ? ' · ' + waiting + ' waiting' : '') + '</span></div>';
+  h += laneHtml(b, 'A') + laneHtml(b, 'B');
+  h += '<details class="more"' + (S.briefOpen ? ' open' : '') + '><summary>More settings</summary><div class="f"><label for="brief">Extra instructions file</label><input id="brief" class="mono" placeholder="docs/briefs/my-campaign.md" value="' + esc(b.brief) + '"><span style="color:var(--muted-foreground);font-size:12px">' + (b.brief ? 'Added to every issue’s kickoff brief.' : 'Optional. A markdown file added to every issue’s kickoff brief.') + '</span></div><div class="f"><button class="btn small" data-act="brief">' + (S.briefOpen ? 'Hide' : 'Preview') + ' what the Flywheel receives</button></div>' +
+    (S.briefOpen ? '<pre class="brief mono">' + esc('# Special orders: ' + b.name + '\n\nOrder book: ' + b.bookId + '\n\n## Lane A\n' + (b.items.filter((i) => i.lane === 'A').map((i, n) => '- A' + (n + 1) + ' ' + i.issue).join('\n') || '- Empty') + '\n\n## Lane B\n' + (b.items.filter((i) => i.lane === 'B').map((i, n) => '- B' + (n + 1) + ' ' + i.issue).join('\n') || '- Empty')) + '</pre>' : '') + '</details></div>';
+  $('#detail').innerHTML = h;
+  if (S.renaming) { const r = $('#rename'); r.focus(); r.select(); }
+}
+
+function renderDrawer() {
+  const d = $('#drawer'), b = book();
+  if (!S.drawer || !b || phase(b) === 'archived') { d.hidden = true; return; }
+  d.hidden = false;
+  const owner = (id) => S.books.find((x) => x.status !== 'complete' && x.items.some((i) => i.issue === id));
+  const q = S.q.trim().toLowerCase();
+  const pool = q ? Object.keys(TITLES).filter((id) => id.toLowerCase().includes(q) || TITLES[id].toLowerCase().includes(q)).slice(0, 12) : BACKLOG.filter((id) => !owner(id));
+  d.innerHTML = '<div class="hd"><h3>Add issues</h3><span class="sp"></span><button class="btn ghost small" data-act="closeadd" aria-label="Close">✕</button></div>' +
+    '<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted-foreground)">Add to <span class="seg"><button data-addlane="A" aria-pressed="' + (S.addLane === 'A') + '">Parallel</button><button data-addlane="B" aria-pressed="' + (S.addLane === 'B') + '">One at a time</button></span></div>' +
+    '<input type="search" id="q" placeholder="Search by ID, title, or label" value="' + esc(S.q) + '" aria-label="Search open issues">' +
+    '<div class="eyebrow" style="margin:8px 0 2px">' + (q ? 'Open issues' : 'Top of your backlog') + '</div>' +
+    (pool.map((id) => { const o = owner(id); const rank = BACKLOG.indexOf(id);
+      return '<div class="cand" draggable="' + !o + '" data-cand="' + id + '"><div class="mid"><div class="ttl" title="' + esc(TITLES[id]) + '">' + esc(TITLES[id]) + '</div><div class="subl"><span class="mono">' + id + '</span>' + (rank >= 0 ? ' · backlog #' + (rank + 1) : '') + '</div></div>' +
+        (o ? '<span class="tag">' + (o === b ? 'In this book' : 'In ' + esc(o.name)) + '</span>' : '<button class="btn small" data-addissue="' + id + '">Add</button>') + '</div>'; }).join('') || '<p class="emptyhint" style="margin:10px 0">No open issues match.</p>') +
+    '<p style="color:var(--muted-foreground);font-size:11.5px;margin:12px 0 0">Adding an issue only changes the list. Work starts when the book is active.</p>';
+}
+function render() { renderRail(); renderDetail(); renderDrawer(); }
+
+function popup(anchor, html, onOk) {
+  closeFloat(); const r = anchor.getBoundingClientRect(); const p = document.createElement('div'); p.className = 'pop';
+  p.style.top = (r.bottom + 6) + 'px'; p.style.left = Math.max(8, Math.min(window.innerWidth - 348, r.right - 340)) + 'px'; p.innerHTML = html; $('#float').appendChild(p);
+  const inp = p.querySelector('input'); if (inp) { inp.focus(); inp.select(); }
+  p.querySelector('[data-ok]').onclick = () => { onOk(inp ? inp.value.trim() : ''); closeFloat(); render(); };
+  p.querySelector('[data-cancel]').onclick = closeFloat;
+  if (inp) inp.onkeydown = (e) => { if (e.key === 'Enter') p.querySelector('[data-ok]').click(); if (e.key === 'Escape') closeFloat(); };
+}
+function menu(anchor, entries) {
+  closeFloat(); const r = anchor.getBoundingClientRect(); const m = document.createElement('div'); m.className = 'menu';
+  m.style.top = (r.bottom + 4) + 'px'; m.style.left = Math.max(8, r.right - 190) + 'px';
+  entries.forEach(([label, fn]) => { const x = document.createElement('button'); x.textContent = label; x.onclick = () => { closeFloat(); fn(); render(); }; m.appendChild(x); });
+  $('#float').appendChild(m);
+}
+function newBook(anchor) {
+  popup(anchor, '<p><b style="font-weight:600">New book</b></p><input placeholder="Name, for example: Release hardening" aria-label="Book name"><div class="f"><button class="btn small" data-cancel>Cancel</button><button class="btn small primary" data-ok>Create draft</button></div>', (name) => {
+    if (!name) return; const id = 'b' + Date.now();
+    S.books.push({ id, bookId: '2026-11-22-' + name.toLowerCase().replace(/[^a-z0-9]+/g, '-'), name, status: 'draft', conc: 2, paused: null, brief: '', items: [] });
+    S.sel = id; S.drawer = true; });
+}
+function addIssue(id, lane) { const b = book(); if (b.items.some((i) => i.issue === id)) return; b.items.push(it(id, lane || S.addLane, 'queued')); toast(id + ' added to ' + ((lane || S.addLane) === 'A' ? 'the parallel lane' : 'the one-at-a-time lane')); }
+
+document.addEventListener('click', (e) => {
+  const t = e.target; const b = book();
+  if (!t.closest('#float') && !t.closest('[data-act="more"],[data-act="pause"],#newbook,#newbook2')) closeFloat();
+  if (t.id === 'newbook' || t.id === 'newbook2') return newBook(t);
+  if (t.id === 'archtoggle') { S.archivedOpen = !S.archivedOpen; return render(); }
+  if (t.id === 'bookname') { S.renaming = true; return render(); }
+  const br = t.closest('[data-book]'); if (br) { S.sel = br.dataset.book; S.optsOpen = null; S.renaming = false; S.drawer = phase(book()) === 'draft'; return render(); }
+  if (t.dataset.conc) { b.conc += Number(t.dataset.conc); return render(); }
+  if (t.dataset.landed) { const k = b.id + t.dataset.landed; S.showLanded[k] = !S.showLanded[k]; return render(); }
+  if (t.dataset.addlane) { S.addLane = t.dataset.addlane; return render(); }
+  if (t.dataset.addissue) { addIssue(t.dataset.addissue); return render(); }
+  if (t.dataset.fix !== undefined) { const p = problems(b)[Number(t.dataset.fix)]; if (p.fix === 'Remove') b.items = b.items.filter((i) => i.issue !== p.issue); else b.items.find((i) => i.issue === p.issue).planAtPickup = true; return render(); }
+  if (t.tagName === 'A' && t.classList.contains('id')) { e.preventDefault(); return toast('Opens ' + t.textContent + ' in the issue view'); }
+  const act = t.dataset.act; if (!act) return;
+  const rowEl = t.closest('[data-issue]'); const item = rowEl && b.items.find((i) => i.issue === rowEl.dataset.issue);
+  if (act === 'queue') { b.status = 'ready'; S.drawer = false; toast(phase(b) === 'active' ? '“' + b.name + '” is now the active book' : '“' + b.name + '” is queued'); }
+  if (act === 'unqueue') { b.status = 'draft'; toast('Moved back to draft. Nothing new starts from it.'); }
+  if (act === 'archive') { b.status = 'complete'; const next = S.books.find((x) => x.status === 'ready'); toast(next ? 'Archived. “' + next.name + '” is now active.' : 'Archived.'); if (next) S.sel = next.id; }
+  if (act === 'restore') { b.status = 'draft'; toast('Restored as a draft'); }
+  if (act === 'startfw') { flywheel = true; $('#fw').value = '1'; toast('Flywheel started on “' + b.name + '”'); }
+  if (act === 'resume') { b.paused = null; toast('Pickup resumed'); }
+  if (act === 'pause') return popup(t, '<p><b style="font-weight:600">Pause pickup?</b> Work already running will finish. Nothing new starts from this book until you resume.</p><input value="Operator paused new pickup." aria-label="Reason"><div class="f"><button class="btn small" data-cancel>Cancel</button><button class="btn small primary" data-ok>Pause pickup</button></div>', (why) => { b.paused = { by: 'you', at: 'Nov 22', why: why || 'Operator paused new pickup.' }; });
+  if (act === 'add') { S.drawer = true; }
+  if (act === 'closeadd') { S.drawer = false; }
+  if (act === 'brief') { S.briefOpen = !S.briefOpen; }
+  if (act === 'more') return menu(t, [['Rename', () => { S.renaming = true; }], ['Copy book ID for the CLI', () => toast('Copied ' + b.bookId)], ...(phase(b) !== 'archived' ? [['Archive', () => { b.status = 'complete'; const n = S.books.find((x) => x.status === 'ready'); if (n) S.sel = n.id; }]] : [])]);
+  if (item && act === 'swap') { item.lane = item.lane === 'A' ? 'B' : 'A'; b.items.push(b.items.splice(b.items.indexOf(item), 1)[0]); }
+  if (item && act === 'opts') { S.optsOpen = S.optsOpen === item.issue ? null : item.issue; }
+  if (item && act === 'rm') { b.items = b.items.filter((i) => i !== item); toast(item.issue + ' removed from the book'); }
+  if (act === 'closeopts') { S.optsOpen = null; }
+  if (act === 'saveopts') { const box = t.closest('.opts'); const x = b.items.find((i) => i.issue === box.dataset.issue);
+    x.prereqs = box.querySelector('[data-f=prereqs]').value.split(/[\s,]+/).map((s) => s.trim().toUpperCase()).filter(Boolean);
+    x.reVerify = box.querySelector('[data-f=reVerify]').checked; x.planAtPickup = box.querySelector('[data-f=planAtPickup]').checked; S.optsOpen = null; }
+  render();
+});
+document.addEventListener('input', (e) => {
+  if (e.target.id === 'q') { S.q = e.target.value; renderDrawer(); const q = $('#q'); q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
+  if (e.target.id === 'brief') book().brief = e.target.value;
+});
+document.addEventListener('keydown', (e) => {
+  if (e.target.id !== 'rename') return;
+  if (e.key === 'Enter') { const v = e.target.value.trim(); if (v) book().name = v; S.renaming = false; render(); }
+  if (e.key === 'Escape') { S.renaming = false; render(); }
+});
+document.addEventListener('focusout', (e) => { if (e.target.id === 'rename' && S.renaming) { const v = e.target.value.trim(); if (v) book().name = v; S.renaming = false; render(); } });
+
+// drag: reorder rows, move between lanes, and drop candidates from the Add panel
+let drag = null;
+document.addEventListener('dragstart', (e) => { const r = e.target.closest('.row[data-issue]'), c = e.target.closest('[data-cand]'); drag = r ? { issue: r.dataset.issue } : c ? { cand: c.dataset.cand } : null; if (drag) e.dataTransfer.setData('text/plain', 'x'); });
+document.addEventListener('dragover', (e) => { if (!drag) return; const lane = e.target.closest('.lane'); if (!lane) return; e.preventDefault();
+  document.querySelectorAll('.dragover,.dropok').forEach((x) => x.classList.remove('dragover', 'dropok')); const r = e.target.closest('.row[data-issue]'); (r || lane).classList.add(r ? 'dragover' : 'dropok'); });
+document.addEventListener('drop', (e) => { if (!drag) return; const laneEl = e.target.closest('.lane'); if (!laneEl) return; e.preventDefault();
+  const b = book(), lane = laneEl.dataset.lane, before = e.target.closest('.row[data-issue]');
+  let item;
+  if (drag.cand) { addIssue(drag.cand, lane); item = b.items.find((i) => i.issue === drag.cand); } else item = b.items.find((i) => i.issue === drag.issue);
+  if (item) { item.lane = lane; b.items.splice(b.items.indexOf(item), 1); const at = before && before.dataset.issue !== item.issue ? b.items.findIndex((i) => i.issue === before.dataset.issue) : -1; if (at >= 0) b.items.splice(at, 0, item); else b.items.push(item); }
+  drag = null; render(); });
+document.addEventListener('dragend', () => { drag = null; document.querySelectorAll('.dragover,.dropok').forEach((x) => x.classList.remove('dragover', 'dropok')); });
+
+$('#fw').onchange = (e) => { flywheel = e.target.value === '1'; render(); };
+$('#theme').onclick = () => { const r = document.documentElement; const dark = r.dataset.theme ? r.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches; r.dataset.theme = dark ? 'light' : 'dark'; };
+$('#reset').onclick = () => { S = seed(); flywheel = true; $('#fw').value = '1'; render(); };
+render();
+</script>
+</body>
+</html>
