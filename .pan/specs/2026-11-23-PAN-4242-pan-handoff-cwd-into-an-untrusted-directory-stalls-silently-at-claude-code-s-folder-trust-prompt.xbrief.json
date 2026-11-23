@@ -4,17 +4,17 @@
     "created": "2026-11-23T08:39:11Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4242: pan handoff --cwd into an untrusted directory stalls silently at Claude Code's folder-trust prompt",
-    "updated": "2026-11-23T08:45:03.575Z"
+    "updated": "2026-11-23T08:46:12.565Z"
   },
   "plan": {
     "id": "pan-4242",
     "title": "pan handoff --cwd into an untrusted directory stalls silently at Claude Code's folder-trust prompt",
-    "status": "proposed",
+    "status": "running",
     "uid": "a3f2671b-c754-478f-97f9-bb627aa4ad13",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-23T08:39:11Z",
-    "updated": "2026-11-23T08:45:03.575Z",
+    "updated": "2026-11-23T08:46:12.565Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4242",
@@ -664,5 +664,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
