@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5598",
   "created": "2026-11-23T02:56:35.201Z",
-  "updated": "2026-11-23T03:04:45.673Z",
+  "updated": "2026-11-23T03:08:46.328Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,9 +32,22 @@
       "doneAt": "2026-11-23T03:04:37.111Z"
     },
     "mcp-delete-body": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5598",
-      "claimedAt": "2026-11-23T03:04:45.672Z"
+      "claimedAt": "2026-11-23T03:04:45.672Z",
+      "doneAt": "2026-11-23T03:08:46.327Z"
+    },
+    "mcp-delete-body.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:08:46.327Z"
+    },
+    "mcp-delete-body.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:08:46.327Z"
+    },
+    "mcp-delete-body.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:08:46.327Z"
     }
   }
 }
