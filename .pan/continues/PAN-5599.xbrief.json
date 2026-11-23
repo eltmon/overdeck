@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5599",
   "created": "2026-11-23T05:24:22.748Z",
-  "updated": "2026-11-23T08:47:29.318Z",
+  "updated": "2026-11-23T08:47:37.040Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -124,6 +124,11 @@
     "cli-list-server-phases.ac4": {
       "status": "completed",
       "doneAt": "2026-11-23T08:47:29.318Z"
+    },
+    "header-skip-copy": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5599",
+      "claimedAt": "2026-11-23T08:47:37.040Z"
     }
   }
 }
