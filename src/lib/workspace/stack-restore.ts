@@ -66,10 +66,14 @@ export function stackLockPath(workspacePath: string): string {
 
 /**
  * Runs `fn` holding the stack lock at `lockPath`, waiting at most `timeoutMs`.
- * Creates the lock's directory first, because `.overdeck/` need not exist yet.
+ * Creates the lock's `.overdeck/` directory first, because it need not exist
+ * yet, but never the workspace itself: a workspace the reaper removed makes
+ * this reject (ENOENT) instead of coming back as an empty directory.
  */
 export async function withStackLock<T>(lockPath: string, fn: () => Promise<T>, timeoutMs: number): Promise<T> {
-  await mkdir(dirname(lockPath), { recursive: true });
+  await mkdir(dirname(lockPath)).catch((error: NodeJS.ErrnoException) => {
+    if (error.code !== 'EEXIST') throw error;
+  });
   return withFileLock(lockPath, fn, {
     staleMs: STACK_LOCK_STALE_MS,
     retryMs: STACK_LOCK_RETRY_MS,

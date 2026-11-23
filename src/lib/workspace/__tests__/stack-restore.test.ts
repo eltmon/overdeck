@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -13,6 +13,7 @@ import {
   restoreReclaimedStack,
   restoreReclaimedStackForSpawn,
   stackLockPath,
+  withStackLock,
   type StackRestoreDeps,
 } from '../stack-restore.js';
 
@@ -248,5 +249,20 @@ describe('restoreReclaimedStackForSpawn (PAN-5623)', () => {
       await expect(restoreReclaimedStackForSpawn(ISSUE, workspace, { ...w.deps, collect, record })).resolves.toBeUndefined();
       expect(record).not.toHaveBeenCalled();
     }
+  });
+});
+
+describe('withStackLock (PAN-5623)', () => {
+  it('creates the .overdeck directory and runs the callback holding the lock', async () => {
+    const lockPath = stackLockPath(workspace);
+    const seen = await withStackLock(lockPath, async () => existsSync(lockPath), 1_000);
+    expect(seen).toBe(true);
+    expect(existsSync(lockPath)).toBe(false);
+  });
+
+  it('rejects for a removed workspace and never re-creates it', async () => {
+    const gone = join(workspace, 'reaped');
+    await expect(withStackLock(stackLockPath(gone), async () => 'ran', 1_000)).rejects.toMatchObject({ code: 'ENOENT' });
+    expect(existsSync(gone)).toBe(false);
   });
 });
