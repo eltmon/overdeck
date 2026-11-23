@@ -52,6 +52,10 @@ describe('issuePanes (PAN-5623)', () => {
 });
 
 describe('panesAllowReclaim (PAN-5623)', () => {
+  it('accepts a finished Herdr work pane (done) at a boundary', () => {
+    expect(panesAllowReclaim([pane({ agentId: 'a', state: 'done' })], at('boundary'))).toEqual({ ok: true });
+  });
+
   it('accepts zero panes', () => {
     expect(panesAllowReclaim([], at('in-turn'))).toEqual({ ok: true });
   });
@@ -66,6 +70,8 @@ describe('panesAllowReclaim (PAN-5623)', () => {
     expect(panesAllowReclaim([pane({ role: 'test', agentId: 'a' })], at('boundary'))).toEqual({ ok: false, reason: 'pane-not-work' });
     expect(panesAllowReclaim([pane({})], at('boundary'))).toEqual({ ok: false, reason: 'pane-no-agent-id' });
     expect(panesAllowReclaim([pane({ agentId: 'a', state: 'working' })], at('boundary'))).toEqual({ ok: false, reason: 'pane-working' });
+    expect(panesAllowReclaim([pane({ agentId: 'a', state: 'unknown' })], at('boundary'))).toEqual({ ok: false, reason: 'pane-not-idle' });
+    expect(panesAllowReclaim([pane({ agentId: 'a', state: 'blocked' })], at('boundary'))).toEqual({ ok: false, reason: 'pane-not-idle' });
     expect(panesAllowReclaim([pane({ agentId: 'a' })], at('in-turn'))).toEqual({ ok: false, reason: 'pane-in-turn' });
     expect(panesAllowReclaim([pane({ agentId: 'a' })], at('unknown'))).toEqual({ ok: false, reason: 'pane-unknown' });
   });

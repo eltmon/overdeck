@@ -249,7 +249,11 @@ async function livePanes(
 
 async function defaultJournalTail(workspacePath: string): Promise<readonly PipelineJournalEntry[]> {
   const { readPipelineJournal } = await import('../cloister/pipeline-journal.js');
-  return readPipelineJournal(workspacePath, { limit: JOURNAL_TAIL_LIMIT });
+  // PAN-5623: drop stack.* housekeeping before the limit, so a run of reclaims
+  // and restores can never push the last pipeline step out of the tail.
+  return readPipelineJournal(workspacePath)
+    .filter((entry) => !isHousekeepingEntry(entry))
+    .slice(-JOURNAL_TAIL_LIMIT);
 }
 
 const JOURNAL_TAIL_LIMIT = 50;

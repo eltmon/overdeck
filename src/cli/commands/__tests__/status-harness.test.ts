@@ -239,6 +239,29 @@ describe('pan status — harness column (PAN-636 workspace-dbf)', () => {
     expect(out).toContain('STACK BROKEN')
   })
 
+  it('lists a reclaimed stack without agent state as stopped to free memory, not broken (PAN-5623)', async () => {
+    ;(listRunningAgentsSync as unknown as ReturnType<typeof vi.fn>).mockReturnValue([])
+    ;(collectDockerContainerLifecycleSnapshot as unknown as ReturnType<typeof vi.fn>).mockReturnValue(Effect.succeed([
+      { id: 'api1', name: 'myn-feature-min-1144-api-1', status: 'Exited (0) 2 minutes ago', state: 'exited' },
+    ]))
+    ;(getWorkspaceStackHealth as unknown as ReturnType<typeof vi.fn>).mockReturnValue(Effect.succeed({
+      healthy: true,
+      reasons: [],
+      lastObserved: '2026-05-17T00:00:00.000Z',
+      reclaimed: ['myn-feature-min-1144-api-1'],
+    }))
+
+    await statusCommand({} as any)
+
+    const out = logSpy.mock.calls.map(c => String(c[0])).join('\n')
+    expect(out).toContain('Reclaimed Workspace Stacks')
+    expect(out).toContain('MIN-1144')
+    expect(out).toContain('stopped to free memory')
+    expect(out).toContain('myn-feature-min-1144-api-1')
+    expect(out).not.toContain('No running agents.')
+    expect(out).not.toContain('STACK BROKEN')
+  })
+
   it('prints gating reasons only for non-running gated agents', async () => {
     ;(listRunningAgentsSync as unknown as ReturnType<typeof vi.fn>).mockReturnValue([
       {

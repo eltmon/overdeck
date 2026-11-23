@@ -13,8 +13,9 @@
  *   reads inside the per-workspace stack lock, journals `stack.reclaimed`,
  *   reads it back, and only then stops the containers by verified id (D5).
  * - The restore poll (every `STACK_RESTORE_POLL_MS`) keeps an index of open
- *   reclaims, seeded from every workspace journal on its first tick so it
- *   survives a dashboard restart (FR-7), and restores a stack when one of its
+ *   reclaims, seeded from every workspace journal on its first tick and
+ *   every 5 minutes after, so it survives a dashboard restart (FR-7) and a
+ *   failed journal read, and restores a stack when one of its
  *   issue's non-review panes is working or mid-turn (FR-5 `turn` trigger).
  *   Spawn and verification restore through `restoreReclaimedStack` directly.
  *
@@ -82,9 +83,15 @@ import type { WorkspaceRow } from '../../../lib/workspaces/types.js';
 export const STACK_RECLAIM_POLL_MS = 30_000;
 export const STACK_RESTORE_POLL_MS = 5_000;
 export const STACK_RESTORE_RETRY_MS = 60_000;
+/**
+ * How often the restore poll re-reads every workspace journal for open
+ * reclaims. A journal read that fails reads as empty, so a periodic reseed
+ * brings back a reclaim one bad read dropped from the index.
+ */
+export const STACK_RESTORE_RESEED_MS = 300_000;
 /** How long a reclaim waits for the stack lock before it skips this poll. */
 const RECLAIM_LOCK_TIMEOUT_MS = 5_000;
-/** The merge gate can take seconds per issue, so only the largest few are asked. */
+/** The merge gate can take seconds per issue, so only the largest few are asked; blockers are checked for all. */
 const MERGE_GATE_CANDIDATES = 3;
 
 type DockerResult = { ok: true } | { ok: false; error: string };
@@ -165,12 +172,12 @@ export interface StackReclaimState {
   restoreIndex: Map<string, string>;
   /** Upper-case issue id → epoch ms before which a failed restore is not retried. */
   restoreRetryAt: Map<string, number>;
-  /** False until the restore poll has seeded the index from the journals (FR-7). */
-  seeded: boolean;
+  /** When the restore poll last seeded the index from the journals (FR-7); null before the first tick. */
+  seededAt: number | null;
 }
 
 export function createStackReclaimState(): StackReclaimState {
-  return { restoreIndex: new Map(), restoreRetryAt: new Map(), seeded: false };
+  return { restoreIndex: new Map(), restoreRetryAt: new Map(), seededAt: null };
 }
 
 export type StackReclaimPollResult =
@@ -224,7 +231,10 @@ function buildCandidates(
     if (containers.length === 0) continue;
     if (issueInGateQueue(snapshot, issueId, workspace.path)) continue;
     if (deps.verificationBusy(issueId)) continue;
-    if (reclaimedInEpisode(deps.readJournal(workspace.path), record.since)) continue;
+    // An open reclaim (even from an earlier episode) is never replaced: a new
+    // entry would hide the containers the open one still owes a restart.
+    const journal = deps.readJournal(workspace.path);
+    if (openStackReclaim(journal) || reclaimedInEpisode(journal, record.since)) continue;
     if (!panesAllowReclaim(issuePanes(panes, issueId, workspace.path), deps.turnState).ok) continue;
     seen.add(issueId);
     candidates.push({ issueId, workspacePath: workspace.path, composeProject, containers });
@@ -232,14 +242,30 @@ function buildCandidates(
   return candidates;
 }
 
-/** FR-2 rule 8 (D7): an unresolved blocker declaration first, then the merge gate's own `ready`. */
-async function isParked(deps: StackReclaimServiceDeps, candidate: ReclaimCandidate): Promise<boolean> {
-  if (pendingDeclarations(deps.readJournal(candidate.workspacePath)).length > 0) return true;
+async function mergeReadySafe(deps: StackReclaimServiceDeps, issueId: string): Promise<boolean> {
   try {
-    return await deps.mergeReady(candidate.issueId);
+    return await deps.mergeReady(issueId);
   } catch {
     return false;
   }
+}
+
+/**
+ * FR-2 rule 8 (D7): the largest parked candidate. A candidate is parked when
+ * it has an unresolved blocker declaration (checked for every candidate, one
+ * file read each) or when the merge gate answers `ready` (asked of at most
+ * `MERGE_GATE_CANDIDATES` candidates, largest first, because it can take
+ * seconds each).
+ */
+async function largestParked(deps: StackReclaimServiceDeps, ranked: readonly ReclaimCandidate[]): Promise<ReclaimCandidate | null> {
+  let mergeChecks = 0;
+  for (const candidate of ranked) {
+    if (pendingDeclarations(deps.readJournal(candidate.workspacePath)).length > 0) return candidate;
+    if (mergeChecks >= MERGE_GATE_CANDIDATES) continue;
+    mergeChecks += 1;
+    if (await mergeReadySafe(deps, candidate.issueId)) return candidate;
+  }
+  return null;
 }
 
 /**
@@ -322,14 +348,8 @@ export async function runStackReclaimPoll(
   const memory = await deps.readMemoryBytes(candidates.flatMap((candidate) => candidate.containers.map((c) => c.name)));
   if (!memory) return idle('stats-unreadable');
 
-  // 7: the largest parked candidate among the top few.
-  let target: ReclaimCandidate | null = null;
-  for (const candidate of rankCandidates(candidates, memory).slice(0, MERGE_GATE_CANDIDATES)) {
-    if (await isParked(deps, candidate)) {
-      target = candidate;
-      break;
-    }
-  }
+  // 7: the largest parked candidate.
+  const target = await largestParked(deps, rankCandidates(candidates, memory));
   if (!target) return idle('none-parked');
   const chosen = target;
 
@@ -392,24 +412,27 @@ export async function runStackReclaimPoll(
   return { kind: 'reclaimed', issueId: chosen.issueId, stopped: outcome.stopped, failed: outcome.failed };
 }
 
-/** D15: seed the index once from every workspace journal, so open reclaims survive a restart (FR-7). */
-function seedRestoreIndex(deps: StackReclaimServiceDeps, state: StackReclaimState): void {
+/**
+ * D15: add every workspace's open reclaim to the index, so open reclaims
+ * survive a restart (FR-7) and a transient journal read failure.
+ */
+function seedRestoreIndex(deps: StackReclaimServiceDeps, state: StackReclaimState, now: number): void {
   for (const workspace of deps.listWorkspaces()) {
     if (!workspace.issueId || !deps.pathExists(workspace.path)) continue;
     if (openStackReclaim(deps.readJournal(workspace.path))) {
       state.restoreIndex.set(workspace.issueId.toUpperCase(), workspace.path);
     }
   }
-  state.seeded = true;
+  state.seededAt = now;
 }
 
 /** The restore poll (D15, WI-13): restores an open reclaim when its issue's agent is working or mid-turn. */
 export async function runStackRestorePoll(deps: StackReclaimServiceDeps, state: StackReclaimState): Promise<void> {
-  if (!state.seeded) seedRestoreIndex(deps, state);
+  const now = deps.now();
+  if (state.seededAt === null || now - state.seededAt >= STACK_RESTORE_RESEED_MS) seedRestoreIndex(deps, state, now);
   if (state.restoreIndex.size === 0) return;
   const panes = await deps.listPanes();
   if (!panes) return;
-  const now = deps.now();
   for (const [issueId, workspacePath] of [...state.restoreIndex]) {
     if (!deps.pathExists(workspacePath) || !openStackReclaim(deps.readJournal(workspacePath))) {
       state.restoreIndex.delete(issueId);
@@ -420,7 +443,8 @@ export async function runStackRestorePoll(deps: StackReclaimServiceDeps, state: 
     if (!panesNeedStack(issuePanes(panes, issueId, workspacePath), deps.turnState)) continue;
     const result = await deps.restore({ issueId, workspacePath, trigger: 'turn' });
     if (result.kind === 'failed') {
-      state.restoreRetryAt.set(issueId, now + STACK_RESTORE_RETRY_MS);
+      // The back-off counts from the failure, not from the tick that started a slow restore.
+      state.restoreRetryAt.set(issueId, deps.now() + STACK_RESTORE_RETRY_MS);
       console.warn(`[stack-reclaim] restore of ${issueId} failed: ${result.error}; retrying in ${STACK_RESTORE_RETRY_MS / 1000} s`);
       continue;
     }

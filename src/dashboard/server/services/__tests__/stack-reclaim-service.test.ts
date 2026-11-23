@@ -15,6 +15,7 @@ import type { WorkspaceRow } from '../../../../lib/workspaces/types.js';
 import {
   STACK_RECLAIM_POLL_MS,
   STACK_RESTORE_POLL_MS,
+  STACK_RESTORE_RESEED_MS,
   createStackReclaimState,
   runStackReclaimPoll,
   runStackRestorePoll,
@@ -236,6 +237,31 @@ describe('runStackReclaimPoll (PAN-5623 WI-12)', () => {
     await expect(runStackReclaimPoll(deps, createStackReclaimState())).resolves.toEqual({ kind: 'idle', reason: 'no-candidates' });
   });
 
+  it('skips an issue whose reclaim from an earlier episode is still open', async () => {
+    const { deps, journals } = world();
+    journals.set(wsPath('MIN-1144'), [{
+      at: SINCE, type: 'stack.reclaimed', issueId: 'MIN-1144',
+      data: { containers: [`${project('MIN-1144')}-fe-1`], episodeSince: '2026-11-22T10:00:00.000Z' },
+    }]);
+    await expect(runStackReclaimPoll(deps, createStackReclaimState())).resolves.toEqual({ kind: 'idle', reason: 'no-candidates' });
+    expect(deps.appendEntry).not.toHaveBeenCalled();
+  });
+
+  it('finds a blocked candidate below three larger ones that are not merge-ready', async () => {
+    const issues = ['MIN-1', 'MIN-2', 'MIN-3', 'MIN-4'];
+    const { deps, journals, memory } = world({
+      listWorkspaces: vi.fn(() => issues.map(workspace)),
+      listRunningContainers: vi.fn(async () => issues.map((issue) => stackContainer(issue, 'api'))),
+      mergeReady: vi.fn(async () => false),
+    });
+    issues.forEach((issue, index) => memory.set(`${project(issue)}-api-1`, (4 - index) * GiB));
+    journals.set(wsPath('MIN-4'), [{ at: SINCE, type: 'blocked.declared', issueId: 'MIN-4', data: { item: 'wi1', blockers: ['PAN-1'] } }]);
+
+    await expect(runStackReclaimPoll(deps, createStackReclaimState())).resolves.toMatchObject({ kind: 'reclaimed', issueId: 'MIN-4' });
+    expect(deps.mergeReady).toHaveBeenCalledTimes(3);
+    expect(deps.mergeReady).not.toHaveBeenCalledWith('MIN-4');
+  });
+
   it('reclaims an issue with an idle work pane and a finished review pane', async () => {
     const { deps } = world({
       listPanes: vi.fn(async () => [
@@ -374,7 +400,7 @@ describe('runStackRestorePoll (PAN-5623 WI-13)', () => {
     await runStackRestorePoll(deps, state);
 
     expect([...state.restoreIndex]).toEqual([['MIN-1144', wsPath('MIN-1144')]]);
-    expect(state.seeded).toBe(true);
+    expect(state.seededAt).toBe(T0 + 30 * 60_000);
   });
 
   it('restores with trigger turn when a work pane is mid-turn, then drops the issue', async () => {
@@ -406,13 +432,54 @@ describe('runStackRestorePoll (PAN-5623 WI-13)', () => {
     });
     journals.set(wsPath('MIN-1144'), [RECLAIMED, { at: SINCE, type: 'stack.restored', issueId: 'MIN-1144' }]);
     const state = createStackReclaimState();
-    state.seeded = true;
+    state.seededAt = T0 + 30 * 60_000;
     state.restoreIndex.set('MIN-1144', wsPath('MIN-1144'));
 
     await runStackRestorePoll(deps, state);
 
     expect(deps.restore).not.toHaveBeenCalled();
     expect(state.restoreIndex.size).toBe(0);
+  });
+
+  it('re-seeds after a failed journal read dropped an open reclaim', async () => {
+    let clock = T0 + 30 * 60_000;
+    const { deps, journals } = world({ now: vi.fn(() => clock) });
+    journals.set(wsPath('MIN-1144'), [RECLAIMED]);
+    const state = createStackReclaimState();
+    await runStackRestorePoll(deps, state);
+    expect(state.restoreIndex.has('MIN-1144')).toBe(true);
+
+    // One unreadable journal read (readPipelineJournal answers []) drops the entry.
+    deps.readJournal.mockReturnValueOnce([]);
+    clock += STACK_RESTORE_POLL_MS;
+    await runStackRestorePoll(deps, state);
+    expect(state.restoreIndex.has('MIN-1144')).toBe(false);
+
+    clock += STACK_RESTORE_RESEED_MS;
+    await runStackRestorePoll(deps, state);
+    expect(state.restoreIndex.has('MIN-1144')).toBe(true);
+  });
+
+  it('counts the retry back-off from the failure of a slow restore', async () => {
+    vi.useFakeTimers();
+    const { deps, journals } = world({
+      listPanes: vi.fn(async () => [pane({ issue: 'MIN-1144', agentId: 'agent-min-1144', state: 'working' })]),
+      now: vi.fn(() => Date.now()),
+      restore: vi.fn(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 70_000));
+        return { kind: 'failed' as const, failed: [`${project('MIN-1144')}-api-1`], error: 'timeout' };
+      }),
+    });
+    journals.set(wsPath('MIN-1144'), [RECLAIMED]);
+    startStackReclaimService(deps);
+
+    // First restore starts at 5 s and fails at 75 s; no retry before 135 s.
+    await vi.advanceTimersByTimeAsync(STACK_RESTORE_POLL_MS + 70_000);
+    expect(deps.restore).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(55_000);
+    expect(deps.restore).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(deps.restore).toHaveBeenCalledTimes(2);
   });
 
   it('never reads the pane inventory with an empty index', async () => {

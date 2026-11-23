@@ -1,6 +1,11 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BackendPane, DerivedIssueState, OrderBook } from '@overdeck/contracts';
 
+import { appendPipelineEntry } from '../../../../src/lib/cloister/pipeline-journal.js';
 import { deriveFlywheelStatus, freshnessFor, selectOpenStrikePr, type DeriveFlywheelStatusDeps } from '../../../../src/lib/flywheel/derive-status.js';
 import type { LegacyConversation } from '../../../../src/lib/overdeck/conversations.js';
 import { listPanesWithBackend, loadIssueStatesForProject, readIssueFromTracker } from '../../../../src/lib/overdeck/derived-issue-state.js';
@@ -910,6 +915,26 @@ describe('board fields (PAN-5283 WI-5)', () => {
     const row = status.inFlight[0]!;
     expect(row.lastJournal?.type).toBe('blocked.declared');
     expect(row.blocker?.kind).toBe('declared-blocked');
+  });
+
+  it('the default journal tail drops stack.* entries before its 50-entry limit (PAN-5623)', async () => {
+    const workspacePath = mkdtempSync(join(tmpdir(), 'derive-status-tail-'));
+    try {
+      appendPipelineEntry(workspacePath, { type: 'blocked.declared', issueId: 'PAN-1', data: { item: 'wi1', blockers: ['PAN-2'] } });
+      for (let index = 0; index < 55; index += 1) {
+        appendPipelineEntry(workspacePath, { type: index % 2 ? 'stack.restored' : 'stack.reclaimed', issueId: 'PAN-1' });
+      }
+      const status = await deriveFlywheelStatus({
+        deps: baseDeps({
+          listWorkspaces: () => [{ issueId: 'PAN-1', workspacePath }],
+          loadStates: working,
+          lastJournal: undefined,
+        }),
+      });
+      expect(status.inFlight[0]!.lastJournal?.type).toBe('blocked.declared');
+    } finally {
+      rmSync(workspacePath, { recursive: true, force: true });
+    }
   });
 
   it('a pending auto-merge row puts the card in merge with its time', async () => {

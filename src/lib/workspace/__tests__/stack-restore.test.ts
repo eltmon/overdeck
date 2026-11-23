@@ -13,6 +13,7 @@ import {
   restoreReclaimedStack,
   restoreReclaimedStackForSpawn,
   stackLockPath,
+  STACK_LOCK_HEARTBEAT_MS,
   withStackLock,
   type StackRestoreDeps,
 } from '../stack-restore.js';
@@ -72,8 +73,20 @@ function world(listed: ComposeContainer[] | null, overrides: Partial<StackRestor
       inLock = false;
     }
   });
+  const fresh: DockerContainerLifecycle[] = [{ id: 'id-api', name: API, status: 'Up 1 second', state: 'running', composeProject: PROJECT }];
+  const collect = vi.fn(async () => {
+    assertInLock('collect');
+    return fresh;
+  });
+  /** Whether the snapshot was recorded before the restore was journaled. */
+  const recordedBeforeJournal: boolean[] = [];
+  const record = vi.fn((_containers: DockerContainerLifecycle[]) => {
+    recordedBeforeJournal.push(restored().length === 0);
+  });
   const deps: Partial<StackRestoreDeps> = {
     composeProjectFor: () => PROJECT,
+    collect,
+    record,
     readJournal,
     listContainers,
     startContainer,
@@ -82,7 +95,7 @@ function world(listed: ComposeContainer[] | null, overrides: Partial<StackRestor
     withLock,
     ...overrides,
   };
-  return { deps, listContainers, startContainer, appendEntry, emitActivity, withLock, journalReadsInLock };
+  return { deps, listContainers, startContainer, appendEntry, emitActivity, withLock, journalReadsInLock, collect, record, fresh, recordedBeforeJournal };
 }
 
 function restored() {
@@ -121,8 +134,11 @@ describe('restoreReclaimedStack (PAN-5623)', () => {
 
     const result = await restoreReclaimedStack({ issueId: ISSUE, workspacePath: workspace, trigger: 'turn' }, w.deps);
 
-    expect(result).toEqual({ kind: 'restored', started: [API], alreadyRunning: [FE], missing: [], refused: [] });
+    expect(result).toEqual({ kind: 'restored', started: [API], alreadyRunning: [FE], missing: [], refused: [], snapshot: w.fresh });
     expect(w.startContainer).toHaveBeenCalledExactlyOnceWith(API);
+    // A background (turn) restore refreshes the cached snapshot before it closes the reclaim.
+    expect(w.record).toHaveBeenCalledExactlyOnceWith(w.fresh);
+    expect(w.recordedBeforeJournal).toEqual([true]);
     expect(w.withLock).toHaveBeenCalledOnce();
     // The cheap read happens before the lock; the re-read that decides happens inside it.
     expect(w.journalReadsInLock).toEqual([false, true]);
@@ -141,7 +157,7 @@ describe('restoreReclaimedStack (PAN-5623)', () => {
     reclaim([API, FE]);
     const w = world([container(API, 'exited')]);
     await expect(restoreReclaimedStack({ issueId: ISSUE, workspacePath: workspace, trigger: 'spawn' }, w.deps))
-      .resolves.toEqual({ kind: 'restored', started: [API], alreadyRunning: [], missing: [FE], refused: [] });
+      .resolves.toMatchObject({ kind: 'restored', started: [API], alreadyRunning: [], missing: [FE], refused: [] });
     expect(restored()).toHaveLength(1);
   });
 
@@ -153,8 +169,10 @@ describe('restoreReclaimedStack (PAN-5623)', () => {
 
     const result = await restoreReclaimedStack({ issueId: ISSUE, workspacePath: workspace, trigger: 'turn' }, w.deps);
 
-    expect(result).toMatchObject({ kind: 'failed', failed: [API] });
+    expect(result).toMatchObject({ kind: 'failed', failed: [API], started: [FE], snapshot: w.fresh });
     expect(w.startContainer).toHaveBeenCalledTimes(2);
+    // The container that did start is recorded running even though the restore failed.
+    expect(w.record).toHaveBeenCalledExactlyOnceWith(w.fresh);
     expect(restored()).toHaveLength(0);
     expect(w.emitActivity).not.toHaveBeenCalled();
   });
@@ -180,7 +198,7 @@ describe('restoreReclaimedStack (PAN-5623)', () => {
     reclaim(['x;y', API]);
     const w = world([container(API, 'exited')]);
     const result = await restoreReclaimedStack({ issueId: ISSUE, workspacePath: workspace, trigger: 'turn' }, w.deps);
-    expect(result).toEqual({ kind: 'restored', started: [API], alreadyRunning: [], missing: [], refused: ['x;y'] });
+    expect(result).toMatchObject({ kind: 'restored', started: [API], alreadyRunning: [], missing: [], refused: ['x;y'] });
     expect(w.startContainer).not.toHaveBeenCalledWith('x;y');
   });
 
@@ -194,7 +212,7 @@ describe('restoreReclaimedStack (PAN-5623)', () => {
       container(API, 'exited'),
     ]);
     const result = await restoreReclaimedStack({ issueId: ISSUE, workspacePath: workspace, trigger: 'verification' }, w.deps);
-    expect(result).toEqual({ kind: 'restored', started: [API], alreadyRunning: [], missing: [], refused: [postgres, foreign] });
+    expect(result).toMatchObject({ kind: 'restored', started: [API], alreadyRunning: [], missing: [], refused: [postgres, foreign] });
     expect(w.startContainer).toHaveBeenCalledExactlyOnceWith(API);
   });
 
@@ -204,6 +222,7 @@ describe('restoreReclaimedStack (PAN-5623)', () => {
     await expect(restoreReclaimedStack({ issueId: ISSUE, workspacePath: workspace, trigger: 'turn' }, w.deps))
       .resolves.toEqual({ kind: 'restored', started: [], alreadyRunning: [], missing: [], refused: [API] });
     expect(w.startContainer).not.toHaveBeenCalled();
+    expect(w.collect).not.toHaveBeenCalled();
   });
 
   it('returns none on a second call after a successful restore', async () => {
@@ -227,6 +246,16 @@ describe('restoreReclaimedStackForSpawn (PAN-5623)', () => {
     expect(result).toBe(fresh);
     expect(record).toHaveBeenCalledExactlyOnceWith(fresh);
     expect(restored()[0]?.source).toBe('stack-restore:spawn');
+  });
+
+  it('returns the fresh listing after a partial start beside a failed one', async () => {
+    reclaim([API, FE]);
+    const w = world([container(API, 'exited'), container(FE, 'exited')]);
+    w.startContainer.mockImplementation(async (name: string) => (name === FE ? { ok: false, error: 'port is already allocated' } : { ok: true }));
+    const record = vi.fn();
+    await expect(restoreReclaimedStackForSpawn(ISSUE, workspace, { ...w.deps, collect: async () => fresh, record })).resolves.toBe(fresh);
+    expect(record).toHaveBeenCalledExactlyOnceWith(fresh);
+    expect(restored()).toHaveLength(0);
   });
 
   it('returns undefined and records nothing when nothing started', async () => {
@@ -258,6 +287,23 @@ describe('withStackLock (PAN-5623)', () => {
     const seen = await withStackLock(lockPath, async () => existsSync(lockPath), 1_000);
     expect(seen).toBe(true);
     expect(existsSync(lockPath)).toBe(false);
+  });
+
+  it('renews the lock every heartbeat while the callback runs, and stops after', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    try {
+      const lockPath = stackLockPath(workspace);
+      const touch = vi.fn(async (_path: string) => {});
+      await withStackLock(lockPath, async () => {
+        await vi.advanceTimersByTimeAsync(STACK_LOCK_HEARTBEAT_MS * 2);
+      }, 1_000, { touch });
+      expect(touch).toHaveBeenCalledTimes(2);
+      expect(touch).toHaveBeenCalledWith(lockPath);
+      await vi.advanceTimersByTimeAsync(STACK_LOCK_HEARTBEAT_MS);
+      expect(touch).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('rejects for a removed workspace and never re-creates it', async () => {

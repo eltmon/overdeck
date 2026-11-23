@@ -201,6 +201,11 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     .filter(([key]) => !agentIssueKeys.has(key))
     .map(([key, issueId]) => ({ issueId, stackHealth: stackHealthByIssue.get(key) }))
     .filter((entry): entry is { issueId: string; stackHealth: NonNullable<typeof entry.stackHealth> } => Boolean(entry.stackHealth && !entry.stackHealth.healthy));
+  // PAN-5623: a stack a memory reclaim stopped reads healthy, so list it on its own when no agent shows it.
+  const reclaimedStacksWithoutAgent = Array.from(issueIds)
+    .filter(([key]) => !agentIssueKeys.has(key))
+    .map(([key, issueId]) => ({ issueId, reclaimed: stackHealthByIssue.get(key)?.reclaimed ?? [] }))
+    .filter((entry) => entry.reclaimed.length > 0);
 
   if (options.json) {
     const agentsWithShadow = await Promise.all(agents.map(async agent => {
@@ -229,7 +234,7 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     console.log('');
   }
 
-  if (agents.length === 0 && brokenStacksWithoutAgent.length === 0) {
+  if (agents.length === 0 && brokenStacksWithoutAgent.length === 0 && reclaimedStacksWithoutAgent.length === 0) {
     console.log(chalk.dim('No running agents.'));
     console.log(chalk.dim('Use "pan start <id>" to spawn one.'));
     return;
@@ -288,6 +293,15 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     for (const { issueId, stackHealth } of brokenStacksWithoutAgent) {
       console.log(`${chalk.cyan(issueId)}`);
       console.log(`  Stack:    ${chalk.red('STACK BROKEN')} ${stackHealth.reasons.join('; ')}`);
+      console.log('');
+    }
+  }
+
+  if (reclaimedStacksWithoutAgent.length > 0) {
+    console.log(chalk.bold('Reclaimed Workspace Stacks\n'));
+    for (const { issueId, reclaimed } of reclaimedStacksWithoutAgent) {
+      console.log(`${chalk.cyan(issueId)}`);
+      console.log(`  Stack:    ${chalk.yellow('stopped to free memory')}: ${reclaimed.join(', ')}; starts again when the issue needs it`);
       console.log('');
     }
   }
