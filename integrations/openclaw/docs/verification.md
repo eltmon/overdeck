@@ -12,6 +12,15 @@ OpenClaw: 2026.10.10 (npm latest on that date; CLI reports `OpenClaw 2026.10.10 
 | CP-7(c) `before_prompt_build` accepts `prependContext` | Docs: `docs/plugins/hooks/prompt-and-session.md`. Runtime: the same `plugins inspect` command | Docs: `prependContext` is a documented result. Runtime: **changed in 2026.10.10**. Without a grant the hook is blocked with "typed hook \"before_prompt_build\" blocked because non-bundled plugins must set plugins.entries.overdeck.hooks.allowConversationAccess=true". With `plugins.entries.overdeck.hooks.allowConversationAccess: true`, `typedHooks` is `[{ "name": "before_prompt_build" }]` and `hookCount` is 1. The README now documents the grant. A live agent turn was not run: it needs a model provider key, which the build host does not have. `tests/summary.test.ts` covers the handler's output. |
 | Connector route end to end | (see "Running the live checks", step 7) | Not run: needs the operator's overdeck.ai sign-in for `pan mcp connector login` and a pairing string from Connect a bot. The dashboard `/mcp` probe above uses the same sessionless JSON Streamable HTTP transport as the connector. |
 
+## Changes since 2026-11-04
+
+Recorded 2026-11-22 (PAN-5486). Only a dated live run counts as a result.
+
+| Change | Check | Result |
+| --- | --- | --- |
+| `mcp connector connect` (PAN-5069, v0.75.0) | OpenClaw runs the command and pairs | Not run. |
+| One-paste connect: **Copy for OpenClaw** in Connect a bot (PAN-5070, v0.78.0) | OpenClaw runs the copied message end to end and calls list_conversations | Not run. |
+
 ## Running the live checks
 
 1. Build the package on Node 22: `cd integrations/openclaw && npm ci && npm run build`.
