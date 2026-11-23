@@ -81,7 +81,14 @@ describe('readGitHubMemberPrFacts', () => {
         }],
       }),
     });
-    const facts = await readGitHubMemberPrFacts('MIN-1142', URL, { fetchPr });
+    // A NONE-association marker makes pr-facts look up the comment author's
+    // kind and Overdeck's own logins; inject both so this stays isolated from
+    // the local `gh` setup and network access (NFR-2).
+    const facts = await readGitHubMemberPrFacts('MIN-1142', URL, {
+      fetchPr,
+      overdeckLogins: async () => [],
+      readAuthorKinds: async () => new Map(),
+    });
     expect(facts.approved).toBe(false);
   });
 

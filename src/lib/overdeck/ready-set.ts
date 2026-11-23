@@ -175,7 +175,11 @@ async function githubRows(repo: ReadySetRepo, deps: ReadySetDeps, scope: 'open' 
       if (facts.error) throw new ReadySetUnavailableError(repo.repoPath, facts.error);
       // A push between the listing and the read: judge the new head next tick.
       if (facts.headSha && row.headRefOid && facts.headSha.toLowerCase() !== row.headRefOid.toLowerCase()) return false;
-      return facts.open && !facts.draft && !facts.changesRequested && facts.approved;
+      // The facts read runs after the listing; require checks and mergeability
+      // on the fresh read too, the same condition the listing gate above and
+      // the GitLab path below both require (FR-9).
+      return facts.open && !facts.draft && !facts.changesRequested && facts.approved
+        && facts.checks === 'green' && facts.mergeable === true;
     };
     return [{ issueId, title: row.title ?? null, number: pr.number, merged: pr.merged, ready }];
   });
