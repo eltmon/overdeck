@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5489",
   "created": "2026-11-23T06:59:21.851Z",
-  "updated": "2026-11-23T07:40:39.889Z",
+  "updated": "2026-11-23T07:49:16.753Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,9 +50,26 @@
       "doneAt": "2026-11-23T07:40:34.271Z"
     },
     "hume-retry-keeps-marker": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5489",
-      "claimedAt": "2026-11-23T07:40:39.889Z"
+      "claimedAt": "2026-11-23T07:40:39.889Z",
+      "doneAt": "2026-11-23T07:49:16.752Z"
+    },
+    "hume-retry-keeps-marker.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T07:49:16.752Z"
+    },
+    "hume-retry-keeps-marker.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T07:49:16.752Z"
+    },
+    "hume-retry-keeps-marker.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T07:49:16.752Z"
+    },
+    "hume-retry-keeps-marker.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T07:49:16.752Z"
     }
   }
 }
