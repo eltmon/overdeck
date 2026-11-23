@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5623",
   "created": "2026-11-23T20:20:25.006Z",
-  "updated": "2026-11-23T20:41:35.151Z",
+  "updated": "2026-11-23T20:41:41.104Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -92,6 +92,11 @@
     "wi4-docker-helpers.ac4": {
       "status": "completed",
       "doneAt": "2026-11-23T20:41:35.150Z"
+    },
+    "wi5-restore-door": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5623",
+      "claimedAt": "2026-11-23T20:41:41.103Z"
     }
   }
 }
