@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-23T08:03:55Z · model: claude-opus-5-5 · open: 952_
+_Last sequenced: 2026-11-23T08:34:02Z · model: claude-opus-5-5 · open: 953_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -10,12 +10,13 @@ _Last sequenced: 2026-11-23T08:03:55Z · model: claude-opus-5-5 · open: 952_
 | 1 | PAN-5617 | S | critical | ok |  |  | npm run typecheck admits each of its 12 tsc lanes separately; under memory pressure one run takes ~1h and stalls agent pushes. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 3 | PAN-5614 | M | critical | ok |  |  | specialists done falls back to GitHub in remote-less polyrepo roots, so GitLab review verdicts are lost and MYN merges stall. |
+| 3 | PAN-5619 | M | critical | ok |  |  | Review never dispatches for adopted handoff PRs on the resume path: a work-agent xBRIEF guard throws, only logged; PAN-5601 stuck. |
 | 4 | PAN-5430 | S | medium | ok |  |  | Markdown Preview prints raw HTML (README logo <div>/<picture>) as text; render it via rehype-raw + rehype-sanitize in doc previews. |
 | 5 | PAN-5567 | S | high | ok |  |  | Codex app-server threads hardcode on-request/workspace-write, so Read-only and Full access settings never apply. |
 | 6 | PAN-5489 | S | high | ok |  |  | pan plan from an agent shell fails workspace creation without HUME_API_KEY, leaves a half-built workspace and hides the cause. |
 | 7 | PAN-5566 | M | high | ok |  |  | UI/help text says Auto blocks destructive calls but the hook approves all; repo .pan.yaml can set bypass mode. |
 | 8 | PAN-5385 | S | critical | ok |  |  | Anywhere remote access is down for trickle clients: machine drops ICE candidates sent before session registers; small server fix |
-| 9 | PAN-5601 | S | high | ok |  |  | pan orders start and the dashboard Start swallow FlywheelAlreadyRunning and drop the book; deliver it to the live conv. Needs handoff |
+| 9 | PAN-5601 | S | high | ok |  | PAN-5619 | pan orders start and the dashboard Start swallow FlywheelAlreadyRunning and drop the book; deliver it to the live conv. Needs handoff |
 | 10 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 10 | PAN-5523 | S | high | ok |  |  | pan conversations move/heal send raw fetch with no token, so routes refuse with Missing origin; same fix pattern as in-pipeline PAN-5516. |
 | 11 | PAN-4553 | S | critical | ok |  |  | Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges. |
@@ -980,6 +981,10 @@ Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat 
 
 New substrate bug that blocks every GitLab polyrepo review from reaching merge (MIN-1144 and MIN-1146 are stuck now). Root cause and fix are pinned in the body, so it ranks with the top critical merge-path fixes, beside PAN-2954 (the other GitLab merge-path refusal).
 
+### PAN-5619 (rank 3)
+
+New substrate bug that blocks the review stage for every adopted (handoff) PR re-dispatched through the resume path; PAN-5601's verified PR #5613 is stuck now and deacon-lite keeps redispatching the same deterministic failure. Evidence and a starting point (fresh request vs resume path) are pinned in the body, so it ranks with the top critical merge-path fixes, beside PAN-5614.
+
 ### PAN-5430 (rank 4)
 
 New issue, sibling of the just-merged front-matter fix PAN-5427, and already queued in the active workflow-redesign order book, so it takes free rank 4 behind critical PAN-5013. It is a small, well-specified MarkdownTab change with named tests, a sanitising allow-list and a concrete acceptance check on the README preview; its parent epic PAN-5284 is closed, so it carries no contains edge.
@@ -1276,10 +1281,6 @@ New planning bug placed in a freed high-tier slot. It blocks pan plan finalize f
 
 Three red-mains in one day from direct-push series bypassing PR CI — conversations need a pre-merge CI surface.
 
-### PAN-3708 (rank 74)
-
-New this pass. pan strike dies at git worktree list --porcelain on a polyrepo wrapper root, which is not a git repository, so the urgent-strike escape hatch is simply unavailable for MYN-class projects. pan swarm already understands nested repos; strike must use the same project repository inventory. Duplicate of PAN-3040 — close one when this lands.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1287,10 +1288,10 @@ New this pass. pan strike dies at git worktree list --porcelain on a polyrepo wr
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-23T08:03:55Z",
+  "generatedAt": "2026-11-23T08:34:02Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 952,
+  "openCount": 953,
   "nodes": [
     {
       "issue": "PAN-5611",
@@ -1354,6 +1355,19 @@ New this pass. pan strike dies at git worktree list --porcelain on a polyrepo wr
       "dependsOn": [],
       "why": "specialists done falls back to GitHub in remote-less polyrepo roots, so GitLab review verdicts are lost and MYN merges stall.",
       "rationale": "New substrate bug that blocks every GitLab polyrepo review from reaching merge (MIN-1144 and MIN-1146 are stuck now). Root cause and fix are pinned in the body, so it ranks with the top critical merge-path fixes, beside PAN-2954 (the other GitLab merge-path refusal).",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5619",
+      "rank": 3,
+      "size": "M",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Review never dispatches for adopted handoff PRs on the resume path: a work-agent xBRIEF guard throws, only logged; PAN-5601 stuck.",
+      "rationale": "New substrate bug that blocks the review stage for every adopted (handoff) PR re-dispatched through the resume path; PAN-5601's verified PR #5613 is stuck now and deacon-lite keeps redispatching the same deterministic failure. Evidence and a starting point (fresh request vs resume path) are pinned in the body, so it ranks with the top critical merge-path fixes, beside PAN-5614.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1429,7 +1443,9 @@ New this pass. pan strike dies at git worktree list --porcelain on a polyrepo wr
       "importance": "high",
       "score": 78,
       "condition": "ok",
-      "dependsOn": [],
+      "dependsOn": [
+        "PAN-5619"
+      ],
       "why": "pan orders start and the dashboard Start swallow FlywheelAlreadyRunning and drop the book; deliver it to the live conv. Needs handoff",
       "rationale": "New substrate bug: starting an order book while a Flywheel conversation runs prints success but never reaches the loop, so operator-queued work silently stalls (seen on the MYN money book 2026-11-23). Root cause and wanted behavior are pinned in the body; TENET-10 means it must run as a supervised handoff, not Flywheel self-work.",
       "gate": "auto",
@@ -14550,6 +14566,20 @@ New this pass. pan strike dies at git worktree list --porcelain on a polyrepo wr
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-5619",
+      "to": "PAN-4636",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-5619",
+      "to": "PAN-5601",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.9
     },
     {
       "from": "PAN-750",
