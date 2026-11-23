@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5610",
   "created": "2026-11-23T06:10:56.307Z",
-  "updated": "2026-11-23T06:10:56.307Z",
+  "updated": "2026-11-23T06:21:59.875Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,22 @@
   "sessionHistory": [],
   "items": {
     "move-origin": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5610",
-      "claimedAt": "2026-11-23T06:10:56.306Z"
+      "claimedAt": "2026-11-23T06:10:56.306Z",
+      "doneAt": "2026-11-23T06:21:59.875Z"
+    },
+    "move-origin.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T06:21:59.875Z"
+    },
+    "move-origin.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T06:21:59.875Z"
+    },
+    "move-origin.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T06:21:59.875Z"
     }
   }
 }
