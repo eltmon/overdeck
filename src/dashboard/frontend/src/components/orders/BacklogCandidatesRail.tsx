@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { OrderBookLane } from '@overdeck/contracts';
 
 import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
-import type { OrderBookView } from './BookStrip';
+import type { OrderBookView } from './types';
 import { withProject } from './projectScope';
 
 interface BacklogCandidate {

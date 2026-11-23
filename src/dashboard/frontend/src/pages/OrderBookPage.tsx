@@ -4,7 +4,8 @@ import { BookOpen, Loader2 } from 'lucide-react';
 
 import { AddIssuesRail } from '../components/orders/AddIssuesRail';
 import { BacklogCandidatesRail } from '../components/orders/BacklogCandidatesRail';
-import { BookStrip, type OrderBookView } from '../components/orders/BookStrip';
+import { BookStrip } from '../components/orders/BookStrip';
+import type { OrderBookView } from '../components/orders/types';
 import { LaneEditor } from '../components/orders/LaneEditor';
 import { LifecycleStrip } from '../components/orders/LifecycleStrip';
 import { ProgressPanel } from '../components/orders/ProgressPanel';

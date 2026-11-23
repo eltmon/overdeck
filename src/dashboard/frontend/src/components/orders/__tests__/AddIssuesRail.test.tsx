@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Issue } from '../../../types';
-import type { OrderBookView } from '../BookStrip';
+import type { OrderBookView } from '../types';
 import { AddIssuesRail } from '../AddIssuesRail';
 
 vi.mock('../../../lib/wsTransport', () => ({
@@ -25,7 +25,7 @@ function issue(identifier: string, title: string, labels: string[] = [], stateTy
 
 function book(id: string, name: string, issues: string[] = []): OrderBookView {
   return {
-    id, name, status: 'ready', settings: { laneAConcurrency: 2, posture: 'open' },
+    id, name, status: 'ready', phase: 'queued', queuePosition: null, finished: false, settings: { laneAConcurrency: 2, posture: 'open' },
     items: issues.map((value, index) => ({ issue: value, lane: 'A', order: index + 1, prereqs: [], reVerify: false, addedAt: '2026-07-18T12:00:00.000Z', addedBy: 'operator' })),
     createdAt: '2026-07-18T12:00:00.000Z', updatedAt: '2026-07-18T12:00:00.000Z',
     progress: { total: issues.length, landed: 0, drained: false },

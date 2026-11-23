@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { OrderBookView } from '../BookStrip';
+import type { OrderBookView } from '../types';
 import { BacklogCandidatesRail } from '../BacklogCandidatesRail';
 
 vi.mock('../../../lib/wsTransport', () => ({
@@ -8,7 +8,7 @@ vi.mock('../../../lib/wsTransport', () => ({
 }));
 
 const book: OrderBookView = {
-  id: '2026-07-18-current', name: 'Current', status: 'ready', settings: { laneAConcurrency: 2, posture: 'open' },
+  id: '2026-07-18-current', name: 'Current', status: 'ready', phase: 'active', queuePosition: 1, finished: false, settings: { laneAConcurrency: 2, posture: 'open' },
   items: [{ issue: 'PAN-2', lane: 'A', order: 1, prereqs: [], reVerify: false, addedAt: '2026-07-18T12:00:00.000Z', addedBy: 'operator' }],
   createdAt: '2026-07-18T12:00:00.000Z', updatedAt: '2026-07-18T12:00:00.000Z',
   progress: { total: 1, landed: 0, drained: false },

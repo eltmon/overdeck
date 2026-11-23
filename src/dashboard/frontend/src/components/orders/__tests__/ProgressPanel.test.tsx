@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { useDashboardStore } from '../../../lib/store';
 import type { DerivedIssueState } from '../../../types';
-import type { OrderBookView } from '../BookStrip';
+import type { OrderBookView } from '../types';
 import { ProgressPanel } from '../ProgressPanel';
 
 function seedDerived(states: DerivedIssueState[]): void {
@@ -17,6 +17,9 @@ const book: OrderBookView = {
   id: '2026-07-18-progress',
   name: 'Progress',
   status: 'running',
+  phase: 'active',
+  queuePosition: 1,
+  finished: false,
   settings: { laneAConcurrency: 2, posture: 'drain' },
   items: [
     { issue: 'PAN-Q', lane: 'B', order: 2, prereqs: ['PAN-P'], reVerify: true, addedAt: at, addedBy: 'operator' },

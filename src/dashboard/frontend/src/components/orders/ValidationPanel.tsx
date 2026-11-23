@@ -1,6 +1,6 @@
 import type { OrderBookStatus } from '@overdeck/contracts';
 import { AlertTriangle, Eye, Play, XCircle } from 'lucide-react';
-import type { OrderBookFindingView } from './BookStrip';
+import type { OrderBookFindingView } from './types';
 
 interface ValidationPanelProps {
   status: OrderBookStatus;

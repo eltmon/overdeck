@@ -5,7 +5,7 @@
  */
 import { useQuery } from '@tanstack/react-query';
 
-import type { OrderBookView } from '../orders/BookStrip';
+import type { OrderBookView } from '../orders/types';
 import { ProgressPanel } from '../orders/ProgressPanel';
 import { RailCard } from './primitives';
 

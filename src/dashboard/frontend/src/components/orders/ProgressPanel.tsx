@@ -4,7 +4,7 @@ import { evaluateOrderDispatchEligibility } from '../../../../../lib/orders/elig
 import { IN_FLIGHT_STATES } from '../../lib/pipeline-state';
 import { useDashboardStore } from '../../lib/store';
 import type { DerivedIssueState } from '../../types';
-import type { OrderBookView } from './BookStrip';
+import type { OrderBookView } from './types';
 
 interface ProgressPanelProps {
   book: OrderBookView;

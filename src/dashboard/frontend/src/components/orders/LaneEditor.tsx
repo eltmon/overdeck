@@ -4,7 +4,7 @@ import type { OrderBookItem, OrderBookLane } from '@overdeck/contracts';
 import { selectIssues, useDashboardStore } from '../../lib/store';
 import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
 import type { Issue } from '../../types';
-import type { OrderBookView } from './BookStrip';
+import type { OrderBookView } from './types';
 import { LaneItem, type LaneItemState } from './LaneItem';
 import { withProject } from './projectScope';
 
