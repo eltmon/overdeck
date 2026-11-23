@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { lstat, readFile, rm } from 'node:fs/promises';
+import { lstat, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import type { EffortLevel, Role } from '@overdeck/contracts';
@@ -12,6 +12,7 @@ import {
   saveAgentState,
 } from '../../../../lib/agents.js';
 import type { RemoteWorkspaceMetadata } from '../../../../lib/remote/interface.js';
+import { requireComposeProjectNameForWorkspace } from '../../../../lib/workspace/stack-health.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { saveAgentStateAndEmitEventProgram } from '../../services/agent-projection.js';
 import {
@@ -280,36 +281,11 @@ export function handleContainerOrchestration(input: {
       } catch {}
 
       if (dockerRunning) {
-        const getComposeProjectName = async (id: string, wPath: string): Promise<string> => {
-          const featureFolder = `feature-${id.toLowerCase()}`;
-          const expected = `overdeck-${featureFolder}`;
-          const validate = (value: string, devPath: string): string => {
-            if (value !== expected) {
-              throw new Error(`Invalid COMPOSE_PROJECT_NAME in ${devPath}: expected ${expected}`);
-            }
-            return value;
-          };
-
-          const devScriptPaths = [join(wPath, '.devcontainer', 'dev'), join(wPath, 'dev')];
-          for (const devPath of devScriptPaths) {
-            try {
-              if (existsSync(devPath)) {
-                const content = await readFile(devPath, 'utf-8');
-                const match = content.match(/COMPOSE_PROJECT_NAME="([^$"]*)\$\{FEATURE_FOLDER\}"/);
-                if (match) return validate(`${match[1]}${featureFolder}`, devPath);
-                const literalMatch = content.match(/COMPOSE_PROJECT_NAME="([^"]+)"/);
-                if (literalMatch) return validate(literalMatch[1], devPath);
-              }
-            } catch (error) {
-              if (error instanceof Error && error.message.startsWith('Invalid COMPOSE_PROJECT_NAME')) throw error;
-            }
-          }
-          return expected;
-        };
-
+        // PAN-5600: a workspace's compose project is whatever it declares
+        // (PAN-3049 contract); never re-derive or hardcode an `overdeck-` prefix.
         let featureName: string;
         try {
-          featureName = yield* Effect.promise(() => getComposeProjectName(issueId, workspacePath));
+          featureName = requireComposeProjectNameForWorkspace(workspacePath, issueId);
         } catch (error) {
           return jsonResponse({
             success: false,
