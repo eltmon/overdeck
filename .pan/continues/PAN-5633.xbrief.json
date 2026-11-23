@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5633",
   "created": "2026-11-23T19:06:23.391Z",
-  "updated": "2026-11-23T19:25:55.028Z",
+  "updated": "2026-11-23T19:25:58.443Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -144,6 +144,11 @@
     "wi6-routes-pass-scan.ac3": {
       "status": "completed",
       "doneAt": "2026-11-23T19:25:55.027Z"
+    },
+    "wi7-banner-poll": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5633",
+      "claimedAt": "2026-11-23T19:25:58.443Z"
     }
   }
 }
