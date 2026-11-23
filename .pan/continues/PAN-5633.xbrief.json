@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5633",
   "created": "2026-11-23T19:06:23.391Z",
-  "updated": "2026-11-23T19:22:37.852Z",
+  "updated": "2026-11-23T19:25:55.028Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -128,9 +128,22 @@
       "doneAt": "2026-11-23T19:22:29.772Z"
     },
     "wi6-routes-pass-scan": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5633",
-      "claimedAt": "2026-11-23T19:22:37.852Z"
+      "claimedAt": "2026-11-23T19:22:37.852Z",
+      "doneAt": "2026-11-23T19:25:55.027Z"
+    },
+    "wi6-routes-pass-scan.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:25:55.027Z"
+    },
+    "wi6-routes-pass-scan.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:25:55.027Z"
+    },
+    "wi6-routes-pass-scan.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:25:55.027Z"
     }
   }
 }
