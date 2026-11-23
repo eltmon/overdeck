@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-23T10:35:00Z · model: claude-opus-5-5 · open: 957_
+_Last sequenced: 2026-11-23T11:35:07Z · model: claude-opus-5-5 · open: 958_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -805,6 +805,7 @@ _Last sequenced: 2026-11-23T10:35:00Z · model: claude-opus-5-5 · open: 957_
 | 746 | PAN-1049 | M | low | needs-refinement |  |  | Spike: evaluate Tauri v2 desktop shell |
 | 747 | PAN-984 | XS | low | needs-refinement |  |  | Evaluate context-mode MCP server as session continuity + search layer |
 | 748 | PAN-5431 | XS | low | ok |  |  | CodeRabbit minor follow-up on PR #5429 (PAN-5424): RELEASING.md direct vs transitive deps wording; native path in a test assertion. |
+| 748 | PAN-5629 | XS | low | ok |  |  | 3 Minor CodeRabbit findings on merged PAN-5599 PR #5627: order-book docs wording and a post-backfill detail snapshot. |
 | 749 | PAN-962 | M | low | needs-refinement |  |  | Post-PAN-946: vBRIEF lifecycle follow-up plan |
 | 750 | PAN-961 | M | low | ok |  |  | Update documentation for vBRIEF v0.6 lifecycle model |
 | 751 | PAN-5365 | S | low | needs-refinement |  |  | MCP memory_add gains a source param now that PAN-5360 shipped; the supersedes-on-agent-surface decision is still open. |
@@ -1292,10 +1293,10 @@ New issue from the Deft adoption PRD. Its dependency PAN-3308 has closed. The ma
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-23T10:35:00Z",
+  "generatedAt": "2026-11-23T11:35:07Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 957,
+  "openCount": 958,
   "nodes": [
     {
       "issue": "PAN-5611",
@@ -11326,6 +11327,19 @@ New issue from the Deft adoption PRD. Its dependency PAN-3308 has closed. The ma
       "planning": "auto"
     },
     {
+      "issue": "PAN-5629",
+      "rank": 748,
+      "size": "XS",
+      "importance": "low",
+      "score": 36,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "3 Minor CodeRabbit findings on merged PAN-5599 PR #5627: order-book docs wording and a post-backfill detail snapshot.",
+      "rationale": "New advisory CodeRabbit follow-up with three Minor findings (two docs, one route snapshot); placed beside comparable minor follow-ups.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-962",
       "rank": 749,
       "size": "M",
@@ -14616,6 +14630,13 @@ New issue from the Deft adoption PRD. Its dependency PAN-3308 has closed. The ma
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-5599",
+      "to": "PAN-5629",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.9
     },
     {
       "from": "PAN-5601",
