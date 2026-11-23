@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4242",
   "created": "2026-11-23T08:46:31.743Z",
-  "updated": "2026-11-23T09:32:27.875Z",
+  "updated": "2026-11-23T09:32:49.082Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,7 +34,7 @@
     "settings-copy-permissions": {
       "status": "in_progress",
       "claimedBy": "agent-pan-4242",
-      "claimedAt": "2026-11-23T09:32:27.875Z"
+      "claimedAt": "2026-11-23T09:32:49.082Z"
     }
   }
 }
