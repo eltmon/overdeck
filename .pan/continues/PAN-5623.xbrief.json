@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5623",
   "created": "2026-11-23T20:20:25.006Z",
-  "updated": "2026-11-23T20:53:30.895Z",
+  "updated": "2026-11-23T20:53:59.760Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -125,9 +125,26 @@
       "claimedAt": "2026-11-23T20:53:08.495Z"
     },
     "wi6-spawn-gate-restore": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5623",
-      "claimedAt": "2026-11-23T20:53:30.894Z"
+      "claimedAt": "2026-11-23T20:53:30.894Z",
+      "doneAt": "2026-11-23T20:53:59.760Z"
+    },
+    "wi6-spawn-gate-restore.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:53:59.760Z"
+    },
+    "wi6-spawn-gate-restore.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:53:59.760Z"
+    },
+    "wi6-spawn-gate-restore.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:53:59.760Z"
+    },
+    "wi6-spawn-gate-restore.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:53:59.760Z"
     }
   }
 }
