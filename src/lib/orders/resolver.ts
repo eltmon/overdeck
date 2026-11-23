@@ -124,6 +124,72 @@ export const liveOrderIssueLookup: OrderIssueLookup = (issueIds) => {
   return result;
 };
 
+export interface OrderIssueBackfillService {
+  isStarted(): boolean;
+  /** Uppercase identifiers the cache already holds. */
+  issueIds(): ReadonlySet<string>;
+  backfillIssue(issueId: string): Promise<void>;
+}
+
+function defaultOrderIssueBackfillService(): OrderIssueBackfillService {
+  const { getSharedIssueService, isSharedIssueServiceStarted } = loadIssueServiceModuleSync();
+  return {
+    isStarted: () => isSharedIssueServiceStarted(),
+    issueIds: () => {
+      const issues = getSharedIssueService().getIssues({ cycle: 'all', includeCompleted: true }) as Array<Record<string, unknown>>;
+      return new Set(issues.map((issue) => issueIdentifier(issue)).filter(Boolean));
+    },
+    backfillIssue: (issueId) => getSharedIssueService().backfillIssue(issueId),
+  };
+}
+
+/**
+ * Ask the tracker for every issue of a `ready` or `running` book that the issue cache does not hold,
+ * so a book whose issues closed outside the closed window still reads as finished (PAN-5599 D5).
+ * Waits at most `timeoutMs`; never throws. Does nothing when the service is not started or empty.
+ */
+export async function backfillUnknownOrderIssues(
+  books: readonly OrderBook[],
+  options: { timeoutMs?: number; service?: OrderIssueBackfillService } = {},
+): Promise<void> {
+  let service: OrderIssueBackfillService;
+  try {
+    service = options.service ?? defaultOrderIssueBackfillService();
+  } catch {
+    return;
+  }
+
+  try {
+    if (!service.isStarted()) return;
+    const cached = service.issueIds();
+    if (cached.size === 0) return;
+
+    const wanted = new Set<string>();
+    for (const book of books) {
+      if (book.status !== 'ready' && book.status !== 'running') continue;
+      for (const item of book.items) {
+        const id = item.issue.toUpperCase();
+        if (!cached.has(id)) wanted.add(id);
+      }
+    }
+    if (wanted.size === 0) return;
+
+    const timeoutMs = options.timeoutMs ?? 3000;
+    const pending = [...wanted].map((id) => service.backfillIssue(id));
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, timeoutMs);
+    });
+    try {
+      await Promise.race([Promise.allSettled(pending), timeout]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  } catch {
+    // Fail safe: a backfill problem leaves the book reading as it does today.
+  }
+}
+
 /**
  * Load the issue-service module through `import()` and start the shared service without polling.
  *
