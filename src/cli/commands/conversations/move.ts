@@ -71,7 +71,8 @@ export async function moveAction(query: string, projectKey: string): Promise<voi
   try {
     const response = await fetch(`${DASHBOARD_URL}/api/conversations/${encodeURIComponent(conversation.name)}/move`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      // The move route runs validateOrigin, which refuses a write with no Origin (PAN-5610).
+      headers: { 'Content-Type': 'application/json', Origin: DASHBOARD_URL },
       body: JSON.stringify({ projectKey }),
     });
 
