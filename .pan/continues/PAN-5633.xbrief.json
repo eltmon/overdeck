@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5633",
   "created": "2026-11-23T19:06:23.391Z",
-  "updated": "2026-11-23T19:08:21.230Z",
+  "updated": "2026-11-23T19:09:47.203Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -36,9 +36,26 @@
       "doneAt": "2026-11-23T19:08:15.806Z"
     },
     "wi2-parser-turn-end": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5633",
-      "claimedAt": "2026-11-23T19:08:21.230Z"
+      "claimedAt": "2026-11-23T19:08:21.230Z",
+      "doneAt": "2026-11-23T19:09:47.203Z"
+    },
+    "wi2-parser-turn-end.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:09:47.203Z"
+    },
+    "wi2-parser-turn-end.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:09:47.203Z"
+    },
+    "wi2-parser-turn-end.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:09:47.203Z"
+    },
+    "wi2-parser-turn-end.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:09:47.203Z"
     }
   }
 }
