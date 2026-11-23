@@ -1,0 +1,619 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-23T06:00:44Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5611: Idle-settled conversations stay in Settled after the operator resumes them, hiding them from their project group",
+    "updated": "2026-11-23T06:12:23.732Z"
+  },
+  "plan": {
+    "id": "pan-5611",
+    "title": "Idle-settled conversations stay in Settled after the operator resumes them, hiding them from their project group",
+    "status": "proposed",
+    "uid": "ffdb7803-7067-4262-8fbe-d4118e4ede73",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-23T06:00:44Z",
+    "updated": "2026-11-23T06:12:23.732Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5611",
+        "label": "PAN-5611",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5611.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "conversations",
+      "triage",
+      "idle-settle",
+      "command-deck",
+      "bug"
+    ],
+    "narratives": {
+      "Problem": "The idle sweep (PAN-4655) settles a conversation with reason 'idle' after N days without activity, but nothing clears that settle when activity resumes. Only the explicit Unsettle (unsettleConversation) and a schedule fire (clearConversationTriage) clear a settle. The frontend places any root with settledAt in the Settled section (sectionOf), so a conversation the operator is chatting with stays hidden from its project group. Handoff and /clear successors are display children of the settled original, so the bug also hits the common case of working in a successor.",
+      "Proposal": "Add a guarded store door resurfaceIdleSettledConversation(name, nowMs, settledAtMs?) that clears only settle_reason='idle' settles and restarts the idle clock. FR-1: the message route's receipt callback calls a new helper resurfaceIdleSettleAfterMessage(name, status) on a 2xx response; it clears the idle settle on the messaged row and its display root (D27 rule via a new displayRootNameOf helper), invalidates the list enrichment cache and emits conversation.schedules_changed. FR-2: a new resurfaceActiveIdleSettles pass, run by the idle-settle service before the settle pass, clears an idle settle on a root when a group member is live and some member's transcript activity is newer than settled_at, writing through the door guarded on the settled_at it read. Manual and merge settles are never cleared. Docs and changelog describe the new behavior. Full detail: .pan/drafts/PAN-5611.md.",
+      "NonGoals": "- Resurfacing settles with reason 'manual' or 'merge', or settled rows whose stored reason is NULL or unknown\n- Unsnoozing a snoozed conversation when it receives a message or activity\n- Changing the Resume route, the triage route (POST /api/conversations/triage), or the schedule service's unconditional clearConversationTriage\n- Treating opening or reading a conversation (last_attached_at) as activity for resurfacing\n- Adding a new domain event type, a schema migration, or any frontend change\n- Changing settleConversation so that a re-settle over an idle settle replaces its reason\n- Resurfacing from inside handleConversationMessage for its non-route callers (PR-watch notifier, trigger hooks, shared-session submit queue, scheduled-message delivery); the FR-2 sweep covers them\n- Raising any scripts/file-size-allowlist.txt row"
+    },
+    "autoDecisions": [
+      {
+        "summary": "FR-1 clears the idle settle on the messaged conversation and on its display root.",
+        "rationale": "Handoff and /clear successors are display children of the original (displayParentId falls back to parentConversationId) and the sweep settles only roots, so clearing only the messaged row leaves the group in Settled in the most common case."
+      },
+      {
+        "summary": "FR-1 runs inside the delivery receipt callback, on any 2xx response, including /pan composer commands and native compact.",
+        "rationale": "A receipt replay never calls the callback, so retries cannot resurface twice; any accepted composer input is operator use of the conversation. Non-2xx responses resurface nothing and FR-2 catches a delivery that did land."
+      },
+      {
+        "summary": "Use a new guarded door resurfaceIdleSettledConversation instead of clearConversationTriage.",
+        "rationale": "clearConversationTriage is unconditional and would clear manual and merge settles, violating FR-3; a single guarded UPDATE also wins races against a concurrent settle."
+      },
+      {
+        "summary": "Emit conversation.schedules_changed after a resurface rather than adding a triage event.",
+        "rationale": "The issue prescribes doing it the way the schedule service does; the reducer already bumps conversationsListRevision so the Command Deck refetches."
+      },
+      {
+        "summary": "FR-2 reuses readTranscriptLastActivityMs with settled_at as the cutoff, including its modified-time fallback.",
+        "rationale": "turnRecordTimestamp parses only Claude-format records; non-Claude transcripts are append-only so modified time is their last write, and Claude's touch-without-record quirk is handled by the record-time branch."
+      },
+      {
+        "summary": "FR-2 considers only idle-settled groups with at least one live member, and skips the tick when liveness is unknown.",
+        "rationale": "Pane-typed work needs a live session, and the filter bounds the steady-state transcript reads of a pass that otherwise runs over every idle-settled group every 15 minutes."
+      },
+      {
+        "summary": "FR-2 runs even when auto_settle_idle_days is 0, and runs before the settle pass in each tick.",
+        "rationale": "Turning auto-settle off should not strand existing idle settles; running first lets the idle_reset_at it writes keep the settle pass from re-settling the row."
+      },
+      {
+        "summary": "Resumes (including Resume all after a backend restart) resurface live idle-settled conversations through FR-2.",
+        "rationale": "PAN-4655 defines a resume as activity, and the resume contract makes the harness write transcript records; the operator chose to resume those conversations."
+      }
+    ],
+    "items": [
+      {
+        "id": "store-resurface-door",
+        "title": "Add the guarded store door resurfaceIdleSettledConversation",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T06:00:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5611",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "message-route-resurface",
+            "sweep-resurface-pass"
+          ],
+          "files_scope": [
+            "src/lib/overdeck/conversation-triage-store.ts",
+            "src/lib/overdeck/__tests__/conversation-triage-store.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-triage-store.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-triage-store.test.ts passes including the resurfaceIdleSettledConversation tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In src/lib/overdeck/conversation-triage-store.ts, after clearConversationTriage (line ~121), add exported resurfaceIdleSettledConversation(name: string, nowMs: number = Date.now(), settledAtMs?: number): boolean. It runs one UPDATE conversations SET settled_at = NULL, settle_reason = NULL, snoozed_until = NULL, idle_reset_at = ? WHERE name = ? AND settled_at IS NOT NULL AND settle_reason = 'idle', plus AND settled_at = ? when settledAtMs is given, and returns result.changes > 0. Use the exact code in the PRD. Append the tests listed in PRD WI-1 to conversation-triage-store.test.ts using that file's existing temp OVERDECK_HOME pattern and helpers."
+        },
+        "items": [
+          {
+            "id": "store-resurface-door.ac1",
+            "title": "Given a row settled through settleIdleConversation, when resurfaceIdleSettledConversation(name, 9000) runs, then it returns true, getConversationTriage returns EMPTY_CONVERSATION_TRIAGE and idle_reset_at persists as 9000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "store-resurface-door.ac2",
+            "title": "Given rows settled with reason 'manual', reason 'merge', and a settled row with settle_reason NULL, when resurfaceIdleSettledConversation runs on each, then it returns false and each row preserves its settled_at, reason and NULL idle_reset_at",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "store-resurface-door.ac3",
+            "title": "Given an idle settle at settled_at 1000, when the door is called with settledAtMs 2000 it returns false and the row stays settled, and when called with settledAtMs 1000 it returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "store-resurface-door.ac4",
+            "title": "When the door runs on an unsettled row or on a name with no row, it returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "store-idle-clock-reason",
+        "title": "Expose the settle reason on IdleClock from listIdleClocks",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T06:00:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5611",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-triage-store.ts",
+            "src/lib/overdeck/__tests__/conversation-triage-store.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-triage-store.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the listIdleClocks test passes with settleReason expectations",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Add settleReason: SettleReason | null to the IdleClock interface in src/lib/overdeck/conversation-triage-store.ts and select settle_reason in listIdleClocks. Map it as rowToTriage does: settled_at !== null ? (isSettleReason(settle_reason) ? settle_reason : 'manual') : null. Update the existing test 'listIdleClocks returns unarchived rows with their clock columns and omits archived rows' (near line 468): idle-j expects settleReason 'manual', idle-k expects settleReason null; add a row settled via settleIdleConversation that expects settleReason 'idle'. Fix any other compile errors the new required field causes (search for IdleClock object literals in tests)."
+        },
+        "items": [
+          {
+            "id": "store-idle-clock-reason.ac1",
+            "title": "Given rows settled 'manual', unsettled, and settled through settleIdleConversation, listIdleClocks returns settleReason 'manual', null and 'idle' respectively and the updated test passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "store-idle-clock-reason.ac2",
+            "title": "Given a settled row whose settle_reason is NULL, listIdleClocks returns settleReason 'manual' for it, matching getConversationTriage",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "display-root-helper",
+        "title": "Add displayRootNameOf to the idle-settle module",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T06:00:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5611",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-idle-settle.ts",
+            "src/lib/overdeck/__tests__/conversation-idle-settle.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-idle-settle.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-idle-settle.test.ts passes including displayRootNameOf and the existing groupByDisplayRoot tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In src/lib/overdeck/conversation-idle-settle.ts extract the inner rootOf closure of groupByDisplayRoot (lines 46-57) into a module function displayRootOf<T extends GroupableRow>(row: T, byId: ReadonlyMap<number, T>): T with the same MAX_PARENT_HOPS cap and cycle rule (a cycle or over-long chain makes the row its own root), and make groupByDisplayRoot call it without changing its output. Add exported displayRootNameOf(name: string, rows: readonly LegacyConversation[]): string that returns the display root's name for the row named `name`, or `name` itself when no row has that name. Add the tests listed in PRD WI-3."
+        },
+        "items": [
+          {
+            "id": "display-root-helper.ac1",
+            "title": "Given a lane under a parent and a successor two levels under a root, displayRootNameOf returns the parent's name and the top root's name respectively",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "display-root-helper.ac2",
+            "title": "Given a critic row whose builder is listed, displayRootNameOf returns the builder's root name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "display-root-helper.ac3",
+            "title": "Given a row whose parent is not in rows, or a name with no row, displayRootNameOf returns the given name unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "display-root-helper.ac4",
+            "title": "Given the existing groupByDisplayRoot nesting and cycle tests, after the extraction groupByDisplayRoot returns the same groups and those tests pass unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "message-route-resurface",
+        "title": "Resurface idle settles after an accepted message through the message route",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T06:00:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5611",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/conversation-idle-resurface.ts",
+            "src/dashboard/server/services/__tests__/conversation-idle-resurface.test.ts",
+            "src/dashboard/server/routes/conversations.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/conversation-idle-resurface.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "conversation-idle-resurface.test.ts passes",
+            "typecheck completes without errors",
+            "file-size guard passes with routes/conversations.ts at or under 1072 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-5",
+            "NFR-2",
+            "NFR-3"
+          ],
+          "acJustification": "Six criteria: five unit-level checks of the helper and route wiring, plus one end-to-end check (ac6) that only the test role can run against a dashboard built from this branch; it is the only observable proof that the Command Deck moves the row. The work agent closes ac6 on the strength of ac1-ac5 and the route diff, and must not start or restart a dashboard to try it."
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Create src/dashboard/server/services/conversation-idle-resurface.ts exporting ResurfaceAfterMessageDeps { listRows, resurface, invalidate, emitChanged } and resurfaceIdleSettleAfterMessage(name: string, status: number, deps = defaultDeps): string[]. Return [] unless 200 <= status < 300 (do not call listRows then). Otherwise root = displayRootNameOf(name, deps.listRows()); call deps.resurface for name and for root when different; collect names that returned true; call deps.invalidate() once when any changed and deps.emitChanged(n) for each; return them. Wrap the body in try/catch: on error console.warn('[conversations] idle resurface failed for <name>: <message>') and return []. Defaults: listConversations (src/lib/overdeck/conversations.ts), (n) => resurfaceIdleSettledConversation(n), invalidateConversationListEnrichmentCache (src/lib/overdeck/conversation-list.ts), emitConversationSchedulesChanged (src/lib/overdeck/conversation-schedules.ts). In src/dashboard/server/routes/conversations.ts postConversationMessageRoute (around line 624) change the withConversationMessageReceipt callback to an async function that awaits handleConversationMessage, calls resurfaceIdleSettleAfterMessage(name, response.status) with a '// PAN-5611 FR-1' comment, and returns the response (exact snippet in the PRD). Do not touch handleConversationMessage. Write the tests listed in PRD WI-4 against a real temp OVERDECK_HOME database with invalidate and emitChanged injected as vi.fn()."
+        },
+        "items": [
+          {
+            "id": "message-route-resurface.ac1",
+            "title": "Given an idle-settled conversation, when resurfaceIdleSettleAfterMessage(name, 200) runs, then it returns [name], the row's triage is empty, invalidate is called once and emitChanged is called with name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "message-route-resurface.ac2",
+            "title": "Given conversations settled 'manual' and 'merge', when the helper runs with status 200, then it returns [] and both rows preserve their settle and reason with no emit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "message-route-resurface.ac3",
+            "title": "Given an idle-settled root and a successor created with parentName of that root, when the helper runs for the successor with status 200, then it returns [rootName] and the root's triage is empty",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "message-route-resurface.ac4",
+            "title": "Given an idle-settled conversation, when the helper runs with status 409, then it returns [], the row stays settled and listRows is not called; and when the injected resurface throws, the helper returns [] without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "message-route-resurface.ac5",
+            "title": "The diff of src/dashboard/server/routes/conversations.ts calls resurfaceIdleSettleAfterMessage(name, response.status) inside the withConversationMessageReceipt callback after handleConversationMessage resolves, and the file is at most 1072 lines so bash scripts/lint-file-size.sh exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "message-route-resurface.ac6",
+            "title": "Test role (browser UAT, isolated Playwright profile, throwaway conversation): given POST /api/conversations/triage sets the conversation settled with settleReason 'idle', when POST /api/conversations/<name>/message returns 2xx, then within 15 seconds GET /api/conversations returns settledAt null for it and the Command Deck renders it outside the Settled section; with settleReason 'manual' instead it stays in Settled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sweep-resurface-pass",
+        "title": "Add the resurfaceActiveIdleSettles sweep pass",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T06:00:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5611",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-idle-settle.ts",
+            "src/lib/overdeck/__tests__/conversation-idle-settle.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-idle-settle.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-idle-settle.test.ts passes including the resurfaceActiveIdleSettles describe block",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. In src/lib/overdeck/conversation-idle-settle.ts add exported IdleResurfaceDeps { now?, listRows?, listIdleClocks?, listLiveSessions, resolveTranscript, lastActivityMs?, resurface?, log? } and resurfaceActiveIdleSettles(deps): Promise<string[]>. Steps: read rows (default listConversations()) and clocks (default listIdleClocks()); candidates = groupByDisplayRoot(rows) groups whose root clock has settledAtMs !== null and settleReason === 'idle'; return [] when none before listing sessions. live = await deps.listLiveSessions(); when null log '[idle-settle] terminal sessions could not be listed; skipping resurface' and return []. Keep groups with at least one member whose tmuxSession is in live. With withConcurrencyLimit(..., TRANSCRIPT_READ_CONCURRENCY), for each member resolve the transcript (skip null), activity = await lastActivityMs(path, settledAtMs) (default readTranscriptLastActivityMs); when activity !== null && activity > settledAtMs call resurface(root.name, settledAtMs, nowMs) (default (n, s, t) => resurfaceIdleSettledConversation(n, t, s)), push the name when it returned true, and stop that group. Never read idleDays. Do not change sweepIdleConversations. Add the tests listed in PRD WI-5."
+        },
+        "items": [
+          {
+            "id": "sweep-resurface-pass.ac1",
+            "title": "Given an idle-settled root with a live member whose transcript activity is newer than settled_at, the pass returns [rootName] and the root's triage reads empty; given activity at or before settled_at, it returns [] and the root stays settled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sweep-resurface-pass.ac2",
+            "title": "Given roots settled 'manual' and 'merge' with live members and newer activity, the pass returns [] and both stay settled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sweep-resurface-pass.ac3",
+            "title": "Given an idle-settled root whose only newer activity is in a child's transcript, the pass resurfaces the root; given an idle-settled group with no live member, it returns [] and resolveTranscript is never called for that group",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sweep-resurface-pass.ac4",
+            "title": "When listLiveSessions returns null the pass returns [] and logs the skip line; the pass resurfaces with no idleDays dependency, so a 0-day setting does not stop it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sweep-resurface-pass.ac5",
+            "title": "Given an injected listIdleClocks reporting settledAtMs 1000 for a row whose database settled_at is 2000, the real door rejects the write and the pass returns [] with the row still settled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "idle-service-resurface",
+        "title": "Run the resurface pass from the idle-settle service and notify the dashboard",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T06:00:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5611",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/conversation-idle-settle-service.ts",
+            "src/dashboard/server/services/__tests__/conversation-idle-settle-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/conversation-idle-settle-service.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-idle-settle-service.test.ts passes with the new seam shape and the resurfaced test",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-6",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. In src/dashboard/server/services/conversation-idle-settle-service.ts add exported IdleSweepOutcome { settled: string[]; resurfaced: string[] }; change IdleSettlePatrolDeps.sweep to () => Promise<IdleSweepOutcome>; add emitChanged?: (name: string) => void (default emitConversationSchedulesChanged from src/lib/overdeck/conversation-schedules.ts). sweepWithRealDeps runs resurfaceActiveIdleSettles({ listLiveSessions: () => listLiveConversationSessions(), resolveTranscript: resolveSessionFile }) first, then the existing sweepIdleConversations(...), and returns both lists. After a sweep: when either list is non-empty call invalidate() once; call emitChanged(name) for each resurfaced name; keep the existing log line '[idle-settle] settled N idle conversation(s): a, b' byte-identical when settled is non-empty; log '[idle-settle] resurfaced N conversation(s) with new activity: a, b' when resurfaced is non-empty. Update the existing tests to the new seam shape and add the two tests in PRD WI-6, keeping vi.useFakeTimers()."
+        },
+        "items": [
+          {
+            "id": "idle-service-resurface.ac1",
+            "title": "Given a sweep seam returning { settled: ['conv-a'], resurfaced: [] }, after the boot delay the service invalidates once and logs exactly '[idle-settle] settled 1 idle conversation(s): conv-a'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "idle-service-resurface.ac2",
+            "title": "Given a sweep seam returning { settled: [], resurfaced: ['conv-b'] }, the service invalidates once, calls emitChanged with 'conv-b', and logs '[idle-settle] resurfaced 1 conversation(s) with new activity: conv-b'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "idle-service-resurface.ac3",
+            "title": "Given a sweep seam returning both lists empty, the service neither invalidates nor emits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-and-changelog",
+        "title": "Document idle-settle resurfacing and add the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T06:00:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5611",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/conversations.mdx",
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "sync-sources/skills/pan-conversations/SKILL.md",
+            ".overdeck/context/codebase/architecture.md",
+            "changelog.d/pan-5611.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Edit features/conversations.mdx section '### Settling idle conversations automatically' (near line 1109), the 'Idle auto-settle (PAN-4655)' bullet in docs/DASHBOARD-ARCHITECTURE.md (near line 651), the auto-settle-idle-days bullet in sync-sources/skills/pan-conversations/SKILL.md (near line 100), and the 'Conversation triage: settle and snooze (PAN-4639)' section of .overdeck/context/codebase/architecture.md (leave its last-verified line unchanged), with the content the PRD specifies. Create changelog.d/pan-5611.md with the exact '#### Fixed' bullet in the PRD. Edit the skill under sync-sources only, never .claude/skills."
+        },
+        "items": [
+          {
+            "id": "docs-and-changelog.ac1",
+            "title": "features/conversations.mdx's idle-settle section states that an idle-settled conversation returns to Inbox immediately on a message (including from a successor or lane in its group) and within about 15 minutes of new transcript activity while it runs, and that manual and merge settles stay settled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-changelog.ac2",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains the names resurfaceIdleSettleAfterMessage, resurfaceActiveIdleSettles and resurfaceIdleSettledConversation, the settle_reason = 'idle' guard, and the statement that both paths emit conversation.schedules_changed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-changelog.ac3",
+            "title": "Given the merged branch, sync-sources/skills/pan-conversations/SKILL.md contains a sentence stating that an idle settle ends on a message or new transcript activity while manual and merge settles do not, and .overdeck/context/codebase/architecture.md contains the same statement",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-changelog.ac4",
+            "title": "changelog.d/pan-5611.md exists with exactly one '#### Fixed' heading and one bullet linking issue #5611, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "store-resurface-door",
+        "to": "store-idle-clock-reason",
+        "type": "blocks"
+      },
+      {
+        "from": "store-resurface-door",
+        "to": "message-route-resurface",
+        "type": "blocks"
+      },
+      {
+        "from": "display-root-helper",
+        "to": "message-route-resurface",
+        "type": "blocks"
+      },
+      {
+        "from": "store-resurface-door",
+        "to": "sweep-resurface-pass",
+        "type": "blocks"
+      },
+      {
+        "from": "store-idle-clock-reason",
+        "to": "sweep-resurface-pass",
+        "type": "blocks"
+      },
+      {
+        "from": "display-root-helper",
+        "to": "sweep-resurface-pass",
+        "type": "blocks"
+      },
+      {
+        "from": "sweep-resurface-pass",
+        "to": "idle-service-resurface",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Code touches only the conversation-triage subsystem (src/lib/overdeck triage store and idle sweep, one dashboard service, one route line); the 7-subsystem count comes from the required docs item spreading one behavior across four doc locations plus changelog.d. Splitting docs into a sibling issue would ship the behavior change undocumented, which the PRD rules forbid. 14 files total, well under the 25-file limit.",
+      "canonicalFilename": "2026-11-23-PAN-5611-idle-settled-conversations-stay-in-settled-after-the-operator-resumes-them-hiding-them-from-their-project-group.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
