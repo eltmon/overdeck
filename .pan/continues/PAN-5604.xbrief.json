@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5604",
   "created": "2026-11-23T18:14:56.256Z",
-  "updated": "2026-11-23T19:02:39.874Z",
+  "updated": "2026-11-23T19:02:49.443Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,6 +74,11 @@
     "permission-dismiss.ac3": {
       "status": "completed",
       "doneAt": "2026-11-23T19:02:39.874Z"
+    },
+    "live-agent-inputs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5604",
+      "claimedAt": "2026-11-23T19:02:49.443Z"
     }
   }
 }
