@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5486",
+  "created": "2026-11-23T03:25:55.145Z",
+  "updated": "2026-11-23T03:25:55.146Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "core-pin-script": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5486",
+      "claimedAt": "2026-11-23T03:25:55.145Z"
+    }
+  }
+}
