@@ -1,0 +1,197 @@
+{
+  "version": "1",
+  "issueId": "PAN-5599",
+  "created": "2026-11-23T05:24:22.748Z",
+  "updated": "2026-11-23T09:33:54.427Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "phase-finished-rule": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5599",
+      "claimedAt": "2026-11-23T05:24:22.748Z",
+      "doneAt": "2026-11-23T05:34:57.132Z"
+    },
+    "phase-finished-rule.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T05:34:57.132Z"
+    },
+    "phase-finished-rule.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T05:34:57.132Z"
+    },
+    "phase-finished-rule.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T05:34:57.132Z"
+    },
+    "phase-finished-rule.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T05:34:57.132Z"
+    },
+    "phase-finished-rule.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-23T05:34:57.132Z"
+    },
+    "dispatch-finished-rule": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5599",
+      "claimedAt": "2026-11-23T05:35:05.162Z",
+      "doneAt": "2026-11-23T05:41:04.210Z"
+    },
+    "dispatch-finished-rule.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T05:41:04.210Z"
+    },
+    "dispatch-finished-rule.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T05:41:04.210Z"
+    },
+    "order-issue-backfill-helper": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5599",
+      "claimedAt": "2026-11-23T05:41:11.937Z",
+      "doneAt": "2026-11-23T05:46:10.609Z"
+    },
+    "order-issue-backfill-helper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T05:46:10.609Z"
+    },
+    "order-issue-backfill-helper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T05:46:10.609Z"
+    },
+    "order-issue-backfill-helper.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T05:46:10.609Z"
+    },
+    "order-issue-backfill-helper.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T05:46:10.609Z"
+    },
+    "orders-route-finished-and-backfill": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5599",
+      "claimedAt": "2026-11-23T05:46:18.676Z",
+      "doneAt": "2026-11-23T05:53:13.457Z"
+    },
+    "orders-route-finished-and-backfill.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T05:53:13.457Z"
+    },
+    "orders-route-finished-and-backfill.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T05:53:13.457Z"
+    },
+    "orders-route-finished-and-backfill.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T05:53:13.457Z"
+    },
+    "status-summary-finished-rule": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5599",
+      "claimedAt": "2026-11-23T05:53:23.299Z",
+      "doneAt": "2026-11-23T06:02:11.347Z"
+    },
+    "status-summary-finished-rule.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T06:02:11.347Z"
+    },
+    "status-summary-finished-rule.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T06:02:11.347Z"
+    },
+    "cli-list-server-phases": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5599",
+      "claimedAt": "2026-11-23T06:02:18.951Z",
+      "doneAt": "2026-11-23T08:47:29.318Z"
+    },
+    "cli-list-server-phases.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T08:47:29.318Z"
+    },
+    "cli-list-server-phases.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T08:47:29.318Z"
+    },
+    "cli-list-server-phases.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T08:47:29.318Z"
+    },
+    "cli-list-server-phases.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T08:47:29.318Z"
+    },
+    "header-skip-copy": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5599",
+      "claimedAt": "2026-11-23T08:47:37.040Z",
+      "doneAt": "2026-11-23T09:18:47.223Z"
+    },
+    "header-skip-copy.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:18:47.223Z"
+    },
+    "header-skip-copy.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:18:47.223Z"
+    },
+    "list-finished-queued-placement": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5599",
+      "claimedAt": "2026-11-23T09:18:56.409Z",
+      "doneAt": "2026-11-23T09:29:21.168Z"
+    },
+    "list-finished-queued-placement.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:29:21.168Z"
+    },
+    "list-finished-queued-placement.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:29:21.168Z"
+    },
+    "list-finished-queued-placement.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:29:21.168Z"
+    },
+    "page-drop-finished-active-notice": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5599",
+      "claimedAt": "2026-11-23T09:29:29.694Z",
+      "doneAt": "2026-11-23T09:32:13.669Z"
+    },
+    "page-drop-finished-active-notice.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:32:13.669Z"
+    },
+    "page-drop-finished-active-notice.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:32:13.669Z"
+    },
+    "page-drop-finished-active-notice.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:32:13.669Z"
+    },
+    "docs-skip-rule": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5599",
+      "claimedAt": "2026-11-23T09:32:21.744Z",
+      "doneAt": "2026-11-23T09:33:54.427Z"
+    },
+    "docs-skip-rule.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:33:54.427Z"
+    },
+    "docs-skip-rule.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:33:54.427Z"
+    },
+    "docs-skip-rule.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:33:54.427Z"
+    }
+  }
+}

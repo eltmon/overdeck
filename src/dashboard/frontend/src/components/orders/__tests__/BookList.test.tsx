@@ -43,6 +43,27 @@ describe('BookList', () => {
     expect(screen.queryByRole('heading', { name: 'Queued' })).toBeNull();
   });
 
+  it('lists a finished queued book after the numbered queued books without a position', () => {
+    renderList([
+      book('active', { phase: 'active', queuePosition: 1 }),
+      book('second', { queuePosition: 2 }),
+      book('done', { queuePosition: null, finished: true }),
+      book('third', { queuePosition: 3 }),
+    ]);
+    const order = [...document.querySelectorAll('[data-book]')].map((el) => el.getAttribute('data-book'));
+    expect(order).toEqual(['active', 'second', 'third', 'done']);
+    const row = (id: string) => within(document.querySelector(`[data-book="${id}"]`) as HTMLElement);
+    expect(row('done').queryByText(/^#\d+$/)).toBeNull();
+  });
+
+  it('says every queued book has finished when no book is active but finished books are queued', () => {
+    renderList([
+      book('done', { queuePosition: null, finished: true }),
+    ]);
+    expect(screen.getByText('Every queued book has finished, so the Flywheel follows the backlog.')).toBeInTheDocument();
+    expect(screen.queryByText('No book is queued, so the Flywheel follows the backlog.')).toBeNull();
+  });
+
   it('shows the meta line for each phase', () => {
     renderList([
       book('active', { phase: 'active', queuePosition: 1, settings: { laneAConcurrency: 2, posture: 'drain' }, progress: { total: 4, landed: 1, drained: false } }, 4),

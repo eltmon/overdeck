@@ -40,12 +40,12 @@ The page shows each book in one phase. Overdeck derives the phase from the book'
 | --- | --- | --- |
 | **Draft** | Nothing starts from a draft. | **+ New book** creates one. **Move back to draft** and **Restore as draft** return a book here. |
 | **Queued** | The book waits in line, shown with its place (`#2`, `#3`). | **Queue book** on a draft. |
-| **Active** | The Flywheel works from this book. Its issues are cleared to start, and `pan start` still works for anything else. | The first queued book in queue order becomes active. |
+| **Active** | The Flywheel works from this book. Its issues are cleared to start, and `pan start` still works for anything else. | The first queued book that still has open issues becomes active. |
 | **Archived** | Kept for the record. Its issues are free to join another book. | **Archive** on a draft or queued book. |
 
 Only one book is active at a time. Queue order is the order the books were created; to run a later book first, move the books ahead of it back to draft.
 
-A book is **finished** when every issue in it has landed or is parked. A finished book still holds the active slot until you archive it, so queued books cannot start. The page says so and offers **Archive and move on**.
+A book is **finished** when every issue in it has landed or is parked. The Flywheel skips a finished queued book and works from the next one; nothing is stored, the rule is derived on every read. The page marks the book **Finished** and offers **Archive** to tidy the list. A book counts as finished only when the dashboard's issue cache reports every issue closed or parked; the dashboard fetches issues that closed outside the cache window (14 days by default) from the tracker before it decides. Without that evidence the book keeps its place.
 
 ## Build a book
 
@@ -55,7 +55,7 @@ Open **Order books** in the dashboard, or go directly to `/orders`.
 2. Add issues from the **Add issues** panel. With an empty search it lists the top of your backlog; type to search open issues by ID, title or label. **Add to** picks the lane. You can also drag a row from the panel onto a lane. Adding an issue only changes the list; work starts when the book is active.
 3. Put work that can overlap in the **Parallel lane**. Put work that would collide in the **One-at-a-time lane**.
 4. Drag rows to change their order, or use **Run one at a time** and **Run in parallel** on a row to move it between lanes.
-5. Fix everything the problems box lists, then click **Queue book**. The book becomes queued, and active once the books ahead of it are archived or moved back to draft.
+5. Fix everything the problems box lists, then click **Queue book**. The book becomes queued, and active once the books ahead of it finish, are archived, or are moved back to draft.
 6. If the Flywheel is stopped when the book is active, click **Start Flywheel**.
 
 To rename a book, click its name. The **⋯** menu also offers **Rename**, **Copy book ID for the CLI** and **Archive**.
@@ -155,7 +155,7 @@ pan flywheel start --orders 2026-07-18-refactor-p3-remainder
 
 `queue` is the CLI form of the dashboard's **Queue book** action: it moves a draft to the queue. It refuses a book that is not a draft. The CLI `pan orders queue` and `pan orders start` skip the problems check; run `pan orders check <id>` or fix problems on `/orders` first.
 
-`pan orders list` shows each book's phase: `active`, `queued #<n>`, `draft` or `archived`, with ` (finished)` when every issue has landed or is parked. Three more verbs move a book between phases:
+`pan orders list` shows each book's phase: `active`, `queued #<n>`, `draft` or `archived`, with ` (finished)` when every issue has landed or is parked. A finished queued book shows `queued (finished)` with no number. `pan orders list` prints the dashboard's phases when the dashboard is running and derives them locally otherwise. Three more verbs move a book between phases:
 
 ```bash
 pan orders unqueue 2026-07-18-refactor-p3-remainder    # queued → draft
@@ -211,7 +211,7 @@ The server derives this result from canonical issue state. The orchestrator cann
 
 The flywheel loop writes its run report to `.pan/flywheel/report.md` when it stops (`pan flywheel stop`) or when asked (`pan flywheel report`), and records substrate fixes and learnings in `.pan/flywheel/state.md`. Both are committed; git history is the archive. See [docs/FLYWHEEL.md](https://github.com/eltmon/overdeck/blob/main/docs/FLYWHEEL.md).
 
-The active book's issues count as released for pickup; queued books wait their turn. A finished book stays active, and nothing advances the queue on its own, so archive it (**Archive and move on**, or `pan orders archive <id>`) to let the next queued book become active. If you do not want a book's issues picked up, keep it as a draft.
+The active book's issues count as released for pickup; queued books wait their turn. A finished book is skipped, so the next queued book becomes active on its own. A book that is stale but still has open issues keeps the slot: archive it (`pan orders archive <id>`) or move it back to draft. If you do not want a book's issues picked up, keep it as a draft.
 
 ## Related
 

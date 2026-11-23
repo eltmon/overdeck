@@ -67,7 +67,7 @@ export function BookList({ books, selectedId, onSelect, onCreate, creating, onCr
   const active = books.filter((book) => book.phase === 'active');
   const queued = books
     .filter((book) => book.phase === 'queued')
-    .sort((left, right) => (left.queuePosition ?? 0) - (right.queuePosition ?? 0));
+    .sort((left, right) => (left.queuePosition ?? Number.MAX_SAFE_INTEGER) - (right.queuePosition ?? Number.MAX_SAFE_INTEGER));
   const drafts = books.filter((book) => book.phase === 'draft');
   const archived = books.filter((book) => book.phase === 'archived');
 
@@ -156,7 +156,11 @@ export function BookList({ books, selectedId, onSelect, onCreate, creating, onCr
       <h3 className={eyebrow}>Active</h3>
       {active.length > 0
         ? active.map(row)
-        : <p className="px-1 text-[11px] text-muted-foreground">No book is queued, so the Flywheel follows the backlog.</p>}
+        : <p className="px-1 text-[11px] text-muted-foreground">
+            {queued.length > 0
+              ? 'Every queued book has finished, so the Flywheel follows the backlog.'
+              : 'No book is queued, so the Flywheel follows the backlog.'}
+          </p>}
 
       {queued.length > 0 && <><h3 className={eyebrow}>Queued</h3>{queued.map(row)}</>}
       {drafts.length > 0 && <><h3 className={eyebrow}>Drafts</h3>{drafts.map(row)}</>}

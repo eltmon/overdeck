@@ -14,22 +14,27 @@
  * went with the cohort code that was its only caller; the cloister's pipeline
  * membership consumer is `merge-eligibility.ts`.)
  */
+import type { OrderIssueLookup } from '../orders/types.js';
 import { resolvePlanHome } from '../pan-dir/paths.js';
-import { currentOrderBook } from '../orders/phase.js';
-import { listBooks } from '../orders/resolver.js';
+import { currentOrderBook, isBookFinished } from '../orders/phase.js';
+import { computeBookProgress, liveOrderIssueLookup, listBooks } from '../orders/resolver.js';
 
 export interface ActiveOrderBookIssuesDeps {
   planHome?: (projectRoot: string) => string | null;
   listBooks?: typeof listBooks;
+  issueLookup?: OrderIssueLookup;
 }
 
 /**
  * The issues in the project's current order book.
  *
  * The book used to be named by the active run's launch metadata. With run
- * records deleted the queue answers it directly: the running book, or the next
- * ready one. No run id, no stored pointer. A draft book is never the current
- * one — drafts are not dispatchable, which is the whole reason callers ask.
+ * records deleted the queue answers it directly: the running book, else the
+ * next ready one that is not finished (PAN-5599). No run id, no stored
+ * pointer. A draft book is never the current one — drafts are not
+ * dispatchable, which is the whole reason callers ask. No backfill: the only
+ * production caller runs in the deacon child, whose label gate refuses before
+ * any book is read (D7), so this keeps the plain lookup.
  */
 export async function activeOrderBookIssues(
   projectRoot: string,
@@ -38,6 +43,10 @@ export async function activeOrderBookIssues(
   // PAN-3917: order books live in the repo's plan home, not a state worktree.
   const planHome = deps.planHome?.(projectRoot) ?? resolvePlanHome(projectRoot);
   if (!planHome) return new Set();
-  const book = currentOrderBook((deps.listBooks ?? listBooks)(planHome));
+  const lookup = deps.issueLookup ?? liveOrderIssueLookup;
+  const book = currentOrderBook(
+    (deps.listBooks ?? listBooks)(planHome),
+    (candidate) => isBookFinished(computeBookProgress(candidate, lookup)),
+  );
   return new Set(book?.items.map((item) => item.issue.toUpperCase()) ?? []);
 }

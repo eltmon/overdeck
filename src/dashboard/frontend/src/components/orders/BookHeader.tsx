@@ -48,10 +48,10 @@ function phaseSentence(book: OrderBookView, activeBookName: string | null | unde
   if (book.phase === 'draft') return 'Nothing starts from a draft. Queue it when the list is right.';
   if (book.phase === 'archived') return 'Kept for the record. Its issues are free to join another book.';
   if (book.finished) {
-    return book.phase === 'queued' ? 'Every issue has landed. Archive it to clear it from the queue.' : null;
+    return book.phase === 'queued' ? 'Every issue has landed. The Flywheel skips this book. Archive it to tidy the list.' : null;
   }
   if (book.phase === 'queued') {
-    return `Waits behind "${activeBookName ?? 'the active book'}". It becomes active when the books ahead of it are archived or moved back to draft.`;
+    return `Waits behind "${activeBookName ?? 'the active book'}". It becomes active when the books ahead of it finish, are archived, or are moved back to draft.`;
   }
   if (!flywheelRunning) return 'This book is next, but the Flywheel is stopped.';
   return <>The Flywheel works from this book. Its issues are cleared to start, and <span className="font-mono">pan start</span> still works for anything else.</>;

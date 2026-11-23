@@ -10,6 +10,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { activeOrderBookIssues } from '../../../../src/lib/cloister/flywheel.js';
 import { currentOrderBook } from '../../../../src/lib/orders/phase.js';
+import type { OrderIssueLookup } from '../../../../src/lib/orders/types.js';
 
 const at = '2026-07-18T12:00:00.000Z';
 
@@ -52,6 +53,21 @@ describe('currentOrderBook', () => {
   it('never picks a draft book — a draft is not dispatchable', () => {
     expect(currentOrderBook([book('draft', 'draft', ['PAN-10'])])).toBeNull();
   });
+
+  it('skips a finished ready book', () => {
+    const books = [book('a', 'ready', ['PAN-1']), book('b', 'ready', ['PAN-2'])];
+    expect(currentOrderBook(books, candidate => candidate.id === 'a')?.id).toBe('b');
+  });
+
+  it('a running book is active even when finished', () => {
+    const books = [book('running', 'running', ['PAN-1']), book('ready', 'ready', ['PAN-2'])];
+    expect(currentOrderBook(books, () => true)?.id).toBe('running');
+  });
+
+  it('with no finished rule the first ready book is active', () => {
+    const books = [book('a', 'ready', ['PAN-1']), book('b', 'ready', ['PAN-2'])];
+    expect(currentOrderBook(books)?.id).toBe('a');
+  });
 });
 
 describe('activeOrderBookIssues', () => {
@@ -72,5 +88,30 @@ describe('activeOrderBookIssues', () => {
       planHome: () => '/plan-home',
       listBooks: () => [book('draft', 'draft', ['PAN-10'])],
     })).resolves.toEqual(new Set());
+  });
+
+  const closedLookup = (closed: string[]): OrderIssueLookup => (issueIds) => new Map(issueIds.map((issue) => [
+    issue.toUpperCase(),
+    { issue: issue.toUpperCase(), open: !closed.includes(issue.toUpperCase()), parked: false },
+  ] as const));
+
+  it('returns the second book\'s issue ids when the first ready book is finished', async () => {
+    const listBooks = () => [book('a', 'ready', ['PAN-1']), book('b', 'ready', ['PAN-2'])];
+
+    await expect(activeOrderBookIssues('/project', {
+      planHome: () => '/plan-home',
+      listBooks,
+      issueLookup: closedLookup(['PAN-1']),
+    })).resolves.toEqual(new Set(['PAN-2']));
+  });
+
+  it('returns the first ready book\'s issue ids when the lookup knows none of its issues (fail safe)', async () => {
+    const listBooks = () => [book('a', 'ready', ['PAN-1']), book('b', 'ready', ['PAN-2'])];
+
+    await expect(activeOrderBookIssues('/project', {
+      planHome: () => '/plan-home',
+      listBooks,
+      issueLookup: () => new Map(),
+    })).resolves.toEqual(new Set(['PAN-1']));
   });
 });

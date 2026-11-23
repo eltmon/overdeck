@@ -9,12 +9,18 @@ import chalk from 'chalk';
 import { dirname, join } from 'node:path';
 
 import { getBookAsync } from '../../lib/orders/resolver.js';
+import type { OrderBookPhaseView } from '../../lib/orders/phase.js';
 import type { OrderIssueLookup } from '../../lib/orders/types.js';
 import { commitPlanArtifacts, pushPlanArtifacts } from '../../lib/overdeck/plan-artifact-commit.js';
 import { surfacePlanArtifactPush } from '../../lib/overdeck/plan-artifact-push-report.js';
 import { getProjectPanPaths } from '../../lib/pan-dir/paths.js';
 import { findProjectByPath, getProjectSync, resolveProjectPath, type ProjectConfig } from '../../lib/projects.js';
 import type { FlywheelRunResult } from './flywheel.js';
+
+export interface ServerOrdersListing {
+  bookIds: string[];
+  phases: Map<string, OrderBookPhaseView>;
+}
 
 export interface OrdersCommandDeps {
   cwd?: string;
@@ -24,6 +30,8 @@ export interface OrdersCommandDeps {
   actor?: string;
   startOrderBook?: (bookId: string) => Promise<FlywheelRunResult>;
   issueLookup?: OrderIssueLookup;
+  /** Test seam over `fetchDashboardOrderPhases` (PAN-5599 D6). */
+  fetchServerPhases?: (projectKey: string | undefined) => Promise<ServerOrdersListing | null>;
 }
 
 export interface OrdersProjectResolution {

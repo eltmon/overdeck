@@ -6,7 +6,7 @@ import type { OrderBook } from '@overdeck/contracts';
 import { describe, expect, it } from 'vitest';
 
 import * as flywheel from '../../../../src/lib/cloister/flywheel.js';
-import { deriveBookPhases } from '../../../../src/lib/orders/phase.js';
+import { deriveBookPhases, isBookFinished } from '../../../../src/lib/orders/phase.js';
 
 const at = '2026-11-22T12:00:00.000Z';
 
@@ -75,5 +75,49 @@ describe('deriveBookPhases', () => {
 describe('currentOrderBook home', () => {
   it('lives in src/lib/orders/phase.ts and is no longer exported by the cloister flywheel module', () => {
     expect('currentOrderBook' in flywheel).toBe(false);
+  });
+});
+
+describe('isBookFinished', () => {
+  it('is false for an empty book and true for a drained non-empty book', () => {
+    expect(isBookFinished({ total: 0, drained: true })).toBe(false);
+    expect(isBookFinished({ total: 2, drained: true })).toBe(true);
+    expect(isBookFinished({ total: 2, drained: false })).toBe(false);
+  });
+});
+
+describe('deriveBookPhases finished rule', () => {
+  it('skips a finished ready book and makes the next ready book active', () => {
+    const views = deriveBookPhases(
+      [book('a', 'ready'), book('b', 'ready')],
+      b => ({ total: b.items.length, drained: b.id === 'a' }),
+    );
+    expect(views.get('b')).toEqual({ phase: 'active', queuePosition: 1, finished: false });
+    expect(views.get('a')).toEqual({ phase: 'queued', queuePosition: null, finished: true });
+  });
+
+  it('a finished queued book has phase queued, finished true and no queue position', () => {
+    const views = deriveBookPhases(
+      [book('running', 'running'), book('finished', 'ready')],
+      b => ({ total: b.items.length, drained: b.id === 'finished' }),
+    );
+    expect(views.get('finished')).toEqual({ phase: 'queued', queuePosition: null, finished: true });
+  });
+
+  it('numbers the active book 1 and the unfinished queued books after it', () => {
+    const views = deriveBookPhases(
+      [book('a', 'ready'), book('b', 'ready'), book('c', 'ready')],
+      b => ({ total: b.items.length, drained: b.id === 'a' }),
+    );
+    expect(views.get('b')).toMatchObject({ phase: 'active', queuePosition: 1 });
+    expect(views.get('c')).toMatchObject({ phase: 'queued', queuePosition: 2 });
+    expect(views.get('a')).toMatchObject({ phase: 'queued', queuePosition: null });
+  });
+
+  it('returns no active book when every ready book is finished', () => {
+    const views = deriveBookPhases([book('a', 'ready'), book('b', 'ready')], () => ({ total: 1, drained: true }));
+    expect(views.get('a')).toEqual({ phase: 'queued', queuePosition: null, finished: true });
+    expect(views.get('b')).toEqual({ phase: 'queued', queuePosition: null, finished: true });
+    expect([...views.values()].some(view => view.phase === 'active')).toBe(false);
   });
 });

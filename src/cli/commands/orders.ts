@@ -1,7 +1,7 @@
 import type { OrderBook, OrderBookLane } from '@overdeck/contracts';
 import { Command, InvalidArgumentError } from 'commander';
 
-import { deriveBookPhases, type OrderBookPhaseView } from '../../lib/orders/phase.js';
+import { deriveBookPhases, type OrderBookPhase, type OrderBookPhaseView } from '../../lib/orders/phase.js';
 import {
   computeBookProgress,
   ensureOrderIssueStore,
@@ -20,7 +20,8 @@ import {
   setStatus,
   type NewOrderBookItem,
 } from '../../lib/orders/writer.js';
-import { resolveProjectPath, type ProjectConfig } from '../../lib/projects.js';
+import { getDashboardApiUrl } from '../../lib/config.js';
+import { listProjectsSync, resolveProjectPath, type ProjectConfig } from '../../lib/projects.js';
 import {
   commandAction,
   commitOrders,
@@ -29,11 +30,12 @@ import {
   panDirFor,
   requireBook,
   resolveOrdersProject,
+  type ServerOrdersListing,
 } from './orders-shared.js';
 import type { FlywheelRunResult } from './flywheel.js';
 import { registerOrdersEditCommands } from './orders-edit.js';
 
-export type { OrdersCommandDeps } from './orders-shared.js';
+export type { OrdersCommandDeps, ServerOrdersListing } from './orders-shared.js';
 export { commandAction, commitOrders, formatBook, panDirFor, requireBook, resolveOrdersProject } from './orders-shared.js';
 
 export interface OrdersListing {
@@ -143,6 +145,82 @@ export function runOrdersList(deps: OrdersCommandDeps = {}): OrdersListing {
     return found ? [[issueId.toUpperCase(), found] as const] : [];
   }));
   return { books, phases: deriveBookPhases(books, (book) => computeBookProgress(book, issueLookup)) };
+}
+
+/**
+ * Ask the running dashboard for its `/api/orders` phases (PAN-5599 D6): a one-shot CLI process keeps
+ * no backfill memo, so deriving phases itself would either re-fetch aged issues on every call or name
+ * a finished book as active after the closed window. Never throws; returns null on any failure.
+ */
+export async function fetchDashboardOrderPhases(
+  projectKey: string | undefined,
+  options: { fetchImpl?: typeof fetch; timeoutMs?: number } = {},
+): Promise<ServerOrdersListing | null> {
+  const timeoutMs = options.timeoutMs ?? 3000;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const base = getDashboardApiUrl().replace(/\/$/, '');
+    const url = projectKey !== undefined ? `${base}/api/orders?project=${encodeURIComponent(projectKey)}` : `${base}/api/orders`;
+    const response = await (options.fetchImpl ?? fetch)(url, { signal: controller.signal });
+    if (!response.ok) return null;
+    const body = await response.json() as { books?: unknown };
+    if (!Array.isArray(body.books)) return null;
+    const bookIds: string[] = [];
+    const phases = new Map<string, OrderBookPhaseView>();
+    for (const entry of body.books) {
+      if (typeof entry !== 'object' || entry === null) return null;
+      const record = entry as Record<string, unknown>;
+      if (typeof record['id'] !== 'string' || typeof record['phase'] !== 'string') return null;
+      bookIds.push(record['id']);
+      phases.set(record['id'], {
+        phase: record['phase'] as OrderBookPhase,
+        queuePosition: typeof record['queuePosition'] === 'number' ? record['queuePosition'] : null,
+        finished: record['finished'] === true,
+      });
+    }
+    return { bookIds, phases };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** The registered project key for `deps`, the same way the project could be looked up again by it. */
+function resolveServerProjectKey(deps: OrdersCommandDeps): string | undefined {
+  if (deps.projectKey !== undefined) return deps.projectKey;
+  if (deps.panDir) return undefined;
+  try {
+    const { projectConfig } = resolveOrdersProject(deps);
+    if (!projectConfig) return undefined;
+    return listProjectsSync().find((entry) => entry.config.path === projectConfig.path)?.key;
+  } catch {
+    return undefined;
+  }
+}
+
+function sameBookIds(serverIds: readonly string[], localIds: readonly string[]): boolean {
+  return serverIds.length === localIds.length && serverIds.every((id, index) => id === localIds[index]);
+}
+
+/**
+ * Prefer the running dashboard's phases; fall back to deriving them locally when the dashboard does
+ * not answer for the same books (PAN-5599 D6). The Flywheel loop reads the active book from this on
+ * every tick, so the server's backfilled evidence matters more here than in a one-shot local read.
+ */
+export async function runOrdersListPreferServer(deps: OrdersCommandDeps = {}): Promise<OrdersListing> {
+  const books = listBooks(panDirFor(deps));
+  const localIds = books.map((book) => book.id);
+  const projectKey = resolveServerProjectKey(deps);
+  const server = deps.panDir && projectKey === undefined
+    ? null
+    : await (deps.fetchServerPhases ?? ((key: string | undefined) => fetchDashboardOrderPhases(key)))(projectKey);
+  if (server && sameBookIds(server.bookIds, localIds)) {
+    return { books, phases: server.phases };
+  }
+  if (!deps.issueLookup) await ensureOrderIssueStore().catch(() => undefined);
+  return runOrdersList(deps);
 }
 
 export async function runOrdersShow(bookId: string, deps: OrdersCommandDeps = {}): Promise<OrderBook> {
@@ -295,11 +373,9 @@ export function createOrdersCommand(): Command {
     .option('--project <key>', 'Resolve the order book in another registered project')
     .option('--json', 'Print the books as JSON')
     .action((options: { project?: string; json?: boolean }) => commandAction(async () => {
-      // A CLI process has no running issue service; load the shared issue cache so the
-      // Phase column can tell a finished book from an unfinished one.
-      const panDir = panDirFor({ projectKey: options.project });
-      await ensureOrderIssueStore().catch(() => undefined);
-      const { books, phases } = runOrdersList({ panDir });
+      // Prefer the running dashboard's phases (it backfills the issue cache); fall back
+      // to a local derivation, which starts the shared issue cache only then.
+      const { books, phases } = await runOrdersListPreferServer({ projectKey: options.project });
       console.log(options.json ? JSON.stringify(books, null, 2) : formatBookList(books, phases));
       // Starting the issue service schedules background refresh work that would keep this
       // one-shot read alive for seconds after the list is printed.
