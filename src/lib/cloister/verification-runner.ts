@@ -46,6 +46,7 @@ import { readLatestCiTestResult, readVerificationCycleState } from './verificati
 import { postVerificationCheckRun } from './verification-check-run.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 import { appendPipelineEntry } from './pipeline-journal.js';
+import { restoreReclaimedStack } from '../workspace/stack-restore.js';
 import { resolveIssueFeedbackTarget } from './feedback-target.js';
 import { isAdoptedWorkspaceWithoutPlan, withAdoptedPlanChecklistSkip } from './adopted-plan-checklist.js';
 import { syncSingleRepo, syncWorkspaceRootsToPrHead, type SyncResult } from './workspace-pr-head-sync.js';
@@ -213,6 +214,8 @@ export async function runVerificationForIssueInProcess(
     source: logPrefix,
     data: { head: headShort },
   });
+  // PAN-5623: container gates `docker exec` into the stack; start a reclaimed stack first.
+  await restoreReclaimedStack({ issueId, workspacePath, trigger: 'verification' });
 
   /** Journal the failure at the point of the failing return, then return it. */
   const failedOutcome = (failedCheck: string, cycleCount: number): VerificationRunnerOutcome => {
