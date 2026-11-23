@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5611",
   "created": "2026-11-23T06:14:33.904Z",
-  "updated": "2026-11-23T10:29:16.162Z",
+  "updated": "2026-11-23T10:42:36.719Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -120,9 +120,22 @@
       "doneAt": "2026-11-23T10:29:11.817Z"
     },
     "idle-service-resurface": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5611",
-      "claimedAt": "2026-11-23T10:29:16.162Z"
+      "claimedAt": "2026-11-23T10:29:16.162Z",
+      "doneAt": "2026-11-23T10:42:36.719Z"
+    },
+    "idle-service-resurface.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T10:42:36.719Z"
+    },
+    "idle-service-resurface.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T10:42:36.719Z"
+    },
+    "idle-service-resurface.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T10:42:36.719Z"
     }
   }
 }
