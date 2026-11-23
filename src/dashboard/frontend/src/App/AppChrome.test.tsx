@@ -25,6 +25,7 @@ vi.mock('../components/StoppedAgentsBanner', () => ({
 }));
 vi.mock('../components/LowCostModePill', () => ({ LowCostModePill: marker('mock-low-cost') }));
 vi.mock('../components/StaleBuildChip', () => ({ StaleBuildChip: marker('mock-stale-build') }));
+vi.mock('../components/conversation-search-indexing/ConversationSearchIndexingIndicator', () => ({ ConversationSearchIndexingIndicator: marker('mock-indexing') }));
 vi.mock('../components/GitHubQuotaPill', () => ({ GitHubQuotaSection: marker('mock-quota-section') }));
 vi.mock('../components/CloisterStatusBar', () => ({ CloisterStatusBar: marker('mock-cloister') }));
 vi.mock('../components/SystemHealthPill', () => ({
@@ -119,13 +120,13 @@ describe('AppChrome top bar (PAN-5292)', () => {
     expect([...order].sort((a, b) => a - b)).toEqual(order);
   });
 
-  it('renders the four exception chips between Needs you and the health dot', () => {
+  it('renders the five exception chips between Needs you and the health dot', () => {
     renderChrome();
-    const [needsYou, deacon, stopped, lowCost, stale, dot] = domOrder(
-      'mock-needs-you', 'mock-deacon-chip', 'mock-stopped-pill', 'mock-low-cost', 'mock-stale-build', 'mock-health-dot',
+    const [needsYou, deacon, stopped, lowCost, stale, indexing, dot] = domOrder(
+      'mock-needs-you', 'mock-deacon-chip', 'mock-stopped-pill', 'mock-low-cost', 'mock-stale-build', 'mock-indexing', 'mock-health-dot',
     );
-    expect([needsYou, deacon, stopped, lowCost, stale, dot]).toEqual(
-      [needsYou, deacon, stopped, lowCost, stale, dot].slice().sort((a, b) => a! - b!),
+    expect([needsYou, deacon, stopped, lowCost, stale, indexing, dot]).toEqual(
+      [needsYou, deacon, stopped, lowCost, stale, indexing, dot].slice().sort((a, b) => a! - b!),
     );
     expect(deacon).toBeGreaterThan(needsYou!);
   });

@@ -74,7 +74,7 @@ export function ConversationSearchSection({
     <>
       <div className="border-t border-border my-2" />
 
-      <div className="px-4 py-3 rounded-lg bg-muted/15 border border-border/50">
+      <div id="conversation-search" className="scroll-mt-4 px-4 py-3 rounded-lg bg-muted/15 border border-border/50">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <span className="text-sm font-medium text-foreground">Conversation Search</span>
