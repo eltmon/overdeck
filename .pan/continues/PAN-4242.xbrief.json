@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4242",
   "created": "2026-11-23T08:46:31.743Z",
-  "updated": "2026-11-23T09:34:13.799Z",
+  "updated": "2026-11-23T09:34:15.103Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -40,7 +40,7 @@
     "trust-dialog-parse": {
       "status": "in_progress",
       "claimedBy": "agent-pan-4242",
-      "claimedAt": "2026-11-23T09:33:12.556Z"
+      "claimedAt": "2026-11-23T09:34:15.103Z"
     },
     "pan-answer-backend": {
       "status": "in_progress",
