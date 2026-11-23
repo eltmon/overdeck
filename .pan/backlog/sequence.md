@@ -1,12 +1,10 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-23T19:27:04Z · model: claude-opus-5-5 · open: 954_
+_Last sequenced: 2026-11-23T19:57:12Z · model: claude-opus-5-5 · open: 954_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
-| 1 | PAN-5615 | S | high | ok |  |  | Role prompts escalate via pan tell flywheel-orchestrator, a dead name; the Flywheel is conv-flywheel, so blockers are lost. |
-| 1 | PAN-5617 | S | critical | ok |  |  | npm run typecheck admits each of its 12 tsc lanes separately; under memory pressure one run takes ~1h and stalls agent pushes. |
 | 1 | PAN-5621 | M | critical | ok |  |  | Gate admission queue starves while MemAvailable < hard reserve + footprint; parked workspace stacks never reclaimed, no gate runs. |
 | 1 | PAN-5637 | S | critical | ok |  |  | In pipeline. Merge train never admits polyrepo issues touching CI-less member repos; add ci: none per repo so MYN infra/docs MRs merge |
 | 1 | PAN-5638 | M | critical | ok |  |  | In pipeline. Polyrepo review verdicts refuse GitHub member PRs and the ready set ignores verdict markers; MIN-1142 can't merge |
@@ -21,7 +19,9 @@ _Last sequenced: 2026-11-23T19:27:04Z · model: claude-opus-5-5 · open: 954_
 | 10 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 10 | PAN-5523 | S | high | ok |  |  | pan conversations move/heal send raw fetch with no token, so routes refuse with Missing origin; same fix pattern as in-pipeline PAN-5516. |
 | 10 | PAN-5625 | M | critical | ok |  |  | Approved green PR for new standalone project BT-1 sits 'held'; train never batches and per-PR scheduler defers forever. |
+| 10 | PAN-5641 | M | critical | ok |  | PAN-5637, PAN-5638 | Polyrepo UAT batch promote and train board read one PR from the non-git root, so no MYN batch can land; walk member repos. |
 | 11 | PAN-4553 | S | critical | ok |  |  | Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges. |
+| 11 | PAN-5640 | S | high | needs-refinement |  | PAN-5637 | Overlaps PAN-5641 (derived state reads MRs at non-git polyrepo root); unique part: glab MR list omits head_pipeline, never green. |
 | 12 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
 | 13 | PAN-4710 | S | high | ok |  |  | Deferred plan hand-off retries omit the guardrail ack, so they're refused at 'agent count high' and give up silently; needs handoff |
 | 14 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; re-test now that likely root cause PAN-5526 merged. |
@@ -962,14 +962,6 @@ _Last sequenced: 2026-11-23T19:27:04Z · model: claude-opus-5-5 · open: 954_
 
 ## Rationale detail
 
-### PAN-5615 (rank 1)
-
-New substrate bug already in the pipeline: every agent escalation to the Flywheel fails silently (MIN-1144 lost a blocker for two hours). Pinned at rank 1 per the in-pipeline rule; the fix is a prompt rename, a cost-attribution alias and a guard test.
-
-### PAN-5617 (rank 1)
-
-New substrate-improvement bug already in the pipeline, pinned at rank 1 per the in-pipeline rule. It is critical because every agent quality gate runs npm run typecheck: on 2026-11-23 two Flywheel handoffs (PAN-5601, PAN-5614) could not push for about an hour, which in turn held MYN merges. FR-1..FR-4 are concrete (admit the chain once, reuse OVERDECK_GATE_ADMITTED, keep the slot cap).
-
 ### PAN-5621 (rank 1)
 
 New substrate-improvement bug already in the pipeline, pinned at rank 1 per the in-pipeline rule. It is critical because a starved admission queue stops every agent quality gate: on 2026-11-23 no gate ran while 7 waiters queued and the PAN-5601 and PAN-5614 substrate fixes sat behind it. FR-1..FR-3 are concrete (starvation detection, reclaiming idle Overdeck-owned stack containers, fake-timer tests); it shares the admission queue with PAN-5617.
@@ -1026,9 +1018,17 @@ Rank unchanged; PAN-5516 closed, so that dependency is removed.
 
 New bug with live evidence: the merge train and the per-PR auto-merge scheduler each defer to the other, so an approved, green PR in a new standalone GitHub project never merges. That blocks the pipeline's final step for every newly registered project, so it ranks with the other merge-path blockers.
 
+### PAN-5641 (rank 10)
+
+New since the prior run. It is the last step before a polyrepo batch can merge: in-pipeline PAN-5637 and PAN-5638 fix admission and verdicts, but promote eligibility and the board still read one PR from the non-git MYN root. The fix site and the reuse of memberReposForProject are named, so it is ok and ranks just behind its in-pipeline siblings.
+
 ### PAN-4553 (rank 11)
 
 Rank unchanged; its duplicate PAN-4929 entered the pipeline with an open PR, so this issue now waits on that PR instead of being picked up separately.
+
+### PAN-5640 (rank 11)
+
+New since the prior run and filed minutes before PAN-5641 with the same first cause, so it carries a duplicate risk. Its unique second cause (GitLab's MR listing omits head_pipeline, so checks never read green) must ride with PAN-5641 or be scoped to that alone.
 
 ### PAN-4733 (rank 12)
 
@@ -1289,37 +1289,11 @@ Found cutting v0.65.0: CI was green but the local release check failed on two ho
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-23T19:27:04Z",
+  "generatedAt": "2026-11-23T19:57:12Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 954,
   "nodes": [
-    {
-      "issue": "PAN-5615",
-      "rank": 1,
-      "size": "S",
-      "importance": "high",
-      "score": 78,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Role prompts escalate via pan tell flywheel-orchestrator, a dead name; the Flywheel is conv-flywheel, so blockers are lost.",
-      "rationale": "New substrate bug already in the pipeline: every agent escalation to the Flywheel fails silently (MIN-1144 lost a blocker for two hours). Pinned at rank 1 per the in-pipeline rule; the fix is a prompt rename, a cost-attribution alias and a guard test.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5617",
-      "rank": 1,
-      "size": "S",
-      "importance": "critical",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "npm run typecheck admits each of its 12 tsc lanes separately; under memory pressure one run takes ~1h and stalls agent pushes.",
-      "rationale": "New substrate-improvement bug already in the pipeline, pinned at rank 1 per the in-pipeline rule. It is critical because every agent quality gate runs npm run typecheck: on 2026-11-23 two Flywheel handoffs (PAN-5601, PAN-5614) could not push for about an hour, which in turn held MYN merges. FR-1..FR-4 are concrete (admit the chain once, reuse OVERDECK_GATE_ADMITTED, keep the slot cap).",
-      "gate": "auto",
-      "planning": "auto"
-    },
     {
       "issue": "PAN-5621",
       "rank": 1,
@@ -1505,6 +1479,22 @@ Found cutting v0.65.0: CI was green but the local release check failed on two ho
       "planning": "auto"
     },
     {
+      "issue": "PAN-5641",
+      "rank": 10,
+      "size": "M",
+      "importance": "critical",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-5637",
+        "PAN-5638"
+      ],
+      "why": "Polyrepo UAT batch promote and train board read one PR from the non-git root, so no MYN batch can land; walk member repos.",
+      "rationale": "New since the prior run. It is the last step before a polyrepo batch can merge: in-pipeline PAN-5637 and PAN-5638 fix admission and verdicts, but promote eligibility and the board still read one PR from the non-git MYN root. The fix site and the reuse of memberReposForProject are named, so it is ok and ranks just behind its in-pipeline siblings.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-4553",
       "rank": 11,
       "size": "S",
@@ -1514,6 +1504,21 @@ Found cutting v0.65.0: CI was green but the local release check failed on two ho
       "dependsOn": [],
       "why": "Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges.",
       "rationale": "Rank unchanged; its duplicate PAN-4929 entered the pipeline with an open PR, so this issue now waits on that PR instead of being picked up separately.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5640",
+      "rank": 11,
+      "size": "S",
+      "importance": "high",
+      "score": 72,
+      "condition": "needs-refinement",
+      "dependsOn": [
+        "PAN-5637"
+      ],
+      "why": "Overlaps PAN-5641 (derived state reads MRs at non-git polyrepo root); unique part: glab MR list omits head_pipeline, never green.",
+      "rationale": "New since the prior run and filed minutes before PAN-5641 with the same first cause, so it carries a duplicate risk. Its unique second cause (GitLab's MR listing omits head_pipeline, so checks never read green) must ride with PAN-5641 or be scoped to that alone.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -14562,13 +14567,6 @@ Found cutting v0.65.0: CI was green but the local release check failed on two ho
       "confidence": 0.5
     },
     {
-      "from": "PAN-5617",
-      "to": "PAN-5621",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
       "from": "PAN-5621",
       "to": "PAN-5623",
       "type": "unblocks",
@@ -14595,6 +14593,34 @@ Found cutting v0.65.0: CI was green but the local release check failed on two ho
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
+    },
+    {
+      "from": "PAN-5637",
+      "to": "PAN-5640",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5637",
+      "to": "PAN-5641",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-5638",
+      "to": "PAN-5641",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5640",
+      "to": "PAN-5641",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.8
     },
     {
       "from": "PAN-750",
