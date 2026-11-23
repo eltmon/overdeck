@@ -1272,6 +1272,16 @@ conversationSearch:
 With it off, indexing stops and conversation text hits drop out of the palette; title matches still
 work.
 
+### See indexing progress
+
+While conversation search indexes transcripts, the top bar shows an **Indexing N/M** chip. Hover it
+to see the kind of indexing, how many files and chunks are done, and how long it has been running.
+Click it for the file being indexed now, how many files are queued and in flight, the start time,
+the last error if one happened, and an **Open conversation search settings** link.
+
+A short run of new-transcript updates — under 3 seconds — never shows the chip, so routine background
+indexing stays quiet. The chip disappears 2 seconds after indexing finishes.
+
 ### When search is not working
 
 Conversation search shows a banner in the system notices row when it is enabled but cannot serve
