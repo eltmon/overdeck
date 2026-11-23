@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5250",
   "created": "2026-11-23T23:10:09.644Z",
-  "updated": "2026-11-23T23:32:55.768Z",
+  "updated": "2026-11-23T23:33:00.536Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -240,6 +240,11 @@
     "wi11-old-reaper-protection.ac3": {
       "status": "completed",
       "doneAt": "2026-11-23T23:32:55.767Z"
+    },
+    "wi10-docs-changelog": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5250",
+      "claimedAt": "2026-11-23T23:33:00.536Z"
     }
   }
 }
