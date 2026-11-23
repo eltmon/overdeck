@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5489",
   "created": "2026-11-23T06:59:21.851Z",
-  "updated": "2026-11-23T07:35:45.459Z",
+  "updated": "2026-11-23T07:40:34.271Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,9 +32,22 @@
       "doneAt": "2026-11-23T07:35:41.160Z"
     },
     "hume-step-error-text": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5489",
-      "claimedAt": "2026-11-23T07:35:45.459Z"
+      "claimedAt": "2026-11-23T07:35:45.459Z",
+      "doneAt": "2026-11-23T07:40:34.271Z"
+    },
+    "hume-step-error-text.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T07:40:34.271Z"
+    },
+    "hume-step-error-text.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T07:40:34.271Z"
+    },
+    "hume-step-error-text.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T07:40:34.271Z"
     }
   }
 }
