@@ -59,7 +59,7 @@
 2 src/lib/overdeck/conversation-effort.ts
 3 src/lib/overdeck/conversation-forks.ts
 1 src/lib/overdeck/conversation-launch-context.ts
-3 src/lib/overdeck/conversation-list.ts
+2 src/lib/overdeck/conversation-list.ts
 1 src/lib/overdeck/conversation-pane-choice.ts
 11 src/lib/overdeck/conversation-restart-all.ts
 1 src/lib/overdeck/conversation-subagent-input.ts

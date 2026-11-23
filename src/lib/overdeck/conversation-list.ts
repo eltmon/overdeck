@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 
-import { resolveEffectivePullRequest } from '@overdeck/contracts';
+import { resolveEffectivePullRequest, type HarnessTranscriptKind } from '@overdeck/contracts';
 
 import { scanPendingInputs, type PendingAskUserQuestionSnapshot, type PendingInputKind } from '../agent-enrichment.js';
 import { getAgentRuntimeStateSync } from '../agents.js';
@@ -159,6 +159,11 @@ async function enrichConversationList(limit: number, offset: number): Promise<re
   // PAN-5633: one stat of ~/.codex/auth.json per page, only when a Codex row needs it.
   let nativeAuthMtimeP: Promise<number | null> | undefined;
   const nativeAuthMtime = () => (nativeAuthMtimeP ??= stat(getNativeCodexAuthPath()).then((s) => s.mtimeMs, () => null));
+  // The transcript kinds whose last turn can carry a provider error, and how to read it.
+  const providerErrorReaders: Partial<Record<HarnessTranscriptKind, (path: string) => Promise<ConversationProviderError | null>>> = {
+    'claude-jsonl': readConversationProviderError,
+    'codex-rollout-jsonl': async (path) => readCodexConversationProviderError(path, await nativeAuthMtime()),
+  };
   return withConcurrencyLimit(
     conversations.map((conv) => async () => {
       let row = conv;
@@ -261,9 +266,8 @@ async function enrichConversationList(limit: number, offset: number): Promise<re
       }
       let providerError: ConversationProviderError | null = null;
       if (sessionAlive && !isWorking && pendingInputCount === 0 && convSf) {
-        const transcriptKind = getHarnessBehavior(row.harness).transcriptKind;
-        if (transcriptKind === 'claude-jsonl') providerError = await readConversationProviderError(convSf);
-        else if (transcriptKind === 'codex-rollout-jsonl') providerError = await readCodexConversationProviderError(convSf, await nativeAuthMtime());
+        const readProviderError = providerErrorReaders[getHarnessBehavior(row.harness).transcriptKind];
+        if (readProviderError) providerError = await readProviderError(convSf);
       }
       const ledger = ledgerCosts.get(String(row.id));
       return {

@@ -10,7 +10,9 @@
  * does, so that rule lives in one place.
  *
  * Live = active Codex conversation rows (id = `tmuxSession`, the agent dir
- * name) plus running Codex agent states (id = `state.id`), capped at 64. Each
+ * name) plus running Codex agent states (id = `state.id`), capped at 64. A
+ * Codex session is one whose harness `usesCodexHome`: its CODEX_HOME symlinks
+ * auth.json to the shared native store, so one dead sign-in breaks them all. Each
  * rollout read is a fixed 128 KiB tail, so a 1 GB rollout costs the same as a
  * small one. Several dashboard tabs poll the status route, and the agent-state
  * listing reads every `state.json`, so one scan serves every caller for 15 s and
@@ -20,6 +22,7 @@ import { listAgentStatesAsync } from '../agents/agent-state-read.js';
 import { resolveCodexRolloutPath } from '../agents/transcript-resolver.js';
 import { readCodexLastTurn, type CodexAuthFailure, type CodexLastTurn } from '../conversations/codex-thread-status.js';
 import { listConversations } from '../overdeck/conversations.js';
+import { getHarnessBehavior } from '../runtimes/behavior.js';
 
 export const CODEX_AUTH_SCAN_CACHE_MS = 15_000;
 export const CODEX_AUTH_SCAN_MAX_SESSIONS = 64;
@@ -33,11 +36,12 @@ export interface CodexAuthFailureScanDeps {
 
 /** Live Codex sessions: active codex conversations (tmuxSession) + running codex agents (id). */
 export async function listLiveCodexSessionIds(): Promise<string[]> {
+  const usesCodexHome = (harness: Parameters<typeof getHarnessBehavior>[0]) => getHarnessBehavior(harness).usesCodexHome;
   const conversations = listConversations()
-    .filter((conv) => conv.harness === 'codex' && conv.status === 'active')
+    .filter((conv) => conv.status === 'active' && usesCodexHome(conv.harness))
     .map((conv) => conv.tmuxSession);
   const agents = (await listAgentStatesAsync({ skip: (name) => name.startsWith('conv-') || name.startsWith('ext-') }))
-    .filter((state) => state.harness === 'codex' && state.status === 'running')
+    .filter((state) => state.status === 'running' && usesCodexHome(state.harness))
     .map((state) => state.id);
   return [...conversations, ...agents];
 }
