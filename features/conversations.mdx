@@ -1135,6 +1135,15 @@ A [scheduled run](#scheduled-runs) delivering its prompt also clears any
 settle or snooze on that conversation, so settling or snoozing never buries a
 conversation past its next scheduled run.
 
+A conversation the idle sweep settled for being idle returns to Inbox on its
+own as soon as it is used again: immediately when you send it a message
+(from the conversation itself, or from any successor or lane in its group),
+and within about 15 minutes when new activity appears in its transcript
+while its terminal is still running (for example work typed directly into
+the terminal, or a resume). Conversations you settled yourself, and ones
+that settled because their pull requests merged, stay settled
+([PAN-5611](https://github.com/eltmon/overdeck/issues/5611)).
+
 ## Stopping or archiving a conversation
 
 Stop is the `X` on the row, "Stop agent" in the tab menu, or

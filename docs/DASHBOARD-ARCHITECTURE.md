@@ -669,6 +669,17 @@ door that does not exist; a real record read door would be a separate change.
   host for PR sync, schedules, and idle-settle. The days come from app_settings
   `conversations.auto_settle_idle_days` (default 3, `0` = off), read and written by
   `GET/PUT /api/conversations/triage/auto-settle` and `pan conv auto-settle-idle-days`.
+  PAN-5611 reverses an `idle` settle (never `manual` or `merge`) on new activity,
+  through two paths that both write with the guarded door
+  `resurfaceIdleSettledConversation` (`conversation-triage-store.ts`, guarded on
+  `settle_reason = 'idle'`) and both emit `conversation.schedules_changed`:
+  `resurfaceIdleSettleAfterMessage` (`services/conversation-idle-resurface.ts`),
+  called from the message route's receipt callback on a 2xx response, targeting
+  the messaged conversation and its display root (`displayRootNameOf`); and
+  `resurfaceActiveIdleSettles` (`conversation-idle-settle.ts`), run by the
+  idle-settle service immediately before the settle pass on each tick, for
+  idle-settled groups with a live member whose transcript activity is newer
+  than `settled_at`.
 - `GET /api/conversations/:name/messages` and `/message-locator` resolve registered
   rows first. A name that is a bare Claude session UUID with no row (a Cmd-K hit on an
   indexed transcript Overdeck never registered) falls back to an exact `<uuid>.jsonl`

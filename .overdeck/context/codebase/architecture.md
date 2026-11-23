@@ -340,7 +340,9 @@ tree root (`CommandDeck/conversation-triage.ts` `sectionOf`, nesting from
 PAN-4653; on idle is PAN-4655 (`src/lib/overdeck/conversation-idle-settle.ts`,
 run by `services/conversation-idle-settle-service.ts`; unsettle and unsnooze
 write `idle_reset_at` to restart the clock; setting
-`conversations.auto_settle_idle_days`, default 3).
+`conversations.auto_settle_idle_days`, default 3). PAN-5611: an `idle` settle
+resurfaces on a message through the message route or on new transcript
+activity in the idle-settle sweep; `manual` and `merge` settles never do.
 
 ## Dashboard auth (verified 2026-11-01)
 
