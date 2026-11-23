@@ -1,0 +1,797 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-23T22:49:19Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5648: CodeRabbit follow-up for PAN-5623 (PR #5647): 10 unsettled finding(s)",
+    "updated": "2026-11-23T23:02:09.388Z"
+  },
+  "plan": {
+    "id": "pan-5648",
+    "title": "CodeRabbit follow-up for PAN-5623 (PR #5647): 10 unsettled finding(s)",
+    "status": "proposed",
+    "uid": "f538ca32-4c86-4940-9b8d-8253ae52425a",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-23T22:49:19Z",
+    "updated": "2026-11-23T23:02:09.388Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5648",
+        "label": "PAN-5648",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/pull/5647",
+        "label": "PR #5647",
+        "type": "pull_request"
+      }
+    ],
+    "tags": [
+      "stack-reclaim",
+      "coderabbit-followup",
+      "pan-5623"
+    ],
+    "narratives": {
+      "Problem": "PR #5647 (PAN-5623 stack reclaim) merged with ten unsettled CodeRabbit findings: reclaimed stacks hidden from pan status, overlapping reclaims losing containers, a top-3 search that starves blocked candidates, an unrenewed stack lock with unsafe release, journal read failures that permanently drop restores, a retry backoff measured from the wrong time, a stale container snapshot after restores, a journal tail cut before filtering, and reclaim allowed for panes in an unknown state.",
+      "Proposal": "Fix all ten in eleven small items (see .pan/drafts/PAN-5648.md): a failure-aware journal read with fail-closed handling in the reclaim service; open-reclaim exclusion; blocker check over all candidates with a merge-gate budget of three; retry deadline after failure; housekeeping filter before the Flywheel tail limit; owner-token release in withFileLock; 60 s stack-lock renewal; snapshot refresh in the restore door and spawn wrapper; an agent-less reclaimed-stacks section in pan status; an idle/done/exited pane rule; and the PIPELINE-GATES docs bullet.",
+      "NonGoals": "- A rotating cursor so merge-ready candidates below the three largest are eventually merge-gate checked\n- Retrying a reclaim whose docker stop calls all failed in the same episode\n- Making restoreReclaimedStack fail closed on an unreadable journal\n- Any change to pan status --json output\n- A TTL for the lifecycle snapshot cache or eager DockerStatsCollector start\n- Changes to workspace-stack-spawn-gate.ts or spawn-issue.ts\n- Posting comments on merged PR #5647\n- A changelog.d entry\n- Closing an open reclaim whose containers never stopped (it no longer blocks a new reclaim, but stays open until a restore runs)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "All ten CodeRabbit findings are fixed; none is closed",
+        "rationale": "Each was verified valid against the merged code at d67d076350e."
+      },
+      {
+        "summary": "Finding 9 allows pane states idle, done and exited instead of idle only",
+        "rationale": "Herdr reports a parked agent's finished turn as done; idle-only would disable reclaim on the default backend."
+      },
+      {
+        "summary": "Finding 4: renew the stack lock every 60 s and make withFileLock release only its own token",
+        "rationale": "Renewal covers both stop and start loops; the token is needed because both polls share one pid."
+      },
+      {
+        "summary": "Finding 5: failure-aware journal read (null) instead of a periodic rescan",
+        "rationale": "Lets candidate selection fail closed too and restores without a rescan delay."
+      },
+      {
+        "summary": "Findings 7 and 10 fixed together in stack-restore.ts, including restores made by another process",
+        "rationale": "The dashboard snapshot cache has no TTL and the spawn route shares the restore poll's process."
+      },
+      {
+        "summary": "Merge-gate budget = the three largest candidates without a blocker declaration, per poll",
+        "rationale": "Matches CodeRabbit's suggestion and bounds the seconds-long merge-gate calls."
+      },
+      {
+        "summary": "No changelog.d entry",
+        "rationale": "changelog.d/pan-5623.md is unreleased and still accurate."
+      },
+      {
+        "summary": "No replies posted on merged PR #5647; settlement recorded in the PRD table and commit messages",
+        "rationale": "Avoids posting under the operator's identity on a merged PR."
+      }
+    ],
+    "items": [
+      {
+        "id": "journal-read-null",
+        "title": "Failure-aware journal read; restore index survives read failures (CodeRabbit r4672667712)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T22:49:19Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5648",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/pipeline-journal.ts",
+            "src/lib/cloister/__tests__/pipeline-journal.test.ts",
+            "src/dashboard/server/services/stack-reclaim-service.ts",
+            "src/dashboard/server/services/__tests__/stack-reclaim-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/cloister/__tests__/pipeline-journal.test.ts src/dashboard/server/services/__tests__/stack-reclaim-service.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "both test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "skip-open-reclaim",
+            "blocker-scan-all"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1 and D1. Add tryReadPipelineJournal (null when the journal exists but cannot be read, [] when missing); readPipelineJournal returns tryRead ?? []. Change the reclaim service dep readJournal to return PipelineJournalEntry[] | null (default tryReadPipelineJournal) and fail closed at all five reads: buildCandidates skips, the parked check is not parked, the read-back returns idle journal-unwritable, seeding sets seeded only when every read succeeded, the restore poll keeps the index entry and continues. Commit names CodeRabbit discussion_r4672667712."
+        },
+        "items": [
+          {
+            "id": "journal-read-null.ac1",
+            "title": "Given a workspace whose .overdeck/pipeline.jsonl is a directory, when tryReadPipelineJournal runs, then it returns null while readPipelineJournal returns []; a missing journal returns [] from both",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "journal-read-null.ac2",
+            "title": "Given an indexed open reclaim whose readJournal returns null, when runStackRestorePoll ticks, then the entry stays in restoreIndex and restore is not called; on the next tick with a readable open reclaim and an in-turn pane, restore is called with trigger turn",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "journal-read-null.ac3",
+            "title": "Given seeding where one workspace journal read returns null, when the first restore tick runs, then state.seeded stays false and a later tick indexes that workspace once its journal reads",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "journal-read-null.ac4",
+            "title": "Given a candidate workspace whose readJournal returns null, when runStackReclaimPoll runs, then stopContainer is never called for it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "skip-open-reclaim",
+        "title": "Exclude issues whose open reclaim still has a stopped container (CodeRabbit r4672667681)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T22:49:19Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5648",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/stack-reclaim-service.ts",
+            "src/dashboard/server/services/__tests__/stack-reclaim-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/services/__tests__/stack-reclaim-service.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "stack-reclaim-service.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2 and D2. Build runningNames from the running listing once. In buildCandidates read the journal once; skip when it is null, when reclaimedInEpisode(journal, record.since), or when openStackReclaim(journal) names any container not in runningNames. An open reclaim whose containers all run again does not exclude the issue (otherwise nothing would ever close it). Commit names discussion_r4672667681."
+        },
+        "items": [
+          {
+            "id": "skip-open-reclaim.ac1",
+            "title": "Given a journal with a stack.reclaimed from an older episode naming [api, fe] and no stack.restored, with api running again, when runStackReclaimPoll runs, then it returns idle no-candidates and calls no stopContainer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skip-open-reclaim.ac2",
+            "title": "Given the same workspace after a stack.restored entry is appended, when runStackReclaimPoll runs, then it reclaims the issue and journals a new stack.reclaimed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skip-open-reclaim.ac3",
+            "title": "Given an open reclaim from an older episode naming [api] whose api container is running (its stop failed), when runStackReclaimPoll runs, then the issue is reclaimed again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "blocker-scan-all",
+        "title": "Blocker check over every candidate, merge-gate budget of three (CodeRabbit r4672667693)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T22:49:19Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5648",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/stack-reclaim-service.ts",
+            "src/dashboard/server/services/__tests__/stack-reclaim-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/services/__tests__/stack-reclaim-service.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "stack-reclaim-service.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3 and D3. Remove isParked; iterate every ranked candidate: null journal skips, a pending declaration selects, otherwise call mergeReady (throw = false) only while fewer than MERGE_GATE_CANDIDATES calls were made this poll. First selected candidate is the target. Commit names discussion_r4672667693."
+        },
+        "items": [
+          {
+            "id": "blocker-scan-all.ac1",
+            "title": "Given four ranked candidates where the top three have no declaration and mergeReady false and the fourth has an unresolved blocked.declared, when runStackReclaimPoll runs, then the fourth candidate's containers are stopped and mergeReady was called exactly 3 times",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "blocker-scan-all.ac2",
+            "title": "Given five ranked candidates none of which is parked, when runStackReclaimPoll runs, then it returns idle none-parked and mergeReady was called exactly 3 times",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "retry-after-failure",
+        "title": "Start retry backoff when the restore fails (CodeRabbit r4672667721)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T22:49:19Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-5648",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/stack-reclaim-service.ts",
+            "src/dashboard/server/services/__tests__/stack-reclaim-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/services/__tests__/stack-reclaim-service.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "stack-reclaim-service.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 and D5. Set restoreRetryAt to deps.now() + STACK_RESTORE_RETRY_MS after the failed restore returns. Test with an injected clock; no real waits. Commit names discussion_r4672667721."
+        },
+        "items": [
+          {
+            "id": "retry-after-failure.ac1",
+            "title": "Given a restore mock that advances the injected clock by 70000 ms and returns failed, when restore ticks run at failure+5 s and failure+59 s, then restore is not called again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "retry-after-failure.ac2",
+            "title": "Given the same state, when a restore tick runs at failure+60 s, then restore is called again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "journal-tail-filter",
+        "title": "Filter stack.* entries before the 50-entry Flywheel journal tail (CodeRabbit r4672667750)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T22:49:19Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5648",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/flywheel/derive-status.ts",
+            "tests/unit/lib/flywheel/derive-status-journal-tail.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/flywheel/derive-status-journal-tail.test.ts tests/unit/lib/flywheel/derive-status.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "both test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5 and D8. Replace defaultJournalTail with exported readFlywheelJournalTail that reads the whole journal, drops housekeeping entries, then keeps the last 50. Keep the row filter at the journal use site. New test file (derive-status.test.ts is near the 1000-line ceiling). Commit names discussion_r4672667750."
+        },
+        "items": [
+          {
+            "id": "journal-tail-filter.ac1",
+            "title": "Given a real journal with one blocked.declared followed by 60 stack.* entries, when readFlywheelJournalTail runs, then it returns exactly the blocked.declared entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "journal-tail-filter.ac2",
+            "title": "Given a real journal with 70 pipeline entries, when readFlywheelJournalTail runs, then it returns the last 50 in order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "file-lock-owner",
+        "title": "withFileLock releases only a lock it still owns (CodeRabbit r4672667704, part b)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T22:49:19Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5648",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/vault/file-lock.ts",
+            "src/lib/vault/__tests__/file-lock.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/vault/__tests__/file-lock.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "file-lock.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6 and D4(b). acquire writes and returns a per-acquisition token `${process.pid} ${randomUUID()}\\n`; release reads the file and removes it only when the content equals the token. Update the module header. Commit names discussion_r4672667704."
+        },
+        "items": [
+          {
+            "id": "file-lock-owner.ac1",
+            "title": "Given fn overwrites the lock file with another holder's content, when withFileLock resolves, then the lock file still exists with that content",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "file-lock-owner.ac2",
+            "title": "Given fn deletes the lock file, when withFileLock resolves, then it does not throw",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "file-lock-owner.ac3",
+            "title": "Given a free lock and an fn that leaves the lock alone, when withFileLock resolves, then the lock file is removed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stack-lock-renew",
+        "title": "Renew the stack lock while its holder runs (CodeRabbit r4672667704, part a)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T22:49:19Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5648",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspace/stack-restore.ts",
+            "src/lib/workspace/__tests__/stack-restore.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/workspace/__tests__/stack-restore.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "stack-restore.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7 and D4(a). Add STACK_LOCK_RENEW_MS = 60000 and startLockRenewal(lockPath, intervalMs, touch) (unref'd setInterval, swallowed rejections); withStackLock takes optional { touch } and wraps fn with the renewal, stopping it in finally. Default touch is fs.promises.utimes to now. Tests fake only setInterval/clearInterval."
+        },
+        "items": [
+          {
+            "id": "stack-lock-renew.ac1",
+            "title": "Given withStackLock with a touch mock, when 120000 ms of fake time pass inside fn, then touch was called twice with the lock path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stack-lock-renew.ac2",
+            "title": "Given withStackLock has resolved, when another 120000 ms of fake time pass, then touch receives no further calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stack-lock-renew.ac3",
+            "title": "Given a touch mock that rejects, when the renewal fires inside fn, then withStackLock still resolves with fn's value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "restore-refresh-snapshot",
+        "title": "Restore door and spawn wrapper keep the lifecycle snapshot fresh (CodeRabbit r4672667736, r4672667787)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T22:49:19Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5648",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspace/stack-restore.ts",
+            "src/lib/workspace/__tests__/stack-restore.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/workspace/__tests__/stack-restore.test.ts src/lib/agents/__tests__/spawn-gate-stack-restore.test.ts tests/unit/lib/cloister/verification-runner-stack-restore.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "all three test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-9",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8 and D7. Move collect/record into StackRestoreDeps; add refreshSnapshot (never records or returns an empty or failed listing). The door refreshes after any successful start, before the failed return and before journaling stack.restored; failed results carry started. The wrapper returns result.snapshot ?? refreshSnapshot for restored/failed, and for none refreshes only when the newest stack.* entry is stack.restored. Rewrite the existing 'returns undefined and records nothing when nothing started' test. No change to workspace-stack-spawn-gate.ts or spawn-issue.ts. Commit names discussion_r4672667736 and discussion_r4672667787. Add collect and record stubs to the world() helper in stack-restore.test.ts so no door test runs real docker ps or writes the global cache."
+        },
+        "items": [
+          {
+            "id": "restore-refresh-snapshot.ac1",
+            "title": "Given an open reclaim with one exited container, when restoreReclaimedStack runs with trigger turn, then record is invoked before the stack.restored append (invocationCallOrder) and the result carries the snapshot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "restore-refresh-snapshot.ac2",
+            "title": "Given two journaled containers where one start succeeds and one fails, when restoreReclaimedStackForSpawn runs, then the door returns failed with started [the started name], record is called once, and the wrapper returns the fresh listing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "restore-refresh-snapshot.ac3",
+            "title": "Given an open reclaim whose containers are all already running, when restoreReclaimedStackForSpawn runs, then it returns a fresh recorded listing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "restore-refresh-snapshot.ac4",
+            "title": "Given a journal whose newest stack.* entry is stack.restored, when restoreReclaimedStackForSpawn runs, then it returns a fresh listing; given a journal with no stack.* entries it returns undefined and collect is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "restore-refresh-snapshot.ac5",
+            "title": "Given the fresh listing throws or is empty, when restoreReclaimedStackForSpawn runs, then it returns undefined and record is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "status-reclaimed-no-agent",
+        "title": "pan status shows reclaimed stacks of issues without an agent (CodeRabbit r4672667670)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T22:49:19Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5648",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/status.ts",
+            "src/cli/commands/__tests__/status-reclaimed-stacks.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/cli/commands/__tests__/status-reclaimed-stacks.test.ts src/cli/commands/__tests__/status-harness.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "both test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9 and D9. Add reclaimedStacksWithoutAgent (no agent, stackHealth.reclaimed non-empty), include it in the empty-status check, and render a 'Stacks Stopped To Free Memory' section after the broken-stack section. JSON output unchanged. Commit names discussion_r4672667670."
+        },
+        "items": [
+          {
+            "id": "status-reclaimed-no-agent.ac1",
+            "title": "Given no agents and a docker snapshot whose PAN-9001 stack health is healthy with reclaimed [overdeck-feature-pan-9001-api-1], when statusCommand runs, then output contains 'Stacks Stopped To Free Memory', 'PAN-9001' and 'stopped to free memory'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "status-reclaimed-no-agent.ac2",
+            "title": "Given the same input, when statusCommand runs, then output does not contain 'No running agents.' nor 'Broken Workspace Stacks'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pane-known-idle",
+        "title": "Reclaim requires a known idle pane state (CodeRabbit r4672667768)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T22:49:19Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5648",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspace/stack-reclaim.ts",
+            "src/lib/workspace/__tests__/stack-reclaim.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/workspace/__tests__/stack-reclaim.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "stack-reclaim.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10 and D6. Add refusal 'pane-not-idle'; after the working check refuse any non-review pane whose state is not idle, done or exited. Do NOT require only idle: Herdr reports a parked agent as done. Update the JSDoc. Commit names discussion_r4672667768."
+        },
+        "items": [
+          {
+            "id": "pane-known-idle.ac1",
+            "title": "Given a work pane with an agent id, state unknown and turn boundary, when panesAllowReclaim runs, then it returns { ok: false, reason: 'pane-not-idle' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pane-known-idle.ac2",
+            "title": "Given a work pane with state blocked and turn boundary, when panesAllowReclaim runs, then it returns { ok: false, reason: 'pane-not-idle' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pane-known-idle.ac3",
+            "title": "Given work panes with state done or idle and turn boundary, when panesAllowReclaim runs, then it returns { ok: true }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-pipeline-gates",
+        "title": "Update the PIPELINE-GATES stack-reclaim bullet for the ten fixes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T22:49:19Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5648",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-6",
+            "FR-7",
+            "FR-11",
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11. Edit the '- **Stack reclaim (PAN-5623).**' bullet (lines 628-660) to state every point listed in WI-11, in the existing voice. No changelog.d file (D10)."
+        },
+        "items": [
+          {
+            "id": "docs-pipeline-gates.ac1",
+            "title": "Given the edited docs/PIPELINE-GATES.md, when a reader opens the Stack reclaim bullet, then it states that an issue whose reclaim from an earlier episode is still open with a container not running is not a candidate and that the merge gate is asked for at most the three largest candidates without a blocker declaration per poll",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-pipeline-gates.ac2",
+            "title": "Given the same bullet, then it states that pane backend state must be idle, done or exited, that the lock holder renews the lock every 60 s and releases only a lock it still holds, and that a failed start retries no sooner than 60 s after the failure",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-pipeline-gates.ac3",
+            "title": "Given the same bullet, then it states that pan status shows such a stack in a 'Stacks Stopped To Free Memory' section when no agent runs for the issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "journal-read-null",
+        "to": "skip-open-reclaim",
+        "type": "blocks"
+      },
+      {
+        "from": "skip-open-reclaim",
+        "to": "blocker-scan-all",
+        "type": "blocks"
+      },
+      {
+        "from": "blocker-scan-all",
+        "to": "retry-after-failure",
+        "type": "blocks"
+      },
+      {
+        "from": "stack-lock-renew",
+        "to": "restore-refresh-snapshot",
+        "type": "blocks"
+      },
+      {
+        "from": "retry-after-failure",
+        "to": "docs-pipeline-gates",
+        "type": "blocks"
+      },
+      {
+        "from": "file-lock-owner",
+        "to": "docs-pipeline-gates",
+        "type": "blocks"
+      },
+      {
+        "from": "restore-refresh-snapshot",
+        "to": "docs-pipeline-gates",
+        "type": "blocks"
+      },
+      {
+        "from": "status-reclaimed-no-agent",
+        "to": "docs-pipeline-gates",
+        "type": "blocks"
+      },
+      {
+        "from": "pane-known-idle",
+        "to": "docs-pipeline-gates",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-23-PAN-5648-coderabbit-follow-up-for-pan-5623-pr-5647-10-unsettled-finding-s.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
