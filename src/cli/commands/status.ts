@@ -193,7 +193,7 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
   const stackHealthByIssue = new Map(await Promise.all(
     Array.from(issueIds, async ([key, issueId]) => [
       key,
-      await Effect.runPromise(getWorkspaceStackHealth(issueId, { containers: dockerContainers })),
+      await Effect.runPromise(getWorkspaceStackHealth(issueId, { containers: dockerContainers, reclaimAware: true })),
     ] as const)
   ));
   const agentIssueKeys = new Set(agents.map(agent => issueKey(agent.issueId!)));
@@ -274,6 +274,10 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     const stackHealth = agent.issueId ? stackHealthByIssue.get(issueKey(agent.issueId)) : undefined;
     if (stackHealth && !stackHealth.healthy) {
       console.log(`  Stack:    ${chalk.red('STACK BROKEN')} ${stackHealth.reasons.join('; ')}`);
+    }
+    // PAN-5623: containers a memory reclaim stopped on purpose.
+    if (stackHealth?.reclaimed?.length) {
+      console.log(`  Stack:    ${chalk.yellow('stopped to free memory')}: ${stackHealth.reclaimed.join(', ')}; starts again when the issue needs it`);
     }
 
     console.log('');
