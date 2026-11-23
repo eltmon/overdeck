@@ -23,6 +23,7 @@ import { randomBytes } from 'node:crypto';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
+import { emitActivityEntry, type EmitActivityOptions } from '../../../lib/activity-logger.js';
 import {
   authorizationServerMetadata,
   authorizePageCsp,
@@ -42,10 +43,34 @@ import { getHeaderFromMap, getTrustedOrigins, type HeaderMap } from './origin-va
 export interface McpOAuthRouteDeps {
   service: McpOAuthService;
   issuerFor(request: HttpServerRequest.HttpServerRequest): string | null;
+  /** Writes the activity entry for a refused registration; defaults to `emitActivityEntry`. */
+  audit?: (entry: EmitActivityOptions) => void;
 }
 
 const NO_STORE = { 'Cache-Control': 'no-store' };
 const MAX_REGISTRATION_BYTES = 16 * 1024;
+const MAX_AUDITED_REDIRECT_URIS = 5;
+
+/**
+ * The `scheme://host` of the first redirect URIs in a registration body, for
+ * the refusal audit entry. A path, query or fragment never appears; an entry
+ * that is not a parseable URL becomes `<invalid>`, and a body without a
+ * `redirect_uris` array gives `[]`.
+ */
+export function redirectOriginsOf(body: unknown): string[] {
+  if (typeof body !== 'object' || body === null) return [];
+  const uris = (body as { redirect_uris?: unknown }).redirect_uris;
+  if (!Array.isArray(uris)) return [];
+  return uris.slice(0, MAX_AUDITED_REDIRECT_URIS).map((uri) => {
+    if (typeof uri !== 'string') return '<invalid>';
+    try {
+      const url = new URL(uri);
+      return `${url.protocol}//${url.host}`;
+    } catch {
+      return '<invalid>';
+    }
+  });
+}
 
 /** The issuer for this request (D-2), or null when its host is not a trusted origin. */
 export function issuerFor(request: HttpServerRequest.HttpServerRequest): string | null {
@@ -80,6 +105,7 @@ function unknownHost() {
 }
 
 export function makeMcpOAuthRouteLayer(deps: McpOAuthRouteDeps) {
+  const audit = deps.audit ?? emitActivityEntry;
   const metadataHandler = (body: (issuer: string) => Record<string, unknown>) =>
     httpHandler(Effect.gen(function* () {
       const request = yield* HttpServerRequest.HttpServerRequest;
@@ -89,8 +115,18 @@ export function makeMcpOAuthRouteLayer(deps: McpOAuthRouteDeps) {
 
   const registerRoute = HttpRouter.add('POST', '/oauth/mcp/register', httpHandler(Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
-    const invalid = (description: string) =>
-      jsonResponse(oauthErrorBody('invalid_client_metadata', description), { status: 400, headers: NO_STORE });
+    // Every refusal writes exactly one activity entry (PAN-5058 W-1); `body` is
+    // undefined when the request was refused before its body was parsed.
+    const refuse = (status: number, errorBody: { error: string; error_description?: string }, body?: unknown) => {
+      audit({
+        source: 'dashboard',
+        level: 'warn',
+        message: 'MCP client registration refused',
+        details: JSON.stringify({ error: errorBody.error, redirectOrigins: redirectOriginsOf(body) }),
+      });
+      return jsonResponse(errorBody, { status, headers: NO_STORE });
+    };
+    const invalid = (description: string) => refuse(400, oauthErrorBody('invalid_client_metadata', description));
     if (!hasMediaType(request, 'application/json')) return invalid('the body must be application/json');
     const text = yield* request.text;
     if (Buffer.byteLength(text) > MAX_REGISTRATION_BYTES) return invalid('the body must be at most 16 KiB');
@@ -103,7 +139,7 @@ export function makeMcpOAuthRouteLayer(deps: McpOAuthRouteDeps) {
     const result = yield* Effect.promise(() => deps.service.registerClient(body));
     return result.ok
       ? jsonResponse(result.body, { status: 201, headers: NO_STORE })
-      : jsonResponse(result.body, { status: result.status, headers: NO_STORE });
+      : refuse(result.status, result.body, body);
   })));
 
   const authorizeRoute = HttpRouter.add('GET', '/oauth/mcp/authorize', httpHandler(Effect.gen(function* () {

@@ -15,6 +15,8 @@
  * included (status 500). It never reads a request body and never logs a token,
  * a code or a header value; the only identifier is the OAuth client id, and a
  * `client_id` query value that is not a minted client id is logged as null.
+ * A `POST /mcp` entry also carries `authScheme` (`authSchemeOf`), the shape of
+ * the authorization header without its value (PAN-5058).
  */
 import { Effect, Exit } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
@@ -36,6 +38,20 @@ const CLIENT_ID_SHAPE = new RegExp(`^${CLIENT_ID_PREFIX}[0-9a-f]{32}$`);
 export interface PublicMcpFunnelDeps {
   limiter: FixedWindowLimiter;
   audit: (entry: EmitActivityOptions) => void;
+}
+
+/**
+ * The scheme of the `authorization` header, never its value (PAN-5058 W-1b):
+ * `bearer` for `Bearer <value>`, `bare` for a lone token, `none` when absent
+ * or empty, and `other` for any other shape. A 401 alone cannot tell a bare
+ * token from a missing or expired one, so the audit records this instead.
+ */
+export function authSchemeOf(headers: HeaderMap): 'none' | 'bearer' | 'bare' | 'other' {
+  const value = getHeaderFromMap(headers, 'authorization')?.trim();
+  if (!value) return 'none';
+  const parts = value.split(/\s+/);
+  if (parts.length >= 2 && parts[0]!.toLowerCase() === 'bearer') return 'bearer';
+  return parts.length === 1 ? 'bare' : 'other';
 }
 
 function clientIp(headers: HeaderMap): string {
@@ -66,11 +82,12 @@ export function makePublicMcpFunnelLayer(deps: PublicMcpFunnelDeps) {
           : null;
         const clientId = oauthClientId
           ?? (queryClientId !== null && CLIENT_ID_SHAPE.test(queryClientId) ? queryClientId : null);
+        const authScheme = surface === 'POST /mcp' ? authSchemeOf(headers) : undefined;
         const audit = (status: number) => deps.audit({
           source: 'dashboard',
           level: status === 429 ? 'warn' : 'info',
           message: `Public MCP ${surface} ${status}`,
-          details: JSON.stringify({ clientId }),
+          details: JSON.stringify({ clientId, authScheme }),
         });
 
         const decision = deps.limiter.hit(key, limit);
