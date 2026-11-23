@@ -6,6 +6,7 @@
  */
 
 import { readFileSync, existsSync } from 'fs';
+import { readFile } from 'node:fs/promises';
 import { join } from 'path';
 import { homedir } from 'os';
 
@@ -38,6 +39,18 @@ export function parseEnvFile(content: string): Record<string, string> {
   }
 
   return result;
+}
+
+/**
+ * A fresh read of ~/.overdeck.env; {} when the file is missing or unreadable.
+ * The path is resolved at call time, so a changed HOME is honored.
+ */
+export async function readOverdeckEnvFile(): Promise<Record<string, string>> {
+  try {
+    return parseEnvFile(await readFile(join(homedir(), '.overdeck.env'), 'utf-8'));
+  } catch {
+    return {};
+  }
 }
 
 /**

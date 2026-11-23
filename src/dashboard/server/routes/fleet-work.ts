@@ -71,6 +71,7 @@ import { connectingStatusSource, type LinkStatusSource } from '../services/machi
 import { currentMachineLoad } from '../services/machine-load.js';
 import { spawnIssueAgentForRoute } from './agents/spawn-issue.js';
 import { credentialScopes, type DashboardCredential, rejectUnauthorizedDashboardRequest, rejectUnsafeDashboardMutationRequest, resolveRequestCredential } from './dashboard-auth.js';
+import { httpHandler } from './http-handler.js';
 import { refuseFleetRequest } from './machines-fleet.js';
 import { readJsonResponse } from './machines-work.js';
 import { parseStartWorkerBody } from './workers.js';
@@ -352,8 +353,9 @@ export function handleFleetIssueStart<R>(
   raw: unknown,
   caller: FleetCaller,
   deps: FleetIssueStartDeps<R>,
-): Effect.Effect<HttpServerResponse.HttpServerResponse, unknown, R> {
-  return Effect.gen(function* () {
+): Effect.Effect<HttpServerResponse.HttpServerResponse, never, R> {
+  // PAN-5489: any failure becomes a logged `500 {"error": <message>}`.
+  return httpHandler(Effect.gen(function* () {
     const body = asObject(raw) ?? {};
     const fields = optionalStrings(body, ['machine', 'model', 'harness', 'effort']);
     if (typeof fields === 'string') return jsonResponse({ error: fields }, { status: 400 });
@@ -382,7 +384,7 @@ export function handleFleetIssueStart<R>(
     }
     const started = answer.json as { issueId?: unknown; agentId?: unknown } | null;
     return jsonResponse({ issueId: started?.issueId ?? issueId.toUpperCase(), agentId: started?.agentId ?? null, machine: machineOf(target), reason: target.reason });
-  });
+  }));
 }
 
 export interface FleetWorkerStopDeps {

@@ -110,7 +110,9 @@ export async function removeWorkspace(options: WorkspaceRemoveOptions): Promise<
   // Remove Hume EVI config
   if (workspaceConfig.hume) {
     const placeholders = createPlaceholders(projectConfig, featureName, workspacePath);
-    const humeResult = await deleteHumeConfig(workspaceConfig.hume, placeholders);
+    const humeResult = await deleteHumeConfig(workspaceConfig.hume, placeholders, {
+      project: { key: projectConfig.name, config: projectConfig },
+    });
     result.steps.push(...humeResult.steps);
   }
 

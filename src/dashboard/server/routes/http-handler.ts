@@ -103,14 +103,17 @@ export function httpHandler<R, E>(
       )
     ),
     Effect.catchTag('WorkspaceCreateError', (err: WorkspaceCreateError) =>
-      Effect.succeed(
-        jsonResponse({ error: `Workspace creation failed for ${err.id}: ${err.message}` }, { status: 500 })
-      )
+      Effect.sync(() => {
+        // PAN-5489: a 500 is always logged, typed or not.
+        console.error(`[httpHandler] ${err._tag} for ${err.id}: ${err.message}`);
+        return jsonResponse({ error: `Workspace creation failed for ${err.id}: ${err.message}` }, { status: 500 });
+      })
     ),
     Effect.catchTag('AgentStartError', (err: AgentStartError) =>
-      Effect.succeed(
-        jsonResponse({ error: `Agent start failed for ${err.id}: ${err.message}` }, { status: 500 })
-      )
+      Effect.sync(() => {
+        console.error(`[httpHandler] ${err._tag} for ${err.id}: ${err.message}`);
+        return jsonResponse({ error: `Agent start failed for ${err.id}: ${err.message}` }, { status: 500 });
+      })
     ),
     Effect.catchCause((cause) =>
       Effect.gen(function* () {

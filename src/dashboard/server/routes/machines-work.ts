@@ -44,6 +44,7 @@ import { type AddProjectRequest, getAddProjectJob, startAddProject, type StartAd
 import { spawnIssueAgentForRoute } from './agents/spawn-issue.js';
 import { conversationReadDependencies } from './conversations.js';
 import { type DashboardCredential, resolveRequestCredential } from './dashboard-auth.js';
+import { httpHandler } from './http-handler.js';
 import { projectFilesRefusal } from './machines-projects.js';
 import { parseStartWorkerBody } from './workers.js';
 
@@ -221,8 +222,9 @@ export function handleWorkIssueStart<R>(
   issueId: string,
   raw: unknown,
   deps: IssueStartDoorDeps<R>,
-): Effect.Effect<HttpServerResponse.HttpServerResponse, unknown, R> {
-  return Effect.gen(function* () {
+): Effect.Effect<HttpServerResponse.HttpServerResponse, never, R> {
+  // PAN-5489: any failure becomes a logged `500 {"error": <message>}`.
+  return httpHandler(Effect.gen(function* () {
     if (credential?.kind !== 'machine') return machineOnly();
     const body = typeof raw === 'object' && raw !== null && !Array.isArray(raw) ? raw as Record<string, unknown> : null;
     if (!body) return jsonResponse({ error: 'body must be an object' }, { status: 400 });
@@ -240,7 +242,7 @@ export function handleWorkIssueStart<R>(
     const response = yield* deps.spawn({ body: fields, internalRequest: false });
     if (response.status !== 200) return response;
     return jsonResponse({ issueId: issueId.toUpperCase(), agentId: `agent-${issueId.toLowerCase()}` });
-  });
+  }));
 }
 
 export interface ProjectDoorDeps {

@@ -51,6 +51,19 @@ describe('issue-start work door (D-4651-3)', () => {
       .toEqual({ status: 422, body: { error: 'Issue PAN-7 is already closed' } });
   });
 
+  it('a dying spawn resolves to a logged 500 with its message (PAN-5489)', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const d = deps();
+      const value: IssueStartDoorDeps<never> = { ...d.value, spawn: () => Effect.die(new Error('door boom')) };
+      expect(await run(laptop, 'PAN-7', { gitOrigin: 'github.com/eltmon/overdeck' }, value))
+        .toEqual({ status: 500, body: { error: 'door boom' } });
+      expect(errorSpy.mock.calls.some((call) => String(call[0]).includes('door boom'))).toBe(true);
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
   it('refuses a non-machine credential', async () => {
     const d = deps();
     expect(await run({ kind: 'root-session' }, 'PAN-7', { gitOrigin: null }, d.value)).toMatchObject({ status: 403, body: { code: 'machine-only' } });

@@ -144,7 +144,7 @@ HUME_API_KEY=your-hume-api-key
 
 **Note**: Direct-compatible providers (Kimi, GLM, MiniMax, MiMo) route through their native Anthropic-compatible endpoints. OpenAI and Gemini route through Overdeck's built-in CLIProxy sidecar.
 
-**Note**: `HUME_API_KEY` is only needed if your project uses Hume EVI integration (see [External Service Integrations](#external-service-integrations) below).
+**Note**: `HUME_API_KEY` is only needed if your project uses Hume EVI integration (see [External Service Integrations](#external-service-integrations) below). The key is looked up, in order, in the running process's environment, the project's `workspace.env.secrets_file`, and `~/.overdeck.env`. `~/.overdeck.env` is read fresh each time, so a dashboard started before the key was added still finds it.
 
 ---
 
@@ -773,7 +773,7 @@ workspace:
 
 Automatically creates/deletes per-workspace Hume EVI configs for BYOLLM (Bring Your Own LLM). Each workspace gets its own Hume config with a workspace-specific callback URL, cloned from a production template config.
 
-**Prerequisites**: `HUME_API_KEY` in `~/.overdeck.env`
+**Prerequisites**: `HUME_API_KEY` in `~/.overdeck.env` or in the project's `workspace.env.secrets_file`
 
 **Config** (in `projects.yaml`):
 ```yaml
@@ -790,6 +790,10 @@ workspace:
 | `name_pattern` | Name for workspace configs (supports `{{FEATURE_FOLDER}}`, `{{FEATURE_NAME}}` placeholders) |
 | `byollm_url_pattern` | BYOLLM callback URL pattern (Hume calls this for LLM completions) |
 | `api_key_env` | Env var name for Hume API key (default: `HUME_API_KEY`) |
+
+**Key lookup**: the Hume step looks for the key named by `api_key_env`, in order, in the running process's environment, the project's `workspace.env.secrets_file`, and `~/.overdeck.env` (read fresh each time). The key is passed to the Hume API as a value; it is never written into the process environment, so one project's secrets do not reach another project's agents. Workspace removal uses the same lookup.
+
+**When the Hume step fails**: workspace creation fails, and the error carries the failing step line, for example `Hume EVI config setup failed: [hume] API key not found: HUME_API_KEY is not set in the process environment, /home/you/.myn/.env, /home/you/.overdeck.env`. The workspace stays marked unfinished, so the next `pan plan` or `pan start` for that issue re-runs the Hume step and writes `.hume-config`. While the Hume step keeps failing, every `pan plan`/`pan start` for that issue fails at the same step: fix the key (or the Hume config), or remove the project's `hume:` block to create workspaces without it.
 
 **Lifecycle**:
 - **Create**: Clones template config with workspace-specific BYOLLM URL, writes `.hume-config` env file (`HUME_CONFIG_ID`, `VITE_HUME_CONFIG_ID`) to workspace root
