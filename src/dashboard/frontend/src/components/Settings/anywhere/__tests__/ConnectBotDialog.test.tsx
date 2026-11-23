@@ -267,28 +267,31 @@ describe('ConnectBotDialog (PAN-4951 WI-3, WI-4)', () => {
     expect(screen.getByText(/Tailscale Serve is not set up on this machine yet/)).toBeInTheDocument();
   });
 
-  it('offers the connector reach first for Grok Bot (PAN-5070 W-7)', async () => {
+  it('offers Public MCP first for Grok Bot and says it is not verified live (PAN-5486)', async () => {
     mockServer();
     const { user } = await renderDialog({ publicMcp: publicMcpBody(false, null) });
 
     await user.click(screen.getByLabelText('Grok Bot'));
 
-    expect(screen.getByLabelText('Overdeck connector')).toBeChecked();
-    expect(screen.getByLabelText('Public MCP')).toBeInTheDocument();
-    expect(screen.getByLabelText('Send messages')).toBeInTheDocument();
+    expect(screen.getByLabelText('Public MCP')).toBeChecked();
+    expect(screen.getByLabelText('Overdeck connector')).toBeInTheDocument();
+    expect(screen.getByText('Public MCP with Grok Bot has not been verified live yet.')).toBeInTheDocument();
   });
 
-  it('renders the OAuth approval note for Grok Bot on Public MCP, not on the connector reach', async () => {
+  it('renders the OAuth approval note for Grok Bot on Public MCP and warns on the connector reach', async () => {
     mockServer();
     const { user } = await renderDialog({ publicMcp: publicMcpBody(true, 'https://box.tail1.ts.net:8443/mcp') });
 
     await user.click(screen.getByLabelText('Grok Bot'));
-    expect(screen.queryByText(/You choose the access level when you approve the sign-in/)).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Send messages')).toBeInTheDocument();
-
-    await user.click(screen.getByLabelText('Public MCP'));
     expect(screen.getByText(/You choose the access level when you approve the sign-in/)).toBeInTheDocument();
     expect(screen.queryByLabelText('Send messages')).not.toBeInTheDocument();
+
+    await user.click(screen.getByLabelText('Overdeck connector'));
+    expect(screen.queryByText(/You choose the access level when you approve the sign-in/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Send messages')).toBeInTheDocument();
+    expect(
+      screen.getByText("Grok Bot's sandbox cannot run the connector (no WebRTC egress). Use Public MCP."),
+    ).toBeInTheDocument();
   });
 
   it('renders "Public MCP is off" and sends no POST when the switch is off', async () => {
