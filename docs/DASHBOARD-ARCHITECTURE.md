@@ -2179,9 +2179,11 @@ opens Home (`/`). After the brand, left to right, the bar holds:
 5. **Exception chips**, each rendered only while its condition is true:
    **Auto-resume frozen** (`DeaconFrozenChip`, while Deacon is paused; click to
    resume), **N stopped** (`StoppedAgentsBanner variant="pill"`), **Low-cost
-   mode** (`LowCostModePill`, while cheap mode is on) and **Build behind main**
+   mode** (`LowCostModePill`, while cheap mode is on), **Build behind main**
    (`StaleBuildChip`, while the server build misses build-input commits on
-   origin/main; its title names `pan reload`).
+   origin/main; its title names `pan reload`), and **Indexing N/M**
+   (`ConversationSearchIndexingIndicator`, while conversation search is
+   indexing; hover for a summary, click for details and a link to Settings).
 6. **Health dot** (`components/SystemHealthPill.tsx`): a 9 px dot whose color
    follows `useSystemHealth()` only (success, warning, destructive with a
    motion-safe pulse, info while measuring, muted when unavailable). It is a
@@ -2193,7 +2195,7 @@ opens Home (`/`). After the brand, left to right, the bar holds:
 7. **Theme toggle.**
 
 **Phone width (PAN-5585).** Below 640 px (`max-sm:`) the wordmark, the crumb,
-the search box's placeholder text and keycap, and the four exception chips
+the search box's placeholder text and keycap, and the exception chips
 are hidden. The Agents and Needs-you triggers keep their accessible
 name/text content (the Agents trigger's accessible name stays
 `"N agents working"`) but show only a dot and a number. The System-health
@@ -2250,6 +2252,43 @@ User docs: `features/safe-shutdown.mdx`. PRD: `.pan/drafts/pan-5342.md`.
 - **No close code (D-12).** The frontend keeps the last snapshot. In phase
   `complete` the banner shows the safe-to-reboot screen and `AppChrome` hides
   `DegradedModeBanner`, so the reconnect loop never shows.
+
+## Conversation-search indexing indicator (PAN-5609)
+
+The top bar's **Indexing N/M** chip shows conversation-search indexing activity
+live, instead of only the manual reindex's own progress bar. PRD: `.pan/drafts/PAN-5609.md`.
+
+- **The tracker** (`src/dashboard/server/services/conversation-search-activity.ts`,
+  `createConversationSearchActivityTracker`, singleton `conversationSearchActivity`)
+  is the single source of truth: at most one batch (`beginBatch`,
+  `ConversationSearchBatchKind` = `startup`, `catch-up` or `full-reindex`) plus one
+  incremental burst derived from the watcher queue (`setQueue`,
+  `recordIncrementalFile`, `recordIncrementalError`, `resetQueue`). The dashboard's
+  startup sweep and a post-outage catch-up sweep each begin a batch in
+  `ConversationSearchWatcher.runFullIndex`; the Settings reindex route
+  (`routes/conversation-search-reindex.ts`) begins a `full-reindex` batch; a file
+  watcher event never begins a batch — it only moves the queue counts the tracker
+  turns into an `incremental` burst. `getSnapshot()` derives a complete
+  `ConversationSearchActivitySnapshot` (`packages/contracts/src/conversation-search-activity.ts`).
+- **The event.** `conversation_search.activity_changed` is emitted only
+  (`emitOnly`, never stored, never replayed) with a 500 ms leading + trailing
+  throttle that skips an unchanged snapshot, like `github_quota.changed`. The
+  read model and `DashboardSnapshot` carry it as `conversationSearchActivity`;
+  `syncSnapshot` uses `snapshot.conversationSearchActivity ?? null` so a server
+  restart mid-index never leaves a stuck indicator.
+- **The legacy route.** `GET /api/settings/conversation-search/reindex-progress`
+  now maps the tracker's snapshot through `toLegacyReindexProgress` instead of
+  reading a private module variable.
+- **The frontend** (`components/conversation-search-indexing/`):
+  `indicatorVisibility.ts` is a plain-TS state machine (no React) — a `startup`
+  or `full-reindex` run shows the chip at once; an `incremental` or `catch-up`
+  run shows it only after 3 s of staying active; once a run ends the chip
+  lingers 2 s before hiding, and a kind change while visible never hides it.
+  `ConversationSearchIndexingIndicator.tsx` renders the chip, a hover tooltip
+  and a click popover, and its Settings link calls
+  `requestSettingsSection('conversation-search')`, which the
+  `ConversationSearchSection` card answers via its `id="conversation-search"`
+  anchor.
 
 ## Left column (PAN-5293)
 

@@ -1,0 +1,710 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-23T05:43:14Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5609: Show active conversation-search indexing in the dashboard top bar, with hover and click details",
+    "updated": "2026-11-23T06:07:43.670Z"
+  },
+  "plan": {
+    "id": "pan-5609",
+    "title": "Show active conversation-search indexing in the dashboard top bar, with hover and click details",
+    "status": "running",
+    "uid": "38ec7dad-a30e-4b00-bb29-6fc463b4b7b3",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-23T05:43:14Z",
+    "updated": "2026-11-23T06:07:43.670Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5609",
+        "label": "PAN-5609",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5609.md",
+        "label": "PRD PAN-5609",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "conversation-search",
+      "top-bar",
+      "read-model",
+      "frontend",
+      "server"
+    ],
+    "narratives": {
+      "Problem": "The dashboard indexes conversation transcripts for search in the background (watcher startup/catch-up sweeps, the watcher's incremental queue, and the Settings full reindex), but the top chrome says nothing about it. Only the failure banner exists, so the operator cannot tell when indexing runs, how far along it is, or why the machine is busy. Only the manual reindex reports progress, through a private module variable polled by the Settings page.",
+      "Proposal": "Add one server-side activity tracker (src/dashboard/server/services/conversation-search-activity.ts) that all three indexing paths write to: the watcher passes onProgress to its sweeps and reports its queue, and the reindex route writes a full-reindex batch instead of its module variable (the legacy reindex-progress route maps from the tracker). The tracker publishes a complete ConversationSearchActivitySnapshot through a new in-memory event conversation_search.activity_changed (emitOnly, 500 ms leading+trailing throttle) and a conversationSearchActivity read-model/snapshot field. The frontend adds a leaf ConversationSearchIndexingIndicator chip in the top bar's exception chips, driven by a plain-TS visibility state machine (startup/full-reindex show at once, incremental/catch-up after 3 s, 2 s linger), with a hover tooltip and a click popover that deep-links to the Conversation Search settings card. Docs: DASHBOARD-ARCHITECTURE.md, features/conversations.mdx, changelog.d/pan-5609.md. Full detail, snippets and decision table in .pan/drafts/PAN-5609.md.",
+      "NonGoals": "- No change to src/lib/conversation-search/indexer.ts or to what gets indexed\n- No change to ConversationSearchBanner; it stays the failure surface\n- The Settings page keeps its own 1 s reindex-progress poll; it is not moved to the store\n- No new HTTP route and no change to the reindex-progress response shape\n- No public event-catalog entry and no docs/EXTERNAL-EVENT-STREAM.md change\n- No CLI output for indexing activity\n- No change to useOverdeckBusy or the orbiting brand mark\n- No phone-width rendering: exception chips stay hidden below 640 px\n- No persistence of indexing activity across server restarts\n- No green or colored running signal, no rounded-full pill on the indicator\n- No raise of any file-size allowlist row"
+    },
+    "autoDecisions": [
+      {
+        "summary": "catch-up sweeps use the same 3 s show delay as incremental work; startup and full-reindex show at once",
+        "rationale": "EINTR resubscribes can trigger up to 30 catch-up sweeps a minute (DEFAULT_MAX_INTERRUPTED_RESUBSCRIBES_PER_MINUTE), and each catch-up is usually a near-instant mtime-filtered sweep; gating it avoids the flicker FR-3 forbids for incremental work."
+      },
+      {
+        "summary": "The idle snapshot keeps the last run's kind and counts with active:false and endedAt",
+        "rationale": "The 2 s linger needs something to render, and the popover can show the finished run; a null idle state would blank the chip during linger."
+      },
+      {
+        "summary": "lastError covers only the current run and resets when a batch or burst starts",
+        "rationale": "ConversationSearchBanner already owns persistent failures; a stale error in a fresh run's popover would mislead."
+      },
+      {
+        "summary": "Tooltip and popover are plain React state (role=tooltip / role=dialog) reusing the NeedsYouIndicator close effect, not Radix",
+        "rationale": "No Radix popover dependency exists and no app-level TooltipProvider is mounted; plain state is testable with fireEvent and lets the tooltip hide while the popover is open."
+      },
+      {
+        "summary": "Frontend visibility lives in a plain-TS external store read with useSyncExternalStore",
+        "rationale": "Timer-driven show/hide in effects would call setState in effects, which the React Compiler lint rejects; an external store keeps timers in testable plain code under fake timers."
+      },
+      {
+        "summary": "docs/EXTERNAL-EVENT-STREAM.md is not updated",
+        "rationale": "It lists only public-catalog events plus two in-memory examples; github_quota.changed and system.shutdown_changed are not listed there either. Skipping it also keeps the plan within the 25-file / 6-subsystem finalize limits."
+      },
+      {
+        "summary": "The legacy reindex-progress route reports active only for kind full-reindex and keeps epoch-ms startedAt",
+        "rationale": "Its only reader is the Settings reindex bar, which must not show the follow-up startup sweep as reindex progress; FR-1 requires the old route to keep working."
+      }
+    ],
+    "metadata": {
+      "prd": ".pan/drafts/PAN-5609.md",
+      "canonicalFilename": "2026-11-23-PAN-5609-show-active-conversation-search-indexing-in-the-dashboard-top-bar-with-hover-and-click-details.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "contract-activity-event",
+        "title": "Contract: ConversationSearchActivitySnapshot, conversation_search.activity_changed event, reducer and snapshot field",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T05:43:14Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-5609",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "activity-tracker",
+            "watcher-activity",
+            "reindex-activity",
+            "indicator-visibility",
+            "indicator-component"
+          ],
+          "files_scope": [
+            "packages/contracts/src/conversation-search-activity.ts",
+            "packages/contracts/src/index.ts",
+            "packages/contracts/src/types.ts",
+            "packages/contracts/src/events.ts",
+            "packages/contracts/src/event-reducers.ts",
+            "packages/contracts/src/__tests__/conversation-search-activity.test.ts",
+            "src/dashboard/server/read-model.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./packages/contracts run test -- src/__tests__/conversation-search-activity.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-search-activity.test.ts passes",
+            "npm run typecheck completes without errors (the dashboard server lane stays at its baseline)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Create packages/contracts/src/conversation-search-activity.ts with ConversationSearchActivityKind (startup, catch-up, incremental, full-reindex) and ConversationSearchActivitySnapshot (all fields required; nullable fields use Schema.NullOr, never optional). Export it from index.ts after ./github-quota. In events.ts add ConversationSearchActivityChangedEvent { type: 'conversation_search.activity_changed', payload: { activity } } after SystemShutdownChangedEvent and add it to the DomainEvent union after SystemShutdownChangedEvent. In event-reducers.ts add conversationSearchActivity: ConversationSearchActivitySnapshot | null to ReadModelState, null to INITIAL_READ_MODEL_STATE, `conversationSearchActivity: snapshot.conversationSearchActivity ?? null` to syncSnapshot, and a plain-replace reducer case after 'system.shutdown_changed'. In types.ts add `conversationSearchActivity: Schema.optional(Schema.NullOr(ConversationSearchActivitySnapshot))` to DashboardSnapshot. In src/dashboard/server/read-model.ts add `conversationSearchActivity: state.conversationSearchActivity,` after `shutdown: state.shutdown,`. Write the reducer/decode test modeled on __tests__/shutdown-reducer.test.ts."
+        },
+        "items": [
+          {
+            "id": "contract-activity-event.ac1",
+            "title": "Given INITIAL_READ_MODEL_STATE, when applyEvent receives a conversation_search.activity_changed event, then state.conversationSearchActivity equals the event's payload.activity, and a second event replaces it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contract-activity-event.ac2",
+            "title": "Given a prior state with an activity snapshot, when syncSnapshot receives a snapshot without conversationSearchActivity, then it returns conversationSearchActivity null; with the field present it copies it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contract-activity-event.ac3",
+            "title": "For each of the four kinds, Schema.decodeUnknownSync(DomainEvent) accepts a JSON round-tripped event whose nullable snapshot fields are all null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contract-activity-event.ac4",
+            "title": "The server read-model snapshot builder in src/dashboard/server/read-model.ts emits a conversationSearchActivity field, and npm run typecheck exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "activity-tracker",
+        "title": "Server activity tracker with batch handles, incremental bursts and a 500 ms throttled emitOnly publish",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T05:43:14Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5609",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "watcher-activity",
+            "reindex-activity"
+          ],
+          "files_scope": [
+            "src/dashboard/server/services/conversation-search-activity.ts",
+            "src/dashboard/server/services/__tests__/conversation-search-activity.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build:contracts",
+            "npx vitest run src/dashboard/server/services/__tests__/conversation-search-activity.test.ts",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "conversation-search-activity.test.ts passes",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Create src/dashboard/server/services/conversation-search-activity.ts exporting ACTIVITY_EMIT_THROTTLE_MS = 500, ConversationSearchBatchKind, ConversationSearchBatchHandle { progress, recordError, end }, ConversationSearchActivityTracker { beginBatch, setQueue, recordIncrementalFile, recordIncrementalError, resetQueue, getSnapshot }, createConversationSearchActivityTracker({ emit?, now?, throttleMs? }), the singleton conversationSearchActivity, and toLegacyReindexProgress(snapshot). Follow the PRD's behavior list exactly: token-guarded handles (a stale handle is a no-op), one batch at a time, bursts start whenever no batch is current, queued+inFlight > 0 and no burst is active (evaluated in setQueue AND in handle.end(), so files queued during a sweep start a burst the moment it ends; beginBatch ends an active burst) and end when queued+inFlight returns to 0, idle snapshot keeps the last run with active:false and endedAt, errors reset per run, leading + trailing throttle that skips identical snapshots, default emit = getEventStore().emitOnly({ type: 'conversation_search.activity_changed', ... }) inside try/catch, timers unref()-ed. Implementation checkpoint: if npm run lint:circular reports a cycle through this module, switch to the lazy import pattern of services/shutdown/drain-service.ts line 84. Tests use vi.useFakeTimers() and an injected emit spy and now()."
+        },
+        "items": [
+          {
+            "id": "activity-tracker.ac1",
+            "title": "Given fake timers, when beginBatch is called it emits at once, and ten progress calls in the next 500 ms produce exactly one more emit at the 500 ms mark with the latest counts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "activity-tracker.ac2",
+            "title": "When end() follows rapid progress calls, then the trailing emit carries active:false, the final counts and a non-null endedAt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "activity-tracker.ac3",
+            "title": "Given beginBatch was called twice, when the first handle calls progress or end, then getSnapshot() is unchanged and still returns the second batch as active; and when a batch ends while queued+inFlight > 0, then the snapshot returns active true, kind incremental and a startedAt equal to the end time",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "activity-tracker.ac4",
+            "title": "Given setQueue(1,0), setQueue(0,1,'/x/a.jsonl'), recordIncrementalFile(4), setQueue(0,0), then the snapshot reports kind incremental, active false, filesIndexed 1, chunksIndexed 4, currentFile null; while active it reported currentFile 'a.jsonl' and filesScanned = filesIndexed + queued + inFlight",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "activity-tracker.ac5",
+            "title": "toLegacyReindexProgress returns epoch-ms startedAt and omits a null currentFile for a full-reindex snapshot, and returns { active:false, filesScanned:0, filesIndexed:0, chunksIndexed:0 } for any other kind",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "watcher-activity",
+        "title": "Watcher reports startup/catch-up sweeps (with onProgress) and its incremental queue to the tracker",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T05:43:14Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5609",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/services/conversation-search-watcher.ts",
+            "src/dashboard/server/services/__tests__/conversation-search-watcher.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build:contracts",
+            "npx vitest run src/dashboard/server/services/__tests__/conversation-search-watcher.test.ts"
+          ],
+          "expected_outputs": [
+            "conversation-search-watcher.test.ts passes, including the new 'indexing activity (PAN-5609)' block"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Add onProgress to the IndexAllFn options type; add activity?: ConversationSearchActivityTracker to ConversationSearchWatcherOptions (default: the conversationSearchActivity singleton). In runFullIndex: beginBatch(label) after the signal guard, pass onProgress: (p) => batch.progress(p), record sweep errors on the batch (same message as recordConversationSearchFailure; also non-abort catch errors), and call batch.end() as the FIRST line of .finally so a chained catch-up starts a fresh batch. Add private reportQueue(startedFile?) that returns early when this.stopped (so an in-flight .finally after resetQueue() never reports a non-zero count) and otherwise calls this.activity.setQueue(this.queued.size, this.inFlight.size, startedFile) after every queue mutation: enqueue() after queued.add, remove() after the deletes, drainQueue() after inFlight.add (passing filePath), and the task .finally after the rerun re-add. In the per-file result handler call recordIncrementalFile(result.chunksIndexed) when not disabled and recordIncrementalError on failures. In stop(), call this.activity.resetQueue() after this.rerun.clear(). Add the tests listed in the PRD with an injected tracker."
+        },
+        "items": [
+          {
+            "id": "watcher-activity.ac1",
+            "title": "Given an injected tracker, when the watcher starts, then a 'startup' batch begins, receives the onProgress calls indexAll makes, and ends when indexAll resolves",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "watcher-activity.ac2",
+            "title": "When a watcher error triggers a catch-up, then a 'catch-up' batch begins after the startup batch ended; a sweep resolving with errors records the last error on its batch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "watcher-activity.ac3",
+            "title": "When two transcript change events are indexed, then setQueue is called with the in-flight file and its final call is (0, 0), and recordIncrementalFile receives each result's chunksIndexed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "watcher-activity.ac4",
+            "title": "When stop() runs during a sweep, then the sweep's batch ends and resetQueue() is called, leaving getSnapshot().active false; given a file event during the startup sweep, when indexAll resolves, then the snapshot returns active true with kind incremental until that file's index call resolves",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reindex-activity",
+        "title": "Settings full reindex writes a full-reindex batch; reindex-progress route reads the tracker",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T05:43:14Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5609",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/routes/settings.ts",
+            "src/dashboard/server/routes/__tests__/settings-conversation-search-reindex.test.ts",
+            "src/dashboard/server/routes/conversation-search-reindex.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run build:contracts",
+            "npx vitest run src/dashboard/server/routes/__tests__/settings-conversation-search-reindex.test.ts",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "settings-conversation-search-reindex.test.ts passes",
+            "lint:file-size passes with settings.ts at 1104 lines or fewer"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. In src/dashboard/server/routes/settings.ts delete interface ConversationReindexProgress and let conversationReindexProgress (lines 62-75). Import conversationSearchActivity and toLegacyReindexProgress from '../services/conversation-search-activity.js'. In the POST /api/settings/conversation-search/reindex job: after stopConversationSearchWatcher(), const batch = conversationSearchActivity.beginBatch('full-reindex'); pass onProgress: (p) => batch.progress(p); call batch.recordError alongside each recordConversationSearchFailure; replace the finally's progress reset with batch.end() and keep await syncConversationSearchWatcher() after it. GET /reindex-progress returns jsonResponse(toLegacyReindexProgress(conversationSearchActivity.getSnapshot())). settings.ts must end at 1104 lines or fewer (cap in scripts/file-size-allowlist.txt; never raise it). Write the route test with the harness of routes/__tests__/shutdown.test.ts using settingsRouteLayer (settings.ts line 1078) and mocks for the watcher, indexer and origin-validation modules, and a real tracker instance with a spy emit. Implementation checkpoint: no test imports settingsRouteLayer today; if loading settings.ts in the route test fails on side effects vi.mock cannot stub, move the reindex-estimate, reindex and reindex-progress routes and their locals (REINDEX_CONFIRM_*, reindexConfirmationNonces, createReindexConfirmationNonce, consumeReindexConfirmationNonce, activeConversationSearchReindex) unchanged into NEW src/dashboard/server/routes/conversation-search-reindex.ts exporting conversationSearchReindexRouteLayer, merge it into settingsRouteLayer, and point the test at it; paths and behavior stay identical."
+        },
+        "items": [
+          {
+            "id": "reindex-activity.ac1",
+            "title": "Given mocked indexer functions, when POST /api/settings/conversation-search/reindex runs, then a full-reindex batch begins, receives the forwarded progress, and ends before syncConversationSearchWatcher is called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reindex-activity.ac2",
+            "title": "When GET /api/settings/conversation-search/reindex-progress is called during the job, then it returns active true with the forwarded counts and a numeric startedAt; before any reindex it returns { active:false, filesScanned:0, filesIndexed:0, chunksIndexed:0 }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reindex-activity.ac3",
+            "title": "When fullReindexConversationSearch rejects, then the batch records the error and still ends with active false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reindex-activity.ac4",
+            "title": "grep -c conversationReindexProgress src/dashboard/server/routes/settings.ts prints 0 and wc -l prints 1104 or less",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "indicator-visibility",
+        "title": "Frontend indicator visibility state machine (3 s incremental/catch-up show delay, 2 s linger) and label helpers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T05:43:14Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5609",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/conversation-search-indexing/indicatorVisibility.ts",
+            "src/dashboard/frontend/src/components/conversation-search-indexing/indicatorVisibility.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/conversation-search-indexing/indicatorVisibility.test.ts",
+            "npm run lint:manual-memo"
+          ],
+          "expected_outputs": [
+            "indicatorVisibility.test.ts passes",
+            "lint:manual-memo passes (no new useMemo/useCallback/memo)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Create indicatorVisibility.ts exporting INCREMENTAL_SHOW_DELAY_MS = 3000, HIDE_LINGER_MS = 2000, IndicatorView, IndicatorVisibility, createIndicatorVisibility(), useIndexingIndicatorView(), kindLabel(), chipText(), formatIndexingElapsed(). update() implements the PRD D-7 table exactly with global setTimeout/clearTimeout: startup/full-reindex active -> visible now; incremental/catch-up active -> visible after 3 s of staying active (only hidden->visible is gated); inactive while visible -> 2 s linger then hide unless active again; a kind change while visible never hides. getView() keeps object identity until visible or snapshot changes. useIndexingIndicatorView uses a module-level instance bound to useDashboardStore.subscribe (start on first listener, unsubscribe on last) and useSyncExternalStore. Labels per D-10: 'Startup sweep', 'Catch-up after watcher restart', 'New transcript changes', 'Full reindex'; chip 'Indexing <done>/<total>' with toLocaleString or 'Indexing'; elapsed '42s' / '3m 05s' / '1h 02m'. No useMemo/useCallback/memo, no setState in effects."
+        },
+        "items": [
+          {
+            "id": "indicator-visibility.ac1",
+            "title": "Given fake timers, an active startup snapshot makes getView().visible true immediately, while an incremental run that ends at 2900 ms never becomes visible",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "indicator-visibility.ac2",
+            "title": "Given fake timers, when an incremental or catch-up snapshot stays active for 3 s, then getView() returns visible true at 3000 ms and visible false at 2999 ms",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "indicator-visibility.ac3",
+            "title": "After a visible run ends, the view stays visible until 2000 ms and then hides; an active snapshot inside the linger keeps it visible; a startup-to-incremental kind change while visible never hides it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "indicator-visibility.ac4",
+            "title": "chipText returns 'Indexing 1,200/4,312' and 'Indexing'; formatIndexingElapsed returns '42s', '3m 05s' and '1h 02m'; getView() returns the same object when update changes neither visibility nor snapshot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "indicator-component",
+        "title": "ConversationSearchIndexingIndicator chip with hover tooltip and click popover",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T05:43:14Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5609",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/conversation-search-indexing/ConversationSearchIndexingIndicator.tsx",
+            "src/dashboard/frontend/src/components/conversation-search-indexing/ConversationSearchIndexingIndicator.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/conversation-search-indexing/ConversationSearchIndexingIndicator.test.tsx",
+            "npm run lint:manual-memo"
+          ],
+          "expected_outputs": [
+            "ConversationSearchIndexingIndicator.test.tsx passes",
+            "lint:manual-memo passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Create ConversationSearchIndexingIndicator({ onOpenSettings }). Read useIndexingIndicatorView(); local state open and hover; render null when (!view.visible && !open) or snapshot is null. Trigger button data-testid='conversation-search-indexing-indicator', aria-haspopup='dialog', aria-expanded, aria-label=chipText(snapshot), classes 'inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground', a lucide RefreshCw 'h-3 w-3 shrink-0 motion-safe:animate-spin' glyph (no color token, no rounded-full), then chipText. Tooltip: role='tooltip' on mouseEnter/focus, hidden on mouseLeave/blur and whenever the popover is open; lines kindLabel, '<done>/<total> files · <chunks> chunks', 'Running for <elapsed>' or 'Finished after <elapsed>'; elapsed from a child component using useNow(1000). Popover: role='dialog' aria-label='Conversation search indexing' with Kind, Files, Chunks, Current file (truncate + title, '—' when null), Queued, In flight, Started, Elapsed, Last error (only when set) and an 'Open conversation search settings' button that closes the popover, calls requestSettingsSection('conversation-search') and onOpenSettings?.(). Close on outside mousedown or Escape with the NeedsYouIndicator.tsx lines 76-90 effect. Tests seed useDashboardStore.setState({ conversationSearchActivity }) under fake timers."
+        },
+        "items": [
+          {
+            "id": "indicator-component.ac1",
+            "title": "Given an idle store (null or inactive snapshot) the indicator renders nothing; given an active full-reindex snapshot with filesIndexed 3 and filesScanned 10 it renders a button with text 'Indexing 3/10'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "indicator-component.ac2",
+            "title": "When the chip receives mouseEnter or focus, then a role=tooltip element shows 'Full reindex', '3/10 files', the chunk count and 'Running for'; mouseLeave removes it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "indicator-component.ac3",
+            "title": "When the chip is clicked, then a role=dialog renders current file, queued, in-flight and last-error rows, no tooltip renders while it is open, and Escape closes it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "indicator-component.ac4",
+            "title": "When 'Open conversation search settings' is clicked, then onOpenSettings is called once and an 'overdeck:settings-section' event with detail 'conversation-search' is dispatched",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "topbar-mount",
+        "title": "Mount the indicator in the top bar's exception chips and add the Conversation Search settings anchor",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T05:43:14Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5609",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/App/AppChrome.tsx",
+            "src/dashboard/frontend/src/App/AppChrome.test.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/ConversationSearchSection.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/App/AppChrome.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "AppChrome.test.tsx passes with the five-chip order test",
+            "npm run typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-5",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. In AppChrome.tsx render <ConversationSearchIndexingIndicator onOpenSettings={onOpenSettings} /> as the last child of the data-testid='topbar-exception-chips' div, after <StaleBuildChip />; AppChrome itself must not call any store selector. In AppChrome.test.tsx mock the indicator module as marker('mock-indexing') and extend the chip-order test to include 'mock-indexing' after 'mock-stale-build' and before 'mock-health-dot' (rename it to 'renders the five exception chips ...'). In ConversationSearchSection.tsx give the card div (line 77, 'px-4 py-3 rounded-lg bg-muted/15 border border-border/50') id='conversation-search' and scroll-mt-4. Add both new frontend test paths to scripts/frontend-test-subset.txt in sorted position so CI runs them."
+        },
+        "items": [
+          {
+            "id": "topbar-mount.ac1",
+            "title": "Given the indicator module is mocked, when AppChrome renders, then the indicator renders inside topbar-exception-chips after the stale-build chip and before the health dot, and the five-chip order test in AppChrome.test.tsx passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "topbar-mount.ac2",
+            "title": "The Conversation Search settings card renders with id='conversation-search', so requestSettingsSection('conversation-search') scrolls Settings to it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "topbar-mount.ac3",
+            "title": "scripts/frontend-test-subset.txt contains src/components/conversation-search-indexing/ConversationSearchIndexingIndicator.test.tsx and src/components/conversation-search-indexing/indicatorVisibility.test.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "topbar-mount.ac4",
+            "title": "Browser UAT (test role, isolated Playwright browser): with transcripts to backfill the chip appears during the startup sweep with rising counts and disappears after it; 'Estimate & reindex' shows it with 'Full reindex' on any page; hover shows the tooltip; click shows the popover whose settings action scrolls to the Conversation Search card",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-indexing-indicator",
+        "title": "Document the indexing indicator, event and tracker; add the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T05:43:14Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5609",
+          "requiresInspection": false,
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "features/conversations.mdx",
+            "changelog.d/pan-5609.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n 'conversation_search.activity_changed' docs/DASHBOARD-ARCHITECTURE.md",
+            "grep -n 'See indexing progress' features/conversations.mdx"
+          ],
+          "expected_outputs": [
+            "lint:docs passes",
+            "both greps print at least one line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. docs/DASHBOARD-ARCHITECTURE.md: in 'Top bar (PAN-5292)' item 5 add the 'Indexing N/M' chip (ConversationSearchIndexingIndicator; hover summary, click details and Settings link) and change 'the four exception chips' in the 'Phone width (PAN-5585)' paragraph to 'the exception chips'; add a new section '## Conversation-search indexing indicator (PAN-5609)' between 'Safe shutdown (PAN-5342)' and 'Left column (PAN-5293)' covering the tracker module and API, the four kinds, the emitOnly event conversation_search.activity_changed with its 500 ms leading+trailing throttle, the conversationSearchActivity snapshot field and syncSnapshot '?? null', the legacy reindex-progress mapping, the frontend show/hide rules and the 'conversation-search' settings anchor. features/conversations.mdx: add '### See indexing progress' before '### When search is not working'. changelog.d/pan-5609.md: the '#### New' entry text from the PRD. Use &#36; for dollar signs and plain prose per the writing-style rules."
+        },
+        "items": [
+          {
+            "id": "docs-indexing-indicator.ac1",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains a '## Conversation-search indexing indicator (PAN-5609)' section naming conversation_search.activity_changed, conversationSearchActivity and the 3 s / 2 s rules, and its Top bar item 5 lists the Indexing chip",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-indexing-indicator.ac2",
+            "title": "features/conversations.mdx contains a '### See indexing progress' subsection describing the chip, its hover and click content and the 3 s / 2 s behavior",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-indexing-indicator.ac3",
+            "title": "changelog.d/pan-5609.md exists with one '#### New' heading and one bullet linking issue #5609, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "contract-activity-event",
+        "to": "activity-tracker",
+        "type": "blocks"
+      },
+      {
+        "from": "activity-tracker",
+        "to": "watcher-activity",
+        "type": "blocks"
+      },
+      {
+        "from": "activity-tracker",
+        "to": "reindex-activity",
+        "type": "blocks"
+      },
+      {
+        "from": "contract-activity-event",
+        "to": "indicator-visibility",
+        "type": "blocks"
+      },
+      {
+        "from": "indicator-visibility",
+        "to": "indicator-component",
+        "type": "blocks"
+      },
+      {
+        "from": "indicator-component",
+        "to": "topbar-mount",
+        "type": "blocks"
+      },
+      {
+        "from": "activity-tracker",
+        "to": "docs-indexing-indicator",
+        "type": "informs"
+      },
+      {
+        "from": "indicator-component",
+        "to": "docs-indexing-indicator",
+        "type": "informs"
+      },
+      {
+        "from": "watcher-activity",
+        "to": "topbar-mount",
+        "type": "blocks"
+      },
+      {
+        "from": "reindex-activity",
+        "to": "topbar-mount",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

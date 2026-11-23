@@ -22,6 +22,7 @@ import {
 } from "./types"
 import { DerivedIssueState } from "./derived-issue-state"
 import { GitHubQuotaSnapshot } from "./github-quota"
+import { ConversationSearchActivitySnapshot } from "./conversation-search-activity"
 import { PullRequestLink } from "./pull-request-links"
 import { BackendPane } from "./backend-pane"
 import {
@@ -181,6 +182,18 @@ export const SystemShutdownChangedEvent = Schema.Struct({
   }),
 })
 export type SystemShutdownChangedEvent = typeof SystemShutdownChangedEvent.Type
+
+/**
+ * PAN-5609 — conversation-search indexing activity; complete snapshot, plain replace.
+ * Emitted in memory only (`emitOnly`), like `system.shutdown_changed`.
+ */
+export const ConversationSearchActivityChangedEvent = Schema.Struct({
+  type: Schema.Literal("conversation_search.activity_changed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({ activity: ConversationSearchActivitySnapshot }),
+})
+export type ConversationSearchActivityChangedEvent = typeof ConversationSearchActivityChangedEvent.Type
 
 // ─── Agent Events ─────────────────────────────────────────────────────────────
 
@@ -1575,6 +1588,7 @@ export const DomainEvent = Schema.Union([
   GitHubQuotaChangedEvent,
   ProjectDeployChangedEvent,
   SystemShutdownChangedEvent,
+  ConversationSearchActivityChangedEvent,
   AgentCreatedEvent,
   AgentEnrichmentChangedEvent,
   AgentStartedEvent,

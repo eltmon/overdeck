@@ -20,6 +20,7 @@ import { HiddenWhenShutDown, ShutdownBanner } from '../components/ShutdownBanner
 import { ShutdownSystemControl } from '../components/ShutdownDialog';
 import { HealthSection, SystemHealthPill } from '../components/SystemHealthPill';
 import { StaleBuildChip } from '../components/StaleBuildChip';
+import { ConversationSearchIndexingIndicator } from '../components/conversation-search-indexing/ConversationSearchIndexingIndicator';
 import type { Tab } from '../components/Header';
 import { useTheme } from '../hooks/useTheme';
 import { useOverdeckBusy } from '../hooks/useOverdeckBusy';
@@ -215,6 +216,7 @@ export function AppChrome({
             <StoppedAgentsBanner variant="pill" />
             <LowCostModePill onOpenSettings={onOpenSettings} />
             <StaleBuildChip />
+            <ConversationSearchIndexingIndicator onOpenSettings={onOpenSettings} />
           </div>
           <SystemHealthPill>
             <GitHubQuotaSection />

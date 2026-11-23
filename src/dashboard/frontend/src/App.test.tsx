@@ -132,6 +132,10 @@ vi.mock('./hooks/useCodexAutoRetry', () => ({ useCodexAutoRetry: () => null }));
 vi.mock('./components/SystemHealthPill', () => ({ SystemHealthPill: () => null, HealthSection: () => null }));
 vi.mock('./App/topbar/AgentsMenu', () => ({ AgentsMenu: () => null }));
 vi.mock('./components/flywheel/NeedsYouIndicator', () => ({ NeedsYouIndicator: () => null }));
+// PAN-5609: its hook binds directly to useDashboardStore.subscribe, which this
+// file's store mock does not implement — irrelevant to routing, so mock it out
+// like the other topbar chips above.
+vi.mock('./components/conversation-search-indexing/ConversationSearchIndexingIndicator', () => ({ ConversationSearchIndexingIndicator: () => null }));
 // lucide-react icons are lightweight SVG components that render fine in jsdom,
 // so we don't mock them — the enumerated mock used to drift every time the app
 // bar gained an icon (PAN-1593 added Search/Snowflake/SlidersHorizontal).

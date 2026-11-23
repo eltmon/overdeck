@@ -406,6 +406,7 @@ export const ReadModelServiceLive = Layer.effect(
         // PAN-3751: in-flight deploys, derived server-side from runtime files.
         deployByProjectKey: state.deployByProjectKey,
         shutdown: state.shutdown,
+        conversationSearchActivity: state.conversationSearchActivity,
         timestamp: new Date().toISOString(),
       };
     }
