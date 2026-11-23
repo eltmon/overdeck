@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5617",
   "created": "2026-11-23T18:07:48.377Z",
-  "updated": "2026-11-23T18:07:48.377Z",
+  "updated": "2026-11-23T18:11:59.948Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,38 @@
   "sessionHistory": [],
   "items": {
     "runner-unadmitted-env": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5617",
-      "claimedAt": "2026-11-23T18:07:48.376Z"
+      "claimedAt": "2026-11-23T18:07:48.376Z",
+      "doneAt": "2026-11-23T18:11:59.948Z"
+    },
+    "runner-unadmitted-env.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:11:59.948Z"
+    },
+    "runner-unadmitted-env.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:11:59.948Z"
+    },
+    "runner-unadmitted-env.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:11:59.948Z"
+    },
+    "runner-unadmitted-env.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:11:59.948Z"
+    },
+    "runner-unadmitted-env.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:11:59.948Z"
+    },
+    "runner-unadmitted-env.ac6": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:11:59.948Z"
+    },
+    "runner-unadmitted-env.ac7": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:11:59.948Z"
     }
   }
 }
