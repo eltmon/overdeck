@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5597",
   "created": "2026-11-23T02:38:35.270Z",
-  "updated": "2026-11-23T02:40:46.031Z",
+  "updated": "2026-11-23T02:41:29.722Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,9 +50,22 @@
       "doneAt": "2026-11-23T02:40:44.843Z"
     },
     "restore-guard": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5597",
-      "claimedAt": "2026-11-23T02:40:46.031Z"
+      "claimedAt": "2026-11-23T02:40:46.031Z",
+      "doneAt": "2026-11-23T02:41:29.721Z"
+    },
+    "restore-guard.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T02:41:29.721Z"
+    },
+    "restore-guard.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T02:41:29.721Z"
+    },
+    "restore-guard.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T02:41:29.721Z"
     }
   }
 }
