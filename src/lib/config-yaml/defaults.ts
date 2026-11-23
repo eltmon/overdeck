@@ -260,6 +260,7 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
     qualityGateSlots: 2,
     qualityGatePsiStartAvg10: 25,
     qualityGateCpuBypassMinutes: 10,
+    qualityGateStarvationMinutes: 15,
     diskWarnGb: 5,
     diskCriticalGb: 2,
   },

@@ -273,6 +273,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       qualityGateSlots: DEFAULT_CONFIG.resources.qualityGateSlots,
       qualityGatePsiStartAvg10: DEFAULT_CONFIG.resources.qualityGatePsiStartAvg10,
       qualityGateCpuBypassMinutes: DEFAULT_CONFIG.resources.qualityGateCpuBypassMinutes,
+      qualityGateStarvationMinutes: DEFAULT_CONFIG.resources.qualityGateStarvationMinutes,
       diskWarnGb: DEFAULT_CONFIG.resources.diskWarnGb,
       diskCriticalGb: DEFAULT_CONFIG.resources.diskCriticalGb,
     },
