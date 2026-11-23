@@ -79,6 +79,11 @@ The order-book tools write the same files the Order books page writes. Like
 the page, they do not commit them; commit `.pan/orders/` yourself or use
 `pan orders`.
 
+Every order-book tool's `project` argument names a registered project key.
+Omit it and the dashboard resolves its own project (the directory the
+dashboard process runs in), not the calling conversation's project, so pass
+it explicitly when you work on a different project's books.
+
 ### Agent-only tools
 
 | Tool | What it does | Scope the token needs |

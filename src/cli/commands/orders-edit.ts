@@ -1,7 +1,9 @@
 /**
  * PAN-5598 WI-7/WI-8/WI-9: the `pan orders` verbs beyond create/list/show/
  * add/remove/move/queue/start, in a separate file so this branch and
- * PAN-5597 do not edit the same lines of orders.ts.
+ * PAN-5597 do not edit the same lines of orders.ts. Imports the shared
+ * helpers from orders-shared.ts, not orders.ts, so orders.ts (which imports
+ * registerOrdersEditCommands from here) and this file never form a cycle.
  */
 import type { OrderBook } from '@overdeck/contracts';
 import { Command, InvalidArgumentError } from 'commander';
@@ -12,7 +14,7 @@ import { backlogCandidates } from '../../lib/orders/resolver.js';
 import { renameBook, setItemRequirements, setSettings } from '../../lib/orders/writer.js';
 import { findProjectByPath, listProjectsSync } from '../../lib/projects.js';
 import { callDashboard, errorText, isDashboardUnreachable } from './dashboard-call.js';
-import { commandAction, commitOrders, formatBook, type OrdersCommandDeps, panDirFor, requireBook } from './orders.js';
+import { commandAction, commitOrders, formatBook, type OrdersCommandDeps, panDirFor, requireBook } from './orders-shared.js';
 
 interface OrdersSetOptions {
   parallel?: number;

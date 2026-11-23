@@ -17,7 +17,10 @@ import {
   routeResult,
 } from './tool.js';
 
-const PROJECT_PROPERTY = { type: 'string', description: 'The registered project; default this conversation\'s project.' } as const;
+const PROJECT_PROPERTY = {
+  type: 'string',
+  description: 'The registered project key. Omit it and the dashboard uses its own project, so pass it when you work in another project.',
+} as const;
 const BOOK_PROPERTY = { type: 'string', description: 'The order book id.' } as const;
 const ISSUE_PROPERTY = { type: 'string', description: 'The issue id.' } as const;
 const LANE_PROPERTY = { type: 'string', enum: ['A', 'B'], description: 'Lane A runs in parallel, lane B one at a time.' } as const;
