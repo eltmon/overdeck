@@ -2,8 +2,9 @@ import { mkdir, mkdtemp, rm, utimes, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { checkCodexAuthStatus, evaluateBurnedFromLog, CODEX_AUTH_BURNED_REASON_PREFIX } from '../codex-auth.js';
-import type { CodexAuthStatus, CodexAuthBurnFlagState } from '../codex-auth.js';
+import { checkCodexAuthStatus, evaluateBurnedFromLog } from '../codex-auth.js';
+import type { CodexAuthStatus } from '../codex-auth.js';
+import type { CodexAuthFailure } from '../conversations/codex-thread-status.js';
 
 const mockCliproxy = vi.hoisted(() => ({
   authDir: '',
@@ -308,40 +309,14 @@ describe('evaluateBurnedFromLog CLIProxy-route coverage (PAN-3528)', () => {
   });
 });
 
-// ─── PAN-2285: native store probe, pane-burn classifier, registry, combine ─────
+// ─── PAN-2285: native store probe and combine; PAN-5633: failed-turn signal ────
 
 import {
+  activeCodexAuthFailures,
+  assertCodexNativeAuthForSpawn,
   classifyNativeCodexAuth,
-  codexAuthBurnFlaggedAtMs,
-  filterCodexAuthBurnedAgentIds,
   combineCodexAuthStatuses,
 } from '../codex-auth.js';
-
-// Moved here from src/lib/codex-auth.ts, which no production code called (PAN-3958 CH-8).
-/**
- * Mark an agent state as codex-auth-burned (PAN-2285). Pure mutation — the
- * caller persists via the agent-state write door (saveAgentStateSync), which
- * mirrors into the shared agents table so the flag crosses the deacon/server
- * process boundary. Returns true only when the state was newly flagged
- * (idempotent: an already-flagged state is left untouched), so callers can emit
- * a single operator notice instead of one per patrol tick. The flag time is
- * embedded in the reason (`codex-auth-burned[<ISO>]`) because the agents table
- * has no dedicated column for it and `troubledAt` may predate the burn when the
- * agent was already troubled for another reason.
- */
-function applyCodexAuthBurnFlag(state: CodexAuthBurnFlagState, nowMs: number = Date.now()): boolean {
-  if (state.troubled && state.lastFailureReason?.startsWith(CODEX_AUTH_BURNED_REASON_PREFIX)) {
-    return false;
-  }
-  const nowIso = new Date(nowMs).toISOString();
-  state.troubled = true;
-  if (!state.troubledAt) state.troubledAt = nowIso;
-  state.lastFailureReason =
-    `${CODEX_AUTH_BURNED_REASON_PREFIX}[${nowIso}]: Codex refresh token was revoked — ` +
-    're-authenticate (dashboard Codex-auth banner has a Re-authenticate button, or run `codex login`)';
-  state.lastFailureAt = nowIso;
-  return true;
-}
 
 function makeJwt(payload: Record<string, unknown>): string {
   const enc = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url');
@@ -412,65 +387,60 @@ describe('classifyNativeCodexAuth (PAN-2285)', () => {
 
 
 
-describe('persisted codex burn flag (PAN-2285)', () => {
-  const FLAG_NOW = ms('2026-07-15T02:00:00Z');
+describe('failed-turn burn signal (PAN-5633)', () => {
+  // NOW is 2026-06-02T03:40:00Z (fake timers); the last `codex login` was ten minutes before.
+  const SIGNED_IN = ms('2026-06-02T03:30:00Z');
 
-  it('applyCodexAuthBurnFlag flags a fresh state (troubled + stamped reason) once', () => {
-    const state: CodexAuthBurnFlagState = {};
-    expect(applyCodexAuthBurnFlag(state, FLAG_NOW)).toBe(true);
-    expect(state.troubled).toBe(true);
-    expect(state.troubledAt).toBe('2026-07-15T02:00:00.000Z');
-    expect(state.lastFailureReason).toMatch(/^codex-auth-burned\[2026-07-15T02:00:00\.000Z\]/);
-    expect(state.lastFailureAt).toBe('2026-07-15T02:00:00.000Z');
-    // Second flag is a no-op — the writer patrol must not re-stamp every tick.
-    expect(applyCodexAuthBurnFlag(state, FLAG_NOW + 60_000)).toBe(false);
-    expect(state.lastFailureReason).toContain('2026-07-15T02:00:00.000Z');
+  const failure = (id: string, at: string): CodexAuthFailure => ({ id, at, message: 'refresh token was already used' });
+
+  /** A valid native ~/.codex/auth.json (HOME is the temp root) last written at SIGNED_IN. */
+  const writeNativeAuth = async () => {
+    const dir = join(tmpRoot, '.codex');
+    await mkdir(dir, { recursive: true });
+    const path = join(dir, 'auth.json');
+    await writeFile(path, JSON.stringify({
+      tokens: {
+        access_token: makeJwt({ exp: Math.floor(ms(NOW) / 1000) + 3600 }),
+        refresh_token: 'rt_abc',
+        id_token: makeJwt({ email: EMAIL }),
+      },
+    }));
+    await utimes(path, new Date(SIGNED_IN), new Date(SIGNED_IN));
+  };
+
+  it('activeCodexAuthFailures keeps failures at or after the native write and drops older ones', () => {
+    const before = failure('conv-old', '2026-06-02T03:29:59.000Z');
+    const atWrite = failure('conv-at', '2026-06-02T03:30:00.000Z');
+    const after = failure('conv-new', '2026-06-02T03:35:00.000Z');
+    const undated = failure('conv-undated', '');
+    expect(activeCodexAuthFailures([before, atWrite, after, undated], SIGNED_IN).map((f) => f.id)).toEqual(['conv-at', 'conv-new']);
   });
 
-  it('applyCodexAuthBurnFlag preserves an earlier troubledAt (agent already troubled for another reason)', () => {
-    const state: CodexAuthBurnFlagState = { troubled: true, troubledAt: '2026-07-14T00:00:00.000Z', lastFailureReason: 'resume failed' };
-    expect(applyCodexAuthBurnFlag(state, FLAG_NOW)).toBe(true);
-    expect(state.troubledAt).toBe('2026-07-14T00:00:00.000Z');
-    // …which is exactly why the flag time is stamped into the reason instead.
-    expect(codexAuthBurnFlaggedAtMs(state)).toBe(FLAG_NOW);
+  it('checkCodexAuthStatus returns burned with affectedAgents for an active auth failure', async () => {
+    await writeNativeAuth();
+    const status = await checkCodexAuthStatus({ authFailures: [failure('conv-20261118-427e', '2026-06-02T03:35:00.000Z')] });
+    expect(status).toMatchObject({ status: 'burned', source: 'native', email: EMAIL, affectedAgents: ['conv-20261118-427e'] });
   });
 
-  it('codexAuthBurnFlaggedAtMs returns null once the agent is untroubled (flag must not linger)', () => {
-    const state: CodexAuthBurnFlagState = {};
-    applyCodexAuthBurnFlag(state, FLAG_NOW);
-    // pan untroubled / resume → applyAgentUntroubled clears troubled + failure fields.
-    delete state.troubled;
-    delete state.troubledAt;
-    delete state.lastFailureReason;
-    delete state.lastFailureAt;
-    expect(codexAuthBurnFlaggedAtMs(state)).toBeNull();
-    // And the agent can be flagged again on a later, genuine re-burn.
-    expect(applyCodexAuthBurnFlag(state, FLAG_NOW + 1000)).toBe(true);
+  it('checkCodexAuthStatus ignores a failure older than auth.json', async () => {
+    await writeNativeAuth();
+    const status = await checkCodexAuthStatus({ authFailures: [failure('conv-20261118-427e', '2026-06-02T03:20:00.000Z')] });
+    expect(status.status).toBe('valid');
+    expect(status.source).toBe('native');
   });
 
-  it('codexAuthBurnFlaggedAtMs falls back to troubledAt for legacy unstamped reasons', () => {
-    const state: CodexAuthBurnFlagState = {
-      troubled: true,
-      troubledAt: '2026-07-15T01:56:55.000Z',
-      lastFailureReason: `${CODEX_AUTH_BURNED_REASON_PREFIX}: Codex refresh token was revoked — re-authenticate`,
-    };
-    expect(codexAuthBurnFlaggedAtMs(state)).toBe(ms('2026-07-15T01:56:55Z'));
+  it('assertCodexNativeAuthForSpawn rejects a codex spawn while an active auth failure exists', async () => {
+    await writeNativeAuth();
+    await expect(assertCodexNativeAuthForSpawn('codex', async () => [failure('agent-pan-1', '2026-06-02T03:35:00.000Z')]))
+      .rejects.toThrow(/revoked \(a running Codex session failed a turn on sign-in/);
+    await expect(assertCodexNativeAuthForSpawn('codex', async () => [failure('agent-pan-1', '2026-06-02T03:20:00.000Z')]))
+      .resolves.toBeUndefined();
   });
 
-  it('codexAuthBurnFlaggedAtMs ignores troubled agents with unrelated failure reasons', () => {
-    expect(codexAuthBurnFlaggedAtMs({ troubled: true, lastFailureReason: 'resume failed 3x' })).toBeNull();
-    expect(codexAuthBurnFlaggedAtMs({ troubled: true })).toBeNull();
-  });
-
-  it('filterCodexAuthBurnedAgentIds keeps flags at/after the native write and drops stale ones (re-login heals)', () => {
-    const burned: CodexAuthBurnFlagState & { id: string } = { id: 'agent-a' };
-    applyCodexAuthBurnFlag(burned, FLAG_NOW);
-    const healthy: CodexAuthBurnFlagState & { id: string } = { id: 'agent-b' };
-
-    // Native store untouched since the flag → active.
-    expect(filterCodexAuthBurnedAgentIds([burned, healthy], FLAG_NOW - 60_000)).toEqual(['agent-a']);
-    // Native store rewritten AFTER the flag (global `codex login`) → stale, banner clears.
-    expect(filterCodexAuthBurnedAgentIds([burned, healthy], FLAG_NOW + 60_000)).toEqual([]);
+  it('assertCodexNativeAuthForSpawn does not call the loader for a non-codex harness', async () => {
+    const load = vi.fn(async () => [failure('agent-pan-1', '2026-06-02T03:35:00.000Z')]);
+    await expect(assertCodexNativeAuthForSpawn('claude-code', load)).resolves.toBeUndefined();
+    expect(load).not.toHaveBeenCalled();
   });
 });
 
