@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5637",
   "created": "2026-11-23T19:37:34.841Z",
-  "updated": "2026-11-23T19:55:47.694Z",
+  "updated": "2026-11-23T20:08:03.165Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -24,9 +24,22 @@
       "doneAt": "2026-11-23T19:55:42.726Z"
     },
     "ci-waiver-predicate": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5637",
-      "claimedAt": "2026-11-23T19:55:47.694Z"
+      "claimedAt": "2026-11-23T19:55:47.694Z",
+      "doneAt": "2026-11-23T20:08:03.165Z"
+    },
+    "ci-waiver-predicate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:08:03.165Z"
+    },
+    "ci-waiver-predicate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:08:03.165Z"
+    },
+    "ci-waiver-predicate.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:08:03.165Z"
     }
   }
 }
