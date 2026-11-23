@@ -27,11 +27,12 @@ interface FixtureBook {
   finished?: boolean;
 }
 
-/** The server's phase rule: the running book, else the first ready one, is active. */
+/** The server's phase rule (PAN-5599): the running book, else the first ready book that isn't finished, is active. */
 function withPhases(books: FixtureBook[]): OrderBookView[] {
   const live = books.filter((book) => book.status !== 'draft' && book.status !== 'complete');
-  const active = live.find((book) => book.status === 'running') ?? live[0];
-  const queue = active ? [active, ...live.filter((book) => book !== active)] : live;
+  const active = live.find((book) => book.status === 'running') ?? live.find((book) => !book.finished);
+  const numbered = live.filter((book) => book === active || !book.finished);
+  const queue = active ? [active, ...numbered.filter((book) => book !== active)] : numbered;
   return books.map((book) => {
     const issues = book.issues ?? ['PAN-1'];
     const phase = book.status === 'complete' ? 'archived' : book.status === 'draft' ? 'draft' : book === active ? 'active' : 'queued';
@@ -40,7 +41,7 @@ function withPhases(books: FixtureBook[]): OrderBookView[] {
       name: book.name,
       status: book.status,
       phase,
-      queuePosition: phase === 'active' || phase === 'queued' ? queue.indexOf(book) + 1 : null,
+      queuePosition: (phase === 'active' || phase === 'queued') && queue.includes(book) ? queue.indexOf(book) + 1 : null,
       finished: book.finished ?? false,
       settings: { laneAConcurrency: 2, posture: 'open' },
       items: issues.map((issue, index) => ({ issue, lane: 'A', order: index + 1, prereqs: [], reVerify: false, addedAt: at, addedBy: 'operator' })),
@@ -168,20 +169,25 @@ describe('OrderBookPage', () => {
     expect(patchBodies(fetchMock, 'queued')).toEqual([{ status: 'draft' }]);
   });
 
-  it('archives a finished active book and selects the next active book', async () => {
+  it('opens the next unfinished book as active and archives a finished queued book from its header', async () => {
     const books: FixtureBook[] = [
       { id: 'done', name: 'Finished book', status: 'ready', finished: true },
       { id: 'next', name: 'Next book', status: 'ready' },
     ];
     const fetchMock = fakeServer(books);
-    window.history.replaceState(null, '', '/orders?book=done');
+    window.history.replaceState(null, '', '/orders');
     render(<OrderBookPage />);
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Archive and move on' }));
-    await waitFor(() => expect(bookRow('next')).toHaveAttribute('aria-current', 'true'));
     await waitFor(() => expect(within(header()).getByText('Active')).toBeInTheDocument());
     expect(within(header()).getByRole('button', { name: 'Next book' })).toBeInTheDocument();
-    expect(patchBodies(fetchMock, 'done')).toEqual([{ status: 'complete' }]);
+
+    fireEvent.click(within(bookRow('done')).getByText('Finished book'));
+    await waitFor(() => expect(within(header()).getByRole('button', { name: 'Finished book' })).toBeInTheDocument());
+    expect(within(header()).getByText('Finished')).toBeInTheDocument();
+    expect(within(header()).getByText('Every issue has landed. The Flywheel skips this book. Archive it to tidy the list.')).toBeInTheDocument();
+
+    fireEvent.click(within(header()).getByRole('button', { name: 'Archive' }));
+    await waitFor(() => expect(patchBodies(fetchMock, 'done')).toEqual([{ status: 'complete' }]));
   });
 
   it('restores an archived book as a draft', async () => {
@@ -212,7 +218,7 @@ describe('OrderBookPage', () => {
     expect(within(header()).getByText('Archived')).toBeInTheDocument();
   });
 
-  it('shows the finished-active notice only for a finished active book', async () => {
+  it('never shows the still-holds-the-active-slot notice', async () => {
     const books: FixtureBook[] = [
       { id: 'done', name: 'Finished book', status: 'ready', finished: true },
       { id: 'queued-done', name: 'Finished queued book', status: 'ready', finished: true },
@@ -220,11 +226,11 @@ describe('OrderBookPage', () => {
     fakeServer(books);
     render(<OrderBookPage />);
 
-    expect(await screen.findByText(/This book still holds the active slot/)).toBeInTheDocument();
+    await waitFor(() => expect(within(header()).getByRole('button', { name: 'Finished book' })).toBeInTheDocument());
+    expect(screen.queryByText(/holds the active slot/)).toBeNull();
     fireEvent.click(within(bookRow('queued-done')).getByText('Finished queued book'));
     await waitFor(() => expect(within(header()).getByRole('button', { name: 'Finished queued book' })).toBeInTheDocument());
-    expect(screen.queryByText(/This book still holds the active slot/)).toBeNull();
-    expect(within(header()).getByRole('button', { name: 'Archive' })).toBeInTheDocument();
+    expect(screen.queryByText(/holds the active slot/)).toBeNull();
   });
 
   it('lists registered projects by name in the picker and defaults to the envelope project', async () => {

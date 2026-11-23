@@ -53,7 +53,7 @@ function setUrlParam(name: string, value: string | null) {
 /** `?book=` when that book exists; else the active book, the first queued, the first draft. Never archived by default. */
 function defaultBook(books: OrderBookView[]): OrderBookView | null {
   return books.find((book) => book.phase === 'active')
-    ?? books.filter((book) => book.phase === 'queued').sort((a, b) => (a.queuePosition ?? 0) - (b.queuePosition ?? 0))[0]
+    ?? books.filter((book) => book.phase === 'queued').sort((a, b) => (a.queuePosition ?? Number.MAX_SAFE_INTEGER) - (b.queuePosition ?? Number.MAX_SAFE_INTEGER))[0]
     ?? books.find((book) => book.phase === 'draft')
     ?? null;
 }
@@ -255,7 +255,7 @@ export function OrderBookPage() {
                 />
                 {actionError && <p role="alert" className="text-xs text-destructive">{actionError}</p>}
 
-                <BookNotices book={selected} onArchive={() => void mutateSelected('', 'PATCH', { status: 'complete' })}
+                <BookNotices book={selected}
                   onResume={() => void mutateSelected('', 'PATCH', { settings: { posture: 'open', postureReason: 'Operator reopened pickup.' } })}
                   onRemove={(issue) => void mutateSelected(`/items/${encodeURIComponent(issue)}`, 'DELETE')}
                 />
@@ -281,9 +281,8 @@ export function OrderBookPage() {
   );
 }
 
-function BookNotices({ book, onArchive, onResume, onRemove }: {
+function BookNotices({ book, onResume, onRemove }: {
   book: OrderBookView;
-  onArchive: () => void;
   onResume: () => void;
   onRemove: (issue: string) => void;
 }) {
@@ -309,14 +308,6 @@ function BookNotices({ book, onArchive, onResume, onRemove }: {
 
   return (
     <>
-      {book.phase === 'active' && book.finished && (
-        <div role="status" data-notice="finished" className="flex flex-wrap items-center gap-3 rounded-lg border border-success/[0.32] bg-success/[0.08] p-3 text-xs">
-          <p className="min-w-0 flex-1 text-foreground">
-            All {book.progress.total} issues have landed. This book still holds the active slot, so queued books cannot start. Archive it to move on.
-          </p>
-          <button type="button" onClick={onArchive} className="rounded-md border border-primary bg-primary px-2.5 py-1.5 text-primary-foreground hover:opacity-90">Archive and move on</button>
-        </div>
-      )}
       {paused && (
         <div role="status" data-notice="paused" className="flex flex-wrap items-center gap-3 rounded-lg border border-warning/[0.32] bg-warning/[0.08] p-3 text-xs">
           <div className="min-w-0 flex-1">
