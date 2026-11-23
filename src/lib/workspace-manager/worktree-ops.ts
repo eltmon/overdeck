@@ -1,6 +1,7 @@
 import { isHarnessNativeTarget } from '../context-layers/native-instructions.js';
 import { chmodSync, existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, copyFileSync, statSync, renameSync, rmSync, rmdirSync, realpathSync } from 'fs';
 import { join, dirname, extname, relative, resolve } from 'path';
+import { realpath } from 'fs/promises';
 import { homedir } from 'os';
 import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
@@ -379,6 +380,39 @@ export async function preTrustDirectory(dirPath: string): Promise<void> {
     writeTrustUnderLock(claudeJsonPath, dirPath);
   } finally {
     releaseClaudeJsonLock(lockDir);
+  }
+}
+
+/**
+ * PAN-4242: the directories a Claude Code launch in `cwd` must have trusted.
+ * The cwd as given and its real path (Claude Code keys trust by the physical
+ * cwd, so a trailing slash or a symlink missed). Inside a git working tree,
+ * also the repository root: Claude Code 2.1.x shows its trust dialog for a
+ * worktree whose settings pre-approve tool permissions until the main
+ * checkout is trusted, even when the worktree is. Home and `/` are never
+ * added (Claude Code never saves home-directory trust).
+ */
+export async function claudeTrustTargets(cwd: string): Promise<string[]> {
+  const targets = new Set<string>([cwd]);
+  const real = await realpath(cwd).catch(() => null);
+  if (real) targets.add(real);
+  const root = await gitRepositoryRoot(real ?? cwd);
+  if (root && root !== homedir() && root !== '/') targets.add(root);
+  return [...targets];
+}
+
+/** Main checkout of the repository holding `dir`, or null outside a work tree. */
+export async function gitRepositoryRoot(dir: string): Promise<string | null> {
+  try {
+    const { stdout } = await execFileAsync(
+      'git',
+      ['-C', dir, 'rev-parse', '--path-format=absolute', '--git-common-dir'],
+      { encoding: 'utf8', timeout: 5000 },
+    );
+    const commonDir = stdout.trim();
+    return commonDir.endsWith('/.git') ? dirname(commonDir) : null;
+  } catch {
+    return null;
   }
 }
 

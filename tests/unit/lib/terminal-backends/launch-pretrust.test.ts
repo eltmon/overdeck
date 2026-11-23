@@ -1,4 +1,5 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -105,5 +106,36 @@ describe('launchAgentPane pre-trusts the cwd (PAN-3905)', () => {
     }, fakeBackend(() => {}));
 
     expect(readFileSync(claudeJsonPath, 'utf-8')).toBe(JSON.stringify({ projects: {} }));
+  });
+
+  it('trusts a real worktree and its repository root before starting it (PAN-4242)', async () => {
+    const base = realpathSync(mkdtempSync(join(tmpdir(), 'pan-4242-launch-repo-')));
+    try {
+      const root = join(base, 'proj');
+      const worktree = join(root, 'workspaces', 'feature-pan-1');
+      mkdirSync(root, { recursive: true });
+      const git = (...args: string[]) =>
+        execFileSync('git', ['-c', 'core.hooksPath=/dev/null', '-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd: root, stdio: 'ignore' });
+      git('init', '-q');
+      git('commit', '-q', '--allow-empty', '-m', 'init');
+      git('worktree', 'add', '-q', '-b', 'feature/pan-1', worktree);
+
+      let trustedAtStart: Array<boolean | undefined> = [];
+      await launchAgentPane({
+        issueId: 'PAN-1',
+        cwd: `${worktree}/`,
+        agentId: 'agent-pan-1',
+        argv: ['bash', 'launcher.sh'],
+        env: {},
+        tokens: { issue: 'PAN-1', role: 'work', harness: 'claude-code', model: 'opus' },
+      }, fakeBackend(() => {
+        const projects = readProjects();
+        trustedAtStart = [projects[worktree]?.hasTrustDialogAccepted, projects[root]?.hasTrustDialogAccepted];
+      }));
+
+      expect(trustedAtStart).toEqual([true, true]);
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
   });
 });
