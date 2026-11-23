@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5623",
   "created": "2026-11-23T20:20:25.006Z",
-  "updated": "2026-11-23T21:35:06.293Z",
+  "updated": "2026-11-23T21:38:46.652Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -294,9 +294,18 @@
       "claimedAt": "2026-11-23T21:34:56.906Z"
     },
     "wi14-main-wiring": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5623",
-      "claimedAt": "2026-11-23T21:35:06.293Z"
+      "claimedAt": "2026-11-23T21:35:06.293Z",
+      "doneAt": "2026-11-23T21:38:46.652Z"
+    },
+    "wi14-main-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T21:38:46.652Z"
+    },
+    "wi14-main-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T21:38:46.652Z"
     }
   }
 }
