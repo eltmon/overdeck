@@ -4,14 +4,22 @@
  * after it started waiting while it is still pending. A prompt that clears
  * cancels its reminders. Clicking the toast or desktop notification reopens
  * the permission dialog for that conversation.
+ *
+ * PAN-5604 — every pending-input toast and desktop notification is keyed by
+ * its tag (the sonner toast id and the `Notification` map key), so
+ * `dismissPendingInputNotification` can close both as soon as the question
+ * they announce leaves the live set.
  */
 import { useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import type { TerminalPendingPermission } from '../../components/TerminalPermissionDialog';
 
-/** Toast plus (when granted) a desktop notification whose click runs `onOpen`. */
+const openDesktopNotifications = new Map<string, Notification>();
+
+/** Toast plus (when granted) a desktop notification whose click runs `onOpen`; both keyed by `tag`. */
 export function showPendingInputNotification(tag: string, title: string, body: string, onOpen: () => void): void {
   toast.info(title, {
+    id: tag,
     description: body,
     duration: 12000,
     action: { label: 'Answer', onClick: onOpen },
@@ -19,9 +27,20 @@ export function showPendingInputNotification(tag: string, title: string, body: s
   if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
     try {
       const n = new Notification(title, { body, tag });
-      n.onclick = (): void => { window.focus(); onOpen(); n.close(); };
+      openDesktopNotifications.set(tag, n);
+      const forget = (): void => { if (openDesktopNotifications.get(tag) === n) openDesktopNotifications.delete(tag); };
+      n.onclick = (): void => { window.focus(); onOpen(); forget(); n.close(); };
+      n.onclose = forget;
     } catch { /* ignore */ }
   }
+}
+
+/** PAN-5604: close the toast and desktop notification shown under `tag`, if any. */
+export function dismissPendingInputNotification(tag: string): void {
+  toast.dismiss(tag);
+  const n = openDesktopNotifications.get(tag);
+  openDesktopNotifications.delete(tag);
+  try { n?.close(); } catch { /* ignore */ }
 }
 
 export interface PermissionNotificationRow {
