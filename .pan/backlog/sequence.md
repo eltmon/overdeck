@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-23T16:51:58Z · model: claude-opus-5-5 · open: 951_
+_Last sequenced: 2026-11-23T17:22:08Z · model: claude-opus-5-5 · open: 952_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -52,6 +52,7 @@ _Last sequenced: 2026-11-23T16:51:58Z · model: claude-opus-5-5 · open: 951_
 | 37 | PAN-4166 | S | critical | ok |  |  | write-sequence replays every superseded sequence commit and dies on an old one, so the ranked order never reaches origin/main |
 | 38 | PAN-3250 | S | critical | ok |  |  | Workspace spawn branches from local HEAD instead of origin/main, so every new feature branch inherits unpushed local-main commits. |
 | 39 | PAN-3946 | S | critical | ok |  |  | Review request treats an APPROVED review on an older commit as "already passed"; newer commits ride an old approval |
+| 39 | PAN-5632 | S | high | ok |  |  | Verification calls a target-branch merge with extra edits synced, so a pass is adopted for unverified edits; compare merge-tree. |
 | 40 | PAN-2954 | XS | critical | ok |  |  | postMergeLifecycle refuses GitLab projects |
 | 41 | PAN-3935 | S | critical | ok |  |  | PRD draft promotion writes the draft into the primary main checkout and deletes the feature-branch copy; PRDs are stranded untracked |
 | 42 | PAN-3657 | S | critical | ok |  |  | Merge-train queues endpoint runs the monorepo queue builder for polyrepo projects, so MYN/Auricle trains are permanently empty. |
@@ -1147,6 +1148,10 @@ New this pass, labelled blocks-main and substrate. Two spawn sites branch from t
 
 Merge-safety bug seen on PR #3933: an approval on fd3334e6 satisfied the request for head ae9d82f0. Approval must count only when its commit_id is the current head; add --force as the explicit override.
 
+### PAN-5632 (rank 39)
+
+New issue from CodeRabbit on PR #5631: classifyRepoHead trusts merge parents and ignores the tree, so the verification gate can adopt a pass for a head whose extra edits nothing verified. Small, well-specified fix with named tests; ranked beside PAN-3946, the same class of stale-verdict head-identity gap.
+
 ### PAN-2954 (rank 40)
 
 Dependency cleared: PAN-2882 (the missing GitLab merged-MR oracle this blocked on) closed since the last pass, so postMergeLifecycle's GitLab refusal is now directly workable. Re-ranked up from 67 to sit with the other unblocked critical merge-path fixes.
@@ -1275,10 +1280,6 @@ Found cutting v0.65.0: CI was green but the local release check failed on two ho
 
 Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback this fix routes failures to is on main and work can start.
 
-### PAN-5193 (rank 72)
-
-New planning bug placed in a freed high-tier slot. It blocks pan plan finalize for every epic child with a stub draft on main; the fix is a candidate-order change plus one test.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1286,10 +1287,10 @@ New planning bug placed in a freed high-tier slot. It blocks pan plan finalize f
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-23T16:51:58Z",
+  "generatedAt": "2026-11-23T17:22:08Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 951,
+  "openCount": 952,
   "nodes": [
     {
       "issue": "PAN-5615",
@@ -1903,6 +1904,19 @@ New planning bug placed in a freed high-tier slot. It blocks pan plan finalize f
       "dependsOn": [],
       "why": "Review request treats an APPROVED review on an older commit as \"already passed\"; newer commits ride an old approval",
       "rationale": "Merge-safety bug seen on PR #3933: an approval on fd3334e6 satisfied the request for head ae9d82f0. Approval must count only when its commit_id is the current head; add --force as the explicit override.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5632",
+      "rank": 39,
+      "size": "S",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Verification calls a target-branch merge with extra edits synced, so a pass is adopted for unverified edits; compare merge-tree.",
+      "rationale": "New issue from CodeRabbit on PR #5631: classifyRepoHead trusts merge parents and ignores the tree, so the verification gate can adopt a pass for a head whose extra edits nothing verified. Small, well-specified fix with named tests; ranked beside PAN-3946, the same class of stale-verdict head-identity gap.",
       "gate": "auto",
       "planning": "auto"
     },
