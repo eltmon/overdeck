@@ -37,6 +37,16 @@ There is no second path to any operation.
 | `start_conversation` | Starts a conversation with a first message. Optional `projectKey`, `model`, `harness`, `effort`, `issueId`, `machine` (a label, environment id or `auto`), `needs`. | `operate` |
 | `start_worker` | Starts a registered worker on an issue that has a workspace on the chosen machine. `issueId`, `prompt`, optional `model`, `harness`, `effort`, `readOnly`, `name`, `machine`, `needs`. | `operate` |
 | `start_issue` | Starts a planned issue's work agent on this machine through the same gates as the dashboard's Start button, or on `machine` through that machine's work door. `issueId`, optional `model`, `harness`, `effort`, `machine`, `needs`. An unplanned issue answers an error that says to run `pan start <id>`, which plans first. | `operate` |
+| `list_order_books` | Lists a project's order books with their progress and problems. Optional `project`. | `read:state` |
+| `get_order_book` | Reads one order book: its issues, lanes, progress and the problems that block it. `book`, optional `project`. | `read:state` |
+| `list_order_book_candidates` | Lists the top backlog issues that are in no order book. Optional `limit` (1 to 100, default 10), `project`. | `read:state` |
+| `preview_order_book_brief` | Shows the brief the Flywheel receives for an order book. `book`, optional `project`. | `read:state` |
+| `create_order_book` | Creates a draft order book. Nothing starts from a draft. `name`, optional `project`. | `operate` |
+| `update_order_book` | Renames an order book, changes its parallel limit or extra instructions file, pauses or resumes pickup, or changes its status (`ready` queues it, `draft` unqueues it, `complete` archives it). `book`, optional `name`, `parallelLimit` (1 to 8), `briefFile`, `pickup` (`open` or `paused`), `pickupReason`, `status`, `project`. | `operate` |
+| `add_order_book_issues` | Adds issues to an order book lane. Lane A runs in parallel, lane B one at a time. `book`, `issues`, optional `lane` (default `A`), `prereqs`, `reVerify`, `planAtPickup`, `project`. | `operate` |
+| `update_order_book_issue` | Moves an issue within or between lanes, or changes what it waits for. `book`, `issue`, optional `lane`, `order`, `prereqs`, `reVerify`, `planAtPickup`, `project`. | `operate` |
+| `remove_order_book_issue` | Removes an issue from an order book. `book`, `issue`, optional `project`. | `operate` |
+| `start_order_book` | Starts the Flywheel on an order book. Refused when the book has blocking problems. `book`, optional `project`. | `operate` |
 | `stop_conversation` | Stops a conversation. `conversation` (`@<machine>/<name>` for one on a linked machine). | `operate` |
 | `resume_conversation` | Resumes a stopped conversation on its transcript, as the dashboard's Resume button does. A conversation that still runs is reattached, not started twice. `conversation` (`@<machine>/<name>` for one on a linked machine). | `operate` |
 | `add_skills` | Loads skill packs or pack skills into a conversation, by default the caller's own. Claude Code loads them in place (from the caller's own conversation they arrive when its current turn ends); Codex and native skills need a restart. `conversation` (omit for your own), `packs` (pack ids; every non-opt-in skill), `skills` (`pack/skill` ids), `restart` (restart a named conversation that cannot load them in place). | `operate` |
@@ -61,9 +71,13 @@ No tool pairs devices, creates or revokes tokens, reads or writes settings, or
 touches the session vault.
 
 `tools/list` shows only the tools whose scope the token holds, so a
-`read:state` token sees only `list_machines`. Calling a tool the token cannot
-see answers `Unknown tool <name>`. Tools for managed agents are listed only to
-agent tokens.
+`read:state` token sees only `list_machines` and the four order-book read
+tools. Calling a tool the token cannot see answers `Unknown tool <name>`.
+Tools for managed agents are listed only to agent tokens.
+
+The order-book tools write the same files the Order books page writes. Like
+the page, they do not commit them; commit `.pan/orders/` yourself or use
+`pan orders`.
 
 ### Agent-only tools
 
