@@ -4,17 +4,17 @@
     "created": "2026-11-23T06:18:55Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5615: Role prompts escalate to a dead session name (flywheel-orchestrator); the Flywheel is conv-flywheel",
-    "updated": "2026-11-23T18:05:25.584Z"
+    "updated": "2026-11-23T18:06:35.913Z"
   },
   "plan": {
     "id": "pan-5615",
     "title": "Role prompts escalate to a dead session name (flywheel-orchestrator); the Flywheel is conv-flywheel",
-    "status": "proposed",
+    "status": "running",
     "uid": "85ff11b3-976c-4ace-bac2-b5c4b54f9c66",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-23T06:18:55Z",
-    "updated": "2026-11-23T18:05:25.584Z",
+    "updated": "2026-11-23T18:06:35.913Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5615",
@@ -758,5 +758,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
