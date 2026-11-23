@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5250",
   "created": "2026-11-23T23:10:09.644Z",
-  "updated": "2026-11-23T23:14:05.503Z",
+  "updated": "2026-11-23T23:16:53.267Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -58,9 +58,34 @@
       "doneAt": "2026-11-23T23:14:02.187Z"
     },
     "wi3-usage-probe": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5250",
-      "claimedAt": "2026-11-23T23:14:05.503Z"
+      "claimedAt": "2026-11-23T23:14:05.503Z",
+      "doneAt": "2026-11-23T23:16:53.267Z"
+    },
+    "wi3-usage-probe.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:16:53.267Z"
+    },
+    "wi3-usage-probe.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:16:53.267Z"
+    },
+    "wi3-usage-probe.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:16:53.267Z"
+    },
+    "wi3-usage-probe.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:16:53.267Z"
+    },
+    "wi3-usage-probe.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:16:53.267Z"
+    },
+    "wi3-usage-probe.ac6": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:16:53.267Z"
     }
   }
 }
