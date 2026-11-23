@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-23T04:22:39Z · model: claude-opus-5-5 · open: 948_
+_Last sequenced: 2026-11-23T05:53:21Z · model: claude-opus-5-5 · open: 951_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -92,6 +92,7 @@ _Last sequenced: 2026-11-23T04:22:39Z · model: claude-opus-5-5 · open: 948_
 | 80 | PAN-3522 | S | critical | ok |  |  | Supervisor watchdog restart-churns under CPU storm because the probe timeout budget ignores the boot warm phase. |
 | 81 | PAN-3314 | M | critical | ok |  |  | One cgroup holds every agent pane, so a single hungry agent inflates the unit and oomd kills the whole fleet — twice now. |
 | 82 | PAN-3278 | S | critical | needs-refinement |  |  | A finished work agent with an open PR sat two hours because review was never dispatched and auto-requeue fired none of 25 attempts. |
+| 83 | PAN-5609 | M | medium | ok |  |  | Top-bar indicator for conversation-search indexing (all three paths), with hover/click details. Operator request; in pipeline. |
 | 84 | PAN-3234 | S | critical | needs-refinement |  |  | Agents freeze indefinitely on blocking choice menus and no health surface notices; the detector is wired only to delivery refusal. |
 | 84 | PAN-5467 | XL | high | ok | ✓ |  | Epic: docs overhaul, 16 page issues, 6 accuracy audits (PAN-5499..5504) and an intro rewrite (PAN-5505); order book drives pickup. |
 | 85 | PAN-3205 | S | critical | ok |  |  | The deployment gate promises the queued deploy will fire at the next verification boundary; that trigger does not exist. |
@@ -728,6 +729,7 @@ _Last sequenced: 2026-11-23T04:22:39Z · model: claude-opus-5-5 · open: 948_
 | 680 | PAN-2449 | M | low | ok |  |  | start-planning: GITHUB_REPOS env shadows projects.yaml github_repo; unknown IDs fall through to Linear and plan the wrong issue |
 | 681 | PAN-4769 | XS | low | ok |  |  | Two-sentence wording fix in features/skill-packs.mdx; PAN-4759 created the page and closed, so this is unblocked. |
 | 682 | PAN-3940 | XL | low | ok | ✓ |  | Parked epic: event-driven plugin/hook system on pipeline-notifier + hygiene-scheduler; do not pick up until the journal has soaked |
+| 682 | PAN-5608 | S | low | ok |  | PAN-5598 | Orders routes resolve .pan from raw project.path, CLI via issue_routing; latent split for routed projects. Never fired yet. |
 | 683 | PAN-2424 | L | low | ok | ✓ |  | Epic: the Order Book |
 | 684 | PAN-2406 | S | low | ok |  |  | Remaining scope: findAllWorkspacePaths must also enumerate -strike-wt and named-suffix worktrees; gaps 1 and 3 are moot. |
 | 685 | PAN-2394 | M | low | ok |  |  | Incident: conv-* agent-dir cleanup destroyed ohmypi/codex conversation transcripts ("no saved history") |
@@ -953,6 +955,7 @@ _Last sequenced: 2026-11-23T04:22:39Z · model: claude-opus-5-5 · open: 948_
 | 903 | PAN-5444 | XS | low | ok |  |  | Two Minor CodeRabbit findings left on merged PR #5443: semgrep repo rules resolve from event cwd; hook tests not isolated from Docker. |
 | 904 | PAN-5405 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5403: changes-query refetch after turns, Send menu keyboard/scheduling guard, tab-menu focus. |
 | 905 | PAN-2423 | XS | low | stale |  |  | Likely fixed: rebuild now uses the PAN-3049 resolver (docker.ts:181) and reap has no hardcoded prefix; confirm and close. |
+| 906 | PAN-5610 | XS | low | needs-refinement |  |  | Duplicate of PAN-5523 (move/heal Missing origin, rank 10), which covers this plus heal. Close as duplicate. |
 
 ## Rationale detail
 
@@ -1283,10 +1286,10 @@ New substrate bug placed in a freed high-tier slot. Under memory pressure the op
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-23T04:22:39Z",
+  "generatedAt": "2026-11-23T05:53:21Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 948,
+  "openCount": 951,
   "nodes": [
     {
       "issue": "PAN-5598",
@@ -2418,6 +2421,19 @@ New substrate bug placed in a freed high-tier slot. Under memory pressure the op
       "dependsOn": [],
       "why": "A finished work agent with an open PR sat two hours because review was never dispatched and auto-requeue fired none of 25 attempts.",
       "rationale": "Triage: the auto-requeue machinery cited targeted the deleted review_status table; verify review-dispatch-after-PR-open against the current mechanism (see PAN-3939 for the post-cut reproduction). Rank held.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5609",
+      "rank": 83,
+      "size": "M",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Top-bar indicator for conversation-search indexing (all three paths), with hover/click details. Operator request; in pipeline.",
+      "rationale": "New operator-requested discoverability feature already in the pipeline (planned); pinned at the free rank 83 slot per the in-pipeline rule.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -10353,6 +10369,21 @@ New substrate bug placed in a freed high-tier slot. Under memory pressure the op
       "isEpic": true
     },
     {
+      "issue": "PAN-5608",
+      "rank": 682,
+      "size": "S",
+      "importance": "low",
+      "score": 35,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-5598"
+      ],
+      "why": "Orders routes resolve .pan from raw project.path, CLI via issue_routing; latent split for routed projects. Never fired yet.",
+      "rationale": "New latent bug deferred from PAN-5598 review; no registered project sets issue_routing, so it ranks with low-impact correctness fixes after PAN-5598 lands.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2424",
       "rank": 683,
       "size": "L",
@@ -13134,6 +13165,19 @@ New substrate bug placed in a freed high-tier slot. Under memory pressure the op
       "rationale": "Demoted: a 2026-11-23 comment and a code check show both the rebuild and reap hardcodes are gone, so only an operator close remains.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-5610",
+      "rank": 906,
+      "size": "XS",
+      "importance": "low",
+      "score": 20,
+      "condition": "needs-refinement",
+      "dependsOn": [],
+      "why": "Duplicate of PAN-5523 (move/heal Missing origin, rank 10), which covers this plus heal. Close as duplicate.",
+      "rationale": "New issue that repeats PAN-5523; ranked last so the Flywheel does not pick the same fix twice.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -14426,6 +14470,13 @@ New substrate bug placed in a freed high-tier slot. Under memory pressure the op
       "confidence": 1
     },
     {
+      "from": "PAN-5523",
+      "to": "PAN-5610",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.95
+    },
+    {
       "from": "PAN-5532",
       "to": "PAN-2344",
       "type": "informs",
@@ -14480,6 +14531,13 @@ New substrate bug placed in a freed high-tier slot. Under memory pressure the op
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-5598",
+      "to": "PAN-5608",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.7
     },
     {
       "from": "PAN-5600",
