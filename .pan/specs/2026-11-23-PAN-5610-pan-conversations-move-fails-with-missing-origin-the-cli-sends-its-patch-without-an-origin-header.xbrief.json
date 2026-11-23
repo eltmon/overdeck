@@ -4,17 +4,17 @@
     "created": "2026-11-23T06:00:49.566Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5610: pan conversations move fails with 'Missing origin': the CLI sends its PATCH without an Origin header",
-    "updated": "2026-11-23T06:08:57.259Z"
+    "updated": "2026-11-23T06:10:17.508Z"
   },
   "plan": {
     "id": "pan-5610",
     "title": "pan conversations move fails with 'Missing origin': the CLI sends its PATCH without an Origin header",
-    "status": "proposed",
+    "status": "running",
     "uid": "e27fa418-6fa7-4823-863c-a433063ad92e",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-23T06:00:49.566Z",
-    "updated": "2026-11-23T06:08:57.259Z",
+    "updated": "2026-11-23T06:10:17.508Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5610",
@@ -369,5 +369,5 @@
     ],
     "edges": []
   },
-  "status": "proposed"
+  "status": "active"
 }
