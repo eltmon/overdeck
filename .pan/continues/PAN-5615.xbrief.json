@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5615",
   "created": "2026-11-23T18:07:00.473Z",
-  "updated": "2026-11-23T18:20:46.737Z",
+  "updated": "2026-11-23T18:24:26.720Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -116,14 +116,27 @@
       "doneAt": "2026-11-23T18:11:54.625Z"
     },
     "conv-tell-harness-lookup": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5615",
-      "claimedAt": "2026-11-23T18:11:59.390Z"
+      "claimedAt": "2026-11-23T18:11:59.390Z",
+      "doneAt": "2026-11-23T18:24:26.719Z"
     },
     "escalation-target-guard-test": {
       "status": "in_progress",
       "claimedBy": "agent-pan-5615",
       "claimedAt": "2026-11-23T18:20:46.736Z"
+    },
+    "conv-tell-harness-lookup.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:24:26.719Z"
+    },
+    "conv-tell-harness-lookup.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:24:26.719Z"
+    },
+    "conv-tell-harness-lookup.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:24:26.719Z"
     }
   }
 }
