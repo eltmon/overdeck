@@ -15,7 +15,7 @@ import { scanPendingInputs } from '../agent-enrichment.js';
 import { withConcurrencyLimit } from '../concurrency.js';
 import { getConversationsAutoSettleIdleDays } from './control-settings.js';
 import { isAgentConversationName, listConversations, type LegacyConversation } from './conversations.js';
-import { listIdleClocks, settleIdleConversation, type IdleClock } from './conversation-triage-store.js';
+import { listIdleClocks, resurfaceIdleSettledConversation, settleIdleConversation, type IdleClock } from './conversation-triage-store.js';
 
 export const DAY_MS = 86_400_000;
 
@@ -180,4 +180,59 @@ export async function sweepIdleConversations(deps: IdleSettleDeps): Promise<stri
     TRANSCRIPT_READ_CONCURRENCY,
   );
   return settled;
+}
+
+export interface IdleResurfaceDeps {
+  now?: () => number;
+  listRows?: () => LegacyConversation[];
+  listIdleClocks?: () => Map<string, IdleClock>;
+  /** Live terminal session names; null when the backend did not answer. */
+  listLiveSessions: () => Promise<ReadonlySet<string> | null>;
+  resolveTranscript: (conv: LegacyConversation) => Promise<string | null>;
+  lastActivityMs?: (path: string, sinceMs: number) => Promise<number | null>;
+  resurface?: (name: string, settledAtMs: number, nowMs: number) => boolean;
+  log?: (line: string) => void;
+}
+
+/** PAN-5611 FR-2: one pass. Ends 'idle' settles whose group has transcript activity after settled_at. Returns the names it resurfaced. */
+export async function resurfaceActiveIdleSettles(deps: IdleResurfaceDeps): Promise<string[]> {
+  const log = deps.log ?? ((line: string) => console.log(line));
+  const nowMs = (deps.now ?? Date.now)();
+
+  const rows = (deps.listRows ?? (() => listConversations()))();
+  const clocks = (deps.listIdleClocks ?? listIdleClocks)();
+  const candidates = [...groupByDisplayRoot(rows).values()].filter((members) => {
+    const clock = clocks.get(members[0]!.name);
+    return clock !== undefined && clock.settledAtMs !== null && clock.settleReason === 'idle';
+  });
+  if (candidates.length === 0) return [];
+
+  const live = await deps.listLiveSessions();
+  if (live === null) {
+    log('[idle-settle] terminal sessions could not be listed; skipping resurface');
+    return [];
+  }
+  const liveGroups = candidates.filter((members) => members.some((member) => live.has(member.tmuxSession)));
+
+  const lastActivityMs = deps.lastActivityMs ?? readTranscriptLastActivityMs;
+  const resurface = deps.resurface ?? ((name: string, settledAtMs: number, atMs: number) => resurfaceIdleSettledConversation(name, atMs, settledAtMs));
+  const resurfaced: string[] = [];
+
+  await withConcurrencyLimit(
+    liveGroups.map((members) => async () => {
+      const root = members[0]!;
+      const settledAtMs = clocks.get(root.name)!.settledAtMs!;
+      for (const member of members) {
+        const path = await deps.resolveTranscript(member);
+        if (path === null) continue;
+        const activity = await lastActivityMs(path, settledAtMs);
+        if (activity !== null && activity > settledAtMs) {
+          if (resurface(root.name, settledAtMs, nowMs)) resurfaced.push(root.name);
+          return;
+        }
+      }
+    }),
+    TRANSCRIPT_READ_CONCURRENCY,
+  );
+  return resurfaced;
 }

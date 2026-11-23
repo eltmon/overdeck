@@ -239,6 +239,146 @@ describe('sweepIdleConversations', () => {
   });
 });
 
+describe('resurfaceActiveIdleSettles', () => {
+  interface FakeResurfaceIo {
+    deps: import('../conversation-idle-settle.js').IdleResurfaceDeps;
+    activity: Map<string, number>;
+    live: Set<string>;
+  }
+
+  function fakeResurfaceIo(overrides: Partial<import('../conversation-idle-settle.js').IdleResurfaceDeps> = {}): FakeResurfaceIo {
+    const activity = new Map<string, number>();
+    const live = new Set<string>();
+    const deps: import('../conversation-idle-settle.js').IdleResurfaceDeps = {
+      now: () => NOW,
+      listLiveSessions: vi.fn(async () => live),
+      resolveTranscript: vi.fn(async (conv) => `/transcripts/${conv.name}.jsonl`),
+      lastActivityMs: vi.fn(async (path: string) => {
+        const name = path.slice('/transcripts/'.length, -'.jsonl'.length);
+        return activity.get(name) ?? null;
+      }),
+      log: () => {},
+      ...overrides,
+    };
+    return { deps, activity, live };
+  }
+
+  async function settleIdleAt(name: string, settledAtMs: number): Promise<void> {
+    const { settleIdleConversation } = await import('../conversation-triage-store.js');
+    settleIdleConversation(name, 0, settledAtMs);
+  }
+
+  it('resurfaces an idle root with newer live activity and leaves one with activity at or before settled_at', async () => {
+    const { resurfaceActiveIdleSettles } = await import('../conversation-idle-settle.js');
+    await createOld('conv-new', 10 * DAY);
+    await createOld('conv-same', 10 * DAY);
+    await settleIdleAt('conv-new', 1_000);
+    await settleIdleAt('conv-same', 1_000);
+    const io = fakeResurfaceIo();
+    io.live.add('conv-new');
+    io.live.add('conv-same');
+    io.activity.set('conv-new', 1_001);
+    io.activity.set('conv-same', 1_000);
+
+    expect(await resurfaceActiveIdleSettles(io.deps)).toEqual(['conv-new']);
+    expect(await settleReasonOf('conv-new')).toBeNull();
+    expect(await settleReasonOf('conv-same')).toBe('idle');
+  });
+
+  it('leaves manual and merge roots even with newer activity', async () => {
+    const { resurfaceActiveIdleSettles } = await import('../conversation-idle-settle.js');
+    const { settleConversation } = await import('../conversation-triage-store.js');
+    await createOld('conv-manual', 10 * DAY);
+    await createOld('conv-merge', 10 * DAY);
+    settleConversation('conv-manual', 'manual', 1_000);
+    settleConversation('conv-merge', 'merge', 1_000);
+    const io = fakeResurfaceIo();
+    io.live.add('conv-manual');
+    io.live.add('conv-merge');
+    io.activity.set('conv-manual', 2_000);
+    io.activity.set('conv-merge', 2_000);
+
+    expect(await resurfaceActiveIdleSettles(io.deps)).toEqual([]);
+    expect(await settleReasonOf('conv-manual')).toBe('manual');
+    expect(await settleReasonOf('conv-merge')).toBe('merge');
+  });
+
+  it("resurfaces the root when only a child's transcript is newer", async () => {
+    const { resurfaceActiveIdleSettles } = await import('../conversation-idle-settle.js');
+    await createOld('conv-child-root', 10 * DAY);
+    await createOld('conv-child-kid', 10 * DAY, 'conv-child-root');
+    await settleIdleAt('conv-child-root', 1_000);
+    const io = fakeResurfaceIo();
+    io.live.add('conv-child-kid');
+    io.activity.set('conv-child-root', 500);
+    io.activity.set('conv-child-kid', 1_500);
+
+    expect(await resurfaceActiveIdleSettles(io.deps)).toEqual(['conv-child-root']);
+  });
+
+  it('leaves a group with no live member and never resolves its transcripts', async () => {
+    const { resurfaceActiveIdleSettles } = await import('../conversation-idle-settle.js');
+    await createOld('conv-no-live', 10 * DAY);
+    await settleIdleAt('conv-no-live', 1_000);
+    const io = fakeResurfaceIo();
+    io.activity.set('conv-no-live', 5_000);
+
+    expect(await resurfaceActiveIdleSettles(io.deps)).toEqual([]);
+    expect(io.deps.resolveTranscript).not.toHaveBeenCalled();
+  });
+
+  it('resurfaces nothing and logs when listLiveSessions returns null', async () => {
+    const { resurfaceActiveIdleSettles } = await import('../conversation-idle-settle.js');
+    await createOld('conv-unknown-live', 10 * DAY);
+    await settleIdleAt('conv-unknown-live', 1_000);
+    const log = vi.fn();
+    const io = fakeResurfaceIo({ listLiveSessions: async () => null, log });
+
+    expect(await resurfaceActiveIdleSettles(io.deps)).toEqual([]);
+    expect(log).toHaveBeenCalledWith('[idle-settle] terminal sessions could not be listed; skipping resurface');
+  });
+
+  it('resurfaces even when auto_settle_idle_days is 0 (no idleDays dependency is read)', async () => {
+    const { setConversationsAutoSettleIdleDays } = await import('../control-settings.js');
+    const { resurfaceActiveIdleSettles } = await import('../conversation-idle-settle.js');
+    setConversationsAutoSettleIdleDays(0);
+    await createOld('conv-zero-days', 10 * DAY);
+    await settleIdleAt('conv-zero-days', 1_000);
+    const io = fakeResurfaceIo();
+    io.live.add('conv-zero-days');
+    io.activity.set('conv-zero-days', 5_000);
+
+    expect(await resurfaceActiveIdleSettles(io.deps)).toEqual(['conv-zero-days']);
+  });
+
+  it('the default door guards on the settledAtMs the pass read, not the current row', async () => {
+    const { resurfaceActiveIdleSettles } = await import('../conversation-idle-settle.js');
+    const { listIdleClocks } = await import('../conversation-triage-store.js');
+    await createOld('conv-guard', 10 * DAY);
+    await settleIdleAt('conv-guard', 2_000);
+    const realClock = listIdleClocks().get('conv-guard')!;
+    const io = fakeResurfaceIo({ listIdleClocks: () => new Map([['conv-guard', { ...realClock, settledAtMs: 1_000 }]]) });
+    io.live.add('conv-guard');
+    io.activity.set('conv-guard', 5_000);
+
+    expect(await resurfaceActiveIdleSettles(io.deps)).toEqual([]);
+    expect(await settleReasonOf('conv-guard')).toBe('idle');
+  });
+
+  it('does not return a name when the injected resurface door returns false', async () => {
+    const { resurfaceActiveIdleSettles } = await import('../conversation-idle-settle.js');
+    await createOld('conv-rejected', 10 * DAY);
+    await settleIdleAt('conv-rejected', 1_000);
+    const resurface = vi.fn(() => false);
+    const io = fakeResurfaceIo({ resurface });
+    io.live.add('conv-rejected');
+    io.activity.set('conv-rejected', 5_000);
+
+    expect(await resurfaceActiveIdleSettles(io.deps)).toEqual([]);
+    expect(resurface).toHaveBeenCalledWith('conv-rejected', 1_000, NOW);
+  });
+});
+
 describe('groupByDisplayRoot', () => {
   it('nests critics under their builder and lanes under their parent, root first', async () => {
     const { groupByDisplayRoot } = await import('../conversation-idle-settle.js');
