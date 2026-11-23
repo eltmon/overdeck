@@ -44,6 +44,7 @@ import { isOverdeckWorkspaceSyncPath } from '../../../../lib/workspace-sync-path
 import { assertWorkspaceStackHealthyForSpawn } from '../../../../lib/agents/spawn-prep.js';
 import { resolveIssueStackDiskHold } from '../../../../lib/workspace/disk-cost.js';
 import { getWorkspaceStackHealth } from '../../../../lib/workspace/stack-health.js';
+import { restoreReclaimedStackForSpawn } from '../../../../lib/workspace/stack-restore.js';
 import { writeAutoStartXBrief } from '../../../../lib/xbrief/auto-synthesize.js';
 import { findPlan, readPlan } from '../../../../lib/xbrief/io.js';
 import { resolveIssueWorkspacePlanHome, transitionIssueXBrief, updatePlanStatus } from '../../../../lib/xbrief/lifecycle-io.js';
@@ -505,7 +506,9 @@ export const spawnIssueAgentForRoute = (input: { body: unknown; internalRequest:
 
     if (!isRemote && !remoteRequested) {
       emitStartAgentPhase(issueId, 'stackHealthGate', 'start', 'checking workspace docker stack health', { workspacePath });
-      let stackHealth = yield* getWorkspaceStackHealth(issueId, { projectConfig, workspacePath });
+      // PAN-5623: start a reclaimed stack before the disk-floor hold can refuse the spawn.
+      const restoredContainers = yield* Effect.promise(() => restoreReclaimedStackForSpawn(issueId, workspacePath));
+      let stackHealth = yield* getWorkspaceStackHealth(issueId, { projectConfig, workspacePath, ...(restoredContainers ? { containers: restoredContainers } : {}) });
       if (!stackHealth.healthy && !allowHost) {
         // PAN-4961: a rebuild that would breach the disk floor is held, not attempted.
         const diskHold = yield* Effect.promise(() => resolveIssueStackDiskHold(issueId));
