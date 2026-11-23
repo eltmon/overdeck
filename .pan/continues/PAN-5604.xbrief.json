@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5604",
   "created": "2026-11-23T18:14:56.256Z",
-  "updated": "2026-11-23T18:14:56.256Z",
+  "updated": "2026-11-23T18:28:49.566Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,30 @@
   "sessionHistory": [],
   "items": {
     "agent-input-gate": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5604",
-      "claimedAt": "2026-11-23T18:14:56.256Z"
+      "claimedAt": "2026-11-23T18:14:56.256Z",
+      "doneAt": "2026-11-23T18:28:49.565Z"
+    },
+    "agent-input-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:28:49.565Z"
+    },
+    "agent-input-gate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:28:49.565Z"
+    },
+    "agent-input-gate.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:28:49.565Z"
+    },
+    "agent-input-gate.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:28:49.565Z"
+    },
+    "agent-input-gate.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:28:49.565Z"
     }
   }
 }
