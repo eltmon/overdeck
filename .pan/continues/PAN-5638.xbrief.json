@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-5638",
   "created": "2026-11-23T19:38:42.567Z",
-  "updated": "2026-11-23T20:48:41.311Z",
+  "updated": "2026-11-23T21:02:50.978Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-23T21:02Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-23T21:02:50.978Z"
+    }
+  ],
   "items": {
     "wi1-github-member-reader": {
       "status": "completed",
@@ -133,5 +139,14 @@
       "status": "completed",
       "doneAt": "2026-11-23T20:48:41.311Z"
     }
-  }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-23T21:02:50Z",
+      "markdownBody": "# CodeRabbit findings for PAN-5638 (PR #5645)\n\nCodeRabbit posted 4 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4671973874 · src/cli/commands/specialists/done.ts:145 [Major]: Apply the verdict guard to every GitHub member before posting.\n  https://github.com/eltmon/overdeck/pull/5645#discussion_r4671973874\n- Thread 4671973900 · src/lib/cloister/__tests__/github-member-pr-facts.test.ts:84 [Minor]: Inject identity lookups in the untrusted-marker test.\n  https://github.com/eltmon/overdeck/pull/5645#discussion_r4671973900\n- Thread 4671973915 · src/lib/cloister/github-member-pr-facts.ts:45 [Major]: A failed standing-review read leaves the ready set silent instead of unavailable.\n  https://github.com/eltmon/overdeck/pull/5645#discussion_r4671973915\n- Thread 4671973927 · src/lib/overdeck/ready-set.ts:178 [Minor]: Check the member facts' checks and mergeability before the ready-set approval.\n  https://github.com/eltmon/overdeck/pull/5645#discussion_r4671973927\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5645/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-5638 -m \"CodeRabbit <thread ids>: <what you changed>\"`.\n   If you only replied, you are done.\n5. If PR #5645 has already merged when you read this, stop: after the merge Overdeck files a follow-up issue\n   for every thread with no reply, no later commit to its file, and no re-review request naming its thread id."
+    }
+  ]
 }
