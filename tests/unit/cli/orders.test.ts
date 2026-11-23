@@ -8,6 +8,7 @@ import {
   formatBook,
   formatBookList,
   runOrdersAdd,
+  runOrdersArchive,
   runOrdersCreate,
   runOrdersList,
   runOrdersMove,
@@ -15,6 +16,8 @@ import {
   runOrdersRemove,
   runOrdersShow,
   runOrdersStart,
+  runOrdersUnarchive,
+  runOrdersUnqueue,
 } from '../../../src/cli/commands/orders.js';
 import { addItems, createBook } from '../../../src/lib/orders/writer.js';
 import type { ProjectConfig } from '../../../src/lib/projects.js';
@@ -149,6 +152,9 @@ describe('pan orders commands', () => {
       'remove',
       'move',
       'queue',
+      'unqueue',
+      'archive',
+      'unarchive',
       'start',
     ]);
     for (const child of command.commands) {
@@ -158,6 +164,10 @@ describe('pan orders commands', () => {
     expect(add.options.map((option) => option.long)).toEqual(['--lane', '--after', '--reverify', '--project']);
     const move = command.commands.find((child) => child.name() === 'move')!;
     expect(move.options.map((option) => option.long)).toEqual(['--lane', '--order', '--project']);
+    const help = command.helpInformation();
+    expect(help).toContain('Move a queued order book back to draft');
+    expect(help).toContain('Archive an order book and free its issues');
+    expect(help).toContain('Restore an archived order book as a draft');
   });
 
   it('resolves --project through the projects registry regardless of cwd', async () => {
@@ -207,6 +217,56 @@ describe('pan orders commands', () => {
 
     await expect(runOrdersQueue(created.id, deps))
       .rejects.toThrow(`Order book ${created.id} must be draft before it can be queued`);
+  });
+
+  it('unqueue moves a ready book to draft and commits', async () => {
+    const panDir = gitFixture();
+    const deps = { panDir, now: () => new Date(at) };
+    const created = await runOrdersCreate('Unqueueable', deps);
+    await runOrdersQueue(created.id, deps);
+
+    await expect(runOrdersUnqueue(created.id, deps)).resolves.toMatchObject({ status: 'draft' });
+    expect((await runOrdersShow(created.id, deps)).status).toBe('draft');
+    expect(git(['log', '-1', '--format=%s'], dirname(panDir))).toBe(`chore(orders): unqueue order book ${created.id}`);
+  });
+
+  it('archive refuses a book that is already archived', async () => {
+    const panDir = gitFixture();
+    const deps = { panDir, now: () => new Date(at) };
+    const created = await runOrdersCreate('Archivable', deps);
+    await runOrdersArchive(created.id, deps);
+    expect(git(['log', '-1', '--format=%s'], dirname(panDir))).toBe(`chore(orders): archive order book ${created.id}`);
+    const before = await runOrdersShow(created.id, deps);
+
+    await expect(runOrdersArchive(created.id, deps))
+      .rejects.toThrow(`Order book ${created.id} must be draft or queued before it can be archived`);
+    expect(await runOrdersShow(created.id, deps)).toEqual(before);
+  });
+
+  it('unarchive restores a complete book as draft', async () => {
+    const panDir = gitFixture();
+    const deps = { panDir, now: () => new Date(at) };
+    const created = await runOrdersCreate('Restorable', deps);
+    await runOrdersAdd(created.id, ['PAN-1'], {}, deps);
+    await runOrdersArchive(created.id, deps);
+
+    await expect(runOrdersUnarchive(created.id, deps)).resolves.toMatchObject({ status: 'draft' });
+    expect(git(['log', '-1', '--format=%s'], dirname(panDir))).toBe(`chore(orders): unarchive order book ${created.id}`);
+  });
+
+  it('unarchive refuses when an issue belongs to another non-archived book', async () => {
+    const panDir = gitFixture();
+    const deps = { panDir, now: () => new Date(at) };
+    const old = await runOrdersCreate('Old', deps);
+    await runOrdersAdd(old.id, ['PAN-1'], {}, deps);
+    await runOrdersArchive(old.id, deps);
+    const fresh = await runOrdersCreate('Fresh', deps);
+    await runOrdersAdd(fresh.id, ['PAN-1'], {}, deps);
+    await runOrdersQueue(fresh.id, deps);
+
+    await expect(runOrdersUnarchive(old.id, deps))
+      .rejects.toThrow(`Order book ${old.id} cannot be restored: PAN-1 already belongs to order book ${fresh.id}`);
+    expect((await runOrdersShow(old.id, deps)).status).toBe('complete');
   });
 
   it('queues a book in another registered project via --project from an unrelated cwd', async () => {

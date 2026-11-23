@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path';
 import { getBookAsync, listBooks, normalizeOrderIssueId } from '../../lib/orders/resolver.js';
 import {
   addItems,
+  assertRestorable,
   createBook,
   moveItem,
   removeItem,
@@ -257,6 +258,36 @@ export async function runOrdersQueue(bookId: string, deps: OrdersCommandDeps = {
   return queued;
 }
 
+export async function runOrdersUnqueue(bookId: string, deps: OrdersCommandDeps = {}): Promise<OrderBook> {
+  const panDir = panDirFor(deps);
+  const book = await requireBook(panDir, bookId);
+  if (book.status !== 'ready') throw new Error(`Order book ${bookId} must be queued before it can be moved back to draft`);
+  const draft = await setStatus(panDir, bookId, 'draft');
+  await commitOrders(panDir, `chore(orders): unqueue order book ${bookId}`);
+  return draft;
+}
+
+export async function runOrdersArchive(bookId: string, deps: OrdersCommandDeps = {}): Promise<OrderBook> {
+  const panDir = panDirFor(deps);
+  const book = await requireBook(panDir, bookId);
+  if (book.status !== 'draft' && book.status !== 'ready') {
+    throw new Error(`Order book ${bookId} must be draft or queued before it can be archived`);
+  }
+  const archived = await setStatus(panDir, bookId, 'complete');
+  await commitOrders(panDir, `chore(orders): archive order book ${bookId}`);
+  return archived;
+}
+
+export async function runOrdersUnarchive(bookId: string, deps: OrdersCommandDeps = {}): Promise<OrderBook> {
+  const panDir = panDirFor(deps);
+  const book = await requireBook(panDir, bookId);
+  if (book.status !== 'complete') throw new Error(`Order book ${bookId} must be archived before it can be restored`);
+  assertRestorable(panDir, book);
+  const restored = await setStatus(panDir, bookId, 'draft');
+  await commitOrders(panDir, `chore(orders): unarchive order book ${bookId}`);
+  return restored;
+}
+
 async function commandAction(action: () => Promise<void>): Promise<void> {
   try {
     await action();
@@ -329,6 +360,30 @@ export function createOrdersCommand(): Command {
     .option('--project <key>', 'Resolve the order book in another registered project')
     .action((id: string, options: { project?: string }) => commandAction(async () => {
       console.log(formatBook(await runOrdersQueue(id, { projectKey: options.project })));
+    }));
+
+  orders
+    .command('unqueue <id>')
+    .description('Move a queued order book back to draft')
+    .option('--project <key>', 'Resolve the order book in another registered project')
+    .action((id: string, options: { project?: string }) => commandAction(async () => {
+      console.log(formatBook(await runOrdersUnqueue(id, { projectKey: options.project })));
+    }));
+
+  orders
+    .command('archive <id>')
+    .description('Archive an order book and free its issues')
+    .option('--project <key>', 'Resolve the order book in another registered project')
+    .action((id: string, options: { project?: string }) => commandAction(async () => {
+      console.log(formatBook(await runOrdersArchive(id, { projectKey: options.project })));
+    }));
+
+  orders
+    .command('unarchive <id>')
+    .description('Restore an archived order book as a draft')
+    .option('--project <key>', 'Resolve the order book in another registered project')
+    .action((id: string, options: { project?: string }) => commandAction(async () => {
+      console.log(formatBook(await runOrdersUnarchive(id, { projectKey: options.project })));
     }));
 
   orders
