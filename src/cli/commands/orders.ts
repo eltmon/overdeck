@@ -4,7 +4,14 @@ import { Command, InvalidArgumentError } from 'commander';
 import { dirname, join } from 'node:path';
 
 import { deriveBookPhases, type OrderBookPhaseView } from '../../lib/orders/phase.js';
-import { computeBookProgress, getBookAsync, listBooks, liveOrderIssueLookup, normalizeOrderIssueId } from '../../lib/orders/resolver.js';
+import {
+  computeBookProgress,
+  ensureOrderIssueStore,
+  getBookAsync,
+  listBooks,
+  liveOrderIssueLookup,
+  normalizeOrderIssueId,
+} from '../../lib/orders/resolver.js';
 import type { OrderIssueLookup } from '../../lib/orders/types.js';
 import {
   addItems,
@@ -337,8 +344,15 @@ export function createOrdersCommand(): Command {
     .description('List order books')
     .option('--project <key>', 'Resolve the order book in another registered project')
     .action((options: { project?: string }) => commandAction(async () => {
-      const { books, phases } = runOrdersList({ projectKey: options.project });
+      // A CLI process has no running issue service; load the shared issue cache so the
+      // Phase column can tell a finished book from an unfinished one.
+      const panDir = panDirFor({ projectKey: options.project });
+      await ensureOrderIssueStore().catch(() => undefined);
+      const { books, phases } = runOrdersList({ panDir });
       console.log(formatBookList(books, phases));
+      // Starting the issue service schedules background refresh work that would keep this
+      // one-shot read alive for seconds after the list is printed.
+      process.exit(0);
     }));
 
   orders
