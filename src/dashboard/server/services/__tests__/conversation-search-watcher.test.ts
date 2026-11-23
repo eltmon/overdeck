@@ -10,6 +10,7 @@ import { getConversationSearchHealth, resetConversationSearchHealthForTests } fr
 import { indexConversationSearch } from '../../../../lib/conversation-search/indexer.js';
 import { ConversationDirectoryWatcher, isInterruptedPollError } from '../conversation-directory-watcher.js';
 import { ConversationSearchWatcher, startConversationSearchWatcher, stopConversationSearchWatcher, syncConversationSearchWatcher, type ConversationSearchWatcherOptions } from '../conversation-search-watcher.js';
+import { createConversationSearchActivityTracker } from '../conversation-search-activity.js';
 
 class FakeWatcher {
   handlers = new Map<string, Array<(arg: string) => void>>();
@@ -730,6 +731,192 @@ describe('conversation search watcher', () => {
 
       expect(watchFactory).toHaveBeenCalledTimes(1);
       expect(getConversationSearchHealth().watcher).toBeNull();
+    });
+  });
+
+  describe('indexing activity (PAN-5609)', () => {
+    it('begins a startup batch, forwards onProgress from indexAll, and ends it when indexAll resolves', async () => {
+      const fakeWatcher = new FakeWatcher();
+      const activity = createConversationSearchActivityTracker({ emit: vi.fn() });
+      const indexAll = vi.fn(async ({ onProgress }: { onProgress?: (progress: { filesScanned: number; filesIndexed: number; chunksIndexed: number; currentFile?: string }) => void }) => {
+        onProgress?.({ filesScanned: 2, filesIndexed: 2, chunksIndexed: 5, currentFile: 'a.jsonl' });
+        return { ...EMPTY_INDEX_RESULT, filesScanned: 2, filesIndexed: 2, chunksIndexed: 5 };
+      });
+      const watcher = new ConversationSearchWatcher({
+        config: config(),
+        roots: ['/tmp/conversations'],
+        watchFactory: vi.fn(() => fakeWatcher),
+        indexAll,
+        indexFile: vi.fn(),
+        activity,
+        log: { log: vi.fn(), warn: vi.fn() },
+      });
+
+      watcher.start();
+      let snapshot = activity.getSnapshot();
+      expect(snapshot.active).toBe(true);
+      expect(snapshot.kind).toBe('startup');
+      expect(snapshot.filesIndexed).toBe(2);
+      expect(snapshot.chunksIndexed).toBe(5);
+
+      await vi.advanceTimersByTimeAsync(0);
+      snapshot = activity.getSnapshot();
+      expect(snapshot.active).toBe(false);
+      expect(snapshot.kind).toBe('startup');
+      expect(snapshot.endedAt).not.toBeNull();
+    });
+
+    it('begins a catch-up batch after a watcher error, once the startup batch has ended', async () => {
+      const fakeWatcher = new FakeWatcher();
+      const activity = createConversationSearchActivityTracker({ emit: vi.fn() });
+      const kinds: Array<string | null> = [];
+      const indexAll = vi.fn(async () => {
+        kinds.push(activity.getSnapshot().kind);
+        return { ...EMPTY_INDEX_RESULT };
+      });
+      const watcher = new ConversationSearchWatcher({
+        config: config(),
+        roots: ['/tmp/conversations'],
+        restartBaseDelayMs: 1_000,
+        watchFactory: vi.fn(() => fakeWatcher),
+        indexAll,
+        indexFile: vi.fn(),
+        activity,
+        log: { log: vi.fn(), warn: vi.fn() },
+      });
+
+      watcher.start();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(activity.getSnapshot().active).toBe(false);
+
+      fakeWatcher.emitError(new Error('boom'));
+      await vi.advanceTimersByTimeAsync(1_000);
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(kinds).toEqual(['startup', 'catch-up']);
+    });
+
+    it('records the last error on the batch when indexAll resolves with errors', async () => {
+      const fakeWatcher = new FakeWatcher();
+      const activity = createConversationSearchActivityTracker({ emit: vi.fn() });
+      const indexAll = vi.fn(async () => ({
+        ...EMPTY_INDEX_RESULT,
+        errors: [{ filePath: '/tmp/a.jsonl', message: 'embed failed' }],
+      }));
+      const watcher = new ConversationSearchWatcher({
+        config: config(),
+        roots: ['/tmp/conversations'],
+        watchFactory: vi.fn(() => fakeWatcher),
+        indexAll,
+        indexFile: vi.fn(),
+        activity,
+        log: { log: vi.fn(), warn: vi.fn() },
+      });
+
+      watcher.start();
+      await vi.advanceTimersByTimeAsync(0);
+
+      const snapshot = activity.getSnapshot();
+      expect(snapshot.active).toBe(false);
+      expect(snapshot.lastError).toBe('embed failed');
+      expect(snapshot.lastErrorAt).not.toBeNull();
+    });
+
+    it('calls setQueue ending at (0, 0) and recordIncrementalFile once per resolved file', async () => {
+      const fakeWatcher = new FakeWatcher();
+      const activity = createConversationSearchActivityTracker({ emit: vi.fn() });
+      const setQueueSpy = vi.spyOn(activity, 'setQueue');
+      const recordIncrementalFileSpy = vi.spyOn(activity, 'recordIncrementalFile');
+      const indexFile = vi.fn(async () => ({ ...EMPTY_INDEX_RESULT, chunksIndexed: 3 }));
+      const watcher = new ConversationSearchWatcher({
+        config: config(),
+        roots: ['/tmp/conversations'],
+        debounceMs: 25,
+        watchFactory: vi.fn(() => fakeWatcher),
+        indexAll: vi.fn(async () => ({ ...EMPTY_INDEX_RESULT })),
+        indexFile,
+        maxConcurrentIndexers: 2,
+        activity,
+        log: { log: vi.fn(), warn: vi.fn() },
+      });
+
+      watcher.start();
+      await vi.advanceTimersByTimeAsync(0);
+      fakeWatcher.emit('change', '/tmp/conversations/a.jsonl');
+      fakeWatcher.emit('change', '/tmp/conversations/b.jsonl');
+      await vi.advanceTimersByTimeAsync(25);
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(setQueueSpy.mock.calls.at(-1)).toEqual([0, 0, undefined]);
+      expect(recordIncrementalFileSpy).toHaveBeenCalledTimes(2);
+      expect(recordIncrementalFileSpy).toHaveBeenCalledWith(3);
+    });
+
+    it('stop() during a sweep ends the batch (the aborted sweep\'s finally) and calls resetQueue()', async () => {
+      const fakeWatcher = new FakeWatcher();
+      const activity = createConversationSearchActivityTracker({ emit: vi.fn() });
+      const resetQueueSpy = vi.spyOn(activity, 'resetQueue');
+      let resolveIndexAll!: (value: typeof EMPTY_INDEX_RESULT) => void;
+      const indexAll = vi.fn(() => new Promise<typeof EMPTY_INDEX_RESULT>((resolve) => { resolveIndexAll = resolve; }));
+      const watcher = new ConversationSearchWatcher({
+        config: config(),
+        roots: ['/tmp/conversations'],
+        watchFactory: vi.fn(() => fakeWatcher),
+        indexAll,
+        indexFile: vi.fn(),
+        activity,
+        log: { log: vi.fn(), warn: vi.fn() },
+      });
+
+      watcher.start();
+      expect(activity.getSnapshot().active).toBe(true);
+
+      const stopPromise = watcher.stop();
+      resolveIndexAll(EMPTY_INDEX_RESULT);
+      await stopPromise;
+
+      expect(activity.getSnapshot().active).toBe(false);
+      expect(resetQueueSpy).toHaveBeenCalled();
+    });
+
+    it('an incremental burst runs for a file queued during the startup sweep, until that file resolves', async () => {
+      const fakeWatcher = new FakeWatcher();
+      const activity = createConversationSearchActivityTracker({ emit: vi.fn() });
+      let resolveIndexAll!: (value: typeof EMPTY_INDEX_RESULT) => void;
+      const indexAll = vi.fn(() => new Promise<typeof EMPTY_INDEX_RESULT>((resolve) => { resolveIndexAll = resolve; }));
+      let resolveIndexFile!: (value: typeof EMPTY_INDEX_RESULT) => void;
+      const indexFile = vi.fn(() => new Promise<typeof EMPTY_INDEX_RESULT>((resolve) => { resolveIndexFile = resolve; }));
+      const watcher = new ConversationSearchWatcher({
+        config: config(),
+        roots: ['/tmp/conversations'],
+        debounceMs: 25,
+        watchFactory: vi.fn(() => fakeWatcher),
+        indexAll,
+        indexFile,
+        activity,
+        log: { log: vi.fn(), warn: vi.fn() },
+      });
+
+      watcher.start();
+      fakeWatcher.emit('change', '/tmp/conversations/a.jsonl');
+      await vi.advanceTimersByTimeAsync(25);
+
+      // The queued file is hidden behind the still-active startup batch (D-2).
+      expect(activity.getSnapshot().kind).toBe('startup');
+
+      resolveIndexAll(EMPTY_INDEX_RESULT);
+      await vi.advanceTimersByTimeAsync(0);
+
+      let snapshot = activity.getSnapshot();
+      expect(snapshot.active).toBe(true);
+      expect(snapshot.kind).toBe('incremental');
+
+      resolveIndexFile({ ...EMPTY_INDEX_RESULT, chunksIndexed: 2 });
+      await vi.advanceTimersByTimeAsync(0);
+
+      snapshot = activity.getSnapshot();
+      expect(snapshot.active).toBe(false);
+      expect(snapshot.kind).toBe('incremental');
     });
   });
 });

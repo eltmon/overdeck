@@ -10,10 +10,11 @@ import {
   recordConversationSearchWatcherStarted,
   recordConversationSearchWatcherStopped,
 } from '../../../lib/conversation-search/health.js';
-import { indexConversationFile, indexConversationSearch, sessionIdFromPath, type ConversationIndexResult } from '../../../lib/conversation-search/indexer.js';
+import { indexConversationFile, indexConversationSearch, sessionIdFromPath, type ConversationIndexProgress, type ConversationIndexResult } from '../../../lib/conversation-search/indexer.js';
 import { dimensionsForModel, openEmbeddingsDb } from '../../../lib/overdeck/conversations-search.js';
 import { ConversationDirectoryWatcher, isInterruptedPollError } from './conversation-directory-watcher.js';
 import { claudeProjectsRoot } from '../../../lib/runtimes/storage/claude-code.js';
+import { conversationSearchActivity, type ConversationSearchActivityTracker } from './conversation-search-activity.js';
 
 interface WatcherLike {
   on(event: 'add' | 'change' | 'unlink', callback: (filePath: string) => void): WatcherLike;
@@ -22,7 +23,7 @@ interface WatcherLike {
 }
 
 type WatchFactory = (paths: string[], options: { ignoreInitial: boolean; awaitWriteFinish: { stabilityThreshold: number; pollInterval: number } }) => WatcherLike;
-type IndexAllFn = (options: { config: NormalizedConversationSearchConfig; roots: string[]; signal?: AbortSignal; modifiedSince?: number }) => Promise<ConversationIndexResult>;
+type IndexAllFn = (options: { config: NormalizedConversationSearchConfig; roots: string[]; signal?: AbortSignal; modifiedSince?: number; onProgress?: (progress: ConversationIndexProgress) => void }) => Promise<ConversationIndexResult>;
 type IndexFileFn = (options: { filePath: string; config: NormalizedConversationSearchConfig; signal?: AbortSignal }) => Promise<ConversationIndexResult>;
 type RemoveFileFn = (options: { filePath: string; config: NormalizedConversationSearchConfig }) => Promise<void>;
 
@@ -47,6 +48,8 @@ export interface ConversationSearchWatcherOptions {
    */
   maxInterruptedResubscribesPerMinute?: number;
   log?: Pick<Console, 'log' | 'warn'>;
+  /** PAN-5609 — the indexing-activity tracker; defaults to the dashboard's singleton. */
+  activity?: ConversationSearchActivityTracker;
 }
 
 const DEFAULT_DEBOUNCE_MS = 250;
@@ -107,6 +110,7 @@ export class ConversationSearchWatcher {
   private readonly maxConsecutiveRestarts: number;
   private readonly maxInterruptedResubscribesPerMinute: number;
   private readonly log: Pick<Console, 'log' | 'warn'>;
+  private readonly activity: ConversationSearchActivityTracker;
   readonly signature: string;
   private watcher: WatcherLike | null = null;
   private stopped = false;
@@ -145,6 +149,7 @@ export class ConversationSearchWatcher {
     this.maxConsecutiveRestarts = Math.max(0, options.maxConsecutiveRestarts ?? DEFAULT_MAX_CONSECUTIVE_RESTARTS);
     this.maxInterruptedResubscribesPerMinute = Math.max(0, options.maxInterruptedResubscribesPerMinute ?? DEFAULT_MAX_INTERRUPTED_RESUBSCRIBES_PER_MINUTE);
     this.log = options.log ?? console;
+    this.activity = options.activity ?? conversationSearchActivity;
   }
 
   /** The restart circuit breaker tripped; only a fresh watcher (restart or settings save) retries. */
@@ -170,6 +175,7 @@ export class ConversationSearchWatcher {
   private runFullIndex(label: 'startup' | 'catch-up'): void {
     const signal = this.abortController?.signal;
     if (!signal) return;
+    const batch = this.activity.beginBatch(label);
     let modifiedSince: number | undefined;
     if (label === 'catch-up') {
       // Capture and clear: a later error starts a new outage window.
@@ -178,7 +184,13 @@ export class ConversationSearchWatcher {
       this.catchUpPending = false;
     }
     const startupT0 = performance.now();
-    this.startupTask = this.indexAll({ config: this.config, roots: this.roots, signal, ...(modifiedSince != null ? { modifiedSince } : {}) })
+    this.startupTask = this.indexAll({
+      config: this.config,
+      roots: this.roots,
+      signal,
+      onProgress: (progress) => batch.progress(progress),
+      ...(modifiedSince != null ? { modifiedSince } : {}),
+    })
       .then((result) => {
         if (signal.aborted || this.stopped) return;
         if (result.disabled) {
@@ -186,7 +198,9 @@ export class ConversationSearchWatcher {
         } else if (result.errors.length > 0) {
           // PAN-3771: surface per-file embed failures (e.g. exhausted credits)
           // through the health state instead of only the log.
-          recordConversationSearchFailure(result.errors[result.errors.length - 1]?.message ?? `${label} indexing reported errors`);
+          const message = result.errors[result.errors.length - 1]?.message ?? `${label} indexing reported errors`;
+          recordConversationSearchFailure(message);
+          batch.recordError(message);
           const prunedNote = result.sessionsPruned > 0 ? `, pruned ${result.sessionsPruned} stale session${result.sessionsPruned === 1 ? '' : 's'}` : '';
           this.log.warn(`[conversation-search] ${label} indexed with ${result.errors.length} error${result.errors.length === 1 ? '' : 's'} across ${result.filesScanned} file${result.filesScanned === 1 ? '' : 's'}${prunedNote}: ${result.errors[0]?.message}`);
         } else {
@@ -197,10 +211,14 @@ export class ConversationSearchWatcher {
         if (label === 'startup') this.log.log(`[boot-timing] conversation-search startup index completed at +${Math.round(performance.now() - startupT0)}ms`);
       })
       .catch((error) => {
-        if (!isAbortError(error)) this.log.warn(`[conversation-search] ${label} index failed:`, error);
+        if (!isAbortError(error)) {
+          this.log.warn(`[conversation-search] ${label} index failed:`, error);
+          batch.recordError(error);
+        }
         if (label === 'startup') this.log.log(`[boot-timing] conversation-search startup index failed at +${Math.round(performance.now() - startupT0)}ms`);
       })
       .finally(() => {
+        batch.end();
         this.startupTask = null;
         if (this.catchUpPending && !this.stopped && this.watcher) {
           this.runFullIndex('catch-up');
@@ -327,6 +345,7 @@ export class ConversationSearchWatcher {
     this.pending.clear();
     this.queued.clear();
     this.rerun.clear();
+    this.activity.resetQueue();
     this.abortController?.abort();
     const watcher = this.watcher;
     this.watcher = null;
@@ -350,12 +369,19 @@ export class ConversationSearchWatcher {
     this.pending.set(filePath, timer);
   }
 
+  /** PAN-5609 — report the current watcher queue to the activity tracker. */
+  private reportQueue(startedFile?: string): void {
+    if (this.stopped) return;
+    this.activity.setQueue(this.queued.size, this.inFlight.size, startedFile);
+  }
+
   private enqueue(filePath: string): void {
     if (this.inFlight.has(filePath)) {
       this.rerun.add(filePath);
       return;
     }
     this.queued.add(filePath);
+    this.reportQueue();
     this.drainQueue();
   }
 
@@ -367,6 +393,7 @@ export class ConversationSearchWatcher {
     this.pending.delete(filePath);
     this.queued.delete(filePath);
     this.rerun.delete(filePath);
+    this.reportQueue();
     const task = Promise.resolve()
       .then(() => this.removeFile({ filePath, config: this.config }))
       .catch((error: unknown) => {
@@ -386,12 +413,15 @@ export class ConversationSearchWatcher {
       this.queued.delete(filePath);
       this.inFlight.add(filePath);
       this.activeIndexers += 1;
+      this.reportQueue(filePath);
       const task = this.indexFile({ filePath, config: this.config, signal })
         .then((result) => {
           if (result.disabled) return;
+          this.activity.recordIncrementalFile(result.chunksIndexed);
           const firstError = result.errors[0];
           if (firstError) {
             recordConversationSearchFailure(firstError.message);
+            this.activity.recordIncrementalError(firstError.message);
           } else {
             recordConversationSearchSuccess();
           }
@@ -402,6 +432,7 @@ export class ConversationSearchWatcher {
           }
           if (!isAbortError(error)) {
             recordConversationSearchFailure(error);
+            this.activity.recordIncrementalError(error);
             this.log.warn(`[conversation-search] failed to index ${filePath}:`, error);
           }
         })
@@ -410,6 +441,7 @@ export class ConversationSearchWatcher {
           this.activeIndexers = Math.max(0, this.activeIndexers - 1);
           this.inFlight.delete(filePath);
           if (this.rerun.delete(filePath) && !this.stopped) this.queued.add(filePath);
+          this.reportQueue();
           this.drainQueue();
         });
       this.activeTasks.add(task);
