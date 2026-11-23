@@ -479,7 +479,7 @@ describe('a conflict on a workspace with no xBRIEF (PAN-5619)', () => {
       .rejects.toThrow('Run planning before spawning a work agent');
   });
 
-  it('stays gated, spawns nothing, says who resolves it, and journals the dead end once', async () => {
+  it('stays gated, spawns nothing, says who resolves it, and journals the dead end', async () => {
     const { deps, spawnRun, journal } = noPlanDeps('conflicts');
 
     const result = await resolveConflictGate('PAN-5601', '/workspace', 'main', deps);
@@ -508,10 +508,11 @@ describe('a conflict on a workspace with no xBRIEF (PAN-5619)', () => {
   it('journals nothing when the probe could not answer: a failed fetch is not a dead end', async () => {
     const { deps, spawnRun, journal } = noPlanDeps('unknown');
 
-    await expect(resolveConflictGate('PAN-5601', '/workspace', 'main', deps)).resolves.toMatchObject({
-      gated: true,
-      resolverDispatchState: 'unavailable',
-    });
+    const result = await resolveConflictGate('PAN-5601', '/workspace', 'main', deps);
+
+    expect(result).toMatchObject({ gated: true, resolverDispatchState: 'unavailable' });
+    expect(result.reason).toContain('the mergeability check against origin/main could not run');
+    expect(result.reason).not.toContain('Merge origin/main into the PR branch');
     expect(spawnRun).not.toHaveBeenCalled();
     expect(journal).not.toHaveBeenCalled();
   });

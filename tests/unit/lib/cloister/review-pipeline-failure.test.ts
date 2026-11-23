@@ -91,6 +91,13 @@ describe('isRepeatedPipelineFailure', () => {
     expect(isRepeatedPipelineFailure([failure('e', 'h'), { type: 'review.dispatched' }], failure('e', 'h'))).toBe(false);
   });
 
+  it('a request-route re-request in between does not start the comparison over; a launched relaunch does', () => {
+    const viaRoute = { type: 'review.redispatched', data: { via: 'request-review' } };
+    const viaConvoy = { type: 'review.redispatched', data: { via: 'convoy-recovery' } };
+    expect(isRepeatedPipelineFailure([failure('e', 'h'), { type: 'review.requested' }, viaRoute], failure('e', 'h'))).toBe(true);
+    expect(isRepeatedPipelineFailure([failure('e', 'h'), viaConvoy], failure('e', 'h'))).toBe(false);
+  });
+
   it('ignores failures other writers journalled', () => {
     expect(isRepeatedPipelineFailure([failure('e', 'h', 'conflict-gate')], failure('e', 'h'))).toBe(false);
   });

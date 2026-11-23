@@ -560,6 +560,14 @@ export async function recoverStalledReviews(now = Date.now()): Promise<string[]>
         }
         via = 'request-review';
         outcome = `re-requested review (${reason})`;
+        if (!recovery) {
+          // PAN-5619: journal nothing here. The door already wrote
+          // `review.requested`, and a retry that fails again must leave its
+          // own `review.dispatch-failed` as the tail, in either order, so the
+          // repeat check sees it and stops. The cooldown above is in memory.
+          actions.push(`recoverStalledReviews: re-requested ${issueId} after a failed review pipeline — ${reason}`);
+          continue;
+        }
       } else if (!recovery.success) {
         // Nothing was launched: do not journal a re-dispatch that never happened.
         console.warn(`[deacon-lite] Stalled-review recovery declined for ${issueId}: ${recovery.message}`);

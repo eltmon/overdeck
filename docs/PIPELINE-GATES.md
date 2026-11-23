@@ -2414,7 +2414,8 @@ leaves a trace:
    pipeline (source `request-review`, PAN-5619) is re-requested once, so a
    transient failure gets another try; when the retry fails with the same
    error at the same head, it is not re-requested again until someone asks
-   for review. Other `review.dispatch-failed` tails are never re-requested.
+   for review. That retry goes straight to the route and journals no
+   `review.redispatched` of its own, so the retry's failure stays the tail. Other `review.dispatch-failed` tails are never re-requested.
 6. `retryDeferredHandoffs` (`cloister/deferred-handoff.ts`, PAN-4155) —
    re-sends a planning hand-off a spawn guardrail refused.
 7. `recoverUndispatchedReviews` (`cloister/undispatched-review-recovery.ts`,

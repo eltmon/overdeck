@@ -185,6 +185,32 @@ describe('recoverStalledReviews', () => {
       expect(mocks.requestReviewThroughRoute).not.toHaveBeenCalled();
     });
 
+    it('the production sequence: retries once, journals no redispatch of its own, then stops on the identical failure', async () => {
+      const error = 'The required xBRIEF checklist for PAN-3705 is missing or unreadable. Run planning before spawning a work agent.';
+      journal([{ type: 'review.requested', minutesAgo: 90 }]);
+      pipelineFailure(80, error);
+
+      // Tick 1: the first failure is retried through the door.
+      expect(await recoverStalledReviews(NOW)).toHaveLength(1);
+      expect(mocks.requestReviewThroughRoute).toHaveBeenCalledTimes(1);
+      expect(readPipelineJournal(workspace).some((entry) => entry.type === 'review.redispatched')).toBe(false);
+
+      // The door journals its request; the retried pipeline fails the same way.
+      const later = NOW + 62 * MINUTE;
+      vi.setSystemTime(NOW);
+      appendPipelineEntry(workspace, { type: 'review.requested', issueId: 'PAN-3705', source: 'deacon-lite' });
+      vi.setSystemTime(NOW + MINUTE);
+      appendPipelineEntry(workspace, {
+        type: 'review.dispatch-failed', issueId: 'PAN-3705', source: 'request-review', data: { reviewer: 'review', error, head: 'abcd1234' },
+      });
+      vi.setSystemTime(later);
+
+      // Tick 2, past the cooldown: the identical failure is not re-requested.
+      expect(await recoverStalledReviews(later)).toEqual([]);
+      expect(mocks.requestReviewThroughRoute).toHaveBeenCalledTimes(1);
+      expect(mocks.recoverMissingConvoyReviewers).not.toHaveBeenCalled();
+    });
+
     it('retries again when the failure changed (a new head or a new error)', async () => {
       journal([{ type: 'review.requested', minutesAgo: 200 }]);
       pipelineFailure(190, 'Command failed: git push', 'abcd1234');

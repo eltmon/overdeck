@@ -83,7 +83,8 @@ type FailureEntry = { type: string; source?: string; data?: Record<string, unkno
  * `entries`: the same error at the same head. deacon-lite re-requests a
  * failed review once, so a transient failure (a network error on the push, a
  * forge 5xx) gets another try, and stops when the retry fails identically.
- * A successful dispatch in between starts the comparison over. `failure` is
+ * A dispatch that launched reviewers in between starts the comparison over;
+ * a request-route re-request does not. `failure` is
  * either not in `entries` yet, or is the very object from `entries` (compared
  * by identity, so it is never compared with itself).
  */
@@ -91,7 +92,10 @@ export function isRepeatedPipelineFailure(entries: readonly FailureEntry[], fail
   let previous: FailureEntry | undefined;
   for (const entry of entries) {
     if (entry === failure) break;
-    if (entry.type === 'review.dispatched' || entry.type === 'review.redispatched') previous = undefined;
+    // Only a run that launched reviewers starts over. A request-route
+    // re-request (`via: 'request-review'`) launched nothing by itself.
+    if (entry.type === 'review.dispatched'
+      || (entry.type === 'review.redispatched' && entry.data?.['via'] !== 'request-review')) previous = undefined;
     if (entry.type === 'review.dispatch-failed' && entry.source === REVIEW_PIPELINE_FAILURE_SOURCE) previous = entry;
   }
   if (!previous) return false;

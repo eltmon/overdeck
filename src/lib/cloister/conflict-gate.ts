@@ -176,7 +176,7 @@ export function buildRealConflictGateDeps(overrides: RealConflictGateDepsOverrid
       // the workspace stack, and the throw escaped the review dispatch on every
       // retry. Check first, the same way the spawn guard does, and spawn nothing.
       if (!hasPlan(input.workspacePath)) {
-        const error = noResolverMessage(input.issueId, input.targetBranch);
+        const error = noResolverMessage(input.issueId, input.targetBranch, input.mergeability);
         // A probe that could not answer (`unknown`) is not a dead end: a
         // failed fetch may pass next time, so it is not journalled.
         if (input.mergeability === 'conflicts') {
@@ -266,7 +266,7 @@ export async function resolveConflictGate(
   return {
     gated: true,
     reason: resolverDispatchState === 'unavailable'
-      ? `${reason}; ${noResolverMessage(issueId, targetBranch)}`
+      ? `${reason}; ${noResolverMessage(issueId, targetBranch, mergeability)}`
       : `${reason}; ${formatResolverDispatchState(resolverDispatchState)}`,
     resolverDispatchState,
   };
@@ -354,9 +354,16 @@ function formatResolverDispatchState(state: ResolverDispatchState): string {
   }
 }
 
-/** PAN-5619: who resolves a conflict that no work agent can. */
-function noResolverMessage(issueId: string, targetBranch: string): string {
+/**
+ * PAN-5619: who resolves a conflict that no work agent can. A probe that could
+ * not answer confirmed no conflict, so it is retried rather than resolved.
+ */
+function noResolverMessage(issueId: string, targetBranch: string, mergeability?: BranchMergeability): string {
   const id = issueId.toUpperCase();
+  if (mergeability === 'unknown') {
+    return `no conflict resolver: ${id} has no xBRIEF, and the mergeability check against origin/${targetBranch} could not run. `
+      + `Run pan review request ${id} again; if it keeps failing, check that the workspace can fetch from origin`;
+  }
   return `no conflict resolver: ${id} has no xBRIEF, so no work agent can be spawned to resolve it. `
     + `Merge origin/${targetBranch} into the PR branch, push, then run pan review request ${id}`;
 }
