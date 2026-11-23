@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5058",
   "created": "2026-11-23T02:58:48.676Z",
-  "updated": "2026-11-23T03:56:07.596Z",
+  "updated": "2026-11-23T03:56:10.683Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,7 +56,7 @@
       "doneAt": "2026-11-23T03:35:12.908Z"
     },
     "w2-cp1-grok-funnel": {
-      "status": "pending",
+      "status": "cancelled",
       "claimedBy": "agent-pan-5058",
       "claimedAt": "2026-11-23T03:35:27.615Z"
     }
