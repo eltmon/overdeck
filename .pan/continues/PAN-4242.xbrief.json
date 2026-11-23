@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4242",
   "created": "2026-11-23T08:46:31.743Z",
-  "updated": "2026-11-23T09:31:45.385Z",
+  "updated": "2026-11-23T09:32:27.875Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,6 +30,11 @@
     "trust-launch-targets.ac4": {
       "status": "completed",
       "doneAt": "2026-11-23T09:31:45.385Z"
+    },
+    "settings-copy-permissions": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4242",
+      "claimedAt": "2026-11-23T09:32:27.875Z"
     }
   }
 }
