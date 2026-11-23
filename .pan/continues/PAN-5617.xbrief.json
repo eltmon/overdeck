@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5617",
+  "created": "2026-11-23T18:07:48.377Z",
+  "updated": "2026-11-23T18:07:48.377Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "runner-unadmitted-env": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5617",
+      "claimedAt": "2026-11-23T18:07:48.376Z"
+    }
+  }
+}
