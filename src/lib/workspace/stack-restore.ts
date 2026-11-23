@@ -25,6 +25,7 @@ import { Effect } from 'effect';
 import { emitActivityEntry } from '../activity-logger.js';
 import {
   appendPipelineEntry,
+  isHousekeepingEntry,
   openStackReclaim,
   readPipelineJournal,
   type PipelineJournalEntry,
@@ -50,8 +51,8 @@ export type StackRestoreTrigger = 'turn' | 'spawn' | 'verification';
 
 export type StackRestoreResult =
   | { kind: 'none' }
-  | { kind: 'restored'; started: string[]; alreadyRunning: string[]; missing: string[]; refused: string[] }
-  | { kind: 'failed'; failed: string[]; error: string };
+  | { kind: 'restored'; started: string[]; alreadyRunning: string[]; missing: string[]; refused: string[]; snapshot?: DockerContainerLifecycle[] }
+  | { kind: 'failed'; failed: string[]; error: string; started?: string[]; snapshot?: DockerContainerLifecycle[] };
 
 /** The stack lock file, under `<workspace>/.overdeck/`. */
 export const STACK_LOCK_FILE = 'stack-reclaim.lock';
@@ -135,6 +136,9 @@ export interface StackRestoreDeps {
   appendEntry: typeof appendPipelineEntry;
   emitActivity: typeof emitActivityEntry;
   withLock: <T>(lockPath: string, fn: () => Promise<T>) => Promise<T>;
+  /** PAN-5648 (r4672667736/787): the lifecycle snapshot a restore refreshes. */
+  collect: () => Promise<DockerContainerLifecycle[]>;
+  record: (containers: DockerContainerLifecycle[]) => void;
 }
 
 function resolveDeps(deps: Partial<StackRestoreDeps> = {}): StackRestoreDeps {
@@ -147,6 +151,8 @@ function resolveDeps(deps: Partial<StackRestoreDeps> = {}): StackRestoreDeps {
     appendEntry: deps.appendEntry ?? appendPipelineEntry,
     emitActivity: deps.emitActivity ?? emitActivityEntry,
     withLock: deps.withLock ?? ((lockPath, fn) => withStackLock(lockPath, fn, RESTORE_LOCK_TIMEOUT_MS)),
+    collect: deps.collect ?? (() => Effect.runPromise(collectDockerContainerLifecycleSnapshot())),
+    record: deps.record ?? recordDockerContainerLifecycleSnapshot,
   };
 }
 
@@ -154,6 +160,26 @@ function resolveWorkspacePath(issueId: string, workspacePath: string | null | un
   if (workspacePath) return workspacePath;
   const projectKey = resolveProjectFromIssueSync(issueId)?.projectKey;
   return defaultWorkspacePath(issueId, projectKey ? getProjectSync(projectKey) : null);
+}
+
+/** Never records, and never returns, an empty or failed listing (D7). */
+async function refreshSnapshot(d: StackRestoreDeps): Promise<DockerContainerLifecycle[] | undefined> {
+  try {
+    const containers = await d.collect();
+    if (containers.length === 0) return undefined;
+    d.record(containers);
+    return containers;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The newest `stack.*` entry's type, or null when the journal has none. */
+function newestHousekeepingType(entries: readonly PipelineJournalEntry[]): PipelineJournalEntry['type'] | null {
+  for (let index = entries.length - 1; index >= 0; index -= 1) {
+    if (isHousekeepingEntry(entries[index])) return entries[index].type;
+  }
+  return null;
 }
 
 /**
@@ -216,7 +242,12 @@ export async function restoreReclaimedStack(
 
       // A failed start writes nothing: the reclaim stays open, so a later
       // attempt finds the containers that did start as already running.
-      if (failed.length > 0) return { kind: 'failed', failed, error: errors.join('; ') };
+      if (failed.length > 0) {
+        const snapshot = started.length > 0 ? await refreshSnapshot(d) : undefined;
+        return { kind: 'failed', failed, error: errors.join('; '), started, snapshot };
+      }
+
+      const snapshot = started.length > 0 ? await refreshSnapshot(d) : undefined;
 
       d.appendEntry(workspacePath, {
         type: 'stack.restored',
@@ -236,7 +267,7 @@ export async function restoreReclaimedStack(
       if (refused.length > 0) {
         console.warn(`[stack-restore] ${issueId}: refused to start ${refused.join(', ')} (not in compose project ${composeProject ?? 'unknown'} or not a reclaimable service)`);
       }
-      return { kind: 'restored', started, alreadyRunning, missing, refused };
+      return { kind: 'restored', started, alreadyRunning, missing, refused, snapshot };
     });
   } catch (err) {
     return { kind: 'failed', failed: [], error: String(err) };
@@ -244,28 +275,30 @@ export async function restoreReclaimedStack(
 }
 
 /**
- * The spawn-path wrapper (D10): restores with trigger `spawn`, and when it
- * started something returns a fresh, recorded container listing for the
- * caller's next health read. Returns `undefined` otherwise, including when
- * the fresh listing fails or is empty, so a gating read never sees a bad
- * listing. Never rejects.
+ * The spawn-path wrapper (D10): restores with trigger `spawn`, then returns a
+ * fresh, recorded container listing for the caller's next health read —
+ * `restored` and `failed` always try for one (reusing the door's own
+ * refresh when it already has one, so `record` fires at most once per
+ * call); `none` refreshes only when the newest `stack.*` entry shows a
+ * restore just happened, so an issue that was never reclaimed never pays for
+ * a docker call on this hot spawn path. Returns `undefined` when there is
+ * nothing fresh to report, including when the listing fails or is empty.
+ * Never rejects.
  */
 export async function restoreReclaimedStackForSpawn(
   issueId: string,
   workspacePath?: string | null,
-  deps?: Partial<StackRestoreDeps> & {
-    collect?: () => Promise<DockerContainerLifecycle[]>;
-    record?: (containers: DockerContainerLifecycle[]) => void;
-  },
+  deps?: Partial<StackRestoreDeps>,
 ): Promise<DockerContainerLifecycle[] | undefined> {
   try {
-    const result = await restoreReclaimedStack({ issueId, workspacePath, trigger: 'spawn' }, deps);
-    if (result.kind !== 'restored' || result.started.length === 0) return undefined;
-    const collect = deps?.collect ?? (() => Effect.runPromise(collectDockerContainerLifecycleSnapshot()));
-    const containers = await collect();
-    if (containers.length === 0) return undefined;
-    (deps?.record ?? recordDockerContainerLifecycleSnapshot)(containers);
-    return containers;
+    const d = resolveDeps(deps);
+    const result = await restoreReclaimedStack({ issueId, workspacePath, trigger: 'spawn' }, d);
+    if (result.kind === 'restored' || result.kind === 'failed') {
+      return result.snapshot ?? await refreshSnapshot(d);
+    }
+    const resolvedPath = resolveWorkspacePath(issueId, workspacePath);
+    if (!resolvedPath || newestHousekeepingType(d.readJournal(resolvedPath)) !== 'stack.restored') return undefined;
+    return await refreshSnapshot(d);
   } catch {
     return undefined;
   }

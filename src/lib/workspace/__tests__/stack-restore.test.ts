@@ -22,6 +22,7 @@ const ISSUE = 'MIN-1144';
 const PROJECT = 'myn-feature-min-1144';
 const API = 'myn-feature-min-1144-api-1';
 const FE = 'myn-feature-min-1144-fe-1';
+const FRESH: DockerContainerLifecycle[] = [{ id: 'id-api', name: API, status: 'Up 1 second', state: 'running', composeProject: PROJECT }];
 
 let workspace: string;
 
@@ -73,6 +74,10 @@ function world(listed: ComposeContainer[] | null, overrides: Partial<StackRestor
       inLock = false;
     }
   });
+  // PAN-5648: stubbed so no door test runs real `docker ps` or writes the
+  // global lifecycle cache; a test that cares about the refresh overrides these.
+  const collect = vi.fn(async (): Promise<DockerContainerLifecycle[]> => []);
+  const record = vi.fn();
   const deps: Partial<StackRestoreDeps> = {
     composeProjectFor: () => PROJECT,
     readJournal,
@@ -81,9 +86,11 @@ function world(listed: ComposeContainer[] | null, overrides: Partial<StackRestor
     appendEntry,
     emitActivity,
     withLock,
+    collect,
+    record,
     ...overrides,
   };
-  return { deps, listContainers, startContainer, appendEntry, emitActivity, withLock, journalReadsInLock };
+  return { deps, listContainers, startContainer, appendEntry, emitActivity, withLock, journalReadsInLock, collect, record };
 }
 
 function restored() {
@@ -217,6 +224,39 @@ describe('restoreReclaimedStack (PAN-5623)', () => {
   });
 });
 
+describe('restoreReclaimedStack snapshot refresh (PAN-5648 restore-refresh-snapshot, CodeRabbit r4672667736/787)', () => {
+  it('records the fresh snapshot before journaling stack.restored, and the result carries it (ac1)', async () => {
+    reclaim([API]);
+    const w = world([container(API, 'exited')]);
+    const record = vi.fn();
+
+    const result = await restoreReclaimedStack(
+      { issueId: ISSUE, workspacePath: workspace, trigger: 'turn' },
+      { ...w.deps, collect: async () => FRESH, record },
+    );
+
+    expect(result).toMatchObject({ kind: 'restored', started: [API], snapshot: FRESH });
+    expect(record).toHaveBeenCalledExactlyOnceWith(FRESH);
+    expect(record.mock.invocationCallOrder[0]).toBeLessThan(w.appendEntry.mock.invocationCallOrder[0]!);
+  });
+
+  it('on a partial failure, returns failed carrying the started name and a refreshed snapshot (ac2)', async () => {
+    reclaim([API, FE]);
+    const w = world([container(API, 'exited'), container(FE, 'exited')]);
+    w.startContainer.mockImplementation(async (name: string) =>
+      (name === FE ? { ok: false, error: 'port is already allocated' } : { ok: true }));
+    const record = vi.fn();
+
+    const result = await restoreReclaimedStack(
+      { issueId: ISSUE, workspacePath: workspace, trigger: 'turn' },
+      { ...w.deps, collect: async () => FRESH, record },
+    );
+
+    expect(result).toMatchObject({ kind: 'failed', failed: [FE], started: [API], snapshot: FRESH });
+    expect(record).toHaveBeenCalledExactlyOnceWith(FRESH);
+  });
+});
+
 describe('restoreReclaimedStackForSpawn (PAN-5623)', () => {
   const fresh: DockerContainerLifecycle[] = [{ id: 'id-api', name: API, status: 'Up 1 second', state: 'running', composeProject: PROJECT }];
 
@@ -230,17 +270,17 @@ describe('restoreReclaimedStackForSpawn (PAN-5623)', () => {
     expect(restored()[0]?.source).toBe('stack-restore:spawn');
   });
 
-  it('returns undefined and records nothing when nothing started', async () => {
+  it('returns a fresh recorded listing when every container is already running (PAN-5648 restore-refresh-snapshot.ac3)', async () => {
     reclaim([API]);
     const w = world([container(API, 'running')]);
     const collect = vi.fn(async () => fresh);
     const record = vi.fn();
-    await expect(restoreReclaimedStackForSpawn(ISSUE, workspace, { ...w.deps, collect, record })).resolves.toBeUndefined();
-    expect(collect).not.toHaveBeenCalled();
-    expect(record).not.toHaveBeenCalled();
+    const result = await restoreReclaimedStackForSpawn(ISSUE, workspace, { ...w.deps, collect, record });
+    expect(result).toBe(fresh);
+    expect(record).toHaveBeenCalledExactlyOnceWith(fresh);
   });
 
-  it('returns undefined without recording when the fresh listing fails or is empty', async () => {
+  it('returns undefined without recording when the fresh listing fails or is empty (PAN-5648 restore-refresh-snapshot.ac5)', async () => {
     for (const collect of [async () => { throw new Error('docker not found'); }, async () => []]) {
       rmSync(workspace, { recursive: true, force: true });
       workspace = mkdtempSync(join(tmpdir(), 'stack-restore-'));
@@ -250,6 +290,39 @@ describe('restoreReclaimedStackForSpawn (PAN-5623)', () => {
       await expect(restoreReclaimedStackForSpawn(ISSUE, workspace, { ...w.deps, collect, record })).resolves.toBeUndefined();
       expect(record).not.toHaveBeenCalled();
     }
+  });
+
+  it('on a partial failure, still returns the fresh listing with record called once (PAN-5648 restore-refresh-snapshot.ac2)', async () => {
+    reclaim([API, FE]);
+    const w = world([container(API, 'exited'), container(FE, 'exited')]);
+    w.startContainer.mockImplementation(async (name: string) =>
+      (name === FE ? { ok: false, error: 'port is already allocated' } : { ok: true }));
+    const record = vi.fn();
+
+    const result = await restoreReclaimedStackForSpawn(ISSUE, workspace, { ...w.deps, collect: async () => FRESH, record });
+
+    expect(result).toBe(FRESH);
+    expect(record).toHaveBeenCalledExactlyOnceWith(FRESH);
+  });
+
+  it('for "none", refreshes only when the newest stack.* entry is stack.restored, never touching docker otherwise (PAN-5648 restore-refresh-snapshot.ac4)', async () => {
+    appendPipelineEntry(workspace, { type: 'stack.reclaimed', issueId: ISSUE, data: { containers: [API], composeProject: PROJECT } });
+    appendPipelineEntry(workspace, { type: 'stack.restored', issueId: ISSUE, data: { containers: [API] } });
+    const restoredCase = world([]);
+    const collectRestored = vi.fn(async () => FRESH);
+    const recordRestored = vi.fn();
+    await expect(restoreReclaimedStackForSpawn(ISSUE, workspace, { ...restoredCase.deps, collect: collectRestored, record: recordRestored }))
+      .resolves.toBe(FRESH);
+    expect(collectRestored).toHaveBeenCalledOnce();
+    expect(recordRestored).toHaveBeenCalledExactlyOnceWith(FRESH);
+
+    rmSync(workspace, { recursive: true, force: true });
+    workspace = mkdtempSync(join(tmpdir(), 'stack-restore-'));
+    const bareCase = world([]);
+    const collectBare = vi.fn(async () => FRESH);
+    await expect(restoreReclaimedStackForSpawn(ISSUE, workspace, { ...bareCase.deps, collect: collectBare }))
+      .resolves.toBeUndefined();
+    expect(collectBare).not.toHaveBeenCalled();
   });
 });
 
