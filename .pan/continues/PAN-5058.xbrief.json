@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5058",
   "created": "2026-11-23T02:58:48.676Z",
-  "updated": "2026-11-23T03:35:12.908Z",
+  "updated": "2026-11-23T03:35:27.615Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -54,6 +54,11 @@
     "w1b-auth-scheme-audit.ac2": {
       "status": "completed",
       "doneAt": "2026-11-23T03:35:12.908Z"
+    },
+    "w2-cp1-grok-funnel": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5058",
+      "claimedAt": "2026-11-23T03:35:27.615Z"
     }
   }
 }
