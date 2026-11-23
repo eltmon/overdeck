@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5623",
   "created": "2026-11-23T20:20:25.006Z",
-  "updated": "2026-11-23T20:53:59.760Z",
+  "updated": "2026-11-23T20:54:10.547Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -145,6 +145,11 @@
     "wi6-spawn-gate-restore.ac4": {
       "status": "completed",
       "doneAt": "2026-11-23T20:53:59.760Z"
+    },
+    "wi8-health-reclaim-aware": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5623",
+      "claimedAt": "2026-11-23T20:54:10.547Z"
     }
   }
 }
