@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5611",
   "created": "2026-11-23T06:14:33.904Z",
-  "updated": "2026-11-23T10:17:56.897Z",
+  "updated": "2026-11-23T10:29:11.818Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -94,9 +94,30 @@
       "doneAt": "2026-11-23T10:17:52.375Z"
     },
     "sweep-resurface-pass": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5611",
-      "claimedAt": "2026-11-23T10:17:56.897Z"
+      "claimedAt": "2026-11-23T10:17:56.897Z",
+      "doneAt": "2026-11-23T10:29:11.817Z"
+    },
+    "sweep-resurface-pass.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T10:29:11.817Z"
+    },
+    "sweep-resurface-pass.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T10:29:11.817Z"
+    },
+    "sweep-resurface-pass.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T10:29:11.817Z"
+    },
+    "sweep-resurface-pass.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T10:29:11.817Z"
+    },
+    "sweep-resurface-pass.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-23T10:29:11.817Z"
     }
   }
 }
