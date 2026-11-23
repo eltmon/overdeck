@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5633",
   "created": "2026-11-23T19:06:23.391Z",
-  "updated": "2026-11-23T19:25:58.443Z",
+  "updated": "2026-11-23T19:27:14.074Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -146,9 +146,22 @@
       "doneAt": "2026-11-23T19:25:55.027Z"
     },
     "wi7-banner-poll": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5633",
-      "claimedAt": "2026-11-23T19:25:58.443Z"
+      "claimedAt": "2026-11-23T19:25:58.443Z",
+      "doneAt": "2026-11-23T19:27:14.073Z"
+    },
+    "wi7-banner-poll.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:27:14.073Z"
+    },
+    "wi7-banner-poll.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:27:14.073Z"
+    },
+    "wi7-banner-poll.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:27:14.073Z"
     }
   }
 }
