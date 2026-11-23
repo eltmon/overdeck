@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5623",
   "created": "2026-11-23T20:20:25.006Z",
-  "updated": "2026-11-23T20:54:36.858Z",
+  "updated": "2026-11-23T20:54:41.227Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -163,6 +163,11 @@
     "wi8-health-reclaim-aware.ac3": {
       "status": "completed",
       "doneAt": "2026-11-23T20:54:36.858Z"
+    },
+    "wi11-candidate-rules": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5623",
+      "claimedAt": "2026-11-23T20:54:41.227Z"
     }
   }
 }
