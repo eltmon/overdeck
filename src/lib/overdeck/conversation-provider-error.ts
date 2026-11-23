@@ -35,6 +35,10 @@ export interface ConversationProviderError {
   code: string | null;
   /** PAN-4641: set only when the error is a usage limit (`error: rate_limit` or HTTP 429). */
   usageLimit: ConversationUsageLimit | null;
+  /** PAN-5633: Codex only — the failed turn's kind. Absent for Claude Code rows. */
+  kind?: 'auth' | 'context-window' | 'other';
+  /** PAN-5633: Codex auth failures only — true once ~/.codex/auth.json was rewritten after the failure. */
+  authRecovered?: boolean;
 }
 
 type JsonRecord = { [key: string]: unknown };

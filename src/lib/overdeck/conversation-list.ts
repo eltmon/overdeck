@@ -5,6 +5,7 @@ import { resolveEffectivePullRequest } from '@overdeck/contracts';
 
 import { scanPendingInputs, type PendingAskUserQuestionSnapshot, type PendingInputKind } from '../agent-enrichment.js';
 import { getAgentRuntimeStateSync } from '../agents.js';
+import { getNativeCodexAuthPath } from '../codex-auth.js';
 import { withConcurrencyLimit } from '../concurrency.js';
 import { laneFieldsByRun } from '../lanes/lane-list-fields.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
@@ -20,7 +21,8 @@ import {
 import { isSupersededConversation } from './conversation-clear-chain.js';
 import { codexConversationPendingInput } from './conversation-delivery.js';
 import { readConversationInputTarget } from './conversation-input-target.js';
-import { readConversationProviderError } from './conversation-provider-error.js';
+import { readCodexConversationProviderError } from './codex-provider-error.js';
+import { readConversationProviderError, type ConversationProviderError } from './conversation-provider-error.js';
 import { listPullRequestLinksForConversations } from './conversation-pull-requests.js';
 import { EMPTY_SCHEDULE_SUMMARY, listScheduleSummariesForConversations } from './conversation-schedules.js';
 import { EMPTY_CONVERSATION_TRIAGE, listConversationTriage } from './conversation-triage-store.js';
@@ -154,6 +156,9 @@ async function enrichConversationList(limit: number, offset: number): Promise<re
   const schedules = listScheduleSummariesForConversations(conversations.map((conv) => conv.name));
   // PAN-5005: lane fields over local and remote lanes of the page's runs.
   const lanes = await laneFieldsByRun(conversations.filter((conv) => conv.laneKey && conv.gauntletRun).map((conv) => conv.gauntletRun as string));
+  // PAN-5633: one stat of ~/.codex/auth.json per page, only when a Codex row needs it.
+  let nativeAuthMtimeP: Promise<number | null> | undefined;
+  const nativeAuthMtime = () => (nativeAuthMtimeP ??= stat(getNativeCodexAuthPath()).then((s) => s.mtimeMs, () => null));
   return withConcurrencyLimit(
     conversations.map((conv) => async () => {
       let row = conv;
@@ -254,10 +259,11 @@ async function enrichConversationList(limit: number, offset: number): Promise<re
           if (codex.approval) pendingAskUserQuestion = codex.approval;
         }
       }
-      let providerError = null;
+      let providerError: ConversationProviderError | null = null;
       if (sessionAlive && !isWorking && pendingInputCount === 0 && convSf) {
         const transcriptKind = getHarnessBehavior(row.harness).transcriptKind;
         if (transcriptKind === 'claude-jsonl') providerError = await readConversationProviderError(convSf);
+        else if (transcriptKind === 'codex-rollout-jsonl') providerError = await readCodexConversationProviderError(convSf, await nativeAuthMtime());
       }
       const ledger = ledgerCosts.get(String(row.id));
       return {
