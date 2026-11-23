@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5250",
   "created": "2026-11-23T23:10:09.644Z",
-  "updated": "2026-11-23T23:10:09.644Z",
+  "updated": "2026-11-23T23:12:02.434Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,30 @@
   "sessionHistory": [],
   "items": {
     "wi1-open-reclaim-union": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5250",
-      "claimedAt": "2026-11-23T23:10:09.644Z"
+      "claimedAt": "2026-11-23T23:10:09.644Z",
+      "doneAt": "2026-11-23T23:12:02.434Z"
+    },
+    "wi1-open-reclaim-union.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:12:02.434Z"
+    },
+    "wi1-open-reclaim-union.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:12:02.434Z"
+    },
+    "wi1-open-reclaim-union.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:12:02.434Z"
+    },
+    "wi1-open-reclaim-union.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:12:02.434Z"
+    },
+    "wi1-open-reclaim-union.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:12:02.434Z"
     }
   }
 }
