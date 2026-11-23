@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5599",
   "created": "2026-11-23T05:24:22.748Z",
-  "updated": "2026-11-23T09:18:47.223Z",
+  "updated": "2026-11-23T09:18:56.409Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -138,6 +138,11 @@
     "header-skip-copy.ac2": {
       "status": "completed",
       "doneAt": "2026-11-23T09:18:47.223Z"
+    },
+    "list-finished-queued-placement": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5599",
+      "claimedAt": "2026-11-23T09:18:56.409Z"
     }
   }
 }
