@@ -197,10 +197,14 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     ] as const)
   ));
   const agentIssueKeys = new Set(agents.map(agent => issueKey(agent.issueId!)));
-  const brokenStacksWithoutAgent = Array.from(issueIds)
+  const issuesWithoutAgent = Array.from(issueIds)
     .filter(([key]) => !agentIssueKeys.has(key))
     .map(([key, issueId]) => ({ issueId, stackHealth: stackHealthByIssue.get(key) }))
-    .filter((entry): entry is { issueId: string; stackHealth: NonNullable<typeof entry.stackHealth> } => Boolean(entry.stackHealth && !entry.stackHealth.healthy));
+    .filter((entry): entry is { issueId: string; stackHealth: NonNullable<typeof entry.stackHealth> } => Boolean(entry.stackHealth));
+  const brokenStacksWithoutAgent = issuesWithoutAgent.filter((entry) => !entry.stackHealth.healthy);
+  // PAN-5648 (r4672667670): a reclaim can leave a stack `healthy` (it is
+  // stopped on purpose), so it was invisible here — neither broken nor shown.
+  const reclaimedStacksWithoutAgent = issuesWithoutAgent.filter((entry) => (entry.stackHealth.reclaimed?.length ?? 0) > 0);
 
   if (options.json) {
     const agentsWithShadow = await Promise.all(agents.map(async agent => {
@@ -229,7 +233,7 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     console.log('');
   }
 
-  if (agents.length === 0 && brokenStacksWithoutAgent.length === 0) {
+  if (agents.length === 0 && brokenStacksWithoutAgent.length === 0 && reclaimedStacksWithoutAgent.length === 0) {
     console.log(chalk.dim('No running agents.'));
     console.log(chalk.dim('Use "pan start <id>" to spawn one.'));
     return;
@@ -288,6 +292,15 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     for (const { issueId, stackHealth } of brokenStacksWithoutAgent) {
       console.log(`${chalk.cyan(issueId)}`);
       console.log(`  Stack:    ${chalk.red('STACK BROKEN')} ${stackHealth.reasons.join('; ')}`);
+      console.log('');
+    }
+  }
+
+  if (reclaimedStacksWithoutAgent.length > 0) {
+    console.log(chalk.bold('Stacks Stopped To Free Memory\n'));
+    for (const { issueId, stackHealth } of reclaimedStacksWithoutAgent) {
+      console.log(`${chalk.cyan(issueId)}`);
+      console.log(`  Stack:    ${chalk.yellow('stopped to free memory')}: ${stackHealth.reclaimed!.join(', ')}; starts again when the issue needs it`);
       console.log('');
     }
   }
