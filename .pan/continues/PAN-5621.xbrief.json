@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5621",
   "created": "2026-11-23T18:11:42.737Z",
-  "updated": "2026-11-23T20:03:14.320Z",
+  "updated": "2026-11-23T20:03:18.176Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -122,6 +122,11 @@
     "wi5-status-line.ac3": {
       "status": "completed",
       "doneAt": "2026-11-23T20:03:14.320Z"
+    },
+    "wi6-docs-changelog": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5621",
+      "claimedAt": "2026-11-23T20:03:18.175Z"
     }
   }
 }
