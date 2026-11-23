@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5615",
   "created": "2026-11-23T18:07:00.473Z",
-  "updated": "2026-11-23T18:08:58.282Z",
+  "updated": "2026-11-23T18:09:39.615Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,9 +32,26 @@
       "doneAt": "2026-11-23T18:08:29.332Z"
     },
     "role-review-escalation-target": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5615",
-      "claimedAt": "2026-11-23T18:08:58.282Z"
+      "claimedAt": "2026-11-23T18:08:58.282Z",
+      "doneAt": "2026-11-23T18:09:39.615Z"
+    },
+    "role-review-escalation-target.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:09:39.615Z"
+    },
+    "role-review-escalation-target.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:09:39.615Z"
+    },
+    "role-review-escalation-target.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:09:39.615Z"
+    },
+    "role-review-escalation-target.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:09:39.615Z"
     }
   }
 }
