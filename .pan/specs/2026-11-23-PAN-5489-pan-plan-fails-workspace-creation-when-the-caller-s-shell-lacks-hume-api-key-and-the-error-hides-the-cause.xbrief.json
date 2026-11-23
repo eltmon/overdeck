@@ -1,0 +1,509 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-23T06:51:26Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5489: pan plan fails workspace creation when the caller's shell lacks HUME_API_KEY, and the error hides the cause",
+    "updated": "2026-11-23T06:59:13.716Z"
+  },
+  "plan": {
+    "id": "pan-5489",
+    "title": "pan plan fails workspace creation when the caller's shell lacks HUME_API_KEY, and the error hides the cause",
+    "status": "running",
+    "uid": "46fdec23-0f93-4d7d-bc43-0e537fcc2136",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-23T06:51:26Z",
+    "updated": "2026-11-23T06:59:13.716Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5489",
+        "label": "PAN-5489",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5489.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "workspace",
+      "hume",
+      "env",
+      "error-reporting",
+      "dashboard-routes"
+    ],
+    "narratives": {
+      "Problem": "Workspace creation for a project with a workspace.hume block fails when the process running createWorkspace has no HUME_API_KEY. For pan plan that process is the dashboard (pan plan only POSTs /api/issues/:id/start-planning), not the caller's shell; the CLI already loads ~/.overdeck.env. The error says 'see steps for details' but no consumer prints the steps. createWorkspace clears the PAN-4171 setup marker even after the Hume step fails, so a retry treats the half-built workspace as finished and never writes .hume-config. Separately, POST /api/fleet/issues/:id/start (MCP start_issue) and the machine work door are not wrapped in httpHandler, and spawn-issue.ts wraps a rejecting Effect.promise in a try/catch that cannot catch it, so start failures become unlogged 500s with no error message.",
+      "Proposal": "Resolve the Hume API key at point of use from process.env, then the project's workspace.env.secrets_file, then a fresh read of ~/.overdeck.env, passing it as a value and never writing process.env (WI-1). Put the failing step line in the workspace-creation error for Hume and tunnel via a small helper (WI-2). Keep the setup marker when the Hume step fails so the next create re-runs it (WI-3). Replace the dead try/catch around pan workspace create in spawn-issue with a never-rejecting helper that logs and returns the message (WI-4). Wrap both issue-start handlers in httpHandler and log the typed 500 errors (WI-5). Update docs/CONFIGURATION.md, docs/WORKSPACES-AND-PROJECTS.md and add changelog.d/pan-5489.md (WI-6). Full detail with before/after code is in .pan/drafts/PAN-5489.md.",
+      "NonGoals": "- Restoring MYN's hume: block in ~/.overdeck/projects.yaml (operator configuration).\n- Repairing existing workspaces already left without .hume-config and without a setup marker.\n- Making a Hume failure non-fatal to workspace creation.\n- Keeping the setup marker for tunnel, port, devcontainer or Docker failures.\n- Writing project secrets_file keys into the dashboard's or the CLI's process.env.\n- Changing how agent panes receive ~/.overdeck.env keys (PAN-5065).\n- Adding a ~/.overdeck.env load to the CLI (src/cli/index.ts already loads it).\n- Confirming the root cause of the two 2026-11-22 MCP start_issue 500s."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fix the Hume key lookup at point of use in src/lib/hume.ts instead of adding a CLI env load.",
+        "rationale": "dashboard.log shows createWorkspace and the Hume failure ran in the dashboard process for MIN-1142 and MIN-1144; src/cli/index.ts already loads ~/.overdeck.env, so a CLI change would be a no-op. The issue's 'verified cause' is a misdiagnosis, not a contradiction to escalate."
+      },
+      {
+        "summary": "Key lookup order: process.env, then the project's secrets_file, then a fresh read of ~/.overdeck.env; empty string counts as absent.",
+        "rationale": "An explicit running-process value wins (matches loadOverdeckEnv's no-override rule); the project file is more specific than the global file; a fresh read covers a dashboard that booted before the key was added."
+      },
+      {
+        "summary": "Only a failed Hume step keeps the PAN-4171 setup marker.",
+        "rationale": "The Hume step is idempotent (reuses a config with the same name) and its output .hume-config is what a retry must produce; keeping the marker for every soft failure would make a persistent port or devcontainer warning fail every later start."
+      },
+      {
+        "summary": "Fix the tunnel step's identical 'see steps for details' error text too, without changing its marker behavior.",
+        "rationale": "Same defect, same file, same helper; costs one line."
+      },
+      {
+        "summary": "Prove acceptance at the unit boundary rather than with the issue's env -u pan plan command.",
+        "rationale": "pan plan runs creation in the dashboard, which env -u in the caller's shell does not affect, and MYN's live projects.yaml currently has no hume: block."
+      },
+      {
+        "summary": "Wrap handleFleetIssueStart and handleWorkIssueStart in httpHandler inside the exported functions, and log the typed 500 errors in httpHandler.",
+        "rationale": "Meets the issue comment's ask (log server-side, return the message) and keeps the existing direct-call tests able to assert the 500 mapping without a router."
+      },
+      {
+        "summary": "Move the spawn-issue workspace-create call into a new module.",
+        "rationale": "spawn-issue.ts is at 955 of the 1000-line ceiling; the helper is also easier to unit test outside the route's service graph."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-23-PAN-5489-pan-plan-fails-workspace-creation-when-the-caller-s-shell-lacks-hume-api-key-and-the-error-hides-the-cause.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "hume-key-resolver",
+        "title": "Resolve the Hume API key from process env, project secrets_file, then ~/.overdeck.env",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T06:51:26Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5489",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "hume-step-error-text",
+            "hume-retry-keeps-marker"
+          ],
+          "files_scope": [
+            "src/lib/env-loader.ts",
+            "src/lib/projects/launch-env.ts",
+            "src/lib/hume.ts",
+            "src/lib/workspace-manager/create.ts",
+            "src/lib/workspace-manager/remove.ts",
+            "tests/unit/lib/hume-api-key.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/hume-api-key.test.ts tests/unit/lib/projects/launch-env.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "hume-api-key.test.ts and launch-env.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-1 exactly: add async readOverdeckEnvFile() to src/lib/env-loader.ts (path resolved at call time via homedir(), {} on any read error); widen readProjectSecrets' parameter in src/lib/projects/launch-env.ts to an exported structural SecretsFileOwner type with no behavior change; add exported resolveHumeApiKey(config, { project? }) to src/lib/hume.ts returning { apiKey, source } or { apiKey: null, checked }, checking process.env[api_key_env||'HUME_API_KEY'] (non-empty), then readProjectSecrets(project), then readOverdeckEnvFile(); never assign process.env. createHumeConfig and deleteHumeConfig gain a third options param and use it; the not-found step becomes '[hume] API key not found: <ENV> is not set in <checked sources joined by ', '>'. create.ts line 618 and remove.ts line 113 pass { project: { key: projectConfig.name, config: projectConfig } }. Write tests/unit/lib/hume-api-key.test.ts with temp HOME, stubbed env and stubbed fetch (immediate responses). Test layout: create the fake project dir and fake HOME as sibling temp dirs (readProjectSecrets ignores a secrets file inside the project path)."
+        },
+        "items": [
+          {
+            "id": "hume-key-resolver.ac1",
+            "title": "Given HUME_API_KEY is empty in process.env and set only in the project's secrets_file, when createHumeConfig runs, then its first fetch sends X-Hume-Api-Key equal to the secrets_file value and resolveHumeApiKey returns source 'secrets-file'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hume-key-resolver.ac2",
+            "title": "Given the key is set only in <HOME>/.overdeck.env written after module import, when resolveHumeApiKey runs, then it returns source 'overdeck-env'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hume-key-resolver.ac3",
+            "title": "Given the key exists in process.env and both files, when resolveHumeApiKey runs, then it returns source 'process-env'; and after any secrets-file resolution process.env.HUME_API_KEY is still empty",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hume-key-resolver.ac4",
+            "title": "Given the key is absent everywhere, when createHumeConfig runs, then it returns success false with one step line naming HUME_API_KEY, the secrets_file path and the .overdeck.env path, and the line contains no key value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "hume-step-error-text",
+        "title": "Put the failing Hume or tunnel step line into the workspace-creation error",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T06:51:26Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5489",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspace-manager/step-failure.ts",
+            "src/lib/workspace-manager/create.ts",
+            "tests/unit/lib/workspace-manager/step-failure.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/workspace-manager/step-failure.test.ts",
+            "git grep -n \"see steps for details\" -- src",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "step-failure.test.ts passes",
+            "git grep prints no lines",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-2: create src/lib/workspace-manager/step-failure.ts exporting failingStepLines(steps) (lines matching /\\b(failed|not found)\\b/i, else the last line, joined with '; ') and setupStepError(label, steps) ('<label> failed: <lines>' or '<label> failed' when empty). In create.ts replace line 612 with setupStepError('Tunnel setup', tunnelResult.steps) and line 628 with setupStepError('Hume EVI config setup', humeResult.steps). No caller changes are needed: pan workspace create, the planning SSE error printed by pan plan, and dashboard.log all print result.errors."
+        },
+        "items": [
+          {
+            "id": "hume-step-error-text.ac1",
+            "title": "Given steps ['[hume] API key not found: HUME_API_KEY is not set in …'], when setupStepError('Hume EVI config setup', steps) runs, then it returns 'Hume EVI config setup failed: [hume] API key not found: HUME_API_KEY is not set in …'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hume-step-error-text.ac2",
+            "title": "Given tunnel steps with two '[tunnel] Failed …' lines between success lines, when failingStepLines runs, then it returns exactly those two lines joined by '; '; given no matching line it returns the last line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hume-step-error-text.ac3",
+            "title": "git grep -n 'see steps for details' -- src produces no output after the change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "hume-retry-keeps-marker",
+        "title": "Keep the setup marker after a failed Hume step so a retry re-runs it",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T06:51:26Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5489",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspace-manager/create.ts",
+            "tests/unit/lib/workspace-manager/create-resume-setup.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/workspace-manager/create-resume-setup.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "create-resume-setup.test.ts passes including the new Hume retry cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-3: in createWorkspace declare let humeFailed = false before the Hume block, set it true when !humeResult.success, and change the final clearWorkspaceSetupIncomplete(workspacePath) to run only when !humeFailed; update the comment at create.ts lines 737-738 as shown in the PRD. Extend tests/unit/lib/workspace-manager/create-resume-setup.test.ts by mocking src/lib/hume.js (createHumeConfig fails first with a '[hume] API key not found' step, then succeeds with configId 'cfg-1') and giving the project config a workspace.hume block. Also mock src/lib/tunnel.js; give the Hume project config workspace.env.secrets_file (a path in a sibling temp dir) and assert createHumeConfig's third argument carries it."
+        },
+        "items": [
+          {
+            "id": "hume-retry-keeps-marker.ac1",
+            "title": "Given createHumeConfig fails, when createWorkspace returns, then success is false, errors contains 'Hume EVI config setup failed: [hume] API key not found', and isWorkspaceSetupIncomplete(workspacePath) returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hume-retry-keeps-marker.ac2",
+            "title": "Given that failed workspace, when createWorkspace runs again and createHumeConfig succeeds with configId 'cfg-1', then createHumeConfig has been called twice, <workspace>/.hume-config contains HUME_CONFIG_ID=cfg-1, and the marker is removed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hume-retry-keeps-marker.ac3",
+            "title": "Given a project whose workspace.env.secrets_file is configured, when createWorkspace runs the Hume step, then createHumeConfig receives a third argument { project: { key: <project name>, config } } whose config.workspace.env.secrets_file equals the configured path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hume-retry-keeps-marker.ac4",
+            "title": "Given a project with no hume block whose mocked addTunnelIngress returns success false with '[tunnel] Failed to get tunnel config: x', when createWorkspace returns, then errors contains 'Tunnel setup failed: [tunnel] Failed to get tunnel config: x' and the setup marker is removed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "spawn-workspace-create-error",
+        "title": "Return a logged 500 with the message when pan workspace create fails during an issue spawn",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T06:51:26Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5489",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/agents/spawn-workspace-create.ts",
+            "src/dashboard/server/routes/agents/spawn-issue.ts",
+            "src/dashboard/server/routes/__tests__/spawn-workspace-create.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/spawn-workspace-create.test.ts",
+            "wc -l src/dashboard/server/routes/agents/spawn-issue.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "spawn-workspace-create.test.ts passes",
+            "spawn-issue.ts has 955 lines or fewer",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-4: create src/dashboard/server/routes/agents/spawn-workspace-create.ts exporting runSpawnWorkspaceCreate(issueId, projectPath, exec) which runs `pan workspace create <ID> --local` with the exact options from spawn-issue.ts lines 355-358, returns null on success, and on rejection console.errors '[spawn-issue] pan workspace create failed for <ID>: <message>' and returns the message (never rejects). In spawn-issue.ts replace the try { yield* Effect.promise(...) } catch (wsErr) block at lines 353-365 with a yield* Effect.promise(() => runSpawnWorkspaceCreate(...)) call and the same 500 { error, hint } response when it returns a message."
+        },
+        "items": [
+          {
+            "id": "spawn-workspace-create-error.ac1",
+            "title": "Given exec rejects with an Error whose message contains 'Hume EVI config setup failed', when runSpawnWorkspaceCreate runs, then it resolves to that message and console.error is called once with a line containing the issue ID",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-workspace-create-error.ac2",
+            "title": "Given exec resolves, when runSpawnWorkspaceCreate runs, then it resolves to null, exec received the command 'pan workspace create MIN-1 --local', and console.error is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-workspace-create-error.ac3",
+            "title": "Given the change, when grep -c 'catch (wsErr)' runs on spawn-issue.ts it returns 0, and wc -l reports 955 lines or fewer (shell verify commands, not vitest)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "issue-start-routes-errors",
+        "title": "Make the issue-start routes log failures and return their message",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T06:51:26Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-5489",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/fleet-work.ts",
+            "src/dashboard/server/routes/machines-work.ts",
+            "src/dashboard/server/routes/http-handler.ts",
+            "src/dashboard/server/__tests__/fleet-workers.test.ts",
+            "src/dashboard/server/__tests__/machines-work-issue-start.test.ts",
+            "src/dashboard/server/routes/__tests__/http-handler.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/fleet-workers.test.ts src/dashboard/server/__tests__/fleet-connector.test.ts src/dashboard/server/__tests__/machines-work-issue-start.test.ts src/dashboard/server/routes/__tests__/http-handler.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all four test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-5: handleFleetIssueStart (fleet-work.ts line 350) and handleWorkIssueStart (machines-work.ts line 219) return httpHandler(Effect.gen(...unchanged body...)) with error type never; in http-handler.ts the WorkspaceCreateError and AgentStartError branches console.error '[httpHandler] <_tag> for <id>: <message>' before returning today's response. Add the tests listed in the PRD."
+        },
+        "items": [
+          {
+            "id": "issue-start-routes-errors.ac1",
+            "title": "Given a self-target fleet issue start whose spawn is Effect.die(new Error('workspace boom')), when handleFleetIssueStart runs under Effect.runPromise, then it resolves to status 500 with body { error: 'workspace boom' } and console.error was called with a string containing 'workspace boom'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-start-routes-errors.ac2",
+            "title": "Given spawn fails with WorkspaceCreateError({ id: 'PAN-9', message: 'Hume EVI config setup failed: x' }), when handleFleetIssueStart runs, then it resolves to status 500 whose error contains 'Hume EVI config setup failed: x' and console.error logs it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-start-routes-errors.ac3",
+            "title": "Given a machine-credential work-door start whose spawn dies with new Error('door boom'), when handleWorkIssueStart runs, then it resolves to status 500 with body { error: 'door boom' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-start-routes-errors.ac4",
+            "title": "Given the wrapped handlers, when the existing fleet-connector.test.ts runs without edits, then it passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-and-changelog",
+        "title": "Document the Hume key lookup, the Hume retry rule, and add the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T06:51:26Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5489",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/CONFIGURATION.md",
+            "docs/WORKSPACES-AND-PROJECTS.md",
+            "changelog.d/pan-5489.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n \"secrets_file\" docs/CONFIGURATION.md",
+            "grep -n \"PAN-5489\" docs/WORKSPACES-AND-PROJECTS.md"
+          ],
+          "expected_outputs": [
+            "lint:docs passes",
+            "CONFIGURATION.md shows the Hume key lookup order naming secrets_file",
+            "WORKSPACES-AND-PROJECTS.md shows the Hume marker rule tagged PAN-5489"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-5",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-6 with the text given there: docs/CONFIGURATION.md line 147 note and the Hume EVI section (lines 772-805) gain the lookup order (process environment, project workspace.env.secrets_file, ~/.overdeck.env read fresh) and the failure/retry behavior with an example error line; docs/WORKSPACES-AND-PROJECTS.md lines 586-589 say soft failures (port, devcontainer, tunnel, Docker) clear the marker but a failed Hume step keeps it (PAN-5489); create changelog.d/pan-5489.md with the two #### Fixed bullets from the PRD. Run npm run lint:docs."
+        },
+        "items": [
+          {
+            "id": "docs-and-changelog.ac1",
+            "title": "docs/CONFIGURATION.md's Hume section contains the lookup order (process environment, then workspace.env.secrets_file, then ~/.overdeck.env), an example 'Hume EVI config setup failed: [hume] API key not found' line, and the way out when the step keeps failing (fix the key or remove the hume: block)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-changelog.ac2",
+            "title": "docs/WORKSPACES-AND-PROJECTS.md contains the rule that a failed Hume step keeps the setup marker so a retry repeats it (PAN-5489), and its soft-failure list no longer contains Hume",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-changelog.ac3",
+            "title": "changelog.d/pan-5489.md exists with a single '#### Fixed' heading and two bullets linking issue #5489, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "hume-key-resolver",
+        "to": "hume-step-error-text",
+        "type": "blocks"
+      },
+      {
+        "from": "hume-step-error-text",
+        "to": "hume-retry-keeps-marker",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

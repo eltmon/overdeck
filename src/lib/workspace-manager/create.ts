@@ -37,6 +37,7 @@ import {
 import { checkDiskFloor, reserveDiskFloor } from '../disk-floor.js';
 import { estimateWorkspaceDiskCost, invalidateWorkspaceDiskCostMemo } from '../workspace/disk-cost.js';
 import { hasPackageJson, installCommandFor } from './dependency-install.js';
+import { setupStepError } from './step-failure.js';
 import type { WorkspaceCreateOptions, WorkspaceCreateResult } from './types.js';
 import {
   clearWorkspaceSetupIncomplete,
@@ -609,13 +610,16 @@ async function createWorkspaceHoldingReservation(
     const tunnelResult = await addTunnelIngress(workspaceConfig.tunnel, placeholders);
     result.steps.push(...tunnelResult.steps);
     if (!tunnelResult.success) {
-      result.errors.push('Tunnel setup had failures (see steps for details)');
+      result.errors.push(setupStepError('Tunnel setup', tunnelResult.steps));
     }
   }
 
   // Create Hume EVI config and write env file for Docker (before Docker so containers pick up the config ID)
+  let humeFailed = false;
   if (workspaceConfig.hume) {
-    const humeResult = await createHumeConfig(workspaceConfig.hume, placeholders);
+    const humeResult = await createHumeConfig(workspaceConfig.hume, placeholders, {
+      project: { key: projectConfig.name, config: projectConfig },
+    });
     result.steps.push(...humeResult.steps);
     if (humeResult.configId) {
       writeFileSync(
@@ -625,7 +629,8 @@ async function createWorkspaceHoldingReservation(
       result.steps.push('Wrote .hume-config with Hume EVI config ID');
     }
     if (!humeResult.success) {
-      result.errors.push('Hume EVI config setup had failures (see steps for details)');
+      humeFailed = true;
+      result.errors.push(setupStepError('Hume EVI config setup', humeResult.steps));
     }
   }
 
@@ -735,8 +740,10 @@ async function createWorkspaceHoldingReservation(
   }
 
   // PAN-4171: every setup step has run. Soft failures above (ports, tunnel,
-  // Hume, Docker) are reported in `errors` but are not re-run on a retry.
-  clearWorkspaceSetupIncomplete(workspacePath);
+  // Docker) are reported in `errors` but are not re-run on a retry. PAN-5489:
+  // a failed Hume step keeps the marker, so the next create re-runs it and
+  // writes .hume-config (the step reuses an existing config by name).
+  if (!humeFailed) clearWorkspaceSetupIncomplete(workspacePath);
 
   result.success = result.errors.length === 0;
   return result;

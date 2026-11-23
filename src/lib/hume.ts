@@ -5,8 +5,18 @@
  * Called during workspace create (createHumeConfig) and workspace remove/deep-wipe (deleteHumeConfig).
  *
  * Pattern mirrors tunnel.ts — stateless CRUD against external API.
+ *
+ * The API key (env var `api_key_env`, default HUME_API_KEY) is resolved at the
+ * moment of use, in order (PAN-5489): the running process's environment, the
+ * project's `workspace.env.secrets_file`, then a fresh read of ~/.overdeck.env.
+ * The key is passed as a value and never written to process.env, because the
+ * dashboard process launches every project's agents (PAN-5061 D-7).
  */
 
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+import { readOverdeckEnvFile } from './env-loader.js';
+import { readProjectSecrets, type SecretsFileOwner } from './projects/launch-env.js';
 import { HumeConfig, TemplatePlaceholders, replacePlaceholders } from './workspace-config.js';
 
 export interface HumeResult {
@@ -15,6 +25,49 @@ export interface HumeResult {
   /** Populated on successful create */
   configId?: string;
   configName?: string;
+}
+
+export interface HumeKeyOptions {
+  /** The project whose secrets_file may hold the key. */
+  project?: SecretsFileOwner;
+}
+
+export type HumeKeyResolution =
+  | { apiKey: string; source: 'process-env' | 'secrets-file' | 'overdeck-env' }
+  | { apiKey: null; checked: string[] };
+
+/**
+ * Resolve the Hume API key: process env, then the project's secrets_file, then
+ * ~/.overdeck.env. An empty value counts as absent. `checked` names the sources
+ * looked at, never a value.
+ */
+export async function resolveHumeApiKey(
+  config: HumeConfig,
+  options: HumeKeyOptions = {},
+): Promise<HumeKeyResolution> {
+  const envName = config.api_key_env || 'HUME_API_KEY';
+  const checked = ['the process environment'];
+
+  const fromProcess = process.env[envName];
+  if (fromProcess) return { apiKey: fromProcess, source: 'process-env' };
+
+  const secretsFile = options.project?.config.workspace?.env?.secrets_file;
+  if (options.project && secretsFile !== undefined) {
+    checked.push(secretsFile.startsWith('~/') ? join(homedir(), secretsFile.slice(2)) : secretsFile);
+    const fromSecrets = (await readProjectSecrets(options.project))[envName];
+    if (fromSecrets) return { apiKey: fromSecrets, source: 'secrets-file' };
+  }
+
+  checked.push(join(homedir(), '.overdeck.env'));
+  const fromOverdeckEnv = (await readOverdeckEnvFile())[envName];
+  if (fromOverdeckEnv) return { apiKey: fromOverdeckEnv, source: 'overdeck-env' };
+
+  return { apiKey: null, checked };
+}
+
+/** The not-found step line: names the env var and the sources, never a value. */
+function keyNotFoundStep(config: HumeConfig, checked: string[]): string {
+  return `[hume] API key not found: ${config.api_key_env || 'HUME_API_KEY'} is not set in ${checked.join(', ')}`;
 }
 
 const HUME_API = 'https://api.hume.ai/v0/evi';
@@ -66,14 +119,16 @@ async function humeFetch(
 export async function createHumeConfig(
   config: HumeConfig,
   placeholders: TemplatePlaceholders,
+  options: HumeKeyOptions = {},
 ): Promise<HumeResult> {
   const steps: string[] = [];
 
-  // Resolve API key
-  const apiKey = process.env[config.api_key_env || 'HUME_API_KEY'];
-  if (!apiKey) {
-    return { success: false, steps: [`[hume] API key not found in env var ${config.api_key_env || 'HUME_API_KEY'}`] };
+  // Resolve API key (process env, project secrets_file, ~/.overdeck.env)
+  const resolved = await resolveHumeApiKey(config, options);
+  if (resolved.apiKey === null) {
+    return { success: false, steps: [keyNotFoundStep(config, resolved.checked)] };
   }
+  const apiKey = resolved.apiKey;
 
   // Resolve config name and BYOLLM URL
   const configName = replacePlaceholders(config.name_pattern, placeholders);
@@ -175,14 +230,16 @@ export async function createHumeConfig(
 export async function deleteHumeConfig(
   config: HumeConfig,
   placeholders: TemplatePlaceholders,
+  options: HumeKeyOptions = {},
 ): Promise<HumeResult> {
   const steps: string[] = [];
 
-  // Resolve API key
-  const apiKey = process.env[config.api_key_env || 'HUME_API_KEY'];
-  if (!apiKey) {
-    return { success: false, steps: [`[hume] API key not found in env var ${config.api_key_env || 'HUME_API_KEY'}`] };
+  // Resolve API key (process env, project secrets_file, ~/.overdeck.env)
+  const resolved = await resolveHumeApiKey(config, options);
+  if (resolved.apiKey === null) {
+    return { success: false, steps: [keyNotFoundStep(config, resolved.checked)] };
   }
+  const apiKey = resolved.apiKey;
 
   const configName = replacePlaceholders(config.name_pattern, placeholders);
   steps.push(`[hume] Looking for config: ${configName}`);
