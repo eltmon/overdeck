@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DomainEvent } from '@overdeck/contracts';
 import { AppLiveStoreHost, countRunningAgents } from './AppLiveStoreHost';
 import { useDashboardStore } from '../lib/store';
+import { NOTHING_SETTLED, settleAgentPendingInput, useAgentPendingInputGate } from '../lib/agentPendingInputGate';
 import {
   applyStoreEvents,
   createRenderCounter,
@@ -44,6 +45,7 @@ function renderWithClient(ui: React.ReactNode) {
 
 beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn(async () => Response.json([])));
+  useAgentPendingInputGate.setState({ held: NOTHING_SETTLED });
   seedDashboardStore({
     issuesRaw: [issue(1, 2), issue(2, 2)],
     agentsById: {
@@ -76,6 +78,7 @@ describe('AppLiveStoreHost', () => {
   });
 
   it('opens the AskUserQuestion dialog for an agent whose enrichment carries one', async () => {
+    settleAgentPendingInput();
     const client = renderWithClient(<AppLiveStoreHost />);
     await vi.waitFor(() => expect(client.isFetching()).toBe(0));
 

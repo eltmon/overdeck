@@ -1143,7 +1143,9 @@ answer in the terminal` when not (PAN-4466), and showing the start of the comman
 conversation's title instead of its raw name. Clicking a non-answerable row navigates straight to
 the conversation's terminal view in one click, rather than reopening a dialog with nothing to
 show. A desktop notification fires when a prompt is first seen and again 5 and 30 minutes after
-it started waiting, while it is still pending.
+it started waiting, while it is still pending. Every pending-input toast and desktop notification
+is keyed by its subject and closes as soon as its question leaves the live feed, including a
+permission prompt's 5- and 30-minute reminders (PAN-5604).
 
 **Held messages.** The composer route checks for an on-screen prompt **before** switching the
 agent selector to main (PAN-4268), because that switch's `Down`/`Enter` would answer the menu.
@@ -1270,6 +1272,12 @@ Precedence is `restarting` > `unauthorized` > `unreachable` > `delayed` > `live`
   bootstrap or applied domain-event batch. Before any bootstrap it is the
   cached snapshot's timestamp (`loadSnapshotCacheEntry()` in
   `lib/snapshotCache.ts`). The clause is omitted when no time is known.
+- **Pending input waits for live data.** Before the first live bootstrap the store holds the
+  localStorage snapshot cache, which can carry answered questions, so agent questions and plans
+  (`useLivePendingAgentInputs`, gated by `lib/agentPendingInputGate.ts`) raise no toast, desktop
+  notification or dialog until a live bootstrap and its post-snapshot replay have applied. During a
+  reconnect the gate shows the last settled lists, so open toasts and dialogs stay put until the new
+  data has caught up. Conversation pending input comes from a live HTTP poll and is not gated.
 - **First-load screen.** `App/BackendConnectionBoundary.tsx` renders the
   first-load screen ("Can't reach the Overdeck server" or "Overdeck server is
   restarting", "The dashboard will load as soon as the server answers.",

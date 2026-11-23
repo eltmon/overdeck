@@ -7,7 +7,8 @@ import { renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const toastInfo = vi.hoisted(() => vi.fn());
-vi.mock('sonner', () => ({ toast: { info: toastInfo } }));
+const toastDismiss = vi.hoisted(() => vi.fn());
+vi.mock('sonner', () => ({ toast: { info: toastInfo, dismiss: toastDismiss } }));
 
 import type { TerminalPendingPermission } from '../../components/TerminalPermissionDialog';
 import { usePermissionNotifications, type PermissionNotificationRow } from './usePermissionNotifications';
@@ -39,17 +40,25 @@ function render(rows: PermissionNotificationRow[], onOpen = vi.fn()) {
 
 /** Desktop notifications created, as their titles. */
 const notifications: Array<{ title: string; options?: NotificationOptions }> = [];
+/** Close spies for each desktop notification created, keyed by its tag. */
+const closeSpies = new Map<string, ReturnType<typeof vi.fn>>();
 
 beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(START);
   toastInfo.mockReset();
+  toastDismiss.mockReset();
   notifications.length = 0;
+  closeSpies.clear();
   class FakeNotification {
     static permission = 'granted';
     onclick: (() => void) | null = null;
-    constructor(title: string, options?: NotificationOptions) { notifications.push({ title, options }); }
-    close(): void {}
+    onclose: (() => void) | null = null;
+    close = vi.fn();
+    constructor(title: string, options?: NotificationOptions) {
+      notifications.push({ title, options });
+      if (options?.tag) closeSpies.set(options.tag, this.close);
+    }
   }
   vi.stubGlobal('Notification', FakeNotification);
 });
@@ -100,6 +109,21 @@ describe('usePendingInputDialogs permission notifications', () => {
     await vi.advanceTimersByTimeAsync(60 * 60_000);
     expect(toastInfo).toHaveBeenCalledTimes(1);
     expect(notifications).toHaveLength(1);
+  });
+
+  it('dismisses the first-sight and reminder keys and closes the notification when the permission clears', async () => {
+    const key = 'conv-perm::20260927-3978::Bash command::rm::1:Yes|2:No';
+    const { rerender } = render(pending);
+
+    rerender({ feed: [{ name: '20260927-3978', title: 'Orca study' }] });
+
+    expect(toastDismiss).toHaveBeenCalledWith(key);
+    expect(toastDismiss).toHaveBeenCalledWith(`${key}::300000`);
+    expect(toastDismiss).toHaveBeenCalledWith(`${key}::1800000`);
+    expect(closeSpies.get(key)).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(60 * 60_000);
+    expect(toastInfo).toHaveBeenCalledTimes(1);
   });
 
   it('the Answer action opens the conversation', () => {

@@ -1,0 +1,567 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-23T05:38:13Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5604: Dashboard shows a 'waiting on you' toast for an already-answered question on page load (stale snapshot cache), and never closes a toast when its question closes",
+    "updated": "2026-11-23T18:14:33.984Z"
+  },
+  "plan": {
+    "id": "pan-5604",
+    "title": "Dashboard shows a 'waiting on you' toast for an already-answered question on page load (stale snapshot cache), and never closes a toast when its question closes",
+    "status": "running",
+    "uid": "a076b080-3610-42b8-95c2-8a235cacdc3f",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-23T05:38:13Z",
+    "updated": "2026-11-23T18:14:33.984Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5604",
+        "label": "PAN-5604",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5604.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "notifications",
+      "pending-input",
+      "snapshot-cache",
+      "bug"
+    ],
+    "narratives": {
+      "Problem": "On page load the dashboard renders the localStorage snapshot cache before /ws/rpc bootstraps. The cache is saved only on full snapshots, so it can hold an agent question answered long ago; usePendingInputDialogs announces every agent pending input in the store (toast + desktop notification) and the same arrays open the AskUserQuestion/PlanApproval modals. Separately, showPendingInputNotification keeps no toast id or Notification handle, so a toast never closes when its question closes.",
+      "Proposal": "Add a tiny gate store (lib/agentPendingInputGate.ts) whose `held` field is a frozen copy of the agent pending-input lists or null. It starts held with empty lists, so the snapshot cache never shows. EventRouter bootstrap() holds it immediately before syncSnapshot(snapshot) and settles it only after the post-snapshot replay has applied (no replay needed or 'caught-up') and the bootstrap generation is current; holding an already-held gate keeps the earlier copy, so a reconnect shows the pre-reconnect lists until the new data has caught up. A new useLivePendingAgentInputs hook returns `held ?? live lists`, gating toast, desktop notification, modals and reconcile in one place; conversation pending input (live HTTP poll) stays ungated. showPendingInputNotification keys toasts by tag and keeps desktop notifications in a module map; dismissPendingInputNotification(tag) closes both. The announce effect is extracted into usePendingInputAnnouncements and dismisses keys that leave the live set; usePermissionNotifications dismisses a cleared prompt's key and both reminder keys. Docs and changelog record the behavior.",
+      "NonGoals": "- Refreshing the snapshot cache on applied events\n- Hiding cached Needs-you rows or other cached UI during the cached phase\n- Dismissing a toast on the optimistic dashboard answer (it closes when the server clears the question)\n- Changing useDesktopActivityNotifications' cached-backlog priming\n- Changing re-announcement after the conversation pending-input poll returns [] on a non-OK response\n- Gating conversation pending input\n- Gating lib/refresh-dashboard-state.ts (live snapshot written outside bootstrap after merge/close-out)\n- Recovering the pre-existing frozen store after a 'failed' post-snapshot replay\n- Any server, contract or /ws/rpc change\n- Gating on streamLive (it flips false on every reconnect)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Gate on a hold/settle bracket around bootstrap's snapshot and post-snapshot replay (lib/agentPendingInputGate.ts), not on streamLive and not on a one-way latch",
+        "rationale": "Plan critique: a latch set by setStreamLive(true) opened before the post-snapshot replay applied deferred clearing events, on first load and on every reconnect. streamLive flips false on every blip and would dismiss and re-announce live toasts."
+      },
+      {
+        "summary": "Gate the agent source arrays so the AUQ/plan modals are gated too, not only the announce loop",
+        "rationale": "The modals read the same arrays and the UI store is not persisted, so a fresh load would open a modal for the same stale question; one gate at the source fixes both."
+      },
+      {
+        "summary": "Do not gate conversation pending input",
+        "rationale": "It comes from a live 4 s HTTP poll with no React Query persister, so it is never stale cache."
+      },
+      {
+        "summary": "Keep desktop Notification handles in a module-level map keyed by tag with dismissPendingInputNotification(tag)",
+        "rationale": "Simplest caller API; both announce paths already pass a unique tag; entries are removed on dismiss, click and onclose."
+      },
+      {
+        "summary": "Cover permission-prompt notifications, including both reminder tags",
+        "rationale": "They share showPendingInputNotification and have the same never-closes defect."
+      },
+      {
+        "summary": "Extract the announce effect into usePendingInputAnnouncements",
+        "rationale": "Makes the cache-to-live transition testable with renderHook and real stores without mounting the React Query-heavy dialog hook, and shrinks a 673-line file."
+      },
+      {
+        "summary": "A toast closes when the server clears the question, not on the optimistic answer",
+        "rationale": "Matches the issue's fix; sonner already closes a toast when its Answer action is clicked."
+      },
+      {
+        "summary": "While held, show the last settled copy (empty at page load), stored in a zustand store rather than React state",
+        "rationale": "Keeps announced keys and open modals stable across a reconnect, and avoids render-phase setState or ref reads (React compiler lint) and render loops with non-memoized mocked selectors (App.test.tsx)."
+      },
+      {
+        "summary": "A 'failed' post-snapshot replay leaves the gate held until the next successful bootstrap",
+        "rationale": "replay() calls coordinator.failRecovery(), which defers every later live event, so the store is frozen anyway; settling would only expose questions the missed events may have cleared."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-23-PAN-5604-dashboard-shows-a-waiting-on-you-toast-for-an-already-answered-question-on-page-load-stale-snapshot-cache-and-never-closes-a-toast-when-its-question-closes.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "agent-input-gate",
+        "title": "Add the agent pending-input gate and bracket bootstrap snapshot + replay with it",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T05:38:13Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5604",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/agentPendingInputGate.ts",
+            "src/dashboard/frontend/src/lib/__tests__/agentPendingInputGate.test.ts",
+            "src/dashboard/frontend/src/components/EventRouter.tsx",
+            "src/dashboard/frontend/src/components/EventRouter.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/agentPendingInputGate.test.ts src/components/EventRouter.test.tsx",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "agentPendingInputGate.test.ts and EventRouter.test.tsx pass including the new gate cases",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-9"
+          ],
+          "foundationFor": [
+            "live-agent-inputs",
+            "announcements-dismiss"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 1 (.pan/drafts/PAN-5604.md), revised after the plan critique. Create lib/agentPendingInputGate.ts: a zustand store useAgentPendingInputGate with `held: PendingAgentInputs | null`, initial NOTHING_SETTLED (module-level empty arrays); holdAgentPendingInput() is a no-op when already held, else captures selectAgentsWithPendingAskUserQuestion/selectAgentsWithPendingProposedPlan(useDashboardStore.getState()); settleAgentPendingInput() sets held null. Exact code is in the PRD. store.ts must not import it. In EventRouter.tsx bootstrap(): call holdAgentPendingInput() right after `if (gen !== generation) return null` and before syncSnapshot(snapshot); replace the replay line with `const replayOutcome = needsReplay ? await replay(snapshot.sequence) : 'caught-up'`, keep the too-far-behind throw, then `if (replayOutcome === 'caught-up' && gen === generation) settleAgentPendingInput()` before `if (reconnecting)`. A 'failed' replay leaves the gate held (D-9). The cache load does not touch the gate; lib/connectionState.ts is not changed. Tests: new agentPendingInputGate.test.ts; EventRouter.test.tsx resets the gate in beforeEach and adds the three named cases plus a held assertion in the existing too-far-behind test. Add the new test file to scripts/frontend-test-subset.txt in sorted position."
+        },
+        "items": [
+          {
+            "id": "agent-input-gate.ac1",
+            "title": "Given a fresh page, agentPendingInputGate.test.ts shows held equals NOTHING_SETTLED; when holdAgentPendingInput() runs on a held gate with an agent question in the store, then held keeps the same object",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-input-gate.ac2",
+            "title": "When settleAgentPendingInput() runs, then held is null; when holdAgentPendingInput() runs after that, then held's arrays are identical (toBe) to the selector output, and a later store change leaves held unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-input-gate.ac3",
+            "title": "Given a live event deferred during getSnapshot, EventRouter.test.tsx shows held is not null after the snapshot resolves (with streamLive already true) and null only after the replay request resolves",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-input-gate.ac4",
+            "title": "When the post-snapshot replay request rejects or returns tooFarBehind, then held stays not null; when the snapshot needs no replay, then held is null after it resolves",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-input-gate.ac5",
+            "title": "When the item lands, then scripts/frontend-test-subset.txt lists src/lib/__tests__/agentPendingInputGate.test.ts and git diff origin/main shows lib/connectionState.ts unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "notification-dismiss-api",
+        "title": "Key pending-input toasts by tag and add dismissPendingInputNotification",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T05:38:13Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5604",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/App/hooks/usePermissionNotifications.ts",
+            "src/dashboard/frontend/src/App/hooks/pendingInputNotification.test.ts",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/App/hooks/pendingInputNotification.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "pendingInputNotification.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 2. In App/hooks/usePermissionNotifications.ts: module-level `openDesktopNotifications = new Map<string, Notification>()`; showPendingInputNotification passes `id: tag` to toast.info and stores the created Notification under tag (deleted on click and on onclose, only if the map still holds that same instance); new export `dismissPendingInputNotification(tag)` calls toast.dismiss(tag), closes and deletes the stored notification. Exact code is in the PRD. New test file mocks sonner as { toast: { info, dismiss } }, stubs a FakeNotification with a close spy, uses vi.useFakeTimers(). Append the test path (relative to src/dashboard/frontend) to scripts/frontend-test-subset.txt in sorted position."
+        },
+        "items": [
+          {
+            "id": "notification-dismiss-api.ac1",
+            "title": "When showPendingInputNotification('k', ...) runs, then toast.info is called with an options object containing id: 'k'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "notification-dismiss-api.ac2",
+            "title": "When dismissPendingInputNotification('k') runs, then toast.dismiss('k') is called and the desktop notification created for 'k' closes; when it runs a second time, then close() is not called again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "notification-dismiss-api.ac3",
+            "title": "Dismissing tag 'a' preserves tag 'b''s desktop notification open (its close spy is not called)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "notification-dismiss-api.ac4",
+            "title": "When the item lands, then scripts/frontend-test-subset.txt lists src/App/hooks/pendingInputNotification.test.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "permission-dismiss",
+        "title": "Close permission-prompt toasts and reminders when the prompt clears",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T05:38:13Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5604",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/App/hooks/usePermissionNotifications.ts",
+            "src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.permission-notify.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/App/hooks/usePendingInputDialogs.permission-notify.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "usePendingInputDialogs.permission-notify.test.tsx passes including the new dismissal case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 3. In usePermissionNotifications' prune loop, after clearing timers and deleting the key, call dismissPendingInputNotification(key) and dismissPendingInputNotification(`${key}::${after}`) for each PERMISSION_RENOTIFY_AFTER_MS value. Update usePendingInputDialogs.permission-notify.test.tsx: the sonner mock currently has only `info` and would throw on toast.dismiss — add a hoisted toastDismiss (reset in beforeEach) and a close spy on FakeNotification. Add the clear-dismisses case. The file is not in scripts/frontend-test-subset.txt yet; add it. If a pre-existing case fails on origin/main, fix the test (not behavior) and note it in the commit body."
+        },
+        "items": [
+          {
+            "id": "permission-dismiss.ac1",
+            "title": "Given a pending permission row, when the feed rerenders without pendingPermission, then toast.dismiss is called with 'conv-perm::20260927-3978::Bash command::rm::1:Yes|2:No' and with that key plus '::300000' and '::1800000'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "permission-dismiss.ac2",
+            "title": "When the permission prompt clears, then its first-sight desktop notification closes (close spy called once), and when fake timers advance 60 minutes then no reminder toast is emitted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "permission-dismiss.ac3",
+            "title": "scripts/frontend-test-subset.txt lists src/App/hooks/usePendingInputDialogs.permission-notify.test.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "live-agent-inputs",
+        "title": "Read agent pending input (AUQ, decisions, plans) through the gate",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T05:38:13Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5604",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/App/hooks/useLivePendingAgentInputs.ts",
+            "src/dashboard/frontend/src/App/hooks/useLivePendingAgentInputs.test.tsx",
+            "src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts",
+            "src/dashboard/frontend/src/App/AppLiveStoreHost.render-count.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/App/hooks/useLivePendingAgentInputs.test.tsx src/App/AppLiveStoreHost.render-count.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "useLivePendingAgentInputs.test.tsx and AppLiveStoreHost.render-count.test.tsx pass",
+            "typecheck completes without errors",
+            "lint completes without new errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 4. New hook App/hooks/useLivePendingAgentInputs.ts: `const held = useAgentPendingInputGate((s) => s.held)`, read both memoized selectors from useDashboardStore, return `held ?? { agentsWithAskUserQuestion: asking, agentsWithProposedPlan: planning }`. No useState, useRef or effect. In usePendingInputDialogs.ts replace the two selector lines (62-63) with this hook and drop the unused selector imports. Do not gate convAskUserQuestionRows. AppLiveStoreHost.render-count.test.tsx: reset the gate in beforeEach and call settleAgentPendingInput() at the start of 'opens the AskUserQuestion dialog for an agent whose enrichment carries one'; grep the other tests that render AppLiveStoreHost/usePendingInputDialogs and settle the gate where an agent dialog is expected. Hook tests use renderHook with the real stores."
+        },
+        "items": [
+          {
+            "id": "live-agent-inputs.ac1",
+            "title": "Given the gate at NOTHING_SETTLED and an agent whose pendingAskUserQuestion.toolUseId is 'operator-decision:od-1', the hook returns empty agentsWithAskUserQuestion and agentsWithProposedPlan",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-agent-inputs.ac2",
+            "title": "When settleAgentPendingInput() runs, the hook returns that agent; when holdAgentPendingInput() runs and the question changes to 'tool-2', then the hook still returns the earlier array (toBe) until the next settle returns 'tool-2'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-agent-inputs.ac3",
+            "title": "Two renders while held return the identical (===) array",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-agent-inputs.ac4",
+            "title": "usePendingInputDialogs.ts reads both agent arrays from useLivePendingAgentInputs and no longer calls selectAgentsWithPendingAskUserQuestion or selectAgentsWithPendingProposedPlan directly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-agent-inputs.ac5",
+            "title": "AppLiveStoreHost.render-count.test.tsx 'opens the AskUserQuestion dialog for an agent whose enrichment carries one' passes with the gate settled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "announcements-dismiss",
+        "title": "Extract pending-input announcements and dismiss toasts whose question closed",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T05:38:13Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5604",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/App/hooks/usePendingInputAnnouncements.ts",
+            "src/dashboard/frontend/src/App/hooks/usePendingInputAnnouncements.test.tsx",
+            "src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts",
+            "src/dashboard/frontend/src/components/EventRouter.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/App/hooks/usePendingInputAnnouncements.test.tsx src/components/EventRouter.test.tsx",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "usePendingInputAnnouncements.test.tsx and EventRouter.test.tsx pass including the end-to-end and recovery-window cases",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-5",
+            "FR-7",
+            "FR-9"
+          ],
+          "acJustification": "Six criteria: the item carries the unit cases, the cache-to-live end-to-end case, the two EventRouter recovery-window cases the plan critique asked for, and the file-shrink check; each maps to a distinct test or diff assertion."
+        },
+        "narrative": {
+          "Action": "PRD work item 5. Move notifiedPendingInputRef and the announce effect (usePendingInputDialogs.ts lines 311-371, starting '// #1102 — clicking the toast') into new App/hooks/usePendingInputAnnouncements.ts taking { agentsWithAskUserQuestion, agentsWithProposedPlan, convRows, issueTitleById, onOpen }; keep keys, titles, bodies byte-identical; hold onOpen in a ref. In the prune loop, a key leaving liveKeys is deleted from the ref AND passed to dismissPendingInputNotification. Call the hook from usePendingInputDialogs; no import from the new file back into usePendingInputDialogs.ts types that creates a cycle. Tests mock sonner { info, dismiss }, FakeNotification with close spy, fake timers; include the end-to-end case from the PRD that composes useLivePendingAgentInputs with usePendingInputAnnouncements against the real stores (gate at NOTHING_SETTLED, then settleAgentPendingInput()) and applies a decoded agent.enrichment_changed event via useDashboardStore.getState().applyEvent. Also add the two recovery-window tests in EventRouter.test.tsx from PRD item 5 step 5: a probe component composing both hooks next to <EventRouter />, sonner spied with vi.spyOn(toast, 'info'/'dismiss'), agent fixtures built with applyEvent(INITIAL_READ_MODEL_STATE, ...) from @overdeck/contracts."
+        },
+        "items": [
+          {
+            "id": "announcements-dismiss.ac1",
+            "title": "Given an agent carrying 'operator-decision:od-82901a56' seeded while the gate is at NOTHING_SETTLED, then toast.info is not called; when the agent is replaced without the question and settleAgentPendingInput() runs, then toast.info is still not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "announcements-dismiss.ac2",
+            "title": "End-to-end: when the live agent gains the question, toast.info is called once with id 'agent::<agentId>::operator-decision:od-82901a56'; after applyEvent of an agent.enrichment_changed without pendingAskUserQuestion, toast.dismiss is called with that id and the notification's close spy is called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "announcements-dismiss.ac3",
+            "title": "Given a conversation AUQ row and the gate held, when the hook renders, then it toasts once with id 'conv::<name>::<toolUseId>'; when it rerenders without the row, then toast.dismiss is called with that id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "announcements-dismiss.ac4",
+            "title": "Given a snapshot carrying a question and a deferred clearing event that the replay returns, EventRouter.test.tsx 'never shows a question that the post-snapshot replay clears' shows every recorded AUQ length is 0 and toast.info is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "announcements-dismiss.ac5",
+            "title": "Given Q1 announced, when requestReconnect() delivers a snapshot with Q1 plus a Q2 that its replay clears, then toast.info stays at one call, toast.dismiss is never called, and no toast carries the Q2 key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "announcements-dismiss.ac6",
+            "title": "usePendingInputDialogs.ts has fewer lines than on origin/main and no longer contains notifiedPendingInputRef",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-changelog",
+        "title": "Document live-data gating and notification closing; add changelog entry",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T05:38:13Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5604",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "changelog.d/pan-5604.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 6. docs/DASHBOARD-ARCHITECTURE.md: in 'Terminal permission prompts and held messages (PAN-4278)', paragraph '**Needs you and notifications.**' (~line 1128) append that pending-input toasts and desktop notifications are keyed by subject and close as soon as the question leaves the live feed, including a permission prompt's 5- and 30-minute reminders. In 'Degraded mode (PAN-4279)', after the '**Freshness stamp.**' bullet, add a '**Pending input waits for live data.**' bullet naming useLivePendingAgentInputs and lib/agentPendingInputGate.ts, stating agent questions and plans wait until a live bootstrap and its post-snapshot replay have applied, that a reconnect keeps showing the last settled lists until the new data catches up, and that conversation pending input is not gated (exact wording in the PRD). Create changelog.d/pan-5604.md with the '#### Fixed' bullet given in the PRD."
+        },
+        "items": [
+          {
+            "id": "docs-changelog.ac1",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md renders a '**Pending input waits for live data.**' bullet in the Degraded mode section that names lib/agentPendingInputGate.ts, the post-snapshot replay, and states conversation pending input is not gated",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac2",
+            "title": "The 'Needs you and notifications' paragraph states that a toast and desktop notification close when their question leaves the live feed, including permission reminders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac3",
+            "title": "changelog.d/pan-5604.md exists with a single '#### Fixed' heading and a bullet linking https://github.com/eltmon/overdeck/issues/5604, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "agent-input-gate",
+        "to": "live-agent-inputs",
+        "type": "blocks"
+      },
+      {
+        "from": "notification-dismiss-api",
+        "to": "permission-dismiss",
+        "type": "blocks"
+      },
+      {
+        "from": "notification-dismiss-api",
+        "to": "announcements-dismiss",
+        "type": "blocks"
+      },
+      {
+        "from": "live-agent-inputs",
+        "to": "announcements-dismiss",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

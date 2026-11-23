@@ -12,6 +12,10 @@ src/App/__tests__/StandaloneDiffPopoutRoute.test.tsx
 src/App/__tests__/countAgreement.test.tsx
 src/App/api.test.ts
 src/App/appChromeLabels.test.ts
+src/App/hooks/pendingInputNotification.test.ts
+src/App/hooks/useLivePendingAgentInputs.test.tsx
+src/App/hooks/usePendingInputAnnouncements.test.tsx
+src/App/hooks/usePendingInputDialogs.permission-notify.test.tsx
 src/App/routes.linked.test.ts
 src/App/topbar/AgentsMenu.test.tsx
 src/App/topbar/Breadcrumb.test.tsx
@@ -508,6 +512,7 @@ src/components/workspace/new/__tests__/smartField.test.ts
 src/components/workspace/new/__tests__/useWorkspaceCreateIntent.test.ts
 src/hooks/__tests__/useColorTheme.test.ts
 src/hooks/__tests__/useTheme.test.ts
+src/lib/__tests__/agentPendingInputGate.test.ts
 src/lib/__tests__/appearance.test.ts
 src/lib/__tests__/bootRequests.test.ts
 src/lib/__tests__/buildDrift.test.ts

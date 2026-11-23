@@ -6,11 +6,12 @@ import type { ClaudeChannelPermissionBehavior } from '@overdeck/contracts';
 import type { ConfirmationRequest } from '../../components/ConfirmationDialog';
 import type { AskUserQuestionSubject } from '../../components/AskUserQuestionDialog';
 import type { PlanApprovalSubject } from '../../components/PlanApprovalDialog';
-import type { TerminalPendingPermission } from '../../components/TerminalPermissionDialog';
 import { useTerminalPermissionDialog } from './useTerminalPermissionDialog';
-import { showPendingInputNotification, usePermissionNotifications } from './usePermissionNotifications';
+import { usePermissionNotifications } from './usePermissionNotifications';
 import { useHeldMessageRelease } from './useHeldMessageRelease';
-import { useDashboardStore, hasDetectedToolPermission, selectAgentsWithPendingAskUserQuestion, selectAgentsWithPendingProposedPlan, selectChannelPermissionRequests } from '../../lib/store';
+import { useLivePendingAgentInputs } from './useLivePendingAgentInputs';
+import { usePendingInputAnnouncements, type ConvAskUserQuestionRow } from './usePendingInputAnnouncements';
+import { useDashboardStore, hasDetectedToolPermission, selectChannelPermissionRequests } from '../../lib/store';
 import { useAskUserQuestionUiStore } from '../../lib/askUserQuestionUiStore';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
 import { fetchWithTimeout } from '../../lib/apiFetch';
@@ -23,19 +24,6 @@ import {
   respondToChannelPermission,
   respondToConfirmation,
 } from '../api';
-
-type ConvAskUserQuestionRow = {
-  name: string;
-  title?: string | null;
-  issueId?: string | null;
-  /** PAN-3766 — pi ask modals are answered by keystrokes, not a message. */
-  harness?: string | null;
-  pendingAskUserQuestion?: AskUserQuestionSubject['pendingAskUserQuestion'];
-  // PAN-1520 (FR-2) — pending ExitPlanMode plan payload for conversation rows.
-  pendingProposedPlan?: PlanApprovalSubject['pendingProposedPlan'];
-  // PAN-4278 — a Claude Code terminal permission prompt blocking the conversation.
-  pendingPermission?: TerminalPendingPermission;
-};
 
 /**
  * Issue id → title of the first issue with that id, cached per `issuesRaw`
@@ -59,8 +47,7 @@ export function usePendingInputDialogs() {
   const queryClient = useQueryClient();
   const issueTitleById = useDashboardStore(useShallow((s) => issueTitlesById(s.issuesRaw)));
   const channelPermissionRequests = useDashboardStore(selectChannelPermissionRequests);
-  const agentsWithAskUserQuestion = useDashboardStore(selectAgentsWithPendingAskUserQuestion);
-  const agentsWithProposedPlan = useDashboardStore(selectAgentsWithPendingProposedPlan);
+  const { agentsWithAskUserQuestion, agentsWithProposedPlan } = useLivePendingAgentInputs();
   const resolvedPlanToolUseIds = useAskUserQuestionUiStore((s) => s.resolvedPlanToolUseIds);
   const dismissedPlanSubjectIds = useAskUserQuestionUiStore((s) => s.dismissedPlanSubjectIds);
   const markPlanResolved = useAskUserQuestionUiStore((s) => s.markPlanResolved);
@@ -308,67 +295,13 @@ export function usePendingInputDialogs() {
     return undefined;
   }, []);
 
-  const notifiedPendingInputRef = useRef<Set<string>>(new Set());
-  useEffect(() => {
-    // #1102 — clicking the toast or desktop notification re-opens the dialog
-    // for that subject (focus + un-dismiss), not just focuses the window.
-    const announce = (id: string, subjectId: string, title: string, body: string): void => {
-      const key = id;
-      if (notifiedPendingInputRef.current.has(key)) return;
-      notifiedPendingInputRef.current.add(key);
-      showPendingInputNotification(key, title, body, () => requestAskUserQuestionReopen(subjectId));
-    };
-
-    for (const a of agentsWithAskUserQuestion) {
-      const toolUseId = a.pendingAskUserQuestion?.toolUseId;
-      if (!toolUseId) continue;
-      const body = a.pendingAskUserQuestion?.questions?.[0]?.question ?? 'AskUserQuestion is open.';
-      const label = (a.issueId ? issueTitleById[a.issueId] : undefined) ?? a.issueId ?? a.id;
-      announce(`agent::${a.id}::${toolUseId}`, a.id, `${label} is waiting on you`, body);
-    }
-    for (const c of convAskUserQuestionRows) {
-      const toolUseId = c.pendingAskUserQuestion?.toolUseId;
-      if (!toolUseId) continue;
-      const body = c.pendingAskUserQuestion?.questions?.[0]?.question ?? 'AskUserQuestion is open.';
-      const label = c.title ?? c.name;
-      announce(`conv::${c.name}::${toolUseId}`, c.name, `"${label}" is waiting on you`, body);
-    }
-
-    // PAN-1520 (FR-5) — pending plans fire the same toast + desktop
-    // notification; clicking re-opens the PLAN dialog (the reopen effect
-    // routes by what's pending, so plan subjects land on PlanApprovalDialog).
-    for (const p of agentsWithProposedPlan) {
-      const toolUseId = p.pendingProposedPlan?.toolUseId;
-      if (!toolUseId) continue;
-      const label = (p.issueId ? issueTitleById[p.issueId] : undefined) ?? p.issueId ?? p.id;
-      announce(`agent-plan::${p.id}::${toolUseId}`, p.id, `${label} has a plan awaiting approval`, 'Review and approve the plan to start implementation.');
-    }
-    for (const c of convAskUserQuestionRows) {
-      const toolUseId = c.pendingProposedPlan?.toolUseId;
-      if (!toolUseId) continue;
-      const label = c.title ?? c.name;
-      announce(`conv-plan::${c.name}::${toolUseId}`, c.name, `"${label}" has a plan awaiting approval`, 'Review and approve the plan to start implementation.');
-    }
-
-    const liveKeys = new Set<string>();
-    for (const a of agentsWithAskUserQuestion) {
-      const id = a.pendingAskUserQuestion?.toolUseId;
-      if (id) liveKeys.add(`agent::${a.id}::${id}`);
-    }
-    for (const c of convAskUserQuestionRows) {
-      const id = c.pendingAskUserQuestion?.toolUseId;
-      if (id) liveKeys.add(`conv::${c.name}::${id}`);
-      const planId = c.pendingProposedPlan?.toolUseId;
-      if (planId) liveKeys.add(`conv-plan::${c.name}::${planId}`);
-    }
-    for (const p of agentsWithProposedPlan) {
-      const id = p.pendingProposedPlan?.toolUseId;
-      if (id) liveKeys.add(`agent-plan::${p.id}::${id}`);
-    }
-    for (const k of notifiedPendingInputRef.current) {
-      if (!liveKeys.has(k)) notifiedPendingInputRef.current.delete(k);
-    }
-  }, [agentsWithAskUserQuestion, agentsWithProposedPlan, convAskUserQuestionRows, issueTitleById]);
+  usePendingInputAnnouncements({
+    agentsWithAskUserQuestion,
+    agentsWithProposedPlan,
+    convRows: convAskUserQuestionRows,
+    issueTitleById,
+    onOpen: requestAskUserQuestionReopen,
+  });
 
   const askUserQuestionAnswerMutation = useMutation({
     mutationFn: async (target: PendingAnswerTarget & {
