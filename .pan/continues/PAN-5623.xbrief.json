@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5623",
   "created": "2026-11-23T20:20:25.006Z",
-  "updated": "2026-11-23T20:54:41.227Z",
+  "updated": "2026-11-23T20:55:07.664Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -165,9 +165,30 @@
       "doneAt": "2026-11-23T20:54:36.858Z"
     },
     "wi11-candidate-rules": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5623",
-      "claimedAt": "2026-11-23T20:54:41.227Z"
+      "claimedAt": "2026-11-23T20:54:41.227Z",
+      "doneAt": "2026-11-23T20:55:07.664Z"
+    },
+    "wi11-candidate-rules.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:55:07.664Z"
+    },
+    "wi11-candidate-rules.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:55:07.664Z"
+    },
+    "wi11-candidate-rules.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:55:07.664Z"
+    },
+    "wi11-candidate-rules.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:55:07.664Z"
+    },
+    "wi11-candidate-rules.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:55:07.664Z"
     }
   }
 }
