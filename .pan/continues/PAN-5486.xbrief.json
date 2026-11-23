@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5486",
   "created": "2026-11-23T03:25:55.145Z",
-  "updated": "2026-11-23T03:52:43.334Z",
+  "updated": "2026-11-23T03:53:25.219Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -121,9 +121,18 @@
       "doneAt": "2026-11-23T03:52:41.877Z"
     },
     "grok-bot-mcp-mdx": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5486",
-      "claimedAt": "2026-11-23T03:52:43.334Z"
+      "claimedAt": "2026-11-23T03:52:43.334Z",
+      "doneAt": "2026-11-23T03:53:25.218Z"
+    },
+    "grok-bot-mcp-mdx.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:53:25.218Z"
+    },
+    "grok-bot-mcp-mdx.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:53:25.218Z"
     }
   }
 }
