@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-23T08:34:02Z · model: claude-opus-5-5 · open: 953_
+_Last sequenced: 2026-11-23T09:34:32Z · model: claude-opus-5-5 · open: 954_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -8,6 +8,7 @@ _Last sequenced: 2026-11-23T08:34:02Z · model: claude-opus-5-5 · open: 953_
 | 1 | PAN-5611 | S | medium | ok |  |  | Idle-settled conversations stay in Settled after the operator resumes them, hiding them from their project group. |
 | 1 | PAN-5615 | S | high | ok |  |  | Role prompts escalate via pan tell flywheel-orchestrator, a dead name; the Flywheel is conv-flywheel, so blockers are lost. |
 | 1 | PAN-5617 | S | critical | ok |  |  | npm run typecheck admits each of its 12 tsc lanes separately; under memory pressure one run takes ~1h and stalls agent pushes. |
+| 1 | PAN-5621 | M | critical | ok |  |  | Gate admission queue starves while MemAvailable < hard reserve + footprint; parked workspace stacks never reclaimed, no gate runs. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 3 | PAN-5614 | M | critical | ok |  |  | specialists done falls back to GitHub in remote-less polyrepo roots, so GitLab review verdicts are lost and MYN merges stall. |
 | 3 | PAN-5619 | M | critical | ok |  |  | Review never dispatches for adopted handoff PRs on the resume path: a work-agent xBRIEF guard throws, only logged; PAN-5601 stuck. |
@@ -973,6 +974,10 @@ New substrate bug already in the pipeline: every agent escalation to the Flywhee
 
 New substrate-improvement bug already in the pipeline, pinned at rank 1 per the in-pipeline rule. It is critical because every agent quality gate runs npm run typecheck: on 2026-11-23 two Flywheel handoffs (PAN-5601, PAN-5614) could not push for about an hour, which in turn held MYN merges. FR-1..FR-4 are concrete (admit the chain once, reuse OVERDECK_GATE_ADMITTED, keep the slot cap).
 
+### PAN-5621 (rank 1)
+
+New substrate-improvement bug already in the pipeline, pinned at rank 1 per the in-pipeline rule. It is critical because a starved admission queue stops every agent quality gate: on 2026-11-23 no gate ran while 7 waiters queued and the PAN-5601 and PAN-5614 substrate fixes sat behind it. FR-1..FR-3 are concrete (starvation detection, reclaiming idle Overdeck-owned stack containers, fake-timer tests); it shares the admission queue with PAN-5617.
+
 ### PAN-5013 (rank 3)
 
 Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.
@@ -983,7 +988,7 @@ New substrate bug that blocks every GitLab polyrepo review from reaching merge (
 
 ### PAN-5619 (rank 3)
 
-New substrate bug that blocks the review stage for every adopted (handoff) PR re-dispatched through the resume path; PAN-5601's verified PR #5613 is stuck now and deacon-lite keeps redispatching the same deterministic failure. Evidence and a starting point (fresh request vs resume path) are pinned in the body, so it ranks with the top critical merge-path fixes, beside PAN-5614.
+New substrate bug that blocks the review stage for every adopted (handoff) PR re-dispatched through the resume path; PAN-5601's verified PR #5613 is stuck now and deacon-lite keeps redispatching the same deterministic failure. Evidence and a starting point (fresh request vs resume path) are pinned in the body, so it ranks with the top critical merge-path fixes, beside PAN-5614. Body edit since the prior run was clarifying only, so the rank holds.
 
 ### PAN-5430 (rank 4)
 
@@ -1277,10 +1282,6 @@ Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback thi
 
 New planning bug placed in a freed high-tier slot. It blocks pan plan finalize for every epic child with a stub draft on main; the fix is a candidate-order change plus one test.
 
-### PAN-2940 (rank 73)
-
-Three red-mains in one day from direct-push series bypassing PR CI — conversations need a pre-merge CI surface.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1288,10 +1289,10 @@ Three red-mains in one day from direct-push series bypassing PR CI — conversat
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-23T08:34:02Z",
+  "generatedAt": "2026-11-23T09:34:32Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 953,
+  "openCount": 954,
   "nodes": [
     {
       "issue": "PAN-5611",
@@ -1333,6 +1334,19 @@ Three red-mains in one day from direct-push series bypassing PR CI — conversat
       "planning": "auto"
     },
     {
+      "issue": "PAN-5621",
+      "rank": 1,
+      "size": "M",
+      "importance": "critical",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Gate admission queue starves while MemAvailable < hard reserve + footprint; parked workspace stacks never reclaimed, no gate runs.",
+      "rationale": "New substrate-improvement bug already in the pipeline, pinned at rank 1 per the in-pipeline rule. It is critical because a starved admission queue stops every agent quality gate: on 2026-11-23 no gate ran while 7 waiters queued and the PAN-5601 and PAN-5614 substrate fixes sat behind it. FR-1..FR-3 are concrete (starvation detection, reclaiming idle Overdeck-owned stack containers, fake-timer tests); it shares the admission queue with PAN-5617.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-5013",
       "rank": 3,
       "size": "S",
@@ -1367,7 +1381,7 @@ Three red-mains in one day from direct-push series bypassing PR CI — conversat
       "condition": "ok",
       "dependsOn": [],
       "why": "Review never dispatches for adopted handoff PRs on the resume path: a work-agent xBRIEF guard throws, only logged; PAN-5601 stuck.",
-      "rationale": "New substrate bug that blocks the review stage for every adopted (handoff) PR re-dispatched through the resume path; PAN-5601's verified PR #5613 is stuck now and deacon-lite keeps redispatching the same deterministic failure. Evidence and a starting point (fresh request vs resume path) are pinned in the body, so it ranks with the top critical merge-path fixes, beside PAN-5614.",
+      "rationale": "New substrate bug that blocks the review stage for every adopted (handoff) PR re-dispatched through the resume path; PAN-5601's verified PR #5613 is stuck now and deacon-lite keeps redispatching the same deterministic failure. Evidence and a starting point (fresh request vs resume path) are pinned in the body, so it ranks with the top critical merge-path fixes, beside PAN-5614. Body edit since the prior run was clarifying only, so the rank holds.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -14568,6 +14582,13 @@ Three red-mains in one day from direct-push series bypassing PR CI — conversat
       "confidence": 0.5
     },
     {
+      "from": "PAN-5617",
+      "to": "PAN-5621",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
       "from": "PAN-5619",
       "to": "PAN-4636",
       "type": "informs",
@@ -14580,6 +14601,20 @@ Three red-mains in one day from direct-push series bypassing PR CI — conversat
       "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.9
+    },
+    {
+      "from": "PAN-5621",
+      "to": "PAN-5601",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
+    },
+    {
+      "from": "PAN-5621",
+      "to": "PAN-5614",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
     },
     {
       "from": "PAN-750",
