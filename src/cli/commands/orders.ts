@@ -17,7 +17,7 @@ import { getProjectPanPaths } from '../../lib/pan-dir/paths.js';
 import { commitPlanArtifacts, pushPlanArtifacts } from '../../lib/overdeck/plan-artifact-commit.js';
 import { surfacePlanArtifactPush } from '../../lib/overdeck/plan-artifact-push-report.js';
 
-interface OrdersCommandDeps {
+export interface OrdersCommandDeps {
   cwd?: string;
   panDir?: string;
   projectKey?: string;
@@ -31,6 +31,8 @@ interface OrdersAddOptions {
   after?: string;
   reverify?: boolean;
   project?: string;
+  prereqs?: string;
+  planAtPickup?: boolean;
 }
 
 interface OrdersMoveOptions {
@@ -45,7 +47,7 @@ interface OrdersProjectResolution {
   projectConfig?: ProjectConfig;
 }
 
-function resolveOrdersProject(deps: OrdersCommandDeps = {}): OrdersProjectResolution {
+export function resolveOrdersProject(deps: OrdersCommandDeps = {}): OrdersProjectResolution {
   if (deps.panDir) return { panDir: deps.panDir };
   if (deps.projectKey !== undefined) {
     const project = getProjectSync(deps.projectKey);
@@ -58,7 +60,7 @@ function resolveOrdersProject(deps: OrdersCommandDeps = {}): OrdersProjectResolu
   return { panDir: getProjectPanPaths(resolveProjectPath(project)).panDir, projectConfig: project };
 }
 
-function panDirFor(deps: OrdersCommandDeps = {}): string {
+export function panDirFor(deps: OrdersCommandDeps = {}): string {
   return resolveOrdersProject(deps).panDir;
 }
 
@@ -67,7 +69,7 @@ function panDirFor(deps: OrdersCommandDeps = {}): string {
  * writes one commits it (PAN-3917: no daemon commits .pan/ behind your back)
  * and pushes it, so the plan home does not drift ahead of origin (#4108).
  */
-async function commitOrders(panDir: string, subject: string): Promise<void> {
+export async function commitOrders(panDir: string, subject: string): Promise<void> {
   const planHome = dirname(panDir);
   const commit = await commitPlanArtifacts({ cwd: planHome, paths: [join(panDir, 'orders')], message: subject });
   if (!commit.committed && commit.reason !== 'nothing to commit') {
@@ -79,7 +81,7 @@ async function commitOrders(panDir: string, subject: string): Promise<void> {
   if (description) console.error(chalk.yellow(`⚠ Order book push: ${description.message}`));
 }
 
-async function requireBook(panDir: string, bookId: string): Promise<OrderBook> {
+export async function requireBook(panDir: string, bookId: string): Promise<OrderBook> {
   const book = await getBookAsync(panDir, bookId);
   if (!book) throw new Error(`Order book not found: ${bookId}`);
   return book;
@@ -190,12 +192,18 @@ export async function runOrdersAdd(
     targetOrder = anchor.order + 1;
   }
 
+  const prereqs = (options.prereqs ?? '')
+    .split(',')
+    .map((prereq) => prereq.trim())
+    .filter((prereq) => prereq.length > 0)
+    .map((prereq) => prereq.toUpperCase());
   const additions: NewOrderBookItem[] = issueIds.map((issue, index) => ({
     issue: issue.toUpperCase(),
     lane: targetLane,
     order: targetOrder + index,
-    prereqs: [],
+    prereqs,
     reVerify: options.reverify ?? false,
+    ...(options.planAtPickup ? { planAtPickup: true } : {}),
   }));
   let updated = await addItems(panDir, bookId, additions, actor);
   if (options.after) {
@@ -257,7 +265,7 @@ export async function runOrdersQueue(bookId: string, deps: OrdersCommandDeps = {
   return queued;
 }
 
-async function commandAction(action: () => Promise<void>): Promise<void> {
+export async function commandAction(action: () => Promise<void>): Promise<void> {
   try {
     await action();
   } catch (error) {
@@ -282,15 +290,18 @@ export function createOrdersCommand(): Command {
     .command('list')
     .description('List order books')
     .option('--project <key>', 'Resolve the order book in another registered project')
-    .action((options: { project?: string }) => commandAction(async () => {
-      console.log(formatBookList(runOrdersList({ projectKey: options.project })));
+    .option('--json', 'Print the books as JSON')
+    .action((options: { project?: string; json?: boolean }) => commandAction(async () => {
+      const books = runOrdersList({ projectKey: options.project });
+      console.log(options.json ? JSON.stringify(books, null, 2) : formatBookList(books));
     }));
 
   orders
     .command('show <id>')
     .description('Show an order book')
     .option('--project <key>', 'Resolve the order book in another registered project')
-    .action((id: string, options: { project?: string }) => commandAction(async () => {
+    .option('--json', 'Print JSON (the default)')
+    .action((id: string, options: { project?: string; json?: boolean }) => commandAction(async () => {
       console.log(formatBook(await runOrdersShow(id, { projectKey: options.project })));
     }));
 
@@ -300,6 +311,8 @@ export function createOrdersCommand(): Command {
     .option('--lane <lane>', 'Target lane: A or B', parseLane, 'A')
     .option('--after <issue>', 'Insert after an issue in the target lane')
     .option('--reverify', 'Require PRD re-verification before pickup')
+    .option('--prereqs <issues>', 'Comma-separated issues that must land first')
+    .option('--plan-at-pickup', 'Write the plan when the issue starts')
     .option('--project <key>', 'Resolve the order book in another registered project')
     .action((id: string, issues: string[], options: OrdersAddOptions) => commandAction(async () => {
       console.log(formatBook(await runOrdersAdd(id, issues, options, { projectKey: options.project })));
