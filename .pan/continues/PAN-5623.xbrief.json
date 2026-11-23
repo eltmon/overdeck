@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5623",
   "created": "2026-11-23T20:20:25.006Z",
-  "updated": "2026-11-23T21:12:20.013Z",
+  "updated": "2026-11-23T21:12:39.458Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -235,6 +235,11 @@
     "wi10-workspace-data-reclaim-aware.ac2": {
       "status": "completed",
       "doneAt": "2026-11-23T21:12:20.012Z"
+    },
+    "wi12-reclaim-poll": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5623",
+      "claimedAt": "2026-11-23T21:12:39.458Z"
     }
   }
 }
