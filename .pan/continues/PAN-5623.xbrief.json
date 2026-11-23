@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5623",
   "created": "2026-11-23T20:20:25.006Z",
-  "updated": "2026-11-23T20:55:07.664Z",
+  "updated": "2026-11-23T20:55:13.908Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -189,6 +189,11 @@
     "wi11-candidate-rules.ac5": {
       "status": "completed",
       "doneAt": "2026-11-23T20:55:07.664Z"
+    },
+    "wi9-status-reclaim-line": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5623",
+      "claimedAt": "2026-11-23T20:55:13.908Z"
     }
   }
 }
