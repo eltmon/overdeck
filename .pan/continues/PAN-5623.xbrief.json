@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5623",
   "created": "2026-11-23T20:20:25.006Z",
-  "updated": "2026-11-23T20:53:08.495Z",
+  "updated": "2026-11-23T20:53:29.504Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -120,7 +120,7 @@
       "doneAt": "2026-11-23T20:53:03.574Z"
     },
     "wi6-spawn-restore": {
-      "status": "in_progress",
+      "status": "cancelled",
       "claimedBy": "agent-pan-5623",
       "claimedAt": "2026-11-23T20:53:08.495Z"
     }
