@@ -16,6 +16,7 @@ import { findProjectByPath, getProjectSync, resolveProjectPath, type ProjectConf
 import { getProjectPanPaths } from '../../lib/pan-dir/paths.js';
 import { commitPlanArtifacts, pushPlanArtifacts } from '../../lib/overdeck/plan-artifact-commit.js';
 import { surfacePlanArtifactPush } from '../../lib/overdeck/plan-artifact-push-report.js';
+import { registerOrdersEditCommands } from './orders-edit.js';
 
 export interface OrdersCommandDeps {
   cwd?: string;
@@ -353,6 +354,8 @@ export function createOrdersCommand(): Command {
       console.log(`Flywheel started: ${result.runId}`);
       console.log(`Order book: ${id}`);
     }));
+
+  registerOrdersEditCommands(orders);
 
   return orders;
 }

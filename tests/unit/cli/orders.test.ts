@@ -150,6 +150,10 @@ describe('pan orders commands', () => {
       'move',
       'queue',
       'start',
+      'rename',
+      'set',
+      'pause',
+      'resume',
     ]);
     for (const child of command.commands) {
       expect(child.options.map((option) => option.long)).toContain('--project');
