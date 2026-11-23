@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-5609",
   "created": "2026-11-23T06:08:07.057Z",
-  "updated": "2026-11-23T13:27:10.880Z",
+  "updated": "2026-11-23T13:33:35.893Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-23T13:33Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-23T13:33:35.893Z"
+    }
+  ],
   "items": {
     "contract-activity-event": {
       "status": "completed",
@@ -185,5 +191,14 @@
       "status": "completed",
       "doneAt": "2026-11-23T13:27:10.880Z"
     }
-  }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-23T13:33:35Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5609\n\nPull request: https://github.com/eltmon/overdeck/pull/5630 (head `86916ebd`)\n\nSource: check_run:test-e2e\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-e2e\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/137725525547/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/45184227008/job/137725525547  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/App.test.tsx\u001b[2m > \u001b[22mApp conversation view routing\u001b[2m > \u001b[22mdefaults missing view state to conversation mode\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/App.test.tsx\u001b[2m > \u001b[22mApp conversation view routing\u001b[2m > \u001b[22mrestores terminal view from the URL on initial render\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/App.test.tsx\u001b[2m > \u001b[22mApp conversation view routing\u001b[2m > \u001b[22mdoes not strip terminal view from a direct deep link on initial render\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/App.test.tsx\u001b[2m > \u001b[22mApp conversation view routing\u001b[2m > \u001b[22mupdates the current conversation URL when the view mode changes\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/App.test.tsx\u001b[2m > \u001b[22mApp conversation view routing\u001b[2m > \u001b[22mrestores a remembered terminal view when returning to a conversation\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/App.test.tsx\u001b[2m > \u001b[22mApp primary routing\u001b[2m > \u001b[22mrenders HomePage at /\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/App.test.tsx\u001b[2m > \u001b[22mApp primary routing\u001b[2m > \u001b[22mopens a Home workspace card through the existing board drawer route\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/App.test.tsx\u001b[2m > \u001b[22mApp primary routing\u001b[2m > \u001b[22mrenders PipelineView at /pipeline\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/App.test.tsx\u001b[2m > \u001b[22mApp primary routing\u001b[2m > \u001b[22mrestores the selected project from a command deck project URL\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/App.test.tsx\u001b[2m > \u001b[22mApp primary routing\u001b[2m > \u001b[22mkeeps route views mounted and visible while the server is unreachable\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/App.test.tsx\u001b[2m > \u001b[22mApp primary routing\u001b[2m > \u001b[22mupdates the URL when a command deck project is selected\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/App.test.tsx\u001b[2m > \u001b[22mApp primary routing\u001b[2m > \u001b[22mthe top-bar brand navigates Home (PAN-5293 F-D14)\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/App.test.tsx\u001b[2m > \u001b[22mApp primary routing\u001b[2m > \u001b[22mopens a left-column conversation in the deck from another route\n…\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m579 passed\u001b[39m\u001b[22m\u001b[90m (580)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ]
 }
