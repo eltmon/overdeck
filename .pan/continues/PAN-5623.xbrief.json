@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5623",
   "created": "2026-11-23T20:20:25.006Z",
-  "updated": "2026-11-23T20:53:29.504Z",
+  "updated": "2026-11-23T20:53:30.895Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -123,6 +123,11 @@
       "status": "cancelled",
       "claimedBy": "agent-pan-5623",
       "claimedAt": "2026-11-23T20:53:08.495Z"
+    },
+    "wi6-spawn-gate-restore": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5623",
+      "claimedAt": "2026-11-23T20:53:30.894Z"
     }
   }
 }
