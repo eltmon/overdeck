@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-23T22:23:22Z · model: claude-opus-5-5 · open: 954_
+_Last sequenced: 2026-11-23T23:11:53Z · model: claude-opus-5-5 · open: 954_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -13,7 +13,6 @@ _Last sequenced: 2026-11-23T22:23:22Z · model: claude-opus-5-5 · open: 954_
 | 6 | PAN-5489 | S | high | ok |  |  | pan plan from an agent shell fails workspace creation without HUME_API_KEY, leaves a half-built workspace and hides the cause. |
 | 7 | PAN-5566 | M | high | ok |  |  | UI/help text says Auto blocks destructive calls but the hook approves all; repo .pan.yaml can set bypass mode. |
 | 8 | PAN-5385 | S | critical | ok |  |  | Anywhere remote access is down for trickle clients: machine drops ICE candidates sent before session registers; small server fix |
-| 8 | PAN-5623 | L | critical | ok |  |  | While gate admission is starved, stop Overdeck-owned stack containers of parked issues and restart them on demand (FR-2 of PAN-5621). |
 | 9 | PAN-5633 | M | high | ok |  |  | Codex app-server auth burn never flags: banner silent, conv shows isWorking while 578 turns fail over 14h. Detect turn errors. |
 | 10 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 10 | PAN-5523 | S | high | ok |  |  | pan conversations move/heal send raw fetch with no token, so routes refuse with Missing origin; same fix pattern as in-pipeline PAN-5516. |
@@ -200,6 +199,7 @@ _Last sequenced: 2026-11-23T22:23:22Z · model: claude-opus-5-5 · open: 954_
 | 179 | PAN-3307 | XS | high | ok |  |  | commitlint scope-enum lists 11 scopes, 14 real ones are missing, and it still names the removed beads scope — trains everyone to ignore it. |
 | 180 | PAN-5250 | M | high | ok |  |  | Idle workspace frontend and dev containers never stop while an agent lives; ~9 GB held by unviewed Vite containers. |
 | 181 | PAN-2642 | XL | high | ok | ✓ |  | Cost strategy: waste detection over budget policing |
+| 181 | PAN-5649 | M | medium | ok |  | PAN-5250 | Browser half of PAN-5250 restart-on-demand: Traefik fallback wake page and a dashboard start-app action for stopped stacks. |
 | 182 | PAN-1868 | XS | high | ok |  |  | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
 | 183 | PAN-4847 | S | high | ok |  |  | Remote reap silently skips review request when a background writer dirties a tracked file; pipeline stalls at PR-open. |
 | 184 | PAN-1042 | S | high | ok |  |  | cost_events retention: 14 months of granular rows accumulating with ad-hoc partial deletions |
@@ -994,10 +994,6 @@ New bug: operators choose Auto believing it gates destructive calls, and a proje
 
 New issue. Phones (iOS, Android) and the connector cannot reach the machine at all, directly or through the relay, because RtcTransport.accept awaits ICE servers before registering the signalling session and drops trickle candidates that arrive in that window. The root cause and the fix (buffer candidates from offer acceptance) are stated in the body and touch only the dashboard server, so this is a small, well-defined fix for a full outage of a shipped feature. It takes the open rank-8 slot ahead of the remaining pipeline-substrate bugs.
 
-### PAN-5623 (rank 8)
-
-New substrate issue split from in-pipeline PAN-5621: detection alone does not end a starvation, reclaiming parked stacks does (the Flywheel did it by hand on 2026-11-23). The body is a verified, deny-by-default spec, so it ranks right behind its parent among the critical gate-throughput fixes; it overlaps PAN-5250's restart-on-demand path.
-
 ### PAN-5633 (rank 9)
 
 New bug with a traced root cause: classifyNativeCodexAuth treats any refresh token as valid and nothing writes the codex-auth-burned flag, so a Codex app-server conversation failed silently for 14 hours. It ranks beside PAN-5567 (the other Codex app-server substrate gap) because silent agent failure undermines every Codex-routed conversation and worker.
@@ -1282,6 +1278,10 @@ Found cutting v0.65.0: CI was green but the local release check failed on two ho
 
 New CodeRabbit follow-up on the just-merged PAN-5623 stack-reclaim code, which stops and restarts workspace containers. Four Major findings touch reclaim correctness (re-reclaiming issues with an open reclaim, transient journal read failures, stale container snapshots after partial restores), so it ranks above routine CodeRabbit follow-ups as high-importance substrate hardening.
 
+### PAN-4566 (rank 71)
+
+Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback this fix routes failures to is on main and work can start.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1289,7 +1289,7 @@ New CodeRabbit follow-up on the just-merged PAN-5623 stack-reclaim code, which s
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-23T22:23:22Z",
+  "generatedAt": "2026-11-23T23:11:53Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 954,
@@ -1395,19 +1395,6 @@ New CodeRabbit follow-up on the just-merged PAN-5623 stack-reclaim code, which s
       "dependsOn": [],
       "why": "Anywhere remote access is down for trickle clients: machine drops ICE candidates sent before session registers; small server fix",
       "rationale": "New issue. Phones (iOS, Android) and the connector cannot reach the machine at all, directly or through the relay, because RtcTransport.accept awaits ICE servers before registering the signalling session and drops trickle candidates that arrive in that window. The root cause and the fix (buffer candidates from offer acceptance) are stated in the body and touch only the dashboard server, so this is a small, well-defined fix for a full outage of a shipped feature. It takes the open rank-8 slot ahead of the remaining pipeline-substrate bugs.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5623",
-      "rank": 8,
-      "size": "L",
-      "importance": "critical",
-      "score": 82,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "While gate admission is starved, stop Overdeck-owned stack containers of parked issues and restart them on demand (FR-2 of PAN-5621).",
-      "rationale": "New substrate issue split from in-pipeline PAN-5621: detection alone does not end a starvation, reclaiming parked stacks does (the Flywheel did it by hand on 2026-11-23). The body is a verified, deny-by-default spec, so it ranks right behind its parent among the critical gate-throughput fixes; it overlaps PAN-5250's restart-on-demand path.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3821,6 +3808,21 @@ New CodeRabbit follow-up on the just-merged PAN-5623 stack-reclaim code, which s
       "gate": "blocked",
       "planning": "skip",
       "isEpic": true
+    },
+    {
+      "issue": "PAN-5649",
+      "rank": 181,
+      "size": "M",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-5250"
+      ],
+      "why": "Browser half of PAN-5250 restart-on-demand: Traefik fallback wake page and a dashboard start-app action for stopped stacks.",
+      "rationale": "New issue split from PAN-5250 during planning; it depends on PAN-5250's wake door, so it ranks directly behind it as medium-importance UI follow-up.",
+      "gate": "auto",
+      "planning": "auto"
     },
     {
       "issue": "PAN-1868",
@@ -13592,13 +13594,6 @@ New CodeRabbit follow-up on the just-merged PAN-5623 stack-reclaim code, which s
       "confidence": 0.95
     },
     {
-      "from": "PAN-3050",
-      "to": "PAN-5623",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
       "from": "PAN-3054",
       "to": "PAN-3061",
       "type": "informs",
@@ -14370,10 +14365,10 @@ New CodeRabbit follow-up on the just-merged PAN-5623 stack-reclaim code, which s
     },
     {
       "from": "PAN-5250",
-      "to": "PAN-5623",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
+      "to": "PAN-5649",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
     },
     {
       "from": "PAN-5263",
@@ -14563,13 +14558,6 @@ New CodeRabbit follow-up on the just-merged PAN-5623 stack-reclaim code, which s
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
-    },
-    {
-      "from": "PAN-5623",
-      "to": "PAN-5648",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
     },
     {
       "from": "PAN-5633",
