@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5623",
   "created": "2026-11-23T20:20:25.006Z",
-  "updated": "2026-11-23T20:37:54.923Z",
+  "updated": "2026-11-23T20:41:35.151Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -72,9 +72,26 @@
       "doneAt": "2026-11-23T20:37:49.815Z"
     },
     "wi4-docker-helpers": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5623",
-      "claimedAt": "2026-11-23T20:37:54.923Z"
+      "claimedAt": "2026-11-23T20:37:54.923Z",
+      "doneAt": "2026-11-23T20:41:35.150Z"
+    },
+    "wi4-docker-helpers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:41:35.150Z"
+    },
+    "wi4-docker-helpers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:41:35.150Z"
+    },
+    "wi4-docker-helpers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:41:35.150Z"
+    },
+    "wi4-docker-helpers.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T20:41:35.150Z"
     }
   }
 }
