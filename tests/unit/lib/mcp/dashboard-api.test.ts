@@ -29,6 +29,14 @@ describe('createFetchDashboardApi (PAN-4927 W-MCP1)', () => {
     expect((calls[0]!.init.headers as Record<string, string>)['Content-Type']).toBeUndefined();
   });
 
+  it('DELETE with a body sends JSON and Content-Type', async () => {
+    const { fetchImpl, calls } = recordingFetch();
+    const api = createFetchDashboardApi({ baseUrl: 'http://dash', token: 'odk_test', fetchImpl });
+    await api.request('DELETE', '/x', {});
+    expect(calls[0]!.init.body).toBe('{}');
+    expect((calls[0]!.init.headers as Record<string, string>)['Content-Type']).toBe('application/json');
+  });
+
   it('GET sends no body', async () => {
     const { fetchImpl, calls } = recordingFetch();
     const api = createFetchDashboardApi({ baseUrl: 'http://dash', token: 'odk_test', fetchImpl });

@@ -20,10 +20,10 @@ const agentProbe: OverdeckTool = {
 };
 
 describe('MCP tool visibility (PAN-4927 W-MCP1)', () => {
-  it('a read:state-only token sees only list_machines', async () => {
+  it('a read:state-only token sees list_machines and the order-book read tools', async () => {
     const client = await connectClient(fakeApi({}), ['read:state']);
     const { tools } = await client.listTools();
-    expect(tools.map((tool) => tool.name)).toEqual(['list_machines']);
+    expect(tools.map((tool) => tool.name)).toEqual(['list_machines', 'list_order_books', 'get_order_book', 'list_order_book_candidates', 'preview_order_book_brief']);
   });
 
   it('read:state, read:conversations and operate see every tool but the approve tools', async () => {
