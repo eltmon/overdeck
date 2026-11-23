@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5633",
+  "created": "2026-11-23T19:06:23.391Z",
+  "updated": "2026-11-23T19:06:23.391Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "wi1-last-turn-reader": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5633",
+      "claimedAt": "2026-11-23T19:06:23.391Z"
+    }
+  }
+}
