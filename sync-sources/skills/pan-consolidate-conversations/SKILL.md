@@ -1,6 +1,6 @@
 ---
 name: pan-consolidate-conversations
-description: "Workflow: take over every open conversation in the current project — read what each one owns, carry its unfinished commitments into this conversation, and archive the ones that are not mid-turn. Use when the operator has lost track of which conversation handles what and wants one conversation to own the project's work streams again."
+description: "Workflow: take over every unarchived conversation in the current project, settled and snoozed ones included — read what each one owns, carry its unfinished commitments into this conversation, and archive the ones that are not mid-turn. Use when the operator has lost track of which conversation handles what and wants one conversation to own the project's work streams again."
 triggers:
   - take over all conversations
   - take over for them all
@@ -18,7 +18,8 @@ allowed-tools:
 
 The operator runs several conversations in one project and loses track of which
 one owns which work stream. This skill makes **the conversation you are in** the
-single owner: you read every other open conversation in the project, take over
+single owner: you read every other unarchived conversation in the project, settled
+and snoozed ones included, take over
 its unfinished commitments, and archive it. You end with a ledger that says what
 each archived conversation owned and what you now own.
 
@@ -47,6 +48,13 @@ A conversation is in scope when either:
 - its `projectKey` is `null` and its `cwd` is under your project root. A
   post-`/clear` continuation row often has no `projectKey`, so the key alone
   misses it.
+
+Settled and snoozed conversations are in scope. Settling only moves a row out of
+the Inbox. The idle sweep settles any conversation untouched for a few days, and
+a merge settles the one that opened the PR, so a settled row can still hold
+unfinished commitments. Digest them like any other row (step 4), and carry what
+is still open after you verify it against live state. The list returns them with
+`settledAt` or `snoozedUntil` set; never filter on those fields.
 
 Exclude:
 
