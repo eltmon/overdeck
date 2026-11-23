@@ -1,6 +1,6 @@
 import { capturePane } from './tmux.js'
 
-export type AwaitingInputReason = 'tool_permission' | 'user_question' | 'disambiguation' | 'confirmation' | 'planning_done' | 'session_resume' | 'rate_limit' | 'other'
+export type AwaitingInputReason = 'tool_permission' | 'user_question' | 'disambiguation' | 'confirmation' | 'planning_done' | 'session_resume' | 'rate_limit' | 'startup_blocked' | 'other'
 
 export interface AwaitingInputDetection {
   reason: AwaitingInputReason

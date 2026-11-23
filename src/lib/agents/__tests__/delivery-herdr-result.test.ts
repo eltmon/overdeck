@@ -40,7 +40,7 @@ vi.mock('../../../dashboard/server/http-helpers.js', () => ({
 
 const { deliverAgentMessage, resetDeliveryBackendSelection } = await import('../delivery.js');
 const { resetPromptGuard } = await import('../../terminal-backends/prompt-guard.js');
-const { describeHerdrRefusal } = await import('../../terminal-backends/agent-pane-io.js');
+const { describeHerdrRefusal, refusedBeforeTyping } = await import('../../terminal-backends/agent-pane-io.js');
 const { createConversation } = await import('../../overdeck/conversations.js');
 const { closeOverdeckDatabase } = await import('../../overdeck/infra.js');
 const { handleConversationMessage } = await import('../../overdeck/conversation-message.js');
@@ -110,6 +110,23 @@ describe('Herdr delivery results for the 15:24 candidates', () => {
       failure: 'refused: agent_blocked — the agent is waiting at a dialog; open the Terminal tab to answer it: '
         + '"Do you trust the files in this folder? / ❯ 1. Yes, proceed / 2. No, exit / Enter to confirm · Esc to cancel"',
     });
+  });
+
+  // PAN-4242: a dialog after the paste says the text is waiting unsent, and is
+  // not counted as a refusal that typed nothing.
+  it('a refusal after the paste says the text was not submitted', async () => {
+    mocks.prompt.mockReturnValue(Effect.succeed({ refused: true, reason: 'agent_blocked_after_paste' }));
+    mocks.readPane.mockResolvedValue('');
+    const result = await deliverAgentMessage(CONV, 'hello', 'conversation-message', 'auto');
+    expect(result).toEqual({
+      ok: false,
+      path: 'herdr',
+      failure: 'refused: agent_blocked_after_paste — a dialog appeared after the text was pasted, so it was not submitted; '
+        + 'open the Terminal tab to answer it, then submit the text',
+    });
+    expect(refusedBeforeTyping(result.failure)).toBe(false);
+    expect(refusedBeforeTyping('refused: agent_blocked — the agent is waiting at a dialog')).toBe(true);
+    expect(refusedBeforeTyping('herdr call timed out')).toBe(false);
   });
 
   it('an agent_blocked refusal keeps the tail of a long screen, bounded', async () => {

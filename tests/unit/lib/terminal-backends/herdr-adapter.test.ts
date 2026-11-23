@@ -332,6 +332,30 @@ describe('HerdrBackend.prompt steer submit (PAN-4292)', () => {
     expect(log.map((call) => call.method)).toEqual(['agent.get']);
   });
 
+  // PAN-4242: a dialog that appears after the paste leaves the text in the
+  // composer, so it is refused with its own reason, never 'agent_blocked'.
+  it('refuses with agent_blocked_after_paste when the agent turns blocked after the paste', async () => {
+    const text = 'change course';
+    let agentGets = 0;
+    const { api, log } = fakeApi(({ method }) => {
+      if (method === 'agent.get') {
+        agentGets += 1;
+        return { agent: { pane_id: 'w1:p2', agent_status: agentGets === 1 ? 'working' : 'blocked', tokens: {} } };
+      }
+      if (method === 'pane.read') return { type: 'pane_read', read: { text: composerWith(text) } };
+      return {};
+    });
+
+    const pending = Effect.runPromise(
+      new HerdrBackend(api as never).prompt({ agentName: 'a' }, text, { messageId: 's3', sender, submit: 'steer' }),
+    );
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    await expect(pending).resolves.toEqual({ refused: true, reason: 'agent_blocked_after_paste' });
+    expect(log.some((call) => call.method === 'pane.send_text')).toBe(true);
+    expect(log.some((call) => call.method === 'pane.send_keys')).toBe(false);
+  });
+
   it('keeps agent.prompt when submit is absent', async () => {
     const { api, log } = fakeApi(({ method }) => {
       if (method === 'agent.get') return { agent: { pane_id: 'w1:p2', agent_status: 'working', tokens: {} } };

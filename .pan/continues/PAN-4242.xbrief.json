@@ -1,0 +1,200 @@
+{
+  "version": "1",
+  "issueId": "PAN-4242",
+  "created": "2026-11-23T08:46:31.743Z",
+  "updated": "2026-11-23T10:15:33.360Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-23T09:41Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-23T09:41:57.293Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-23T10:15Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-11-23T10:15:33.360Z"
+    }
+  ],
+  "items": {
+    "trust-launch-targets": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4242",
+      "claimedAt": "2026-11-23T08:46:31.743Z",
+      "doneAt": "2026-11-23T09:31:45.385Z"
+    },
+    "trust-launch-targets.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:31:45.385Z"
+    },
+    "trust-launch-targets.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:31:45.385Z"
+    },
+    "trust-launch-targets.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:31:45.385Z"
+    },
+    "trust-launch-targets.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:31:45.385Z"
+    },
+    "settings-copy-permissions": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4242",
+      "claimedAt": "2026-11-23T09:32:49.082Z",
+      "doneAt": "2026-11-23T09:34:13.798Z"
+    },
+    "trust-dialog-parse": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4242",
+      "claimedAt": "2026-11-23T09:34:15.103Z",
+      "doneAt": "2026-11-23T09:34:36.680Z"
+    },
+    "pan-answer-backend": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4242",
+      "claimedAt": "2026-11-23T09:34:47.307Z",
+      "doneAt": "2026-11-23T09:35:06.750Z"
+    },
+    "settings-copy-permissions.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:34:13.798Z"
+    },
+    "settings-copy-permissions.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:34:13.798Z"
+    },
+    "settings-copy-permissions.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:34:13.798Z"
+    },
+    "trust-dialog-parse.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:34:36.680Z"
+    },
+    "trust-dialog-parse.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:34:36.680Z"
+    },
+    "trust-dialog-parse.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:34:36.680Z"
+    },
+    "trust-dialog-parse.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:34:36.680Z"
+    },
+    "pan-answer-backend.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:35:06.750Z"
+    },
+    "pan-answer-backend.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:35:06.750Z"
+    },
+    "pan-answer-backend.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:35:06.750Z"
+    },
+    "startup-stall-flag": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4242",
+      "claimedAt": "2026-11-23T09:35:07.831Z",
+      "doneAt": "2026-11-23T09:35:28.592Z"
+    },
+    "startup-stall-flag.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:35:28.592Z"
+    },
+    "startup-stall-flag.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:35:28.592Z"
+    },
+    "startup-stall-flag.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:35:28.592Z"
+    },
+    "kickoff-hold-on-refusal": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4242",
+      "claimedAt": "2026-11-23T09:35:42.539Z",
+      "doneAt": "2026-11-23T09:36:04.728Z"
+    },
+    "kickoff-hold-on-refusal.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:36:04.728Z"
+    },
+    "kickoff-hold-on-refusal.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:36:04.728Z"
+    },
+    "kickoff-hold-on-refusal.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:36:04.728Z"
+    },
+    "resume-delivers-kickoff": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4242",
+      "claimedAt": "2026-11-23T09:36:06.086Z",
+      "doneAt": "2026-11-23T09:36:28.039Z"
+    },
+    "resume-delivers-kickoff.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:36:28.039Z"
+    },
+    "resume-delivers-kickoff.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:36:28.039Z"
+    },
+    "resume-delivers-kickoff.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:36:28.039Z"
+    },
+    "resume-delivers-kickoff.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:36:28.039Z"
+    },
+    "resume-delivers-kickoff.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:36:28.039Z"
+    },
+    "docs-trust-kickoff": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4242",
+      "claimedAt": "2026-11-23T09:36:39.876Z",
+      "doneAt": "2026-11-23T09:37:09.834Z"
+    },
+    "docs-trust-kickoff.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:37:09.834Z"
+    },
+    "docs-trust-kickoff.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:37:09.834Z"
+    },
+    "docs-trust-kickoff.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T09:37:09.834Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-23T09:41:57Z",
+      "markdownBody": "# CI Failure Feedback for PAN-4242\n\nPull request: https://github.com/eltmon/overdeck/pull/5622 (head `11f7c9f4`)\n\nSource: check_run:lint-group (core)\n\n## Failing checks (1)\n\n### lint-group (core)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/137604809137/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/45148849585/job/137604809137  \n```\nlive only in src/lib/runtimes/storage/\n\n$ npm run lint:harness-branches\n\n> @overdeck/core@0.90.1 lint:harness-branches\n> bash scripts/lint-harness-branches.sh\n\n✖ src/lib/agents/startup-stall.ts: NEW file with 1 harness-name branches\nReplace the branch with a HarnessCapabilities field — see configuration/harnesses.mdx \"Harness capabilities\".\n##[error]Process completed with exit code 1.\nPost job cleanup.\n[command]/usr/bin/git version\ngit version 2.56.1\nTemporarily overriding HOME='/home/runner/work/_temp/190bdd54-4126-445f-b42b-475e498e1389' before making global git config changes\nAdding repository directory to the temporary git global config as a safe directory\n[command]/usr/bin/git config --global --add safe.directory /home/runner/work/overdeck/overdeck\n[command]/usr/bin/git config --local --name-only --get-regexp core\\.sshCommand\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'core\\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp http\\.https\\:\\/\\/github\\.com\\/\\.extraheader\nhttp.https://github.com/.extraheader\n[command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'http\\.https\\:\\/\\/github\\.com\\/\\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\\.gitdir:\n[command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url\nCleaning up orphan processes\n##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-11-23T10:15:33Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-4242\n\n# Review — PAN-4242\n## Verdict: CHANGES REQUESTED — a failed resume-kickoff delivery leaves `fork_status='injecting'`, so the conversation shows \"Injecting\" forever with no composer, no Start and no error\n\n## Context\n- Run ID: agent-pan-4242-review-089de8b8\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4242/.pan/review/agent-pan-4242-review-089de8b8/context.json\n- Branch / workspace: feature/pan-4242 / /home/eltmon/Projects/overdeck/workspaces/feature-pan-4242\n- PR: https://github.com/eltmon/overdeck/pull/5622\n- HEAD reviewed: 089de8b87b1c08a860252f5b0dfefc987512db0b\n- Base / prior cycle SHA: merge base 56329afe21445f9933ce0d7c318eb7c0f7bd5ea8; no prior review cycle\n- Spec: `.pan/drafts/PAN-4242.md`. The manifest's `acceptanceCriteria` list is empty, so the AC matrix below maps the PRD's AC-1 to AC-8.\n\n## Blocking Findings\n\n### [correctness] A failed resume kickoff leaves the conversation stuck at \"Injecting\" — `src/lib/overdeck/conversation-undelivered-kickoff.ts:39`\n- Severity: ! (MUST)\n- Classification / requirement scope: implementation defect; in_pr_scope (FR-8, WI-7, D6).\n- Trigger and changed-code connection: `POST /api/conversations/:name/resume` → `handleConversationResume` → the new `deliverResumeNoticeOrKickoff(conv, notice, deliverForkSeed)`. It claims a held kickoff (a refused fork with no `hold: true`) and calls `deliverForkSeed` → `injectForkSummary`. The first line of `injectForkSummary` is `updateForkStatus(conv.name, 'injecting')` (`conversation-forks.ts:275`). Any later throw (a refused delivery via `assertForkDelivered`, a Herdr transport error, `waitForPiTuiReady`) propagates. `deliverForkSeed`'s new catch only restores the held text and rethrows. The new module's catch restores the held kickoff, logs, and returns `'failed'`. Nothing resets `fork_status`: `handleConversationResume` then calls `markConversationActive`, which only clears `archived_at` and `spawn_error` (`conversations.ts:831`).\n- Expected / observed / impact:\n  - Expected (FR-8 \"on failure it is restored\", D6): the kickoff stays recoverable through the held-handoff surface, the way the Start door does it. `deliverClaimedKickoff` in `conversation-kickoff.ts:31-33` restores the hold **and** sets `updateForkStatus(name, 'failed', message)`.\n  - Observed: the row stays at `fork_status='injecting'` while the session is alive. In the dashboard:\n    - `conversation-reads.ts:495` computes `sessionAlive = … && !conv.forkStatus`, so it reads false.\n    - `ConversationPanel.tsx:643-645` sets `isForkInProgress`, so `heldLookupOpen` (line 672) is false and `HeldHandoffView`/Start never render.\n    - Line 784 renders `ForkProgressView` at the \"Injecting\" step with no error.\n    - Line 890 (`isForking ? null`) hides the composer and resume bar.\n  - Impact: the operator sees a perpetual \"Seeding the new session…\" spinner over a live session they cannot type into. The restored kickoff can't be reached from the UI. `healFailedForkVerdictOnLiveActivity` (`routes/hooks.ts:72`) heals only `'failed'`. The only ways out are the `pan conversations heal` CLI (`clear-fork-state`) or a dashboard restart (`recoverStuckForks`, which may re-run the whole fork pipeline while the old kickoff is still held).\n  - Regression versus baseline: before this PR the same resume sent the resume notice through `deliverResumeContractUnlessGated`, which never touches `fork_status`, so the conversation stayed usable.\n- Reachability: the branch runs whenever the respawned session still refuses or fails delivery. That is the same problem class as this issue: a startup dialog the new pre-trust did not prevent. Pre-trust is non-fatal (a held `~/.claude.json` lock throws `\"… was not pre-trusted\"` and is swallowed in `launch.ts`), a repository rooted at `$HOME` is never trusted, and other startup menus exist. A Herdr transport throw also reaches it.\n- Evidence: static trace of the lines above. Not reproduced live. `conversation-undelivered-kickoff.test.ts` injects a fake `deliverKickoff` that never sets `injecting`, so the test cannot observe this.\n- Fix: in the `catch` of `deliverResumeNoticeOrKickoff`, mirror the Start door: `updateForkStatus(conv.name, 'failed', <error message>)` after `restoreHeldKickoff`. With `'failed'`, `heldLookupOpen` becomes true and the panel shows `HeldHandoffView` with **Start** and the error (`startError = forkError`). Add a test whose fake deliverer sets `injecting` and then throws, and assert `forkStatus === 'failed'` with the held text restored.\n\n## Non-blocking Findings\n\n1. **~ / spec defect — \"refused means nothing typed\" is not true on Herdr's post-paste path** (`src/lib/terminal-backends/herdr-submit.ts:73-95`, `herdr.ts:808-809`, `delivery.ts:454`). For a Claude pane, `herdrBackend.prompt` goes through `pasteAndSubmitHerdrPane`. It pastes with `pane.send_text` (step 1) and returns `'blocked'` at step 3 when a menu or blocked status appears. That maps to `{ refused: true, reason: 'agent_blocked' }` → `refused: agent_blocked …` → `ForkDeliveryRefusedError` → the kickoff is held even though its text reached the pane. A later **Start** into the same live pane (`ensureForkSessionReady` reuses it) could leave the text in the composer twice. In the trust-dialog case this is mostly prevented: the pre-paste check at `herdr.ts:807` refuses before any paste when Herdr already reports `blocked`. Not reproduced. Spec fix: the PRD glossary (\"Both … refuse before any byte is typed\") and NFR-4 should distinguish a pre-paste refusal from step-3 `blocked`, or the Herdr backend should return a different reason for the post-paste case.\n2. **~ / spec gap — FR-7 holds nothing on tmux hosts.** On tmux, a menu-blocked delivery throws `MessageDeliveryFailed` after `paste-buffer` (`tmux.ts:1118`), not a `refused:` result. The `refused:` failure at `delivery.ts:462` comes from the token/sender prompt guard, not the menu. So a kickoff refused by the trust dialog on a tmux host is still lost (baseline behaviour). Not holding it is the safe choice, since the text was pasted. The PRD glossary's claim about the tmux guard is wrong, and FR-7 in practice covers Herdr only. Document it.\n3. **? — `sendResumeContract: false` still sends a held kickoff.** `deliverResumeNoticeOrKickoff` never checks `notice.send`. Sending the kickoff is arguably correct, because it is the mission and not the notice, but the PRD does not decide it. Confirm it and note it in `docs/FORKS.md`.\n4. **? — Start after an edited kickoff now holds the edited text on refusal.** `deliverForkSeed` restores `seed` (the edited text) before the door's `restoreHeldKickoff(claimed)`, which then no-ops. This is probably the better outcome, but it changes PAN-4499's behaviour. Worth a line in the docs.\n5. **? / pre-existing — home guard.** `claudeTrustTargets` compares only the git root to an unresolved `homedir()`. The cwd and its realpath are not guarded, but cwd-as-home was already pre-trusted before this PR (PAN-3905), and a symlinked `$HOME` is an edge case. Not a must-not-7 violation introduced here.\n6. **? — performance.** For a live Claude agent past 180 s whose transcript mtime is null or older than `startedAt`, each 10 s enrichment poll (`agent-enrichment-service.ts:399`, agents with a live pane in running/starting only) now does one extra pane read. Bounded by the live-agent count; conversations never reach it, so the PAN-5169 cost decision is unaffected. An idle agent whose transcript path never resolves pays it indefinitely. Measuring that population would establish impact.\n7. **≉ — NFR-2 wording.** `src/dashboard/server/routes/conversations.ts` grew 1039 → 1041 lines, and NFR-2 says no other changed file may grow past 1000. `scripts/lint-file-size.sh` passes (the allowlist row is 1072), so this is a spec-wording point only.\n8. **nit — AC-8 names `changelog.d/PAN-4242.md`.** The file is `changelog.d/pan-4242.md`, which is what `changelog.d/README.md` requires (lowercase). The AC has the typo; the code is right.\n9. **? — tracked project settings.** `copyOverdeckSettingsToWorkspace` now strips user-duplicated `permissions.allow` from `<workspace>/.claude/settings.json`. When a project tracks that file, the edit shows up as a tracked diff an agent could commit. This class already existed (the sync already rewrote the file with user hooks and keys). Overdeck itself does not track the file.\n\n## Coverage\n\n### Changed-file ledger\n| File | Status |\n| --- | --- |\n| configuration/harnesses.mdx | reviewed: folder-trust bullet + capability table row accurate |\n| src/dashboard/server/routes/conversations.ts | reviewed: passes `deliverKickoff: deliverForkSeed` to resume |\n| src/lib/workspace-manager/migration.ts | reviewed: `withoutUserGrants` correct; other user keys still copied (non-goal 5 holds); hooks merge unchanged |\n| packages/contracts/src/harness-capabilities.ts | reviewed: flag true only for claude-code; Pi spreads ohmypi, Grok and Antigravity spread opencode (all false) |\n| packages/contracts/src/harness-behavior.test.ts | reviewed + run (28/28) |\n| src/cli/commands/answer.ts | reviewed: per-command memoized `resolveAgentPaneIo`; read throw → \"No pending choice menu\"; keys go through `toHerdrKey` (same door as `resume-pane-choice.ts`) |\n| src/cli/commands/__tests__/answer.test.ts | reviewed |\n| src/lib/agent-enrichment.ts | reviewed: stall fallback only when no question/runtime/pane detection; `startup_blocked` → `paneQuestion`, blocking set |\n| src/lib/agent-input-detection.ts | reviewed (type union) |\n| src/lib/agents/startup-stall.ts | reviewed: capability gate, 180 s, mtime check, guard-mode parse, read-throw → null; imports the `agent-state-read` leaf |\n| src/lib/agents/__tests__/startup-stall.test.ts | reviewed |\n| src/lib/overdeck/conversation-forks.ts | reviewed: `ForkDeliveryRefusedError` + hold on refusal; stranded not held (see NB-1) |\n| src/lib/overdeck/conversation-kickoff-store.ts | reviewed: `forkRequestedHold` |\n| src/lib/overdeck/conversation-runtime.ts | reviewed: 1224 → 1218 lines (NFR-2 met); call swap only |\n| src/lib/overdeck/conversation-undelivered-kickoff.ts | reviewed: **blocking finding** |\n| src/lib/overdeck/__tests__/conversation-*-kickoff.test.ts (2) | reviewed |\n| src/lib/pane-choice-menu.ts | reviewed: exact-shape detector; numbered parser unchanged |\n| tests/lib/pane-choice-menu.test.ts, tests/fixtures/claude-trust-dialog.ts | reviewed |\n| src/lib/terminal-backends/launch.ts | reviewed: harness-gated, non-fatal, loops over the trust targets |\n| src/lib/workspace-manager/worktree-ops.ts | reviewed: async `realpath` + promisified `execFile` with 5 s timeout (NFR-1); bare repo/submodule → null |\n| tests/unit/lib/terminal-backends/launch-pretrust.test.ts, tests/unit/lib/workspace-manager/pretrust-directory.test.ts, tests/lib/workspace-manager.test.ts | reviewed: real git worktree, temp HOME (NFR-3) |\n| docs/TERMINAL-BACKENDS.md, docs/FORKS.md, changelog.d/pan-4242.md, .overdeck/context/codebase/concerns.md | reviewed: accurate except the FORKS.md claim that a refusal \"types nothing\" (NB-1) |\n| .pan/drafts, .pan/specs, .pan/continues | not applicable: planning artifacts (the PRD was read as the spec) |\n\n### Dimensions\n- **Correctness:** one blocker (resume failure branch) plus NB-1 to NB-4. The trust-dialog parser cannot produce a false positive without the literal `Yes, I trust this folder` row plus the footer.\n- **Security:** must-not 3 holds. The only automatic pane answerer (`resume-pane-choice.ts`) keys the exact resume-summary gate and returns not-ready for any other menu, the trust dialog included. Repo-root trust grants nothing beyond what the worktree trust already implied (D1). No new injection surface: `git -C <cwd>` goes through `execFile` with an argv array.\n- **Performance:** bounded (NB-6). Pre-trust adds one `git rev-parse` per Claude launch (5 s timeout).\n- **Requirements/UX:** see the matrix. Non-goals 1-9 are respected. Non-goal 8 (\"never hold a stranded kickoff\") holds for the `stranded` outcome, but NB-1 shows one Herdr path where pasted text can be classed as a refusal.\n\n### AC matrix (PRD AC-1 to AC-8)\n| AC | Status | Evidence |\n| --- | --- | --- |\n| AC-1 (WI-1 trust targets) | met | the launch-pretrust worktree+root case with trailing-slash cwd and the pretrust-directory cases pass locally |\n| AC-2 (WI-2 settings) | met | workspace-manager.test.ts passes |\n| AC-3 (WI-3 parser) | met | pane-choice-menu.test.ts passes with both verbatim fixtures |\n| AC-4 (WI-4 pan answer) | met (unit) | answer.test.ts passes with a fake pane IO; live Herdr unverified, key mapping checked statically |\n| AC-5 (WI-5 stall) | met | startup-stall.test.ts passes |\n| AC-6 (WI-6 hold on refusal) | met as specified | conversation-forks-undelivered-kickoff.test.ts passes; spec premise caveat NB-1 |\n| AC-7 (WI-7 resume) | partially met | tests pass and runtime.ts is 1218 ≤ 1224, but the failure branch leaves the conversation unrecoverable in the UI (blocker) |\n| AC-8 (WI-8 docs) | met | PAN-4242 appears in all four files (changelog uses the README-mandated lowercase name) |\n| typecheck / lint | CI | `build (22)`, `lint`, `lint-group (core/effect/state/skills)` pass on CI for 089de8b |\n\n## Verification\n- `npx vitest run` on the 8 PAN-4242 test files: 8 files, 100 tests passed.\n- `npx vitest run src/harness-behavior.test.ts` (packages/contracts, run separately because the root run did not pick it up): 28 passed.\n- `bash scripts/lint-file-size.sh`: passed.\n- `npm run lint:effect-diagnostics`: started locally but still queued behind the shared gate-admission queue when this report was written. CI `lint-group (effect)` passed for HEAD 089de8b, so it is cited instead.\n- `gh pr checks 5622` at report time: build, lint, lint-groups, test shards 1/3/4, smoke and integrations pass. Pending: `test-shard (2/4)`, `test-e2e`, `bare-host-linux`, `bare-host-macos` (unverified, not green).\n- Full suite not run (verification gate / CI owns it). No live Herdr or tmux reproduction of the blocker; the evidence is a static trace.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4242/.pan/review/agent-pan-4242-review-089de8b8/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-4242 -m \"Fixed review issues\"`"
+    }
+  ]
+}

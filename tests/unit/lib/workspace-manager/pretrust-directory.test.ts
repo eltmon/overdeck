@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, rmdirSync, statSync, utimesSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, rmdirSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -17,7 +18,7 @@ vi.mock('fs', async (importOriginal) => {
   };
 });
 
-import { preTrustDirectory } from '../../../../src/lib/workspace-manager/worktree-ops.js';
+import { claudeTrustTargets, preTrustDirectory } from '../../../../src/lib/workspace-manager/worktree-ops.js';
 
 /**
  * PAN-3905: preTrustDirectory read-modify-writes ~/.claude.json, which Claude
@@ -156,5 +157,79 @@ describe('preTrustDirectory (PAN-3905)', () => {
       rmdirSync(lockDir);
     }
     expect(statSync(claudeJsonPath).mtimeMs).toBe(mtimeMs);
+  });
+});
+
+/** A real repository with one linked worktree, under a fresh temp dir. */
+function makeRepoWithWorktree(base: string): { root: string; worktree: string } {
+  const root = join(base, 'proj');
+  const worktree = join(root, 'workspaces', 'feature-x');
+  mkdirSync(root, { recursive: true });
+  const git = (cwd: string, ...args: string[]) =>
+    execFileSync('git', ['-c', 'core.hooksPath=/dev/null', '-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd, stdio: 'ignore' });
+  git(root, 'init', '-q');
+  git(root, 'commit', '-q', '--allow-empty', '-m', 'init');
+  git(root, 'worktree', 'add', '-q', '-b', 'feature/x', worktree);
+  return { root, worktree };
+}
+
+describe('claudeTrustTargets (PAN-4242)', () => {
+  let base: string;
+  let prevCeiling: string | undefined;
+
+  beforeEach(() => {
+    base = realpathSync(mkdtempSync(join(tmpdir(), 'pan-4242-targets-')));
+    prevCeiling = process.env.GIT_CEILING_DIRECTORIES;
+    // A temp dir never resolves to a repository above the test's own base.
+    process.env.GIT_CEILING_DIRECTORIES = base;
+  });
+
+  afterEach(() => {
+    if (prevCeiling === undefined) delete process.env.GIT_CEILING_DIRECTORIES;
+    else process.env.GIT_CEILING_DIRECTORIES = prevCeiling;
+    rmSync(base, { recursive: true, force: true });
+  });
+
+  it('adds the repository root for a linked worktree', async () => {
+    const { root, worktree } = makeRepoWithWorktree(base);
+
+    expect(await claudeTrustTargets(worktree)).toEqual([worktree, root]);
+  });
+
+  it('adds the realpath without the trailing slash', async () => {
+    const { root, worktree } = makeRepoWithWorktree(base);
+
+    expect(await claudeTrustTargets(`${worktree}/`)).toEqual([`${worktree}/`, worktree, root]);
+  });
+
+  it('adds the real path of a symlinked cwd', async () => {
+    const { root, worktree } = makeRepoWithWorktree(base);
+    const link = join(base, 'link');
+    symlinkSync(worktree, link);
+
+    expect(await claudeTrustTargets(link)).toEqual([link, worktree, root]);
+  });
+
+  it('returns only the directory outside a git work tree', async () => {
+    const plain = join(base, 'plain');
+    mkdirSync(plain);
+
+    expect(await claudeTrustTargets(plain)).toEqual([plain]);
+  });
+
+  it('returns only the path given when it does not exist', async () => {
+    expect(await claudeTrustTargets('/work/missing/dir')).toEqual(['/work/missing/dir']);
+  });
+
+  it('never adds the home directory or / as a repository root', async () => {
+    const home = join(base, 'home');
+    mkdirSync(join(home, 'scratch'), { recursive: true });
+    execFileSync('git', ['init', '-q'], { cwd: home, stdio: 'ignore' });
+    process.env.HOME = home;
+
+    const targets = await claudeTrustTargets(join(home, 'scratch'));
+
+    expect(targets).toEqual([join(home, 'scratch')]);
+    expect(targets).not.toContain('/');
   });
 });

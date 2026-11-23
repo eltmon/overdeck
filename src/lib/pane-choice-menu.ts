@@ -36,6 +36,13 @@
  *    excluded — the existing tool_permission detection path owns them.
  *  - Multi-select menus ("space to select") are excluded — answering needs
  *    toggle semantics the card does not model.
+ *
+ * One unnumbered shape is also recognised (PAN-4242): Claude Code's
+ * folder-trust dialog, in both its plain ("❯ No, exit") and backstop
+ * ("❯ No, continue without these permissions") variants, with "Yes, I trust
+ * this folder" as the other row and the harness footer directly below. It is
+ * matched by its exact labels only, so the numbered rules above stay as
+ * strict as they were; its options are numbered 1 and 2 in rendered order.
  */
 
 const ANSI_PATTERN = /\x1b\[[0-9;?]*[ -/]*[@-~]/g
@@ -159,7 +166,7 @@ export function parsePaneChoiceMenu(
     // look back through what trailing chrome we would accept anyway.
     if (end - i > MAX_TRAILING_LINES + MAX_OPTIONS) break
   }
-  if (lastOption < 0) return null
+  if (lastOption < 0) return parseClaudeTrustDialog(lines, end)
 
   const optionLines: ParsedOptionLine[] = []
   let firstOption = lastOption
@@ -254,6 +261,61 @@ export function parsePaneChoiceMenu(
     selectedIndex: hasCursor ? cursorRows[0]! : 0,
     footerHint,
     confidence,
+  }
+}
+
+const TRUST_CONFIRM_LABEL = 'Yes, I trust this folder'
+const TRUST_DIALOG_TITLE = 'Accessing workspace:'
+/** "❯ No, exit" / "  Yes, I trust this folder" — the trust dialog's unnumbered rows. */
+const UNNUMBERED_OPTION_LINE = /^\s*(❯|›)?\s*(\S.*)$/
+const MAX_TRUST_CONTEXT_LINES = 12
+/** How far above the options the context walk may look for the dialog's top. */
+const MAX_TRUST_CONTEXT_SCAN = 40
+
+/**
+ * PAN-4242: Claude Code's folder-trust dialog, whose two options carry no
+ * numbers. Exact shape only: the harness footer is the last line, the two
+ * option rows sit directly above it (one with the cursor), and one option is
+ * literally "Yes, I trust this folder" while the other starts "No, ". The
+ * options are numbered 1 and 2 in rendered order.
+ */
+function parseClaudeTrustDialog(lines: string[], end: number): PaneChoiceMenu | null {
+  const footer = lines[end]!.trim()
+  if (!looksLikeHarnessFooterHint(footer)) return null
+
+  let bottom = end - 1
+  while (bottom >= 0 && lines[bottom]!.trim() === '') bottom -= 1
+  let top = bottom
+  while (top - 1 >= 0 && lines[top - 1]!.trim() !== '' && !SEPARATOR_LINE.test(lines[top - 1]!)) top -= 1
+  if (bottom < 0 || bottom - top + 1 !== 2) return null
+
+  const rows = [lines[top]!, lines[bottom]!].map((line) => UNNUMBERED_OPTION_LINE.exec(line))
+  if (rows.some((row) => row === null)) return null
+  const parsed = rows.map((row) => ({ cursor: Boolean(row![1]), label: row![2]!.trim() }))
+  const cursorRows = parsed.map((row, index) => (row.cursor ? index : -1)).filter((index) => index >= 0)
+  if (cursorRows.length !== 1) return null
+  const labels = parsed.map((row) => row.label)
+  const confirm = labels.indexOf(TRUST_CONFIRM_LABEL)
+  if (confirm < 0 || !labels[1 - confirm]!.startsWith('No, ')) return null
+
+  // Context: up to the dialog's top rule (or its title line), top-down.
+  const contextLines: string[] = []
+  for (let i = top - 1; i >= 0 && top - i <= MAX_TRUST_CONTEXT_SCAN; i -= 1) {
+    const line = lines[i]!.trim()
+    if (SEPARATOR_LINE.test(line)) break
+    if (line === '' || line === 'Security guide') continue
+    contextLines.unshift(line)
+    if (line === TRUST_DIALOG_TITLE) break
+  }
+  const kept = contextLines.slice(0, MAX_TRUST_CONTEXT_LINES)
+
+  return {
+    title: kept[0] ?? TRUST_DIALOG_TITLE,
+    contextLines: kept,
+    options: labels.map((label, index) => ({ number: index + 1, label, recommended: false })),
+    selectedIndex: cursorRows[0]!,
+    footerHint: footer,
+    confidence: 'high',
   }
 }
 

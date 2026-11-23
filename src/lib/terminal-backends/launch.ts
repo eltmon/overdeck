@@ -129,6 +129,9 @@ export interface LaunchPaneRequest {
  * died with `ready-signal-timeout`. Conversations are included: their cwd is
  * the operator's explicit choice, and an untrusted one left the pane at the
  * dialog, where Herdr refuses the first message with `agent_blocked`.
+ * PAN-4242: also its real path (a trailing slash or symlink wrote a key Claude
+ * Code never reads) and its git repository root (without it Claude Code 2.1.x
+ * asks about a worktree's project `permissions.allow` rules at startup).
  * Idempotent; a failure is non-fatal, as it is in `createWorkspace`: the agent
  * still starts and the prompt is visible.
  */
@@ -137,8 +140,8 @@ async function preTrustClaudeCodeCwd(request: LaunchPaneRequest): Promise<void> 
   try {
     // Lazy: this module is imported almost everywhere; keep workspace-manager
     // out of its static import graph.
-    const { preTrustDirectory } = await import('../workspace-manager/worktree-ops.js');
-    await preTrustDirectory(request.cwd);
+    const { claudeTrustTargets, preTrustDirectory } = await import('../workspace-manager/worktree-ops.js');
+    for (const dir of await claudeTrustTargets(request.cwd)) await preTrustDirectory(dir);
   } catch {
     // Non-fatal.
   }

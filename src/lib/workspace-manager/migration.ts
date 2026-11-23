@@ -69,6 +69,33 @@ export function migrateOverdeckToPan(projectPath: string): PanMigrationResult {
   return result;
 }
 
+const USER_GRANT_KEYS = ['allow', 'additionalDirectories'] as const;
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * PAN-4242: the workspace's own `permissions` block, minus every `allow` and
+ * `additionalDirectories` entry the user-level settings already grant (older
+ * syncs copied them in). An emptied array is dropped; other keys (`deny`,
+ * `ask`, `defaultMode`, …) stay. Undefined when nothing is left.
+ */
+function withoutUserGrants(workspace: unknown, user: unknown): Record<string, unknown> | undefined {
+  if (!isPlainObject(workspace)) return undefined;
+  const userPermissions = isPlainObject(user) ? user : {};
+  const own: Record<string, unknown> = { ...workspace };
+  for (const key of USER_GRANT_KEYS) {
+    const entries = own[key];
+    if (!Array.isArray(entries)) continue;
+    const userEntries = Array.isArray(userPermissions[key]) ? (userPermissions[key] as unknown[]) : [];
+    const kept = entries.filter((entry) => !(typeof entry === 'string' && userEntries.includes(entry)));
+    if (kept.length > 0) own[key] = kept;
+    else delete own[key];
+  }
+  return Object.keys(own).length > 0 ? own : undefined;
+}
+
 /**
  * Copy Overdeck global configuration into a workspace so that agents testing
  * Overdeck itself have the same projects, model assignments, and hooks.
@@ -77,7 +104,8 @@ export function migrateOverdeckToPan(projectPath: string): PanMigrationResult {
  *   - ~/.overdeck/config.yaml      → <workspace>/.overdeck/config.yaml
  *   - ~/.overdeck/projects.yaml    → <workspace>/.overdeck/projects.yaml
  *   - ~/.overdeck/settings.json    → <workspace>/.overdeck/settings.json
- *   - ~/.claude/settings.json hooks  → <workspace>/.claude/settings.json (merged)
+ *   - ~/.claude/settings.json      → <workspace>/.claude/settings.json (merged,
+ *     without `permissions`; PAN-4242)
  *
  * Safe to call multiple times — merges rather than overwrites.
  */
@@ -180,11 +208,18 @@ export function copyOverdeckSettingsToWorkspace(workspacePath: string): { copied
         }
       }
 
-      const merged = { ...globalSettings, ...workspaceSettings };
+      // PAN-4242: user-level permissions already apply to every session. Copied
+      // into project settings they become gated grants, and Claude Code asks
+      // about them at startup unless the repository root is trusted.
+      const { permissions: userPermissions, ...globalWithoutPermissions } = globalSettings;
+      const merged: Record<string, unknown> = { ...globalWithoutPermissions, ...workspaceSettings };
+      const ownPermissions = withoutUserGrants(workspaceSettings.permissions, userPermissions);
+      if (ownPermissions) merged.permissions = ownPermissions;
+      else delete merged.permissions;
       if (Object.keys(mergedHooks).length > 0) {
         merged.hooks = mergedHooks;
       } else {
-        delete (merged as Record<string, unknown>).hooks;
+        delete merged.hooks;
       }
 
       writeFileSync(workspaceSettingsPath, JSON.stringify(merged, null, 2), 'utf-8');

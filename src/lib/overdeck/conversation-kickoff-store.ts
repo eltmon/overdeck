@@ -46,3 +46,13 @@ export function heldKickoffFocus(forkRequest: string | null | undefined): string
     return null;
   }
 }
+
+/** PAN-4242: true when the persisted fork request asked to hold the kickoff (`pan handoff --hold`). */
+export function forkRequestedHold(forkRequest: string | null | undefined): boolean {
+  if (!forkRequest) return false;
+  try {
+    return (JSON.parse(forkRequest) as { hold?: unknown }).hold === true;
+  } catch {
+    return false;
+  }
+}

@@ -19,6 +19,7 @@ import { stripVTControlCharacters } from 'node:util';
 import { Effect } from 'effect';
 
 import { getHerdrApiClient, type HerdrApiClient } from './herdr-api.js';
+import { HERDR_BLOCKED_AFTER_PASTE } from './herdr-submit.js';
 import { STEER_HERDR_KEYS, STEER_TMUX_KEYS } from './steer-keys.js';
 import type { TerminalBackend } from './types.js';
 
@@ -188,15 +189,31 @@ export function blockedDialogExcerpt(screen: string): string {
 }
 
 /**
+ * PAN-4242: true when a failed delivery was refused before any byte was typed,
+ * so sending the same text again later cannot duplicate it. A Herdr refusal
+ * after the paste (`HERDR_BLOCKED_AFTER_PASTE`) left the text in the composer.
+ */
+export function refusedBeforeTyping(failure: string | undefined): boolean {
+  return failure !== undefined
+    && failure.startsWith('refused:')
+    && !failure.startsWith(`refused: ${HERDR_BLOCKED_AFTER_PASTE}`);
+}
+
+/**
  * The failure text for a Herdr prompt refusal. `agent_blocked` means the agent
  * sits at an approval or question dialog, which only keys can answer, so the
- * text says so and quotes the screen. The instruction comes first: the
+ * text says so and quotes the screen; `HERDR_BLOCKED_AFTER_PASTE` also says the
+ * pasted text is waiting unsent. The instruction comes first: the
  * composer shows one ellipsized line with the whole text on hover. Reading the
  * screen is bounded and best-effort; a failed read still names the dialog.
  */
 export async function describeHerdrRefusal(reason: string, paneId: string): Promise<string> {
-  if (reason !== 'agent_blocked') return `refused: ${reason}`;
-  const hint = 'refused: agent_blocked — the agent is waiting at a dialog; open the Terminal tab to answer it';
+  const hint = reason === 'agent_blocked'
+    ? 'refused: agent_blocked — the agent is waiting at a dialog; open the Terminal tab to answer it'
+    : reason === HERDR_BLOCKED_AFTER_PASTE
+      ? `refused: ${HERDR_BLOCKED_AFTER_PASTE} — a dialog appeared after the text was pasted, so it was not submitted; open the Terminal tab to answer it, then submit the text`
+      : null;
+  if (hint === null) return `refused: ${reason}`;
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     const { readHerdrPaneText } = await import('./herdr.js');

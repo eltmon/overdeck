@@ -46,7 +46,7 @@ import {
 } from './herdr-api.js';
 import { herdrPaneReadText } from './herdr-pane-read.js';
 import { controlTerminal, observeTerminal, sizeHerdrTerminal } from './herdr-stream.js';
-import { pasteAndSubmitHerdrPane } from './herdr-submit.js';
+import { HERDR_BLOCKED_AFTER_PASTE, pasteAndSubmitHerdrPane } from './herdr-submit.js';
 import { adoptIssueWorkspace, listIssueWorkspaces, type HerdrWorkspaceInfo } from './herdr-workspaces.js';
 import { checkPrompt } from './prompt-guard.js';
 import { registerTerminalBackend } from './registry.js';
@@ -806,7 +806,8 @@ export class HerdrBackend implements TerminalBackend {
         if (!info.agent?.pane_id) return unsupported('herdr steer needs a detected agent pane');
         if (info.agent.agent_status === 'blocked') return { refused: true, reason: 'agent_blocked' };
         const outcome = await pasteAndSubmitHerdrPane(this.api, info.agent.pane_id, text, options.submit ?? 'enter');
-        return outcome === 'blocked' ? { refused: true, reason: 'agent_blocked' } : { delivered: true, messageId: options.messageId };
+        // PAN-4242: blocked after the paste leaves the text unsent in the composer — not the pre-paste refusal above.
+        return outcome === 'blocked' ? { refused: true, reason: HERDR_BLOCKED_AFTER_PASTE } : { delivered: true, messageId: options.messageId };
       }
 
       const wait = options.wait

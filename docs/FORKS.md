@@ -235,6 +235,34 @@ pending-input feed also lists every unarchived held conversation (alive or
 ended) with `heldKickoff: { since, focus? }`, so Awareness → Needs you shows
 it under Waiting until it is started or archived.
 
+**Undelivered kickoff (PAN-4242).** When a fork's kickoff delivery is
+refused before any byte was typed, the kickoff becomes the conversation's held
+kickoff. On Herdr that is the pre-paste `agent_blocked` refusal (the pane
+already sits at a dialog such as Claude Code's folder-trust prompt) or a
+prompt-guard refusal (`refusedBeforeTyping` in
+`src/lib/terminal-backends/agent-pane-io.ts`). `assertForkDelivered` then
+throws `ForkDeliveryRefusedError`, and `deliverForkSeed` stores the seed with
+`restoreHeldKickoff`, which never overwrites a kickoff already held. Nothing
+else is held, so the text is never sent twice: not a Herdr refusal after the
+paste (`agent_blocked_after_paste`: a dialog appeared after the text was
+pasted and it waits unsent in the composer), not a `stranded` turn, and not a
+tmux menu block (tmux pastes before it finds the menu, so a tmux host keeps
+the old behaviour and holds nothing). A Start with edited text that is refused
+holds the edited text. The failed conversation shows as a held handoff with
+**Start**, and `pan answer conv-<name>` can answer the dialog first. A resume
+by respawn through `POST /api/conversations/:name/resume` delivers the held
+kickoff once, in place of the `CONVERSATION RESUME` notice, and does so even
+when `sendResumeContract` is false, since the kickoff is the work itself and
+not the notice (`deliverResumeNoticeOrKickoff` in
+`src/lib/overdeck/conversation-undelivered-kickoff.ts`, with `deliverForkSeed`
+passed in as `deliverKickoff`). When that delivery fails, it restores the hold
+and marks the fork `failed` with the error, as the Start door does, so the
+panel shows the held handoff again instead of a fork spinner. A resume never
+sends a kickoff whose fork request asked for a hold (`hold: true`, from
+`pan handoff --hold`; `forkRequestedHold`); only Start sends that one. Resumes
+started without a deliverer (message auto-resume, scheduled messages, the
+Flywheel) send the resume notice and leave the kickoff held.
+
 `pan handoff --skill <name>` / `--pack <id>` write only the successor's
 `conversations.skill_overrides` (PAN-4486's per-conversation skill layer) —
 `src/lib/skill-overrides/conversation-flags.ts` resolves the requested names

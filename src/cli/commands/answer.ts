@@ -3,8 +3,14 @@ import {
   answerSessionPaneChoice,
   captureSessionPaneChoice,
   type PendingPaneChoice,
+  type SessionPaneChoiceDeps,
   type SessionPaneChoiceResult,
 } from '../../lib/session-pane-choice.js'
+import {
+  resolveAgentPaneIo,
+  type AgentPaneIo,
+  type SelectorKey,
+} from '../../lib/terminal-backends/agent-pane-io.js'
 import { sessionExistsSync } from '../../lib/tmux.js'
 
 export interface AnswerCommandDeps {
@@ -29,6 +35,24 @@ export function normalizeAnswerSessionId(id: string): string {
   return `agent-${normalized}`
 }
 
+/**
+ * PAN-4242: read and key the pane through the host's terminal backend (Herdr,
+ * or tmux), not tmux alone: on a Herdr host tmux sees no pane, so every menu
+ * read as "No pending choice menu". The pane is resolved once per command. A
+ * pane no backend holds makes the read throw, which the capture reports as no
+ * menu.
+ */
+function backendPaneChoiceDeps(): SessionPaneChoiceDeps {
+  let io: Promise<AgentPaneIo> | undefined
+  const paneIo = (sessionName: string) => (io ??= resolveAgentPaneIo(sessionName))
+  return {
+    capture: async (sessionName, lines) => (await paneIo(sessionName)).read(lines),
+    // buildChoiceKeystrokes only emits Up, Down and Enter.
+    sendKey: async (sessionName, key) => (await paneIo(sessionName)).sendKey(key as SelectorKey),
+    sessionExists: async () => true,
+  }
+}
+
 function paneChoiceErrorMessage(result: SessionPaneChoiceResult): string {
   const code = result.body['code']
   if (code === 'menu-gone') return 'The pending choice menu is no longer on screen.'
@@ -44,8 +68,11 @@ export async function answerCommand(
   deps: AnswerCommandDeps = {},
 ): Promise<void> {
   const sessionName = normalizeAnswerSessionId(id)
-  const capture = deps.captureSessionPaneChoice ?? captureSessionPaneChoice
-  const answer = deps.answerSessionPaneChoice ?? answerSessionPaneChoice
+  const paneDeps = backendPaneChoiceDeps()
+  const capture = deps.captureSessionPaneChoice
+    ?? ((name: string) => captureSessionPaneChoice(name, paneDeps.capture))
+  const answer = deps.answerSessionPaneChoice
+    ?? ((name: string, body: { selectedIndex: number; signature: string }) => answerSessionPaneChoice(name, body, paneDeps))
   const log = deps.log ?? console.log
   const error = deps.error ?? console.error
   const exit = deps.exit ?? (async (code: number) => { await exitCli(code) })

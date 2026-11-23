@@ -90,6 +90,7 @@ import {
   resolveConversationUploadClientIp,
 } from '../../../lib/overdeck/conversation-message.js';
 import {
+  deliverForkSeed,
   handleConversationHandoffDoc,
   handleConversationSummaryFork,
 } from '../../../lib/overdeck/conversation-forks.js';
@@ -369,7 +370,8 @@ const postConversationResumeRoute = HttpRouter.add(
     const key = params['name'] ?? '';
     const name = resolveConversationKey(key)?.name ?? key;
     const body = yield* readJsonBody;
-    return yield* Effect.promise(async () => handleConversationResume(name, body, { resolveSessionFile }));
+    // PAN-4242: a failed handoff's held, never-delivered kickoff goes out in place of the resume notice.
+    return yield* Effect.promise(async () => handleConversationResume(name, body, { resolveSessionFile, deliverKickoff: deliverForkSeed }));
   }),
 );
 //

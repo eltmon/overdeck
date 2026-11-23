@@ -237,6 +237,64 @@ describe('copyOverdeckSettingsToWorkspace', () => {
     const workspaceSettings = JSON.parse(readFileSync(join(workspaceDir, '.claude', 'settings.json'), 'utf8'));
     expect(workspaceSettings.hooks).toBeUndefined();
   });
+
+  // PAN-4242: copied into project settings, user-level allow rules become
+  // grants Claude Code asks about at startup unless the repository is trusted.
+  it('does not copy user-level permissions into a new workspace', async () => {
+    const { copyOverdeckSettingsToWorkspace } = await import('../../src/lib/workspace-manager.js');
+
+    writeFileSync(join(homeDir, '.claude', 'settings.json'), JSON.stringify({
+      model: 'opus',
+      permissions: { allow: ['Bash(gh issue create:*)'], additionalDirectories: ['/srv/shared'] },
+    }), 'utf8');
+
+    copyOverdeckSettingsToWorkspace(workspaceDir);
+
+    const workspaceSettings = JSON.parse(readFileSync(join(workspaceDir, '.claude', 'settings.json'), 'utf8'));
+    expect(workspaceSettings.model).toBe('opus');
+    expect(workspaceSettings).not.toHaveProperty('permissions');
+  });
+
+  it('removes user-level grants an earlier sync copied, keeping the workspace\'s own', async () => {
+    const { copyOverdeckSettingsToWorkspace } = await import('../../src/lib/workspace-manager.js');
+
+    writeFileSync(join(homeDir, '.claude', 'settings.json'), JSON.stringify({
+      permissions: { allow: ['Bash(gh issue create:*)'], additionalDirectories: ['/srv/shared'] },
+    }), 'utf8');
+    mkdirSync(join(workspaceDir, '.claude'), { recursive: true });
+    writeFileSync(join(workspaceDir, '.claude', 'settings.json'), JSON.stringify({
+      permissions: {
+        allow: ['Bash(gh issue create:*)', 'Bash(make:*)'],
+        additionalDirectories: ['/srv/shared'],
+      },
+    }), 'utf8');
+
+    copyOverdeckSettingsToWorkspace(workspaceDir);
+
+    const workspaceSettings = JSON.parse(readFileSync(join(workspaceDir, '.claude', 'settings.json'), 'utf8'));
+    expect(workspaceSettings.permissions).toEqual({ allow: ['Bash(make:*)'] });
+  });
+
+  it('keeps a workspace deny rule and both hook sets', async () => {
+    const { copyOverdeckSettingsToWorkspace } = await import('../../src/lib/workspace-manager.js');
+
+    writeFileSync(join(homeDir, '.claude', 'settings.json'), JSON.stringify({
+      permissions: { allow: ['Bash(gh issue create:*)'] },
+      hooks: { PostToolUse: [{ command: 'echo user' }] },
+    }), 'utf8');
+    mkdirSync(join(workspaceDir, '.claude'), { recursive: true });
+    writeFileSync(join(workspaceDir, '.claude', 'settings.json'), JSON.stringify({
+      permissions: { deny: ['Bash(rm -rf:*)'] },
+      hooks: { PostToolUse: [{ command: 'echo workspace' }] },
+    }), 'utf8');
+
+    copyOverdeckSettingsToWorkspace(workspaceDir);
+
+    const workspaceSettings = JSON.parse(readFileSync(join(workspaceDir, '.claude', 'settings.json'), 'utf8'));
+    expect(workspaceSettings.permissions).toEqual({ deny: ['Bash(rm -rf:*)'] });
+    expect(workspaceSettings.hooks.PostToolUse.map((hook: { command: string }) => hook.command))
+      .toEqual(['echo user', 'echo workspace']);
+  });
 });
 
 describe('createWorkspace', () => {

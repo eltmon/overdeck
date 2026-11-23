@@ -952,4 +952,12 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   `app-server-manager.ts` `mapRuntimeMode` turns into on-request approval and `workspace-write`;
   the setting only reaches `config.toml` (`initCodexHome`), so Read-only and Full access apply
   only on `codex.transport: tui`. `PAN_YOLO` never reaches Codex launches.
+- **Claude Code 2.1.330 asks about project tool grants even in a trusted worktree** (PAN-4242 planning probe) —
+  when `.claude/settings.json` in the cwd has `permissions.allow` rules, Claude Code shows its folder-trust
+  dialog ("This folder pre-approves N tool permissions … ❯ No, continue without these permissions / Yes, I trust
+  this folder") unless the git repository root (the main checkout, parent of `--git-common-dir`) is trusted in
+  `~/.claude.json`; trusting only the worktree (`preTrustDirectory`) is not enough. Hooks alone do not trigger it.
+  `copyOverdeckSettingsToWorkspace` (`workspace-manager/migration.ts`) copies the operator's whole
+  `~/.claude/settings.json`, `permissions.allow` included, into every workspace. The dialog's options are
+  unnumbered, so `parsePaneChoiceMenu` never matches it, and pane-choice capture is tmux-only.
 <!-- last-verified: 2026-11-04 -->

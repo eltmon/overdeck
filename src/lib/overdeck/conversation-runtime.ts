@@ -83,11 +83,8 @@ import { cleanupConversationAttachments, cleanupUnreferencedConversationAttachme
 import { readLauncherPinnedSessionId, resolveCodexRolloutPath } from '../agents/transcript-resolver.js';
 import { closeCompanionTerminalForOwner } from './companion-terminal/index.js';
 import { sendConversationControlCommand, isPiControlChannelHarness, resolveConversationDeliveryMethod } from './conversation-delivery.js';
-import {
-  assertKimiResumeContractResult,
-  deliverMandatoryKimiResumeContext,
-  deliverResumeContractUnlessGated,
-} from './resume-contract-delivery.js';
+import { assertKimiResumeContractResult, deliverMandatoryKimiResumeContext } from './resume-contract-delivery.js';
+import { deliverResumeNoticeOrKickoff, type KickoffDeliverer } from './conversation-undelivered-kickoff.js';
 import { kimiHomeDefault, kimiSessionsRoot, kimiWirePath } from '../runtimes/storage/kimi-code.js';
 import { codexSessionsRoot, extractThreadIdFromRollout } from '../runtimes/storage/codex.js';
 import { piSessionsRoot } from '../runtimes/storage/pi.js';
@@ -1126,7 +1123,8 @@ export async function handleConversationClearForkState(
 export async function handleConversationResume(
   name: string,
   body: Record<string, unknown>,
-  deps: { resolveSessionFile: (conv: Conversation) => Promise<string | null>; resumeCause?: ResumeCause },
+  // PAN-4242: deliverKickoff (deliverForkSeed) sends a held, never-delivered kickoff in place of the resume notice.
+  deps: { resolveSessionFile: (conv: Conversation) => Promise<string | null>; resumeCause?: ResumeCause; deliverKickoff?: KickoffDeliverer },
 ): Promise<ReturnType<typeof jsonResponse>> {
   try {
     let conv = getConversationByName(name);
@@ -1177,13 +1175,9 @@ export async function handleConversationResume(
       }
       // The harness may open its own blocking gate on resume. The operator owns
       // that answer, so the contract delivery seam skips rather than races it.
-      const resumeContractResult = await deliverResumeContractUnlessGated(
-        conv.tmuxSession,
-        `CONVERSATION RESUME: ${buildResumeContract(resumeCause)}`,
-        'conversation-resume',
-        method,
-        sendResumeContract,
-      );
+      const resumeContractResult = await deliverResumeNoticeOrKickoff(conv, {
+        text: `CONVERSATION RESUME: ${buildResumeContract(resumeCause)}`, caller: 'conversation-resume', method, send: sendResumeContract,
+      }, deps.deliverKickoff);
       if (caps.resumeContractMustLand) assertKimiResumeContractResult(resumeContractResult);
       markConversationActive(name);
       return jsonResponse({ ...conv, status: 'active', model: model ?? conv.model, effort: getConversationByName(name)?.effort ?? conv.effort, harness, reattached: false, sessionAlive: true, ...(requestedName !== name ? { redirectedFrom: requestedName } : {}) });
