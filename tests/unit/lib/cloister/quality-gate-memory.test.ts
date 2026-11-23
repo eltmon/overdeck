@@ -14,6 +14,7 @@ import { computeGovernorReserveDefaultsGb } from '../../../../src/lib/config-yam
 import {
   DEFAULT_GATE_FOOTPRINT_BYTES,
   evaluateMemoryHeadroom,
+  fitsAloneAboveHardReserve,
   footprintStoreDir,
   ownerReservationBytes,
   readGateFootprintEstimate,
@@ -110,6 +111,22 @@ describe('evaluateMemoryHeadroom (PAN-5248)', () => {
   it('clamps the footprint to 0 when the soft reserve exceeds total memory', () => {
     const verdict = evaluateMemoryHeadroom({ ...base, memTotalBytes: 8 * GiB, memAvailableBytes: 20 * GiB })
     expect(verdict.footprintBytes).toBe(0)
+  })
+})
+
+describe('fitsAloneAboveHardReserve (PAN-5621)', () => {
+  const base = {
+    memTotalBytes: 62 * GiB,
+    hardReserveBytes: 8 * GiB,
+    estimateBytes: 2_864_852_992,
+  }
+
+  it('is false when the hard reserve would be breached', () => {
+    expect(fitsAloneAboveHardReserve({ ...base, memAvailableBytes: 10.4e9 })).toBe(false)
+  })
+
+  it('is true once MemAvailable leaves the hard reserve free', () => {
+    expect(fitsAloneAboveHardReserve({ ...base, memAvailableBytes: 11.5e9 })).toBe(true)
   })
 })
 

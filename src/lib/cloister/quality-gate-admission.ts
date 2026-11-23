@@ -17,6 +17,7 @@ import {
 } from './quality-gate-cpu.js'
 import {
   evaluateMemoryHeadroom,
+  fitsAloneAboveHardReserve,
   ownerReservationBytes,
   readGateFootprintEstimate,
   recordGateFootprintPeak,
@@ -90,6 +91,8 @@ const ADMISSION_TICKET_VERSION = 2
 /** PAN-5285: a changed wait reason is reported at most this often, so a flapping queue does not flood the log. */
 const QUALITY_GATE_WAIT_REPORT_MS = 60 * 1_000
 export const DEFAULT_QUALITY_GATE_SLOTS = 2
+/** PAN-5621: when a gate was last admitted, for the starvation module's episode rule. */
+export const QUALITY_GATE_LAST_ADMITTED_FILE = 'last-admitted.json'
 
 export interface QualityGatePressureSample {
   cpuUtilization: number
@@ -474,12 +477,21 @@ export interface QualityGateQueueEntry {
   acquiredAt?: number
   /** PAN-5285: set on waiters only; the reason the waiter last reported and when it began. */
   wait?: { since: number; reason: QualityGateWaitReason }
+  /** PAN-5621: identifies this entry's ticket, for the starvation module to track across polls. */
+  ticketId?: string
+  footprintKey?: string
+  /** PAN-5285: when this entry, as head, first failed the memory rule. */
+  memoryBlockedSince?: number
 }
 
 export interface QualityGateQueueSnapshot {
   slots: number
   owners: QualityGateQueueEntry[]
   waiters: QualityGateQueueEntry[]
+  /** PAN-5621: the admission root could not be read for a reason other than being absent. */
+  readError?: string
+  /** PAN-5621: from last-admitted.json; when the queue last admitted a gate. */
+  lastAdmittedAt?: number
 }
 
 function queueEntry(ticket: AdmissionTicket | AdmissionOwner): QualityGateQueueEntry {
@@ -492,6 +504,9 @@ function queueEntry(ticket: AdmissionTicket | AdmissionOwner): QualityGateQueueE
   if (typeof ticket.footprintBytes === 'number') entry.footprintBytes = ticket.footprintBytes
   if ('acquiredAt' in ticket && Number.isFinite(ticket.acquiredAt)) entry.acquiredAt = ticket.acquiredAt
   if (ticket.wait && Number.isFinite(ticket.wait.since)) entry.wait = ticket.wait
+  if (ticket.ticketId) entry.ticketId = ticket.ticketId
+  if (ticket.footprintKey) entry.footprintKey = ticket.footprintKey
+  if (Number.isFinite(ticket.memoryBlockedSince)) entry.memoryBlockedSince = ticket.memoryBlockedSince
   return entry
 }
 
@@ -539,9 +554,17 @@ export async function readQualityGateQueue(deps: {
     }
     waiters.sort((left, right) => left.createdAt - right.createdAt
       || String(left.ticketId).localeCompare(String(right.ticketId)))
-    return { slots, owners, waiters: waiters.map(queueEntry) }
-  } catch {
-    return empty
+    const lastAdmitted = await readJson<{ at?: number }>(join(root, QUALITY_GATE_LAST_ADMITTED_FILE))
+    const lastAdmittedAt = Number.isFinite(lastAdmitted?.at) ? lastAdmitted!.at : undefined
+    return {
+      slots,
+      owners,
+      waiters: waiters.map(queueEntry),
+      ...(lastAdmittedAt !== undefined ? { lastAdmittedAt } : {}),
+    }
+  } catch (error) {
+    if (isErrnoException(error) && error.code === 'ENOENT') return empty
+    return { ...empty, readError: error instanceof Error ? error.message : String(error) }
   }
 }
 
@@ -701,10 +724,12 @@ export async function acquireQualityGateAdmission(
    * clamped to what the host could give it above the hard reserve, not the
    * soft reserve, so a large estimate is never under-counted.
    */
-  const fitsAlone = (poll: PollMemory, estimateBytes: number): boolean => {
-    const footprintBytes = Math.min(estimateBytes, Math.max(0, poll.memory.memTotalBytes - poll.hardReserveBytes))
-    return poll.memory.memAvailableBytes - footprintBytes >= poll.hardReserveBytes
-  }
+  const fitsAlone = (poll: PollMemory, estimateBytes: number): boolean => fitsAloneAboveHardReserve({
+    memAvailableBytes: poll.memory.memAvailableBytes,
+    memTotalBytes: poll.memory.memTotalBytes,
+    hardReserveBytes: poll.hardReserveBytes,
+    estimateBytes,
+  })
   /**
    * Why we must keep our place behind `ahead`, or null when we may pass all of
    * them: each is blocked on memory and the head is not due to run alone. A
@@ -912,6 +937,8 @@ export async function acquireQualityGateAdmission(
       }
 
       await unlinkIfExists(ownTicketPath)
+      // PAN-5621: best-effort; the starvation module's episode rule tolerates a missing or stale marker.
+      await replaceFile(join(root, QUALITY_GATE_LAST_ADMITTED_FILE), { at: owner.acquiredAt }).catch(() => undefined)
       // PAN-5588: the head's two CPU samples were low, so the pressure cleared and the queue's block ends.
       // A waiter that passed a memory-blocked head leaves it: that head may still bypass on its own clock.
       if (!cpuAlone && position === 0) await clearQueueCpuBlock(root)

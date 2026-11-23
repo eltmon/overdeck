@@ -149,6 +149,23 @@ export function evaluateMemoryHeadroom(input: MemoryHeadroomInput): MemoryHeadro
   return { ok: headroomBytes >= input.softReserveBytes, footprintBytes, headroomBytes }
 }
 
+export interface AloneHeadroomInput {
+  memAvailableBytes: number
+  memTotalBytes: number
+  hardReserveBytes: number
+  estimateBytes: number
+}
+
+/**
+ * PAN-5285: alone, the gate would still leave the hard reserve free. Its
+ * footprint is clamped to what the host could give it above the hard
+ * reserve, not the soft reserve, so a large estimate is never under-counted.
+ */
+export function fitsAloneAboveHardReserve(input: AloneHeadroomInput): boolean {
+  const footprintBytes = Math.min(input.estimateBytes, Math.max(0, input.memTotalBytes - input.hardReserveBytes))
+  return input.memAvailableBytes - footprintBytes >= input.hardReserveBytes
+}
+
 /**
  * D4: memory a live owner has been promised but has not allocated yet. Growth
  * above its baseline counts as allocated; without a baseline or a tree read,
