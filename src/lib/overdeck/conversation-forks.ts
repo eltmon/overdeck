@@ -44,7 +44,7 @@ import {
 import { resolveConversationDeliveryMethod } from './conversation-delivery.js';
 import { conversationLaunchContext } from './conversation-launch-context.js';
 import { ConversationSkillFlagError, parseSkillFlagList, resolveConversationSkillFlags } from '../skill-overrides/conversation-flags.js';
-import { holdKickoff } from './conversation-kickoff-store.js';
+import { holdKickoff, restoreHeldKickoff } from './conversation-kickoff-store.js';
 import { deliverAgentMessage, getAgentRuntimeStateSync, waitForReadySignal } from '../agents.js';
 import { getTranscriptAdapter } from '../conversations/transcript-adapter.js';
 import {
@@ -254,9 +254,17 @@ export async function ensureForkSessionReady(
  * composer stayed full after two standalone-Enter nudges and must be surfaced as
  * a failed fork without re-delivering duplicate text.
  */
+/**
+ * PAN-4242: a delivery refused before any byte was typed (Herdr's
+ * `agent_blocked`, the tmux guard). Re-sending its text later cannot duplicate it.
+ */
+export class ForkDeliveryRefusedError extends Error {}
+
 /** A refused or failed delivery must surface as a failed fork, never vanish (PAN-3921). */
 function assertForkDelivered(conv: Conversation, caller: string, delivery: DeliveryResult): void {
-  if (!delivery.ok) throw new Error(`[${caller}] fork summary not delivered to ${conv.name}: ${delivery.failure ?? delivery.path}`);
+  if (delivery.ok) return;
+  const message = `[${caller}] fork summary not delivered to ${conv.name}: ${delivery.failure ?? delivery.path}`;
+  throw delivery.failure?.startsWith('refused:') ? new ForkDeliveryRefusedError(message) : new Error(message);
 }
 
 async function tmuxSessionPresent(sessionName: string): Promise<boolean> {
@@ -332,7 +340,15 @@ export function handleForkPipelineFailure(name: string, err: unknown): void {
 
 /** PAN-4499 D7: the shared delivery tail for a fork's kickoff — a fresh fork or a kickoff door claim. */
 export async function deliverForkSeed(conv: Conversation, seed: string, caller: string): Promise<void> {
-  const injection = await self.injectForkSummary(conv, seed, caller);
+  let injection: 'submitted' | 'stranded';
+  try {
+    injection = await self.injectForkSummary(conv, seed, caller);
+  } catch (error) {
+    // PAN-4242: a refusal typed nothing, so keep the kickoff for a later Start or
+    // resume. restoreHeldKickoff never overwrites a kickoff already held.
+    if (error instanceof ForkDeliveryRefusedError) restoreHeldKickoff(conv.name, seed);
+    throw error;
+  }
   markConversationActive(conv.name);
   if (injection === 'stranded') {
     updateForkStatus(
