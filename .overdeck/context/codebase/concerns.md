@@ -966,4 +966,8 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   `copyOverdeckSettingsToWorkspace` (`workspace-manager/migration.ts`) copies the operator's whole
   `~/.claude/settings.json`, `permissions.allow` included, into every workspace. The dialog's options are
   unnumbered, so `parsePaneChoiceMenu` never matches it, and pane-choice capture is tmux-only.
+- **Codex failed turns live in the rollout** (PAN-5633) — a failed Codex turn is recorded as
+  `task_complete.error` with `codex_error_info` (`unauthorized`, `context_window_exceeded`); a successful
+  `task_complete` has no `error` key. A running app-server re-reads the shared `~/.codex/auth.json` after
+  `codex login` with no restart, so a sign-in fix needs only a new message per conversation.
 <!-- last-verified: 2026-11-04 -->

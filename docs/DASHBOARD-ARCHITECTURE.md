@@ -1242,6 +1242,42 @@ reset** button. Queued rows render at the end of the timeline as dimmed user bub
 (Dismiss for a failed or unconfirmed row). From a terminal: `pan tell <conv> --when-limit-resets
 "<msg>"` queues a message and `pan conv pending <conv>` lists the queue.
 
+## Codex sign-in failures (PAN-5633)
+
+A used or revoked Codex refresh token is invisible in `~/.codex/auth.json`: the access token can
+still look refreshable. The proof is a failed turn, and Codex records it in the session's rollout
+as a `task_complete` that carries `error`, with the structured code in `codex_error_info`
+(`unauthorized`, `context_window_exceeded`, ...). A successful `task_complete` has no `error` key.
+
+- **Signal.** `readCodexLastTurn` (`src/lib/conversations/codex-thread-status.ts`) reads the
+  rollout's last 128 KiB and walks back to the newest turn event. `task_started` means running;
+  `turn_aborted` or a `task_complete` without `error` means done; a `task_complete` with `error`
+  is a failure classified as `auth`, `context-window` or `other` (the code first, then the
+  message text as a fallback for auth).
+- **Live-session scan.** `scanCodexAuthFailures` (`src/lib/codex/auth-failure-scan.ts`) reads the
+  newest turn of every live Codex session (active Codex conversations plus running Codex agents,
+  capped at 64) and returns the auth failures. One scan serves every caller for 15 s, and
+  concurrent callers share the in-flight scan.
+- **Healing rule.** `activeCodexAuthFailures` (`src/lib/codex-auth.ts`) keeps only failures at or
+  after the mtime of `~/.codex/auth.json`. A `codex login` rewrites that file, and every managed
+  `CODEX_HOME` symlinks to it, so one login heals every session. No restart is needed: a running
+  app-server re-reads the shared file on its next turn. Send a message to resume each affected
+  conversation; Overdeck does not retry turns automatically.
+- **Status route.** `GET /api/settings/codex-auth` passes the scan to `checkCodexAuthStatus`, which
+  returns `status: 'burned'`, `source: 'native'` and `affectedAgents` (the failing session ids)
+  while an active failure exists.
+- **Spawn gates.** `assertCodexNativeAuthForSpawn` (`pan start` and every CLI spawn path) refuses a
+  new Codex-harness spawn while an active failure exists. The dashboard issue-spawn route
+  (`codexSubscriptionSpawnBlock`, `src/lib/codex/subscription-spawn-gate.ts`) refuses only a GPT
+  model on a ChatGPT subscription, which signs in through the same credentials; a Claude spawn
+  is never refused by a Codex sign-in failure.
+- **Banner timing.** `useCodexAuthStatus` polls every 30 s and treats data as stale after 15 s
+  (`CODEX_AUTH_REFETCH_MS`, `CODEX_AUTH_STALE_MS`). With the 15 s scan cache, the banner appears
+  within about 45 s of a failed turn and names how many Codex sessions are failing.
+- **Conversation rows.** The failed turn also sets the row's `providerError` (see the Live view
+  section above), the Codex parser ends the turn on `task_complete` so `isWorking` turns false,
+  and the timeline shows a `Turn failed` error row with the message.
+
 ## Degraded mode (PAN-4279)
 
 When a tab loses touch with its server, the dashboard never blocks the UI. The
@@ -1518,7 +1554,16 @@ session id when it differs from `id`, and the Live view looks runtime facts up b
 whose transcript's last turn ended in a provider error (billing, a usage limit) while the
 session otherwise looks idle (`readConversationProviderError`, `src/lib/overdeck/`) — reason 3
 above fires on it exactly like an issue agent's `api-error` attention, with the error's own
-message and timestamp.
+message and timestamp. Codex conversations set it from the rollout's newest `task_complete.error`
+(`readCodexConversationProviderError`, `src/lib/overdeck/codex-provider-error.ts`, PAN-5633). A
+Codex `providerError` adds `kind` (`auth` | `context-window` | `other`) and, for `auth`,
+`authRecovered` (true once `~/.codex/auth.json` was rewritten after the failure). Its `message`
+is an operator sentence followed by `Last error: <message>`:
+
+- `auth`, not recovered: `Codex sign-in failed. Re-authenticate from the Codex banner.`
+- `auth`, recovered: `Codex sign-in is fixed. Send a message to resume.`
+- `context-window`: `The context window is full and compaction failed. Hand this conversation off to a new one.`
+- `other`: the error message alone.
 
 When there are no visible rows, the Live view renders one column, never the two-panel layout: the
 loading/error status or the empty message (`Nothing is running or waiting. Finished work is in

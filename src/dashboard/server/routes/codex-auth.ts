@@ -12,6 +12,7 @@ import {
   getNativeCodexAuthPath,
   type CheckCodexAuthOptions,
 } from '../../../lib/codex-auth.js';
+import { scanCodexAuthFailures } from '../../../lib/codex/auth-failure-scan.js';
 import { FsError } from '../../../lib/errors.js';
 import { bridgeCodexAuthToCliproxy, getCliproxyAuthDir } from '../../../lib/cliproxy.js';
 import { createSession, sessionExists, listSessionNames } from '../../../lib/tmux.js';
@@ -153,11 +154,11 @@ const getCodexAuthRoute = HttpRouter.add(
   '/api/settings/codex-auth',
   httpHandler(
     Effect.gen(function* () {
-      // PAN-3917: the burned-agent cross-check read a `troubled` flag off the
-      // agent mirror, which is gone. Auth status now rests on the native
-      // ~/.codex/auth.json mtime check alone.
+      // PAN-5633: the burned signal is a failed turn in a live Codex session's rollout.
       yield* Effect.promise(() => rebridgeCodexAuthIfNativeNewer());
-      const status = yield* checkCodexAuth({});
+      // A failed scan (a database error) degrades to the static status instead of a 500.
+      const authFailures = yield* Effect.promise(() => scanCodexAuthFailures().catch(() => []));
+      const status = yield* checkCodexAuth({ authFailures });
       return jsonResponse(status);
     }),
   ),
@@ -245,8 +246,10 @@ const postCodexReauthStatusRoute = HttpRouter.add(
         (beforeCredential.accessToken !== null && afterCredential.accessToken !== beforeCredential.accessToken) ||
         (afterCredential.mtimeMs !== null && afterCredential.mtimeMs >= session.createdAt)
       );
+      const authFailures = yield* Effect.promise(() => scanCodexAuthFailures().catch(() => []));
       const authStatus = yield* checkCodexAuth({
         ...(refreshedCredential ? { ignoreBurnBefore: session.createdAt } : {}),
+        authFailures,
       });
       if (!refreshedCredential || authStatus.status !== 'valid') {
         return jsonResponse({

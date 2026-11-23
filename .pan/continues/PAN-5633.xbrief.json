@@ -1,0 +1,246 @@
+{
+  "version": "1",
+  "issueId": "PAN-5633",
+  "created": "2026-11-23T19:06:23.391Z",
+  "updated": "2026-11-23T20:47:14.656Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-23T20:36Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-23T20:36:34.051Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-23T20:45Z] ci-monitor → FAILED — seq 2",
+      "timestamp": "2026-11-23T20:45:52.017Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-23T20:47Z] review-agent → CHANGES-REQUESTED — seq 3",
+      "timestamp": "2026-11-23T20:47:14.656Z"
+    }
+  ],
+  "items": {
+    "wi1-last-turn-reader": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5633",
+      "claimedAt": "2026-11-23T19:06:23.391Z",
+      "doneAt": "2026-11-23T19:08:15.806Z"
+    },
+    "wi1-last-turn-reader.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:08:15.806Z"
+    },
+    "wi1-last-turn-reader.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:08:15.806Z"
+    },
+    "wi1-last-turn-reader.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:08:15.806Z"
+    },
+    "wi1-last-turn-reader.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:08:15.806Z"
+    },
+    "wi1-last-turn-reader.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:08:15.806Z"
+    },
+    "wi2-parser-turn-end": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5633",
+      "claimedAt": "2026-11-23T19:08:21.230Z",
+      "doneAt": "2026-11-23T19:09:47.203Z"
+    },
+    "wi2-parser-turn-end.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:09:47.203Z"
+    },
+    "wi2-parser-turn-end.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:09:47.203Z"
+    },
+    "wi2-parser-turn-end.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:09:47.203Z"
+    },
+    "wi2-parser-turn-end.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:09:47.203Z"
+    },
+    "wi3-codex-provider-error": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5633",
+      "claimedAt": "2026-11-23T19:09:52.234Z",
+      "doneAt": "2026-11-23T19:11:53.429Z"
+    },
+    "wi3-codex-provider-error.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:11:53.429Z"
+    },
+    "wi3-codex-provider-error.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:11:53.429Z"
+    },
+    "wi3-codex-provider-error.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:11:53.429Z"
+    },
+    "wi3-codex-provider-error.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:11:53.429Z"
+    },
+    "wi4-auth-failure-scan": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5633",
+      "claimedAt": "2026-11-23T19:11:54.732Z",
+      "doneAt": "2026-11-23T19:13:15.099Z"
+    },
+    "wi4-auth-failure-scan.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:13:15.099Z"
+    },
+    "wi4-auth-failure-scan.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:13:15.099Z"
+    },
+    "wi4-auth-failure-scan.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:13:15.099Z"
+    },
+    "wi4-auth-failure-scan.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:13:15.099Z"
+    },
+    "wi5-codex-auth-replace-burn-flags": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5633",
+      "claimedAt": "2026-11-23T19:13:20.489Z",
+      "doneAt": "2026-11-23T19:22:29.772Z"
+    },
+    "wi5-codex-auth-replace-burn-flags.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:22:29.772Z"
+    },
+    "wi5-codex-auth-replace-burn-flags.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:22:29.772Z"
+    },
+    "wi5-codex-auth-replace-burn-flags.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:22:29.772Z"
+    },
+    "wi5-codex-auth-replace-burn-flags.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:22:29.772Z"
+    },
+    "wi5-codex-auth-replace-burn-flags.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:22:29.772Z"
+    },
+    "wi6-routes-pass-scan": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5633",
+      "claimedAt": "2026-11-23T19:22:37.852Z",
+      "doneAt": "2026-11-23T19:25:55.027Z"
+    },
+    "wi6-routes-pass-scan.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:25:55.027Z"
+    },
+    "wi6-routes-pass-scan.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:25:55.027Z"
+    },
+    "wi6-routes-pass-scan.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:25:55.027Z"
+    },
+    "wi7-banner-poll": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5633",
+      "claimedAt": "2026-11-23T19:25:58.443Z",
+      "doneAt": "2026-11-23T19:27:14.073Z"
+    },
+    "wi7-banner-poll.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:27:14.073Z"
+    },
+    "wi7-banner-poll.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:27:14.073Z"
+    },
+    "wi7-banner-poll.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:27:14.073Z"
+    },
+    "wi8-panel-working": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5633",
+      "claimedAt": "2026-11-23T19:27:15.816Z",
+      "doneAt": "2026-11-23T19:28:07.995Z"
+    },
+    "wi8-panel-working.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:28:07.995Z"
+    },
+    "wi8-panel-working.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:28:07.995Z"
+    },
+    "wi8-panel-working.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:28:07.995Z"
+    },
+    "wi8-panel-working.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:28:07.995Z"
+    },
+    "wi9-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5633",
+      "claimedAt": "2026-11-23T19:28:13.423Z",
+      "doneAt": "2026-11-23T19:29:22.544Z"
+    },
+    "wi9-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:29:22.544Z"
+    },
+    "wi9-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:29:22.544Z"
+    },
+    "wi9-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:29:22.544Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-23T20:36:34Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5633\n\nPull request: https://github.com/eltmon/overdeck/pull/5644 (head `dad24550`)\n\nSource: check_run:mobile-android\n\n## Failing checks (1)\n\n### mobile-android\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/137994920258/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/45260861119/job/137994920258  \n```\nerdeck/apps/mobile/android/build/reports/problems/problems-report.html\n109 actionable tasks: 109 executed\n##[error]Process completed with exit code 1.\nPost job cleanup.\n(node:3096) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.\n(Use `node --trace-deprecation ...` to show where the warning was created)\nPost job cleanup.\n[command]/usr/bin/git version\ngit version 2.56.1\nTemporarily overriding HOME='/home/runner/work/_temp/e412ff3d-a93f-401d-aa1e-7988f7bf2831' before making global git config changes\nAdding repository directory to the temporary git global config as a safe directory\n[command]/usr/bin/git config --global --add safe.directory /home/runner/work/overdeck/overdeck\n[command]/usr/bin/git config --local --name-only --get-regexp core\\.sshCommand\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'core\\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp http\\.https\\:\\/\\/github\\.com\\/\\.extraheader\nhttp.https://github.com/.extraheader\n[command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'http\\.https\\:\\/\\/github\\.com\\/\\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\\.gitdir:\n[command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url\nCleaning up orphan processes\n##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-java@v4, actions/setup-node@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    },
+    {
+      "seq": 2,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-23T20:45:52Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5633\n\nPull request: https://github.com/eltmon/overdeck/pull/5644 (head `dad24550`)\n\nSource: check_run:test\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (2)\n\n### test\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/138001251710/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/45260861119/job/138001251710  \n```\n2026-11-23T20:45:35.9200156Z Current runner version: '2.338.2'\n##[group]Runner Image Provisioner\nHosted Compute Agent\nVersion: 20261111.635\nCommit: b8a594ea514ff44cadb5342986c68b1eac6e22ed\nBuild Date: 2026-11-11T01:49:01Z\nWorker ID: {f1c053eb-fa88-48f1-a025-06df36e093ba}\nRegion: eastus\nCloud: Azure\n##[endgroup]\n##[group]Operating System\nUbuntu\n26.04.1\nLTS\n##[endgroup]\n##[group]Runner Image\nImage: ubuntu-26.04\nVersion: 20261116.202.1\nIncluded Software: https://github.com/actions/runner-images/blob/ubuntu26/20261116.202/images/ubuntu/Ubuntu2604-Readme.md\nImage Release: https://github.com/actions/runner-images/releases/tag/ubuntu26%2F20261116.202\n##[endgroup]\n##[group]GITHUB_TOKEN Permissions\nContents: read\nMetadata: read\nPackages: read\n##[endgroup]\nSecret source: Actions\nCache mode: write\nPrepare workflow directory\nPrepare all required actions\nComplete job name: test\n##[group]Run echo \"test-shard:     success\"\n\u001b[36;1mecho \"test-shard:     success\"\u001b[0m\n\u001b[36;1mecho \"test-e2e:       success\"\u001b[0m\n\u001b[36;1mecho \"mobile-android: failure\"\u001b[0m\n\u001b[36;1mecho \"integrations:   success\"\u001b[0m\n\u001b[36;1mtest \"success\" = success\u001b[0m\n\u001b[36;1mtest \"success\" = success\u001b[0m\n\u001b[36;1mtest \"failure\" = success\u001b[0m\n\u001b[36;1mtest \"success\" = success\u001b[0m\nshell: /usr/bin/bash -e {0}\nenv:\n  SKIP_DOCS_INDEX: 1\n  OVERDECK_TELEMETRY: 0\n##[endgroup]\ntest-shard:     success\ntest-e2e:       success\nmobile-android: failure\nintegrations:   success\n##[error]Process completed with exit code 1.\nCleaning up orphan processes\n```\n\n### mobile-android\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/137994920258/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/45260861119/job/137994920258  \n```\nerdeck/apps/mobile/android/build/reports/problems/problems-report.html\n109 actionable tasks: 109 executed\n##[error]Process completed with exit code 1.\nPost job cleanup.\n(node:3096) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.\n(Use `node --trace-deprecation ...` to show where the warning was created)\nPost job cleanup.\n[command]/usr/bin/git version\ngit version 2.56.1\nTemporarily overriding HOME='/home/runner/work/_temp/e412ff3d-a93f-401d-aa1e-7988f7bf2831' before making global git config changes\nAdding repository directory to the temporary git global config as a safe directory\n[command]/usr/bin/git config --global --add safe.directory /home/runner/work/overdeck/overdeck\n[command]/usr/bin/git config --local --name-only --get-regexp core\\.sshCommand\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'core\\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp http\\.https\\:\\/\\/github\\.com\\/\\.extraheader\nhttp.https://github.com/.extraheader\n[command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'http\\.https\\:\\/\\/github\\.com\\/\\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\\.gitdir:\n[command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url\nCleaning up orphan processes\n##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-java@v4, actions/setup-node@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    },
+    {
+      "seq": 3,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-11-23T20:47:14Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-5633\n\n# Review — PAN-5633\n## Verdict: CHANGES REQUESTED — the dashboard issue-spawn gate now refuses Claude (Anthropic-subscription) spawns whenever any live Codex session has an unhealed sign-in failure\n\n## Context\n- Run ID: agent-pan-5633-review-dad24550\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-5633/.pan/review/agent-pan-5633-review-dad24550/context.json (its `acceptanceCriteria` list is empty; this report builds the AC matrix from AC-1 to AC-10 in `.pan/drafts/PAN-5633.md`)\n- Branch / workspace: feature/pan-5633, /home/eltmon/Projects/overdeck/workspaces/feature-pan-5633\n- PR: https://github.com/eltmon/overdeck/pull/5644\n- HEAD reviewed: dad2455061a12337dde0f0f82dbec829ab7410f7\n- Base / prior cycle SHA: merge-base 815423c04485e0099c1bf0727f7661be1ea32bd6; no prior review cycle\n\n## Blocking Findings\n\n### [correctness] The issue-spawn Codex gate is not scoped to Codex/OpenAI spawns, so a burned Codex session blocks every subscription spawn — `src/dashboard/server/routes/agents/spawn-issue.ts:454-470`\n- Severity: ! (MUST)\n- Classification / requirement scope: implementation defect that this PR exposes (in_pr_scope). The unscoped gate is older (PAN-4651), but this PR changes its call site, and that change makes the `burned` verdict reachable from a common, long-lived condition. It also exceeds FR-7, which says the check refuses \"a new **Codex** spawn\".\n- Trigger and changed-code connection: `POST /api/agents` → `spawnIssueAgentForRoute`. This route is used by the dashboard Start button, `src/lib/cloister/work-agent-start.ts:44` (automatic work-agent starts), `src/lib/overdeck/planning-promotion.ts:417`, `machines-work.ts` and `fleet-work.ts` (the MCP `start_issue` tool). Line 453 runs the Codex check whenever `providerAuthMode === 'subscription'`. `getProviderAuthMode` (`src/lib/agents/runtime-command.ts:671-677`) returns `'subscription'` for an **Anthropic** model when Claude is logged in without an API key. Between model resolution (line 442) and line 453, nothing narrows the check to OpenAI models or Codex harnesses. This PR changes line 457 to `checkCodexAuthStatus({ authFailures: await scanCodexAuthFailures() })`.\n- Expected / observed / impact:\n  - Expected (FR-7, and the PR's own doc text at `docs/DASHBOARD-ARCHITECTURE.md` \"Spawn gates\"): only a new Codex spawn is refused.\n  - Observed: if one live Codex conversation's newest turn failed on sign-in and nobody has run `codex login` since, `checkCodexAuthStatus` returns `burned`. The route then returns HTTP 429 `\"Codex authentication burned. GPT subscription agents cannot spawn…\"` for every subscription-mode issue spawn, including Claude-model work agents.\n  - Baseline: before this PR, native `burned` was unreachable (the route passed no agent states, and the burn flag had no writer). This gate blocked Claude spawns only on native `expired` or a CLIProxy-log burn.\n  - Impact: this is exactly the PAN-5633 incident condition, a Codex conversation idle on a failed auth turn for hours. With this PR, that condition also stops automatic Claude work-agent starts, planning promotion and the Start button pipeline-wide until the operator re-authenticates Codex or ends that conversation. The 429 message also blames \"GPT subscription agents\", which misleads the operator about why a Claude spawn was refused.\n- Evidence: static trace of `spawn-issue.ts:425-471`, `runtime-command.ts:671-685`, `codex-auth.ts:226-249` and the `/api/agents` callers named above. I did not reproduce it live, because that would need a real failing Codex session and a dashboard spawn. No test covers a non-OpenAI model reaching this gate.\n- Fix: scope the Codex auth check at this call site to spawns that actually use Codex/ChatGPT sign-in, for example `if (providerAuthMode === 'subscription' && getProviderForModel(spawnModel).name === 'openai')`, or key it on the resolved harness's `usesCodexHome`. The scan then also runs only for those spawns. Add a route test showing that an Anthropic-subscription spawn proceeds while `scanCodexAuthFailures` returns an active failure. (Optional: correct the 429 text to name Codex.)\n\n## Non-blocking Findings\n\n### [requirements] The working-indicator guard misses ACP failed tool rows — `src/dashboard/frontend/src/lib/workingPhase.ts:202-208`\n- Severity: ~ (SHOULD). Classification: specification defect, followed faithfully by the implementation.\n- WI-8 assumes only Claude Code emits mid-turn `tone: 'error'` rows and guards them with `!lastWork.toolInput`. ACP failed tool calls (`src/dashboard/server/services/acp-conversation-parser.ts:105`, `toToolEntry`) are `tone: 'error'` and carry `command`/`result` but never `toolInput`. The row keeps its original `createdAt`, which is later than the narrating assistant message.\n- Impact: in an ACP conversation, the panel spinner turns off after a failed tool call until the next thought, message or tool row arrives, even though the turn continues. This is cosmetic: `agentBusy` drives only `sendNowAvailable`, which applies to `send-now-keys` harnesses, not ACP.\n- Fix: narrow the guard to turn-end rows. Use a positive marker (label `Turn failed` / `Prompt failed` / `Prompt stalled`, an explicit `turnEnd` flag, or the row id prefix) instead of \"no toolInput\". Add an ACP failed-tool test case.\n\n### [performance/NFR-1] The scan reaches synchronous rollout-tree walks on the status route\n- Severity: ? (MAY). Classification: specification defect on a pre-existing helper.\n- NFR-1 says \"no synchronous filesystem call is added to any server-reachable path\", but WI-4 prescribes `resolveCodexRolloutPath`. That helper calls `findRolloutPath` (cached after the first hit; `existsSync` afterwards) and, when no `codex-thread-id` exists, `findLatestRollout` (`src/lib/runtimes/storage/codex.ts:114`, uncached `readdirSync`/`statSync` walk). This runs at most once per 15 s, over at most 64 per-session trees, and the same helper already serves `conversation-reads.ts:141`. The cost is bounded and small. An async resolver would close the gap.\n\n### [performance] Agent-state listing every scan\n- Severity: ? (MAY). `listAgentStatesAsync` reads every non-`conv-`/`ext-` `state.json` with an unbounded `Promise.all`. A read-only probe on this machine (3,390 dirs, 2,261 states, Node 22, plain JSON.parse without schema decode) took 86-139 ms. With the 30 s banner poll and 15 s cache, the cache misses on each poll, so about one listing every 30 s per server. The cost is acceptable and matches what `agent-directory.ts` already does.\n\n### [correctness] Untested production session lister\n- Severity: ? (MAY). Every scan test injects `listSessionIds`, so `listLiveCodexSessionIds` itself has no test. Static trace: `listConversations()` (`src/lib/overdeck/conversations.ts:553`) has no limit, returns unarchived rows newest first and excludes vault rows. `tmuxSession` is the agent dir name that `resolveCodexRolloutPath` expects (the same key as `conversation-reads.ts:141`). Conversations come before agents, so many stale `status: 'active'` Codex conversation rows could crowd running Codex agents out of the 64 cap. That case is unlikely at current scale.\n\n### [correctness] Rejected scan in the GET route becomes a defect\n- Severity: ? (MAY). `routes/codex-auth.ts:159` wraps the scan in `Effect.promise`. `listConversations()` (synchronous SQLite) or `listAgentStatesAsync`'s `readdir`-guarded path can throw only on a DB failure. In that case the banner request fails with a 500 instead of degrading to the static status. Hardening: `.catch(() => [])` on the scan at the routes, as the per-session errors already do.\n\n### Notes\n- `trailingAgentMessageAt = createdAt` on a successful `task_complete` moves `lastTurnCompletedAt` from the agent message to the turn-end timestamp. The only reader outside the parsers is `activity-summary.ts`, so this is harmless and more correct.\n- An `authRecovered` row keeps `providerError`, so it stays a Needs-you row in Agents Live until a new message is sent. This matches PRD D4.\n\n## Coverage\n\n### Changed-file ledger (29 files)\n| File | Status |\n| --- | --- |\n| src/lib/conversations/codex-thread-status.ts | reviewed: matches D2/D3; tail bound kept; `codexThreadStatus` wrapper preserved |\n| src/lib/codex/auth-failure-scan.ts | reviewed: 64 cap, dedupe, single-flight 15 s cache, rejected scan evicted; advisories above |\n| src/lib/codex-auth.ts | reviewed: dead burn-flag code removed; healing rule `at >= mtime`; spawn gate async and loader called only for `codex` |\n| src/lib/agents/spawn.ts | reviewed: two call lines swapped; line count 1088 = origin/main; dynamic import avoids the cycle (lint:circular green in CI core group) |\n| src/dashboard/server/routes/codex-auth.ts | reviewed: GET and reauth-status pass scan; `ignoreBurnBefore` kept |\n| src/dashboard/server/routes/agents/spawn-issue.ts | reviewed: **blocking finding** |\n| src/lib/overdeck/codex-provider-error.ts | reviewed: messages, 300-char cap, `authRecovered` consistent with healing rule (`mtime > at`) |\n| src/lib/overdeck/conversation-list.ts | reviewed: reader map by transcript kind; memoized auth mtime stat per page |\n| src/lib/overdeck/conversation-provider-error.ts | reviewed: two optional fields only |\n| src/dashboard/server/services/codex-conversation-parser.ts | reviewed: branch only when no rollout message; unique id per turn |\n| src/dashboard/frontend/src/lib/workingPhase.ts | reviewed: ACP advisory |\n| src/dashboard/frontend/src/hooks/useCodexAuthStatus.ts | reviewed: 30 s / 15 s constants |\n| src/dashboard/frontend/src/components/CodexAuthBanner.tsx | reviewed: count text |\n| scripts/harness-branches-baseline.txt | reviewed: ratchet lowered 3→2 (allowed direction) |\n| src/lib/conversations/__tests__/codex-thread-status.test.ts | reviewed (ran) |\n| src/lib/codex/__tests__/auth-failure-scan.test.ts | reviewed (ran): injected `now`, no real timers |\n| src/lib/__tests__/codex-auth.test.ts | reviewed (ran) |\n| src/lib/overdeck/__tests__/conversation-list-codex-provider-error.test.ts | reviewed: live-row mocks per PRD |\n| src/dashboard/server/routes/__tests__/codex-auth.test.ts | reviewed (ran) |\n| src/dashboard/server/services/__tests__/codex-conversation-parser.test.ts | reviewed: includes `summarizeConversationActivity` fresh-rollout case (AC-2; placed here instead of activity-summary-sources.test.ts, which mocks parsers) |\n| src/dashboard/frontend/src/lib/__tests__/workingPhase.test.ts | reviewed (ran) |\n| src/dashboard/frontend/src/components/CodexAuthBanner.test.tsx | reviewed (ran) |\n| docs/DASHBOARD-ARCHITECTURE.md | reviewed: accurate except \"Spawn gates\" claims the dashboard check is Codex-only (true only after the blocking fix) |\n| configuration/harnesses.mdx | reviewed |\n| changelog.d/pan-5633.md | reviewed: format OK |\n| .overdeck/context/codebase/concerns.md | reviewed |\n| .pan/drafts/PAN-5633.md | not applicable (planning artifact; read as spec) |\n| .pan/continues/PAN-5633.xbrief.json | not applicable (planning artifact) |\n| .pan/specs/…-agent-failing-silently-for-14h.xbrief.json | not applicable (planning artifact) |\n\nNo `.only`, `skipIf`, `.skip(` or real `setTimeout` appears in the added test hunks.\n\n### Dimensions\n- Correctness: blocking gate-scope finding; ACP advisory; the rest traced and sound (turn-end detection, healing rule boundary consistency, cache eviction, parser precedence).\n- Security: no new trust boundary. Rollout content is local, operator-owned data. Error text flows into JSON and React text nodes (no HTML sink). No new route (no-loss matrix not needed). No secrets are logged; the message is only the provider's error string.\n- Performance: bounded 128 KiB tails, 64-session cap, 15 s single-flight cache, about 100 ms async listing; sync tree walk advisory (spec-level).\n- Requirements/UX: FR-1 to FR-6 and FR-8 to FR-11 met. FR-7 is over-applied on the dashboard route (blocking). Banner, row message and timeline row are wired end to end. Panel UX was split to PAN-5636 by design (D13), so no stub UI was added.\n\n### AC matrix (from PRD)\n| AC | Status | Evidence |\n| --- | --- | --- |\n| AC-1 | met | codex-thread-status.test.ts passes; `codexThreadStatus` signature kept |\n| AC-2 | met | parser test: failed turn sets `lastTurnCompletedAt`, Turn failed row, `summarizeConversationActivity` → `isWorking: false` |\n| AC-3 | met | conversation-list-codex-provider-error.test.ts passes (kind auth, \"Codex sign-in failed\") |\n| AC-4 | met | auth-failure-scan.test.ts passes with injected clock; lint:circular green (CI lint-group core) |\n| AC-5 | met | `git grep codex-auth-burned\\|CodexAuthBurnFlagState\\|filterCodexAuthBurnedAgentIds -- src` empty; spawn.ts 1088 = origin/main |\n| AC-6 | met as written, but see blocker | routes test passes; spawn-issue passes `authFailures`, without scoping the check to Codex spawns (FR-7) |\n| AC-7 | met | CodexAuthBanner.test.tsx passes; `CODEX_AUTH_REFETCH_MS = 30_000` |\n| AC-8 | met (spec gap noted) | workingPhase.test.ts passes; ACP failed-tool case not covered |\n| AC-9 | met | doc heading, 30 s / 15 s, `auth-failure-scan.ts` present; lint:docs in CI core group green |\n| AC-10 | met | `overdeck/test` verification gate (typecheck+lint) passed; CI lint-group core/effect/skills/state pass on HEAD |\n\n## Verification\n- CI on HEAD dad2455 (run 45260861119): test-shard 1-4 pass, test-e2e pass, build (22) pass, lint-group core/effect/skills/state pass (core runs lint:circular, lint:file-size, lint:harness-branches, lint:docs; effect runs lint:effect-diagnostics, so the effect-diagnostics check is satisfied on the exact HEAD), clean install + smoke pass, bare-host-macos pass, bare-host-linux pending, mobile-android **fail** in \"Android unit tests\". The PR touches no mobile files and the same job passed on main run 45258137629. I could not retrieve the job log, so its cause is unverified; likely unrelated.\n- Local focused runs: 6 backend test files, 86 tests passed; 2 frontend test files, 19 tests passed.\n- Read-only probe of the agent-state listing cost in the session scratchpad (no tracked files touched).\n- Not run: the full test suite (CI owns it) and a live reproduction of the blocking finding (needs a real failing Codex session).\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-5633/.pan/review/agent-pan-5633-review-dad24550/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-5633 -m \"Fixed review issues\"`"
+    }
+  ]
+}

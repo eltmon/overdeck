@@ -64,6 +64,9 @@ interface CodexPayload {
   input?: unknown;
   output?: unknown;
   info?: { total_token_usage?: CodexTokenUsage };
+  /** PAN-5633: a failed turn's `task_complete` carries `{ message, codex_error_info }`. */
+  error?: unknown;
+  turn_id?: unknown;
   [k: string]: unknown;
 }
 
@@ -72,6 +75,11 @@ interface CodexEntry {
   timestamp?: string;
   payload?: CodexPayload;
   [k: string]: unknown;
+}
+
+function asErrorRecord(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown> : null;
 }
 
 function parseToolInput(args: string): Record<string, unknown> | undefined {
@@ -258,6 +266,25 @@ export function createCodexConversationAccumulator(sessionFile: string, options:
           totalTokens = typeof usage.total_tokens === 'number'
             ? usage.total_tokens
             : (usage.input_tokens ?? 0) + (usage.output_tokens ?? 0);
+        }
+      } else if (ptype === 'task_complete' || ptype === 'turn_aborted') {
+        // PAN-5633: a turn-end event ends the turn even with no agent message (a failed turn writes none).
+        trailingAgentMessageAt = createdAt;
+        const error = ptype === 'task_complete' ? asErrorRecord(payload.error) : null;
+        if (error) {
+          const message = (typeof error.message === 'string' ? error.message.trim() : '') || 'The turn failed.';
+          sequence += 1;
+          const turnId = typeof payload.turn_id === 'string' ? payload.turn_id : '';
+          addWork({
+            id: turnId ? `codex-turn-failed-${turnId}` : `codex-turn-failed-${rowSuffix(location)}`,
+            createdAt,
+            label: 'Turn failed',
+            toolTitle: 'Turn failed',
+            tone: 'error',
+            sequence: nextRowSequence(location),
+            detail: message,
+            result: message,
+          });
         }
       }
       return;

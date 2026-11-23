@@ -212,8 +212,8 @@ async function spawnRunWithoutConsentClaim(
   const harnessBehavior = getHarnessBehavior(resolvedHarness);
   const isAcp = harnessBehavior.launchCommandKind === 'acp-host';
   const harnessLaunch = await prepareHarnessLaunch(resolvedHarness, { model: selectedModel });
-  // PAN-2285: reject fresh Codex launches when native auth would wedge in a 401 loop.
-  assertCodexNativeAuthForSpawn(resolvedHarness, listAgentStates());
+  // PAN-2285/PAN-5633: reject fresh Codex launches when native auth would wedge in a 401 loop.
+  await assertCodexNativeAuthForSpawn(resolvedHarness, () => import('../codex/auth-failure-scan.js').then((scan) => scan.scanCodexAuthFailures()));
   await ensureLifecycleHooksBeforeLaunch(agentId, resolvedHarness);
   if (
     getProviderForModel(selectedModel).name === 'openai'
@@ -708,8 +708,8 @@ async function spawnClaimedAgent(options: SpawnOptions, role: 'work' | 'strike' 
   });
   const promptHostTransport = hostTransportFor(resolvedHarness);
   const harnessLaunch = await prepareHarnessLaunch(resolvedHarness, { model: selectedModel });
-  // PAN-2285: reject fresh Codex launches when native auth would wedge in a 401 loop.
-  assertCodexNativeAuthForSpawn(resolvedHarness, listAgentStates());
+  // PAN-2285/PAN-5633: reject fresh Codex launches when native auth would wedge in a 401 loop.
+  await assertCodexNativeAuthForSpawn(resolvedHarness, () => import('../codex/auth-failure-scan.js').then((scan) => scan.scanCodexAuthFailures()));
   await ensureLifecycleHooksBeforeLaunch(agentId, resolvedHarness);
   const startedBy = resolveAgentStartedBy(options.startedBy);
   const state: AgentState = {

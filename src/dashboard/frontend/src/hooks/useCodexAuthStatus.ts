@@ -7,9 +7,16 @@ export interface CodexAuthStatus {
   message?: string;
   /** Which store the status came from: 'native' (~/.codex) or 'cliproxy'. PAN-2285. */
   source?: 'native' | 'cliproxy';
-  /** Agent ids whose live pane showed the revoked-token burn. PAN-2285. */
+  /** Session ids whose newest Codex turn failed on sign-in. PAN-5633. */
   affectedAgents?: string[];
 }
+
+/**
+ * PAN-5633: poll every 30 s. The server caches its live-session scan for 15 s,
+ * so the banner appears within about 45 s of a failed turn.
+ */
+export const CODEX_AUTH_REFETCH_MS = 30_000;
+export const CODEX_AUTH_STALE_MS = 15_000;
 
 export async function fetchCodexAuthStatus(): Promise<CodexAuthStatus> {
   const res = await fetch('/api/settings/codex-auth');
@@ -24,7 +31,7 @@ export function useCodexAuthStatus() {
   return useQuery<CodexAuthStatus>({
     queryKey: ['codex-auth-status'],
     queryFn: fetchCodexAuthStatus,
-    refetchInterval: 120_000,
-    staleTime: 60_000,
+    refetchInterval: CODEX_AUTH_REFETCH_MS,
+    staleTime: CODEX_AUTH_STALE_MS,
   });
 }
