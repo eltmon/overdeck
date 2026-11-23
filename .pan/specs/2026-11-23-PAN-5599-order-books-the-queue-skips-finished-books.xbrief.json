@@ -1,0 +1,743 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-23T05:19:14Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5599: Order books: the queue skips finished books",
+    "updated": "2026-11-23T05:22:56.578Z"
+  },
+  "plan": {
+    "id": "pan-5599",
+    "title": "Order books: the queue skips finished books",
+    "status": "proposed",
+    "uid": "64599a41-7cfc-4014-b53f-6c4435c9e0e5",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-23T05:19:14Z",
+    "updated": "2026-11-23T05:22:56.578Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5599",
+        "label": "PAN-5599",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5599/.pan/drafts/pan-5599.md",
+        "label": "PRD draft (.pan/drafts/pan-5599.md)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "order-books",
+      "flywheel",
+      "dispatch",
+      "dashboard",
+      "cli"
+    ],
+    "metadata": {
+      "sizeJustification": "One derived rule (isBookFinished in currentOrderBook) has five readers that must agree: dispatch, the orders API, pan orders list, the Flywheel status summary and the page. Shipping any reader alone makes the page and the Flywheel name different active books. The 7 path-subsystems are src/lib, src/dashboard, src/cli, tests/unit and three single doc files; the code change is about 150 lines over 21 files.",
+      "canonicalFilename": "2026-11-23-PAN-5599-order-books-the-queue-skips-finished-books.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The Flywheel releases work from the running book, else the first ready order book. A book whose issues have all landed still holds that slot, so the next queued book never starts until a person archives it. Separately, the dashboard issue cache drops closed issues after 14 days (issues.closedWindowDays), so a finished book would stop reading as finished two weeks later and a long book would never read as finished. Note: the 2026-11-22 July book (2026-07-30-hardening-20260729) still has three open issues, so it is not finished and this change does not release it.",
+      "Proposal": "Add isBookFinished(progress) to src/lib/orders/phase.ts and pass it to currentOrderBook from every reader: dispatch (activeOrderBookIssues), deriveBookPhases (orders API and CLI), and the Flywheel status summary. A finished ready book is skipped, keeps status ready, and gets queuePosition null. Nothing is stored. Evidence stays fail-safe: only positive closed/parked state counts. The dashboard server backfills uncached issues of ready/running books through the existing IssueDataService.backfillIssue door (3000 ms cap) before deriving phases, and pan orders list prints the dashboard's phases when the dashboard answers for the same books. The page drops the finished-active notice and shows a finished queued book as skipped with Archive.",
+      "NonGoals": "- Writing any stored status when a book finishes\n- Auto-archiving finished books\n- Reordering the queue\n- Skipping stale books that still have open issues (the July hardening book stays stuck)\n- Fixing the deacon child's missing shared issue service or its labels-unavailable dispatch refusals\n- Adding backfill or an HTTP read to activeOrderBookIssues\n- Loading the issue cache in pan flywheel status\n- Persisting backfilled issues to the SQLite cache\n- Editing sync-sources/skills/pan-flywheel/SKILL.md or the PAN-5597 design mockup"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Corrected the PRD's problem statement: the 2026-11-22 July book is not finished and stays stuck",
+        "rationale": "GitHub shows PAN-3290, PAN-3288 and PAN-3297 open with no parked label. The issue scopes the change to finished books; widening it to stale books would contradict the issue's fail-safe rule. Not a contradiction between authoritative inputs, so planning continues."
+      },
+      {
+        "summary": "Added server-side backfill of uncached book issues through IssueDataService.backfillIssue with a 3000 ms cap",
+        "rationale": "closedWindowDays (14) drops closed issues from the cache; without backfill the skip rule silently reverts after two weeks. Verified live: a backfill of PAN-3295 moved the hardening book from 0/4 to 1/4 landed."
+      },
+      {
+        "summary": "pan orders list prints the dashboard's phases when it answers for the same book ids, else derives locally",
+        "rationale": "The Flywheel loop picks the active book from pan orders list. A one-shot CLI keeps no backfill memo, so local derivation would name a finished book active after 14 days; getDashboardApiUrl already exists for CLI-to-dashboard reads."
+      },
+      {
+        "summary": "Dispatch (activeOrderBookIssues) keeps the plain lookup; the old checkpoint CP-1 is decided, not delegated",
+        "rationale": "Its only caller runs in the deacon child, which never starts the shared issue service; the label gate refuses there before any book is read, so extra evidence would change nothing."
+      },
+      {
+        "summary": "Finished non-active queued books get queuePosition null and sort after numbered queued books",
+        "rationale": "Numbers should describe the order the Flywheel will actually work in; the CLI formatter already prints 'queued (finished)' for a null position."
+      },
+      {
+        "summary": "A running (legacy) book stays active even when finished",
+        "rationale": "Preserves existing behavior for data nothing writes any more; documented as the single FR-3 exception."
+      },
+      {
+        "summary": "Set plan.metadata.sizeJustification instead of splitting into sibling issues",
+        "rationale": "Every reader must change together or the page and the Flywheel disagree about the active book; the subsystem count is inflated by three single-file doc paths."
+      }
+    ],
+    "items": [
+      {
+        "id": "phase-finished-rule",
+        "title": "Add isBookFinished and make currentOrderBook and deriveBookPhases skip finished ready books",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T05:19:14Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5599",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/orders/phase.ts",
+            "tests/unit/lib/orders/orders-phase.test.ts",
+            "tests/unit/lib/cloister/flywheel-active-order-book.test.ts",
+            "tests/unit/cli/orders.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/orders/orders-phase.test.ts tests/unit/lib/cloister/flywheel-active-order-book.test.ts tests/unit/cli/orders.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "the three vitest files pass",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ],
+          "foundationFor": [
+            "dispatch-finished-rule",
+            "status-summary-finished-rule",
+            "orders-route-finished-and-backfill",
+            "cli-list-server-phases"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In src/lib/orders/phase.ts add exported isBookFinished(progress) = progress.total > 0 && progress.drained. Give currentOrderBook a second parameter isFinished: (book) => boolean defaulting to () => false, and skip ready books for which it returns true (a running book stays first even when finished, D3). In deriveBookPhases compute each book's progress once, call currentOrderBook(books, finishedOf), and number only the active book plus the unfinished in-queue books (D8): a finished non-active queued book gets phase 'queued', finished true, queuePosition null. phase.ts stays types-only imports (no resolver/cloister import). Update the module header comment. In tests/unit/cli/orders.test.ts replace the assertion expect(phaseOf(listLines(['PAN-1']), ids[0]!)).toBe('active (finished)') with ids[0] -> 'queued (finished)' and ids[1] -> 'active'. Add the tests named in PRD WI-1."
+        },
+        "items": [
+          {
+            "id": "phase-finished-rule.ac1",
+            "title": "Given two ready books whose first book's issues are all closed, when deriveBookPhases runs, then it returns the second book as phase active with queuePosition 1 and the first as phase queued, finished true, queuePosition null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phase-finished-rule.ac2",
+            "title": "Given a running book whose issues are all closed and a later ready book, when currentOrderBook runs with the finished rule, then it returns the running book",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phase-finished-rule.ac3",
+            "title": "Given ready books and no finished rule argument, when currentOrderBook runs, then it returns the first ready book exactly as before (NFR-1)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phase-finished-rule.ac4",
+            "title": "Given every ready book is finished, when deriveBookPhases runs, then no book has phase active and every in-queue book has queuePosition null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phase-finished-rule.ac5",
+            "title": "Given the CLI list test with PAN-1 closed, when formatBookList renders, then the first book shows 'queued (finished)' and the second shows 'active'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dispatch-finished-rule",
+        "title": "Make activeOrderBookIssues pass the finished rule to currentOrderBook",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T05:19:14Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5599",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/flywheel.ts",
+            "tests/unit/lib/cloister/flywheel-active-order-book.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/flywheel-active-order-book.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "flywheel-active-order-book.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Add optional issueLookup?: OrderIssueLookup to ActiveOrderBookIssuesDeps. Replace `const book = currentOrderBook((deps.listBooks ?? listBooks)(planHome));` with a call that passes (candidate) => isBookFinished(computeBookProgress(candidate, deps.issueLookup ?? liveOrderIssueLookup)). No backfill and no HTTP read here (D7: the only production caller runs in the deacon child, whose label gate refuses before the book is read). Update the function's doc comment. Add the two tests named in PRD WI-2."
+        },
+        "items": [
+          {
+            "id": "dispatch-finished-rule.ac1",
+            "title": "Given a finished first ready book and an unfinished second ready book, when activeOrderBookIssues runs, then it returns the second book's issue ids",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dispatch-finished-rule.ac2",
+            "title": "Given a lookup that knows none of the first ready book's issues, when activeOrderBookIssues runs, then it returns the first book's issue ids (fail safe)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "order-issue-backfill-helper",
+        "title": "Add backfillUnknownOrderIssues to the order resolver",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T05:19:14Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5599",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/orders/resolver.ts",
+            "tests/unit/lib/orders/orders-issue-backfill.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/orders/orders-issue-backfill.test.ts tests/unit/lib/orders/orders-resolver.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "both vitest files pass",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "orders-route-finished-and-backfill",
+            "status-summary-finished-rule"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Export interface OrderIssueBackfillService { isStarted(); issueIds(); backfillIssue(id) } and async backfillUnknownOrderIssues(books, { timeoutMs = 3000, service }) from src/lib/orders/resolver.ts. Default service adapts the lazily loaded issue-service module via loadIssueServiceModuleSync (isSharedIssueServiceStarted, uppercase identifiers of getIssues({ cycle: 'all', includeCompleted: true }), getSharedIssueService().backfillIssue). Return immediately when not started or when the cache holds zero issues. Otherwise backfill the uppercase issue ids of items in books with status ready or running that the cache lacks, awaiting Promise.allSettled raced against a setTimeout of timeoutMs; clear the timer; never throw. Tests use vi.useFakeTimers for the timeout case and an injected service; no real waits."
+        },
+        "items": [
+          {
+            "id": "order-issue-backfill-helper.ac1",
+            "title": "Given an injected started service holding PAN-1, and a ready book [PAN-1, PAN-2], a draft book [PAN-3] and a complete book [PAN-4], when backfillUnknownOrderIssues runs, then backfillIssue is called exactly once, with PAN-2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "order-issue-backfill-helper.ac2",
+            "title": "Given a service that is not started, or started with zero issues, when backfillUnknownOrderIssues runs, then backfillIssue is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "order-issue-backfill-helper.ac3",
+            "title": "Given a backfillIssue that never settles, when 3000 ms of fake time pass, then backfillUnknownOrderIssues resolves",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "order-issue-backfill-helper.ac4",
+            "title": "Given a backfillIssue that rejects, when backfillUnknownOrderIssues runs, then it resolves without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "orders-route-finished-and-backfill",
+        "title": "Make the orders API await the issue backfill before deriving phases",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T05:19:14Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-5599",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/orders.ts",
+            "src/dashboard/server/routes/__tests__/orders.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/orders.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "orders.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Add backfillIssues?: (books) => Promise<void> to OrdersRouteDeps. Default: no-op when deps.issueLookup is injected, else backfillUnknownOrderIssues. In getOrdersPayload await it with listBooks(stateRoot) before buildOrdersReadSnapshot; in getOrderPayload await it after the book is found and before enrichedBook. bookPhases needs no change (deriveBookPhases applies the rule). Add the route test that a finished first ready book is queued/finished/unnumbered and the next ready book is active, and the test that backfillIssues is awaited once with every book id in index order before the response."
+        },
+        "items": [
+          {
+            "id": "orders-route-finished-and-backfill.ac1",
+            "title": "Given two ready books where the injected lookup reports the first book's issue closed, when GET /api/orders runs, then the response lists the first book with phase queued, finished true, queuePosition null and the second with phase active, queuePosition 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "orders-route-finished-and-backfill.ac2",
+            "title": "Given an injected backfillIssues spy, when GET /api/orders runs, then the spy is called once with every book in index order and resolves before the response is returned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "orders-route-finished-and-backfill.ac3",
+            "title": "Given a test that injects issueLookup without backfillIssues, when GET /api/orders runs, then no live backfill is attempted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "status-summary-finished-rule",
+        "title": "Make the Flywheel status summary skip finished books after backfilling",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T05:19:14Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5599",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/flywheel/derive-status.ts",
+            "tests/unit/lib/flywheel/derive-status.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/flywheel/derive-status.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "derive-status.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. In defaultRunningBook import backfillUnknownOrderIssues from the resolver and isBookFinished from phase, await backfillUnknownOrderIssues(books) after listBooks, then call currentOrderBook(books, (candidate) => isBookFinished(computeBookProgress(candidate))). Update the comment to cite PAN-5599. Add backfillUnknownOrderIssues: vi.fn(async () => {}) to the test file's resolver vi.mock. Add the test named in PRD WI-5."
+        },
+        "items": [
+          {
+            "id": "status-summary-finished-rule.ac1",
+            "title": "Given books ready-a [PAN-1] and ready-b [PAN-2] where only PAN-1 is closed, when deriveFlywheelStatus runs without a runningBook dep, then status.orderBook is { id: 'ready-b', landed: 0, total: 1 }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "status-summary-finished-rule.ac2",
+            "title": "Given the existing single-ready-book test, when deriveFlywheelStatus runs, then it still reports ready-1 with landed 1 of 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-list-server-phases",
+        "title": "Make pan orders list print the dashboard's phases with a local fallback",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T05:19:14Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5599",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/orders.ts",
+            "tests/unit/cli/orders.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/orders.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "orders.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Add fetchServerPhases to OrdersCommandDeps and a default fetchDashboardOrderPhases(projectKey) that GETs `${getDashboardApiUrl()}/api/orders?project=<key>` with a 3000 ms AbortController+setTimeout abort, returning { bookIds, phases } or null on any failure or malformed body. Resolve the project key from deps.projectKey or the registered key whose config.path equals the resolved project's path; when deps.panDir is given without a key, skip the server. Add runOrdersListPreferServer(deps): use the server phases only when the server's book ids equal the local ids in order; otherwise ensureOrderIssueStore (unless issueLookup is injected) and runOrdersList. The list action calls runOrdersListPreferServer and keeps process.exit(0). Timeout test uses fake timers."
+        },
+        "items": [
+          {
+            "id": "cli-list-server-phases.ac1",
+            "title": "Given an injected fetchServerPhases returning the local book ids with book 2 active, when runOrdersListPreferServer runs, then formatBookList prints book 2 as active and book 1 as 'queued (finished)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-list-server-phases.ac2",
+            "title": "Given fetchServerPhases returns null, when runOrdersListPreferServer runs, then it returns the phases derived locally by runOrdersList",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-list-server-phases.ac3",
+            "title": "Given fetchServerPhases returns a different set of book ids, when runOrdersListPreferServer runs, then it falls back to the locally derived phases",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-list-server-phases.ac4",
+            "title": "Given a fetch that never resolves until aborted, when 3000 ms of fake time pass, then fetchDashboardOrderPhases resolves to null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "header-skip-copy",
+        "title": "Change the book header sentences for finished and waiting queued books",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T05:19:14Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5599",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/orders/BookHeader.tsx",
+            "src/dashboard/frontend/src/components/orders/__tests__/BookHeader.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/orders/__tests__/BookHeader.test.tsx"
+          ],
+          "expected_outputs": [
+            "BookHeader.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. In phaseSentence: a finished queued book returns 'Every issue has landed. The Flywheel skips this book. Archive it to tidy the list.'; an unfinished queued book returns 'Waits behind \"<active>\". It becomes active when the books ahead of it finish, are archived, or are moved back to draft.' Keep the Archive primary button. Update the existing rerender test assertions."
+        },
+        "items": [
+          {
+            "id": "header-skip-copy.ac1",
+            "title": "Given a queued book with finished true, when BookHeader renders, then it shows 'Finished', the sentence 'Every issue has landed. The Flywheel skips this book. Archive it to tidy the list.' and an Archive button that PATCHes { status: 'complete' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "header-skip-copy.ac2",
+            "title": "Given an unfinished queued book with activeBookName 'Hardening', when BookHeader renders, then it shows 'Waits behind \"Hardening\". It becomes active when the books ahead of it finish, are archived, or are moved back to draft.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "list-finished-queued-placement",
+        "title": "Sort finished queued books last in the book list and fix the empty-active text",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T05:19:14Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5599",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/orders/BookList.tsx",
+            "src/dashboard/frontend/src/components/orders/__tests__/BookList.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/orders/__tests__/BookList.test.tsx",
+            "npm run lint:manual-memo"
+          ],
+          "expected_outputs": [
+            "BookList.test.tsx passes",
+            "lint:manual-memo passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. Change the queued sort fallback from ?? 0 to ?? Number.MAX_SAFE_INTEGER. When no book is active but queued books exist, render 'Every queued book has finished, so the Flywheel follows the backlog.'; otherwise keep 'No book is queued, so the Flywheel follows the backlog.' Add the two tests named in PRD WI-8. No useMemo/useCallback/memo."
+        },
+        "items": [
+          {
+            "id": "list-finished-queued-placement.ac1",
+            "title": "Given queued books with queuePosition 2, null (finished) and 3, when BookList renders, then the Queued section lists them in the order #2, #3, then the finished book with no '#' marker and the text 'Finished · all <n> landed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "list-finished-queued-placement.ac2",
+            "title": "Given no active book and one finished queued book, when BookList renders, then it shows 'Every queued book has finished, so the Flywheel follows the backlog.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "list-finished-queued-placement.ac3",
+            "title": "Given only draft books, when BookList renders, then it still shows 'No book is queued, so the Flywheel follows the backlog.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "page-drop-finished-active-notice",
+        "title": "Remove the finished-active notice from the order book page",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T05:19:14Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5599",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/pages/OrderBookPage.tsx",
+            "src/dashboard/frontend/src/pages/__tests__/OrderBookPage.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/pages/__tests__/OrderBookPage.test.tsx",
+            "npm run lint:manual-memo"
+          ],
+          "expected_outputs": [
+            "OrderBookPage.test.tsx passes",
+            "lint:manual-memo passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. Delete the data-notice=\"finished\" block and its 'Archive and move on' button; remove the unused onArchive prop from BookNotices and its call site. In defaultBook sort queued books with ?? Number.MAX_SAFE_INTEGER. Update the withPhases test fixture to the new server rule (first ready book with finished !== true is active; finished non-active queued books get queuePosition null). Replace the two finished-active tests as described in PRD WI-9."
+        },
+        "items": [
+          {
+            "id": "page-drop-finished-active-notice.ac1",
+            "title": "Given books 'done' (finished) and 'next', when the page loads without ?book=, then 'next' is selected and its header shows 'Active'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-drop-finished-active-notice.ac2",
+            "title": "Given the finished queued book is selected, when its header Archive button is clicked, then the page PATCHes { status: 'complete' } for that book",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-drop-finished-active-notice.ac3",
+            "title": "Given any fixture book, when the page renders it, then no text matching /holds the active slot/ and no 'Archive and move on' button is present",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-skip-rule",
+        "title": "Document the skip rule, fail-safe and backfill in order-books.mdx, FLYWHEEL.md and the changelog",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T05:19:14Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5599",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/order-books.mdx",
+            "docs/FLYWHEEL.md",
+            "changelog.d/pan-5599.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -c 'The Flywheel skips a finished queued book' configuration/order-books.mdx",
+            "grep -c 'still holds the active slot' configuration/order-books.mdx"
+          ],
+          "expected_outputs": [
+            "lint:docs passes",
+            "first grep prints 1 or more",
+            "second grep prints 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. Edit configuration/order-books.mdx lines 43, 48, 58, 158 and 194 with the replacement text given in the PRD; edit docs/FLYWHEEL.md line 42 (rule) and line 118 (bare pan flywheel status may still name a finished book); create changelog.d/pan-5599.md with one #### Improved bullet linking #5599. Do not edit sync-sources/skills/pan-flywheel/SKILL.md (it already reads the active book from pan orders list)."
+        },
+        "items": [
+          {
+            "id": "docs-skip-rule.ac1",
+            "title": "Given the edited configuration/order-books.mdx, when grepped, then it contains 'The Flywheel skips a finished queued book' and the fail-safe sentence about the issue cache, and contains no 'still holds the active slot'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-skip-rule.ac2",
+            "title": "Given docs/FLYWHEEL.md, when read, then the Order book row says the active book is the running book, else the first ready book that is not finished, and the known-limits paragraph says a bare pan flywheel status can still name a finished book",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-skip-rule.ac3",
+            "title": "Given changelog.d/pan-5599.md, when npm run lint:docs runs, then it accepts the file's single #### Improved section",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "phase-finished-rule",
+        "to": "dispatch-finished-rule",
+        "type": "blocks"
+      },
+      {
+        "from": "phase-finished-rule",
+        "to": "orders-route-finished-and-backfill",
+        "type": "blocks"
+      },
+      {
+        "from": "phase-finished-rule",
+        "to": "status-summary-finished-rule",
+        "type": "blocks"
+      },
+      {
+        "from": "phase-finished-rule",
+        "to": "cli-list-server-phases",
+        "type": "blocks"
+      },
+      {
+        "from": "order-issue-backfill-helper",
+        "to": "orders-route-finished-and-backfill",
+        "type": "blocks"
+      },
+      {
+        "from": "order-issue-backfill-helper",
+        "to": "status-summary-finished-rule",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
