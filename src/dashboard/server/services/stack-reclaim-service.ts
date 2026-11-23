@@ -41,6 +41,7 @@ import {
   appendPipelineEntry,
   openStackReclaim,
   readPipelineJournal,
+  reclaimRestoresOnTurn,
   reclaimedInEpisode,
   type PipelineJournalEntry,
 } from '../../../lib/cloister/pipeline-journal.js';
@@ -58,6 +59,7 @@ import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
 import { resolveLaunchBackend } from '../../../lib/terminal-backends/launch.js';
 import { isUnsupported } from '../../../lib/terminal-backends/types.js';
 import { tryComposeProjectNameForWorkspace } from '../../../lib/workspace/stack-health.js';
+import { isStackPinned } from '../../../lib/workspace/stack-idle-config.js';
 import {
   issueInGateQueue,
   issuePanes,
@@ -111,6 +113,8 @@ export interface StackReclaimServiceDeps {
   stopContainer: (id: string) => Promise<DockerResult>;
   emitActivity: typeof emitActivityEntry;
   restore: typeof restoreReclaimedStack;
+  /** PAN-5250 FR-10: a pinned workspace is never reclaimed. */
+  isPinned: (workspacePath: string) => boolean;
   now: () => number;
 }
 
@@ -156,6 +160,7 @@ function resolveDeps(deps: Partial<StackReclaimServiceDeps> = {}): StackReclaimS
     stopContainer: deps.stopContainer ?? stopContainer,
     emitActivity: deps.emitActivity ?? emitActivityEntry,
     restore: deps.restore ?? restoreReclaimedStack,
+    isPinned: deps.isPinned ?? isStackPinned,
     now: deps.now ?? Date.now,
   };
 }
@@ -217,6 +222,7 @@ function buildCandidates(
     if (workspace.kind === 'main' || !workspace.issueId) continue;
     const issueId = workspace.issueId.toUpperCase();
     if (seen.has(issueId) || !deps.pathExists(workspace.path)) continue;
+    if (deps.isPinned(workspace.path)) continue;
     if (!deps.projectRegistered(issueId)) continue;
     const composeProject = deps.composeProjectFor(workspace.path, issueId);
     if (!composeProject) continue;
@@ -260,6 +266,7 @@ async function recheckBeforeStop(
   const blocked = await headStillBlocked(deps, snapshot);
   if (!blocked.ok) return null;
   if (deps.verificationBusy(target.issueId)) return null;
+  if (deps.isPinned(target.workspacePath)) return null;
   const panes = await deps.listPanes();
   if (!panes || !panesAllowReclaim(issuePanes(panes, target.issueId, target.workspacePath), deps.turnState).ok) return null;
   const running = await deps.listRunningContainers();
@@ -358,8 +365,9 @@ export async function runStackReclaimPoll(
         },
       });
       // D5: appendPipelineEntry swallows write errors, so stop nothing unless the entry landed.
+      // PAN-5250 D4: compare the newest entry, not the union with an older open idle stop.
       const open = openStackReclaim(deps.readJournal(chosen.workspacePath));
-      if (!open || open.at !== written.at || open.containers.join('\n') !== names.join('\n')) {
+      if (!open || open.latestAt !== written.at || open.latestContainers.join('\n') !== names.join('\n')) {
         return { kind: 'idle' as const, reason: 'journal-unwritable' };
       }
       const stopped: string[] = [];
@@ -396,7 +404,7 @@ export async function runStackReclaimPoll(
 function seedRestoreIndex(deps: StackReclaimServiceDeps, state: StackReclaimState): void {
   for (const workspace of deps.listWorkspaces()) {
     if (!workspace.issueId || !deps.pathExists(workspace.path)) continue;
-    if (openStackReclaim(deps.readJournal(workspace.path))) {
+    if (reclaimRestoresOnTurn(openStackReclaim(deps.readJournal(workspace.path)))) {
       state.restoreIndex.set(workspace.issueId.toUpperCase(), workspace.path);
     }
   }
@@ -411,7 +419,8 @@ export async function runStackRestorePoll(deps: StackReclaimServiceDeps, state: 
   if (!panes) return;
   const now = deps.now();
   for (const [issueId, workspacePath] of [...state.restoreIndex]) {
-    if (!deps.pathExists(workspacePath) || !openStackReclaim(deps.readJournal(workspacePath))) {
+    // PAN-5250 FR-8: an idle-only reclaim waits for a spawn, verification or `pan workspace up`.
+    if (!deps.pathExists(workspacePath) || !reclaimRestoresOnTurn(openStackReclaim(deps.readJournal(workspacePath)))) {
       state.restoreIndex.delete(issueId);
       state.restoreRetryAt.delete(issueId);
       continue;
