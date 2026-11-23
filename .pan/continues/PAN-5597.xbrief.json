@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5597",
   "created": "2026-11-23T02:38:35.270Z",
-  "updated": "2026-11-23T02:39:41.656Z",
+  "updated": "2026-11-23T02:39:57.014Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,6 +30,11 @@
     "phase-lib.ac4": {
       "status": "completed",
       "doneAt": "2026-11-23T02:39:41.656Z"
+    },
+    "validate-landed": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5597",
+      "claimedAt": "2026-11-23T02:39:57.014Z"
     }
   }
 }
