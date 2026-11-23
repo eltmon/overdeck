@@ -302,7 +302,9 @@ describe('pan orders commands', () => {
     expect(phaseOf(lines, ids[2]!)).toBe('draft');
     expect(phaseOf(lines, ids[3]!)).toBe('archived');
 
-    expect(phaseOf(listLines(['PAN-1']), ids[0]!)).toBe('active (finished)');
+    const linesWithFirstFinished = listLines(['PAN-1']);
+    expect(phaseOf(linesWithFirstFinished, ids[0]!)).toBe('queued (finished)');
+    expect(phaseOf(linesWithFirstFinished, ids[1]!)).toBe('active');
   });
 
   it('queues a book in another registered project via --project from an unrelated cwd', async () => {

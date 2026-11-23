@@ -52,6 +52,21 @@ describe('currentOrderBook', () => {
   it('never picks a draft book — a draft is not dispatchable', () => {
     expect(currentOrderBook([book('draft', 'draft', ['PAN-10'])])).toBeNull();
   });
+
+  it('skips a finished ready book', () => {
+    const books = [book('a', 'ready', ['PAN-1']), book('b', 'ready', ['PAN-2'])];
+    expect(currentOrderBook(books, candidate => candidate.id === 'a')?.id).toBe('b');
+  });
+
+  it('a running book is active even when finished', () => {
+    const books = [book('running', 'running', ['PAN-1']), book('ready', 'ready', ['PAN-2'])];
+    expect(currentOrderBook(books, () => true)?.id).toBe('running');
+  });
+
+  it('with no finished rule the first ready book is active', () => {
+    const books = [book('a', 'ready', ['PAN-1']), book('b', 'ready', ['PAN-2'])];
+    expect(currentOrderBook(books)?.id).toBe('a');
+  });
 });
 
 describe('activeOrderBookIssues', () => {
