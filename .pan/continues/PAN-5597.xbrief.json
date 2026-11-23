@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5597",
   "created": "2026-11-23T02:38:35.270Z",
-  "updated": "2026-11-23T02:40:44.844Z",
+  "updated": "2026-11-23T02:40:46.031Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -48,6 +48,11 @@
     "validate-landed.ac3": {
       "status": "completed",
       "doneAt": "2026-11-23T02:40:44.843Z"
+    },
+    "restore-guard": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5597",
+      "claimedAt": "2026-11-23T02:40:46.031Z"
     }
   }
 }
