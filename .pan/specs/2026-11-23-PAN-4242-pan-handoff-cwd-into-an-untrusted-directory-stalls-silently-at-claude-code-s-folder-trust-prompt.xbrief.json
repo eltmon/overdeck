@@ -1,0 +1,668 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-23T08:39:11Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4242: pan handoff --cwd into an untrusted directory stalls silently at Claude Code's folder-trust prompt",
+    "updated": "2026-11-23T08:45:03.575Z"
+  },
+  "plan": {
+    "id": "pan-4242",
+    "title": "pan handoff --cwd into an untrusted directory stalls silently at Claude Code's folder-trust prompt",
+    "status": "proposed",
+    "uid": "a3f2671b-c754-478f-97f9-bb627aa4ad13",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-23T08:39:11Z",
+    "updated": "2026-11-23T08:45:03.575Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4242",
+        "label": "PAN-4242",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4242.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "claude-code",
+      "trust-dialog",
+      "terminal-backends",
+      "handoff",
+      "pane-choice",
+      "herdr"
+    ],
+    "metadata": {
+      "sizeJustification": "The issue body requires three fixes (pre-trust, stall signal, kickoff re-delivery) and its comments add the trust-dialog answer path; requirements review checks all of them, so splitting would ship this issue incomplete. The projected surface is 24 files; the subsystem count (8) is inflated because the lint counts each of the four doc files (docs/TERMINAL-BACKENDS.md, docs/FORKS.md, configuration/harnesses.mdx, changelog.d/PAN-4242.md) as its own subsystem. Code spans only src/lib, src/cli and their tests.",
+      "canonicalFilename": "2026-11-23-PAN-4242-pan-handoff-cwd-into-an-untrusted-directory-stalls-silently-at-claude-code-s-folder-trust-prompt.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Claude Code launches managed by Overdeck can sit at Claude Code's folder-trust dialog for hours while Overdeck reports them as running. Fix 1 of the issue (pre-trust the cwd) shipped in PAN-3905 (#4163), but (a) the handoff --cwd is not normalized, so a trailing slash or symlink writes a trust key Claude Code never reads, and (b) Claude Code 2.1.330 shows a 'backstop' trust dialog in a trusted worktree whose .claude/settings.json carries permissions.allow rules until the repository root (main checkout) is trusted. Workspace sync copies the operator's user-level permissions.allow into every workspace, and myn-cli's repository root is untrusted, so planning agents stalled there. The dialog has unnumbered options, so parsePaneChoiceMenu never sees it, pan answer and agent pane detection read only tmux (dead on the default Herdr backend), and a refused handoff kickoff is lost: resume sends only the generic CONVERSATION RESUME notice.",
+      "Proposal": "Prevent: pre-trust the cwd, its realpath and its git repository root at the launchAgentPane chokepoint, and stop copying user-level permissions into workspace settings. Detect: recognise both variants of the trust dialog as a two-option pane choice, make pan answer read and key through resolveAgentPaneIo (Herdr or tmux), and flag a Claude Code agent with no transcript 180 s after launch and a blocking menu on screen as pendingInputKinds paneQuestion. Recover: hold a refused fork kickoff in conversations.held_kickoff, and on a respawning resume of a failed fork deliver that held kickoff once instead of the resume notice. Document all of it. Full detail, verified references and verbatim dialog fixtures are in .pan/drafts/PAN-4242.md.",
+      "NonGoals": "- No Herdr pane-choice detection in the conversation pending-input feed and no change to the MCP answer_pane_choice tool (PAN-5169 cost decision stands).\n- No change to GET/POST /api/agents/:id/pane-choice and no frontend component change.\n- No automatic answering of the trust dialog; Overdeck must never press Yes on the operator's behalf.\n- No startup-stall signal for non-Claude harnesses (Codex, Pi, Kimi, OpenCode).\n- No change to which non-permission user-level keys (model, hooks, statusLine, enabledPlugins) the workspace settings copy carries.\n- No change to project registration's pre-trust or to createWorkspace's preTrustDirectory call.\n- Never pre-trust the home directory or '/'.\n- Never hold a 'stranded' kickoff (text pasted but not submitted); only refusals are held.\n- No growth of src/lib/overdeck/conversation-runtime.ts and no file-size allowlist raise."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Treat issue fix #1 (pre-trust handoff --cwd) as shipped by PAN-3905 (#4163, merged 2026-09-24T23:21Z) and close the remaining gaps: realpath normalization and repository-root trust.",
+        "rationale": "Conversation launches already pass through launchAgentPane, which pre-trusts the cwd; probes on Claude Code 2.1.330 proved worktree trust is not enough when project permissions.allow rules exist, and the handoff route only trims --cwd."
+      },
+      {
+        "summary": "Pre-trust the repository root (parent of --git-common-dir) at every Claude Code launch, except home and '/'.",
+        "rationale": "Probe: trusting the root removed the backstop dialog; Claude Code states trusting a folder in a repository trusts the whole repository, so this grants nothing new. Home trust is never saved by Claude Code."
+      },
+      {
+        "summary": "Stop copying user-level permissions into workspace .claude/settings.json and strip duplicated allow/additionalDirectories entries from existing files.",
+        "rationale": "Agents use the real ~/.claude config, so user-level rules already apply; the copy only creates a gated grant. The comment's own fix candidate."
+      },
+      {
+        "summary": "Detect the trust dialog with a dedicated exact-shape recogniser instead of loosening the numbered-menu parser.",
+        "rationale": "The parser's header warns that false positives park phantom decision cards in live conversations; the dialog has a stable literal option 'Yes, I trust this folder'."
+      },
+      {
+        "summary": "Surface an agent startup stall as the existing paneQuestion kind with a pan answer instruction.",
+        "rationale": "Decisions already renders paneQuestion; the frontend renders paneChoice cards only for conversations, so no frontend change is needed."
+      },
+      {
+        "summary": "Startup-stall gate: claude-code harness, at least 180 s since launch, no transcript write since launch, and a blocking menu on the pane.",
+        "rationale": "The comment asked for 'a few minutes'; requiring a menu prevents flagging an idle resumed agent or a held handoff."
+      },
+      {
+        "summary": "Reuse conversations.held_kickoff for a refused kickoff and deliver it on a respawning resume unless the persisted fork request asked for a hold.",
+        "rationale": "The store already gives atomic claim and restore-on-failure. fork_status cannot discriminate because markConversationRunning resets 'failed' to NULL on resurrection; buildForkRequest writes hold: true only for --hold. A failed fork with a held kickoff renders as a held handoff with Start, the intended recovery surface."
+      },
+      {
+        "summary": "Leave conversation pane-choice detection on Herdr and the MCP answer_pane_choice tool out of scope.",
+        "rationale": "PAN-5169 deliberately skipped Herdr capture in the 5 s conversation feed for cost; pan answer conv-<name> covers the operator path through resolveAgentPaneIo."
+      }
+    ],
+    "items": [
+      {
+        "id": "trust-launch-targets",
+        "title": "Pre-trust the real cwd and its git repository root at every Claude Code launch",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T08:39:11Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4242",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "docs-trust-kickoff"
+          ],
+          "files_scope": [
+            "src/lib/workspace-manager/worktree-ops.ts",
+            "src/lib/terminal-backends/launch.ts",
+            "tests/unit/lib/workspace-manager/pretrust-directory.test.ts",
+            "tests/unit/lib/terminal-backends/launch-pretrust.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/workspace-manager/pretrust-directory.test.ts tests/unit/lib/terminal-backends/launch-pretrust.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass, including the new git-worktree and trailing-slash cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In src/lib/workspace-manager/worktree-ops.ts add exported async gitRepositoryRoot(dir) (reuse the existing execFileAsync at line 11: git -C dir rev-parse --path-format=absolute --git-common-dir, timeout 5000; return dirname when the output ends in '/.git', else null; null on any error) and claudeTrustTargets(cwd) (Set of cwd, realpath(cwd) from fs/promises when it resolves, and the repository root of the real path unless it equals homedir() or '/'). In src/lib/terminal-backends/launch.ts preTrustClaudeCodeCwd, replace `await preTrustDirectory(request.cwd)` with a loop calling preTrustDirectory for each claudeTrustTargets(request.cwd) entry, keeping the non-fatal try/catch, and mention PAN-4242 in its doc comment. No execSync. Tests set HOME to a temp dir and build a real repo with git init + git worktree add inside mkdtempSync."
+        },
+        "items": [
+          {
+            "id": "trust-launch-targets.ac1",
+            "title": "Given a real git worktree as cwd, when launchAgentPane starts a claude-code pane, then ~/.claude.json has hasTrustDialogAccepted true for both the worktree path and the repository root before startAgent runs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "trust-launch-targets.ac2",
+            "title": "Given cwd with a trailing slash, when claudeTrustTargets(cwd) runs, then it returns the realpath without the trailing slash as one of its entries",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "trust-launch-targets.ac3",
+            "title": "Given a directory outside any git work tree, when claudeTrustTargets runs, then it returns only the directory itself (and its realpath when different) and never homedir() or '/'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "trust-launch-targets.ac4",
+            "title": "Given a non-claude-code harness token, when launchAgentPane runs, then ~/.claude.json is left unchanged (existing behaviour preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-copy-permissions",
+        "title": "Stop copying user-level permissions into workspace .claude/settings.json",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T08:39:11Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4242",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspace-manager/migration.ts",
+            "tests/lib/workspace-manager.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/workspace-manager.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "workspace-manager.test.ts passes including the new permissions cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. In copyOverdeckSettingsToWorkspace (src/lib/workspace-manager/migration.ts), replace `const merged = { ...globalSettings, ...workspaceSettings };` with a merge that omits the user-level `permissions` key and keeps only the workspace's own permissions after a module-local withoutUserGrants(workspace, user) helper removes every permissions.allow and permissions.additionalDirectories string the user settings also contain (emptied arrays deleted; permissions key deleted when nothing remains; deny/ask/defaultMode kept). Update the function doc comment. Hook merging is unchanged."
+        },
+        "items": [
+          {
+            "id": "settings-copy-permissions.ac1",
+            "title": "Given user settings with permissions.allow and no workspace settings file, when copyOverdeckSettingsToWorkspace runs, then the written workspace settings.json has no permissions key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-copy-permissions.ac2",
+            "title": "Given an existing workspace file whose permissions.allow holds a user-level rule plus 'Bash(make:*)', when the copy runs, then the file's permissions.allow equals ['Bash(make:*)']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-copy-permissions.ac3",
+            "title": "Given user hooks and workspace hooks plus a workspace permissions.deny rule, when the copy runs, then the merged file contains both hook sets and keeps the deny rule",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "trust-dialog-parse",
+        "title": "Recognise Claude Code's folder-trust dialog as a two-option pane choice",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T08:39:11Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4242",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "pan-answer-backend",
+            "startup-stall-flag"
+          ],
+          "files_scope": [
+            "src/lib/pane-choice-menu.ts",
+            "tests/lib/pane-choice-menu.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/pane-choice-menu.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "pane-choice-menu.test.ts passes with both verbatim trust-dialog fixtures",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Add module-local parseClaudeTrustDialog(lines, end) to src/lib/pane-choice-menu.ts and return it from parsePaneChoiceMenu where the numbered scan finds no option (`if (lastOption < 0) return parseClaudeTrustDialog(lines, end)`), in both card and guard modes. Shape: last non-blank line is a harness footer hint; directly above it (after blank lines) exactly two contiguous option lines, one with the ❯/› cursor; one label is exactly 'Yes, I trust this folder' and the other starts with 'No, '; context = non-blank trimmed lines between the nearest separator rule and the options, excluding 'Security guide', top-down, max 12; options numbered 1 and 2 in rendered order, recommended false; title = first context line (fallback 'Accessing workspace:'); confidence 'high'. Update the module header. Tests use the two verbatim Claude Code 2.1.330 fixtures in the PRD (plain: '❯ No, exit' / 'Yes, I trust this folder'; backstop: '❯ No, continue without these permissions' / 'Yes, I trust this folder'), each prefixed with 20 blank lines. The numbered parser's rules are not loosened."
+        },
+        "items": [
+          {
+            "id": "trust-dialog-parse.ac1",
+            "title": "Given the plain fixture, when parsePaneChoiceMenu runs, then it returns options ['No, exit', 'Yes, I trust this folder'] numbered 1 and 2, selectedIndex 0 and title 'Accessing workspace:'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "trust-dialog-parse.ac2",
+            "title": "Given the backstop fixture, when parsePaneChoiceMenu runs, then it returns options ['No, continue without these permissions', 'Yes, I trust this folder'] and contextLines include 'Bash(gh issue create:*)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "trust-dialog-parse.ac3",
+            "title": "Given either fixture, when buildChoiceKeystrokes(menu, 1) runs, then it returns ['Down', 'Enter'], and paneHasBlockingChoiceMenu returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "trust-dialog-parse.ac4",
+            "title": "Given a fixture with real output appended after the footer, or two unnumbered lines without 'Yes, I trust this folder', when parsePaneChoiceMenu runs, then it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-answer-backend",
+        "title": "Make pan answer read and key pane choices through the host terminal backend",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T08:39:11Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4242",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/answer.ts",
+            "src/cli/commands/__tests__/answer.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/answer.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "answer.test.ts passes including the Herdr-backed trust-dialog cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. In src/cli/commands/answer.ts, build the default capture and answer deps from resolveAgentPaneIo(sessionName) (src/lib/terminal-backends/agent-pane-io.ts): capture = io.read(lines) fed to paneChoiceFromText; answer = answerSessionPaneChoice(name, body, { capture: io.read, sendKey: io.sendKey, sessionExists: async () => true }). A thrown read prints 'No pending choice menu for <id>' and exits 1. Injected deps keep working. normalizeAnswerSessionId is unchanged. Tests vi.mock agent-pane-io.js with a fake whose read returns the PRD backstop fixture, and use vi.useFakeTimers() + vi.advanceTimersByTimeAsync for the keystroke gaps."
+        },
+        "items": [
+          {
+            "id": "pan-answer-backend.ac1",
+            "title": "Given a Herdr-backed fake pane showing the backstop dialog, when pan answer planning-cli-2 runs with no option, then it logs '1. No, continue without these permissions' and '2. Yes, I trust this folder'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-answer-backend.ac2",
+            "title": "Given the same fake, when pan answer planning-cli-2 2 runs and the next read shows no menu, then the fake receives sendKey Down then Enter and the command logs 'Answered planning-cli-2: Yes, I trust this folder'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-answer-backend.ac3",
+            "title": "Given resolveAgentPaneIo whose read throws, when pan answer runs, then it prints 'No pending choice menu for <id>' and exits 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "startup-stall-flag",
+        "title": "Flag a Claude Code agent waiting at a startup menu with no transcript since launch",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T08:39:11Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4242",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/startup-stall.ts",
+            "src/lib/agents/__tests__/startup-stall.test.ts",
+            "src/lib/agent-enrichment.ts",
+            "src/lib/agent-input-detection.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/startup-stall.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "startup-stall.test.ts passes",
+            "typecheck completes without errors",
+            "lint passes, including lint:circular"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Add 'startup_blocked' to AwaitingInputReason (src/lib/agent-input-detection.ts). New src/lib/agents/startup-stall.ts exports STARTUP_TRANSCRIPT_GRACE_MS = 180_000 and detectStartupStall(agentId, startedAt, deps) with injectable now/harness/transcriptMtime/readPane (defaults: Date.now, getAgentState from agents/agent-state-read.js, getAgentJsonlMtime via lazy import of ../agent-enrichment.js, readAgentPaneText(agentId, 90, undefined, 'visible')). It returns { reason: 'startup_blocked', prompt } only when harness is claude-code or undefined, startedAt parses, now - startedAt >= 180 s, transcript mtime is null or earlier than startedAt, the pane read succeeds and parsePaneChoiceMenu(screen, { mode: 'guard' }) is non-null; the prompt (normalizeAwaitingInputPrompt) lists the no-transcript minutes, the menu title, up to 3 more context lines, each option as 'n. label', and 'Answer it with: pan answer <agentId> <number> (or in the Terminal tab).'. In src/lib/agent-enrichment.ts, paneDetection becomes `(await detectAwaitingInputForAgent(agentId, { isPlanning })) ?? (await detectStartupStall(agentId, startedAt))`, and 'startup_blocked' joins BLOCKING_AWAITING_INPUT_REASONS and the paneQuestion branch of appendPaneDetectionKind. agent-enrichment.ts must stay under 1000 lines."
+        },
+        "items": [
+          {
+            "id": "startup-stall-flag.ac1",
+            "title": "Given a claude-code agent started 181 s ago with no transcript and the backstop fixture on its pane, when detectStartupStall runs, then it returns reason 'startup_blocked' with a prompt containing '2. Yes, I trust this folder' and 'pan answer agent-x <number>'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "startup-stall-flag.ac2",
+            "title": "Given the same agent at 179 s, or with transcript mtime at or after startedAt, or with harness 'codex', or a pane with no menu, or a pane read that throws, when detectStartupStall runs, then it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "startup-stall-flag.ac3",
+            "title": "Given a detection with reason 'startup_blocked', when appendPaneDetectionKind runs, then the kinds array contains 'paneQuestion'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "kickoff-hold-on-refusal",
+        "title": "Hold a refused fork kickoff in conversations.held_kickoff",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T08:39:11Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4242",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-forks.ts",
+            "src/lib/overdeck/__tests__/conversation-forks-undelivered-kickoff.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-forks-undelivered-kickoff.test.ts src/lib/overdeck/__tests__/conversation-forks-hold.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. In src/lib/overdeck/conversation-forks.ts add `export class ForkDeliveryRefusedError extends Error {}` and make assertForkDelivered throw it (same message) when delivery.failure starts with 'refused:'; other failures keep throwing Error. In deliverForkSeed wrap `self.injectForkSummary(conv, seed, caller)` in try/catch: on ForkDeliveryRefusedError call restoreHeldKickoff(conv.name, seed) from conversation-kickoff-store.js, then rethrow. A 'stranded' result is never held. handleForkPipelineFailure is unchanged (it still marks the fork failed and the row ended). Model the test DB setup on the sibling conversation-forks-hold.test.ts."
+        },
+        "items": [
+          {
+            "id": "kickoff-hold-on-refusal.ac1",
+            "title": "Given injectForkSummary throws ForkDeliveryRefusedError, when deliverForkSeed runs, then readHeldKickoff(name) returns the seed text and the error is rethrown",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kickoff-hold-on-refusal.ac2",
+            "title": "Given injectForkSummary throws a plain Error or returns 'stranded', when deliverForkSeed runs, then readHeldKickoff(name) returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kickoff-hold-on-refusal.ac3",
+            "title": "Given a held kickoff already exists, when a second refusal occurs, then the stored text is preserved unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "resume-delivers-kickoff",
+        "title": "Deliver an undelivered kickoff on resume instead of the generic resume notice",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T08:39:11Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4242",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-undelivered-kickoff.ts",
+            "src/lib/overdeck/conversation-kickoff-store.ts",
+            "src/lib/overdeck/conversation-runtime.ts",
+            "src/lib/overdeck/__tests__/conversation-undelivered-kickoff.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-undelivered-kickoff.test.ts",
+            "wc -l src/lib/overdeck/conversation-runtime.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "conversation-undelivered-kickoff.test.ts passes",
+            "wc prints 1224 or fewer lines for conversation-runtime.ts",
+            "typecheck completes without errors",
+            "lint passes, including the file-size guard"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. In src/lib/overdeck/conversation-kickoff-store.ts add exported forkRequestedHold(forkRequest): true only when the JSON has hold === true (false for null/invalid), next to heldKickoffFocus. New src/lib/overdeck/conversation-undelivered-kickoff.ts exports deliverResumeNoticeOrKickoff(conv, { text, caller, method, send }) returning ResumeContractDeliveryResult: re-read the row with getConversationByName; when !forkRequestedHold(conv.forkRequest) and claimHeldKickoff(name) returns text (check the hold flag BEFORE claiming), await deliverForkSeed(conv, text, 'conversation-resume-kickoff') and return 'delivered'; if that throws, restoreHeldKickoff(name, text), log, return 'failed'; otherwise return deliverResumeContractUnlessGated(conv.tmuxSession, text, caller, method, send) exactly as today. Do NOT key on conv.forkStatus: markConversationRunning resets 'failed' to NULL whenever an ended row is resurrected. In handleConversationResume (src/lib/overdeck/conversation-runtime.ts, search 'CONVERSATION RESUME:'), replace the deliverResumeContractUnlessGated call with deliverResumeNoticeOrKickoff and swap the import. Implementation checkpoint: wc -l must print 1224 or fewer (the file may not grow); join argument lines if needed. The claudeAlive reattach branch is unchanged."
+        },
+        "items": [
+          {
+            "id": "resume-delivers-kickoff.ac1",
+            "title": "Given a held kickoff, a fork request without hold and forkStatus NULL, when deliverResumeNoticeOrKickoff runs, then deliverForkSeed receives the held text, the resume notice is not sent, the result is 'delivered' and readHeldKickoff returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resume-delivers-kickoff.ac2",
+            "title": "Given deliverForkSeed throws, when deliverResumeNoticeOrKickoff runs, then the held text is restored and the result is 'failed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resume-delivers-kickoff.ac3",
+            "title": "Given a held kickoff whose fork request contains \"hold\":true, or no held kickoff, when deliverResumeNoticeOrKickoff runs, then the generic resume notice is sent and the held text is preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resume-delivers-kickoff.ac4",
+            "title": "Given forkRequestedHold, when called with '{\"hold\":true}' it returns true, and with '{}', null or invalid JSON it returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resume-delivers-kickoff.ac5",
+            "title": "Given the change is applied, when wc -l src/lib/overdeck/conversation-runtime.ts runs, then it prints 1224 or fewer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-trust-kickoff",
+        "title": "Document repository-root trust, startup-stall signal, pan answer on Herdr and undelivered kickoffs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T08:39:11Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4242",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/TERMINAL-BACKENDS.md",
+            "docs/FORKS.md",
+            "configuration/harnesses.mdx",
+            "changelog.d/PAN-4242.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'PAN-4242' docs/TERMINAL-BACKENDS.md docs/FORKS.md configuration/harnesses.mdx changelog.d/PAN-4242.md",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "grep matches in all four files",
+            "lint passes, including lint:docs"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. docs/TERMINAL-BACKENDS.md: next to the launchAgentPane description add a 'Claude Code folder trust (PAN-3905, PAN-4242)' paragraph covering cwd/realpath/repository-root pre-trust and why (the backstop dialog for project permissions.allow), the startup-stall paneQuestion signal (180 s, no transcript, menu on screen), and pan answer reading and keying through the host backend. docs/FORKS.md: under 'Held kickoff (PAN-4499)' add 'Undelivered kickoff (PAN-4242)': a refused kickoff becomes the held kickoff, the failed conversation shows as a held handoff with Start, a resume of a conversation whose fork request did not ask for a hold delivers it once instead of the resume notice, an operator --hold (fork request hold: true) is never sent by a resume. configuration/harnesses.mdx under '### Claude Code (default)': one bullet that Overdeck marks the launch folder and its git repository root trusted in ~/.claude.json and no longer copies user-level permissions into workspace .claude/settings.json. changelog.d/PAN-4242.md: one user-facing entry in the changelog.d/README.md format."
+        },
+        "items": [
+          {
+            "id": "docs-trust-kickoff.ac1",
+            "title": "Given the docs change, when grep -n 'PAN-4242' runs over docs/TERMINAL-BACKENDS.md, docs/FORKS.md, configuration/harnesses.mdx and changelog.d/PAN-4242.md, then every file matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-trust-kickoff.ac2",
+            "title": "Given docs/TERMINAL-BACKENDS.md, when a reader opens the new folder-trust paragraph, then it states that the repository root is trusted because Claude Code otherwise asks about project permissions.allow rules, and that pan answer works on Herdr",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-trust-kickoff.ac3",
+            "title": "Given docs/FORKS.md, when a reader opens 'Undelivered kickoff (PAN-4242)', then it states that only refused deliveries are held and that a resume never sends a kickoff whose fork request asked for a hold",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "trust-dialog-parse",
+        "to": "pan-answer-backend",
+        "type": "blocks"
+      },
+      {
+        "from": "trust-dialog-parse",
+        "to": "startup-stall-flag",
+        "type": "blocks"
+      },
+      {
+        "from": "trust-launch-targets",
+        "to": "docs-trust-kickoff",
+        "type": "blocks"
+      },
+      {
+        "from": "pan-answer-backend",
+        "to": "docs-trust-kickoff",
+        "type": "blocks"
+      },
+      {
+        "from": "startup-stall-flag",
+        "to": "docs-trust-kickoff",
+        "type": "blocks"
+      },
+      {
+        "from": "kickoff-hold-on-refusal",
+        "to": "docs-trust-kickoff",
+        "type": "blocks"
+      },
+      {
+        "from": "resume-delivers-kickoff",
+        "to": "docs-trust-kickoff",
+        "type": "blocks"
+      },
+      {
+        "from": "settings-copy-permissions",
+        "to": "docs-trust-kickoff",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
