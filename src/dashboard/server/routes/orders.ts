@@ -303,7 +303,7 @@ function parseItems(book: OrderBook, value: unknown): NewOrderBookItem[] {
 
 async function defaultStartOrderBook(book: OrderBook, project: ProjectConfig): Promise<StartOrderBookResult> {
   const { startFlywheelRun } = await import('../../../cli/commands/flywheel.js');
-  return startFlywheelRun({ cwd: resolveProjectPath(project), orders: book.id });
+  return startFlywheelRun({ cwd: resolveProjectPath(project), orders: book.id, projectPath: project.path });
 }
 
 export async function getOrdersPayload(deps: OrdersRouteDeps = {}, projectKey?: string): Promise<RouteResult> {

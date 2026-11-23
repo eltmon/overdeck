@@ -83,20 +83,27 @@ export interface FlywheelRunResult {
  * (`/pan-flywheel <book> --project <key>`); a failed delivery throws, so the
  * book is never dropped silently (PAN-5601). The dashboard's orders route
  * calls this too, so it never prints or sets an exit code.
+ *
+ * `projectPath` is the selected project's registered root. The key is resolved
+ * from it, not from `cwd`: `cwd` may be an `issue_routing` path outside that
+ * root, which no project contains.
  */
-export async function startFlywheelRun(options: FlywheelStartOptions = {}): Promise<FlywheelRunResult> {
+export async function startFlywheelRun(
+  options: FlywheelStartOptions & { projectPath?: string } = {},
+): Promise<FlywheelRunResult> {
+  const { projectPath, ...startOptions } = options;
   try {
-    await startFlywheel(options);
+    await startFlywheel(startOptions);
     return { runId: FLYWHEEL_CONVERSATION_SESSION, delivered: 'started' };
   } catch (error) {
     if (!(error instanceof FlywheelAlreadyRunning)) throw error;
   }
   if (!options.orders) return { runId: FLYWHEEL_CONVERSATION_SESSION };
-  const cwd = options.cwd ?? process.cwd();
+  const keyPath = projectPath ?? options.cwd ?? process.cwd();
   const { resolveProjectKeyForCwdAsync } = await import('../../lib/projects.js');
-  const projectKey = await resolveProjectKeyForCwdAsync(cwd);
+  const projectKey = await resolveProjectKeyForCwdAsync(keyPath);
   if (!projectKey) {
-    throw new Error(`Flywheel already running, but order book ${options.orders} was not sent: no registered project contains ${cwd}`);
+    throw new Error(`Flywheel already running, but order book ${options.orders} was not sent: no registered project contains ${keyPath}`);
   }
   await sendOrderBookToFlywheel(options.orders, projectKey);
   return { runId: FLYWHEEL_CONVERSATION_SESSION, delivered: 'running-conversation' };

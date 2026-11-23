@@ -369,7 +369,7 @@ describe('pan orders commands', () => {
 
     await expect(runOrdersStart(created.id, { projectKey: 'other-project' }))
       .resolves.toEqual({ runId: 'RUN-CLI-CROSS' });
-    expect(mockStartFlywheelRun).toHaveBeenCalledWith({ cwd: '/fake/other-project', orders: created.id });
+    expect(mockStartFlywheelRun).toHaveBeenCalledWith({ cwd: '/fake/other-project', orders: created.id, projectPath: '/fake/other-project' });
   });
 
   // PAN-5601: a running flywheel gets the book, and the CLI says so instead of "Flywheel started".
