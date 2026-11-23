@@ -1,4 +1,4 @@
-# Flywheel report (2026-11-22)
+# Flywheel report (2026-11-23)
 
 ## Shipped this run (merged, deployed, closed)
 
@@ -13,7 +13,7 @@
 
 ## In flight
 
-None.
+None. Re-checked 2026-11-23 02:08 UTC: no new released issues, no new PRs, main CI green at 9319060e36.
 
 ## Parked / waiting on the operator
 
