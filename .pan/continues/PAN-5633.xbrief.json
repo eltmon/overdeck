@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5633",
   "created": "2026-11-23T19:06:23.391Z",
-  "updated": "2026-11-23T19:06:23.391Z",
+  "updated": "2026-11-23T19:08:15.807Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,30 @@
   "sessionHistory": [],
   "items": {
     "wi1-last-turn-reader": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5633",
-      "claimedAt": "2026-11-23T19:06:23.391Z"
+      "claimedAt": "2026-11-23T19:06:23.391Z",
+      "doneAt": "2026-11-23T19:08:15.806Z"
+    },
+    "wi1-last-turn-reader.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:08:15.806Z"
+    },
+    "wi1-last-turn-reader.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:08:15.806Z"
+    },
+    "wi1-last-turn-reader.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:08:15.806Z"
+    },
+    "wi1-last-turn-reader.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:08:15.806Z"
+    },
+    "wi1-last-turn-reader.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-23T19:08:15.806Z"
     }
   }
 }
