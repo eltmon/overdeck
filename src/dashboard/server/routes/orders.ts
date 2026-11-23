@@ -3,6 +3,7 @@ import type {
   OrderBookItem,
   OrderBookLane,
   OrderBookSettings,
+  OrderBookStatus,
 } from '@overdeck/contracts';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
@@ -13,6 +14,7 @@ import type { OrderIssueLookup, OrderIssueState } from '../../../lib/orders/type
 import { createOrderPrdLookup, hasOrderIssuePrd, validateBookForStart } from '../../../lib/orders/validate.js';
 import {
   addItems,
+  assertRestorable,
   createBook,
   moveItem,
   removeItem,
@@ -383,6 +385,24 @@ export async function getOrderPayload(
   });
 }
 
+/**
+ * The status moves PATCH /api/orders/:id accepts: queue a draft, move a queued or archived book
+ * back to draft (unqueue / restore), and archive a draft or queued book. `running` and `drained`
+ * are never written through this route.
+ */
+type PatchableStatus = Extract<OrderBookStatus, 'ready' | 'draft' | 'complete'>;
+
+const STATUS_TRANSITIONS: Record<PatchableStatus, { from: readonly OrderBookStatus[]; refusal: string }> = {
+  ready: { from: ['draft'], refusal: 'must be draft before it can be queued' },
+  draft: { from: ['ready', 'complete'], refusal: 'must be queued or archived before it can be moved back to draft' },
+  complete: { from: ['draft', 'ready'], refusal: 'must be draft or queued before it can be archived' },
+};
+
+function statusTransition(value: unknown): PatchableStatus {
+  if (value === 'ready' || value === 'draft' || value === 'complete') return value;
+  throw new Error('status may only transition to ready, draft, or complete through this route');
+}
+
 export async function patchOrderPayload(
   bookId: string,
   body: Record<string, unknown>,
@@ -396,11 +416,13 @@ export async function patchOrderPayload(
       patch.postureSetAt = (deps.now ?? (() => new Date()))().toISOString();
       patch.postureSetBy = (deps.actor ?? (() => 'dashboard'))();
     }
-    if (body['status'] !== undefined) {
-      if (body['status'] !== 'ready') throw new Error('status may only transition to ready through this route');
+    const targetStatus = body['status'] === undefined ? undefined : statusTransition(body['status']);
+    if (targetStatus !== undefined) {
       if (body['runId'] !== undefined) throw new Error('runId is server-controlled');
       const book = await requireBook(stateRoot, bookId);
-      if (book.status !== 'draft') throw new Error(`Order book ${bookId} must be draft before it can be queued`);
+      const transition = STATUS_TRANSITIONS[targetStatus];
+      if (!transition.from.includes(book.status)) throw new Error(`Order book ${bookId} ${transition.refusal}`);
+      if (book.status === 'complete' && targetStatus === 'draft') assertRestorable(stateRoot, book);
     }
 
     let changed = false;
@@ -412,8 +434,8 @@ export async function patchOrderPayload(
       await setSettings(stateRoot, bookId, patch);
       changed = true;
     }
-    if (body['status'] !== undefined) {
-      await setStatus(stateRoot, bookId, 'ready');
+    if (targetStatus !== undefined) {
+      await setStatus(stateRoot, bookId, targetStatus);
       changed = true;
     }
     if (!changed) throw new Error('name, settings, or status is required');

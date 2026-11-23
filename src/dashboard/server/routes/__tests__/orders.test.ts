@@ -349,6 +349,110 @@ describe('/api/orders routes', () => {
     });
   });
 
+  describe('status transitions', () => {
+    const openStates = new Map<string, OrderIssueState>([
+      ['PAN-1', { issue: 'PAN-1', open: true, parked: false }],
+      ['PAN-2', { issue: 'PAN-2', open: true, parked: false }],
+    ]);
+
+    async function bookWith(layer: ReturnType<typeof makeOrdersRouteLayer>, id: string, issue: string, queue = true) {
+      await requestOrdersRoute(layer, '/api/orders', mutation('POST', { id, name: id }));
+      await requestOrdersRoute(layer, `/api/orders/${id}/items`, mutation('POST', { items: [{ issue, lane: 'A' }] }));
+      if (queue) await requestOrdersRoute(layer, `/api/orders/${id}`, mutation('PATCH', { status: 'ready' }));
+    }
+
+    it('moves a ready book back to draft', async () => {
+      const root = gitFixture();
+      const layer = makeOrdersRouteLayer({ stateRoot: () => root, issueLookup: issueLookup(openStates), hasPrd: () => true });
+      await bookWith(layer, '2026-07-18-first', 'PAN-1');
+
+      await expect(requestOrdersRoute(layer, '/api/orders/2026-07-18-first', mutation('PATCH', { status: 'draft' })))
+        .resolves.toMatchObject({ status: 200, body: { status: 'draft', phase: 'draft', queuePosition: null } });
+    });
+
+    it('archives a ready book and frees the active slot for the next ready book', async () => {
+      const root = gitFixture();
+      const layer = makeOrdersRouteLayer({ stateRoot: () => root, issueLookup: issueLookup(openStates), hasPrd: () => true });
+      await bookWith(layer, '2026-07-18-first', 'PAN-1');
+      await bookWith(layer, '2026-07-18-second', 'PAN-2');
+
+      await expect(requestOrdersRoute(layer, '/api/orders/2026-07-18-first', mutation('PATCH', { status: 'complete' })))
+        .resolves.toMatchObject({ status: 200, body: { status: 'complete', phase: 'archived' } });
+      await expect(requestOrdersRoute(layer, '/api/orders')).resolves.toMatchObject({
+        status: 200,
+        body: { books: [
+          { id: '2026-07-18-first', phase: 'archived' },
+          { id: '2026-07-18-second', phase: 'active', queuePosition: 1 },
+        ] },
+      });
+    });
+
+    it('restores an archived book as a draft', async () => {
+      const root = gitFixture();
+      const layer = makeOrdersRouteLayer({ stateRoot: () => root, issueLookup: issueLookup(openStates), hasPrd: () => true });
+      await bookWith(layer, '2026-07-18-first', 'PAN-1');
+      await requestOrdersRoute(layer, '/api/orders/2026-07-18-first', mutation('PATCH', { status: 'complete' }));
+
+      await expect(requestOrdersRoute(layer, '/api/orders/2026-07-18-first', mutation('PATCH', { status: 'draft' })))
+        .resolves.toMatchObject({ status: 200, body: { status: 'draft', phase: 'draft' } });
+    });
+
+    it('refuses to restore an archived book whose issue now belongs to another book with a 409', async () => {
+      const root = gitFixture();
+      const layer = makeOrdersRouteLayer({ stateRoot: () => root, issueLookup: issueLookup(openStates), hasPrd: () => true });
+      await bookWith(layer, '2026-07-18-old', 'PAN-1');
+      await requestOrdersRoute(layer, '/api/orders/2026-07-18-old', mutation('PATCH', { status: 'complete' }));
+      await bookWith(layer, '2026-07-18-new', 'PAN-1');
+
+      await expect(requestOrdersRoute(layer, '/api/orders/2026-07-18-old', mutation('PATCH', { status: 'draft' })))
+        .resolves.toEqual({
+          status: 409,
+          body: { error: 'Order book 2026-07-18-old cannot be restored: PAN-1 already belongs to order book 2026-07-18-new' },
+        });
+      await expect(requestOrdersRoute(layer, '/api/orders/2026-07-18-old'))
+        .resolves.toMatchObject({ status: 200, body: { status: 'complete' } });
+    });
+
+    it('refuses complete to ready with a 400', async () => {
+      const root = gitFixture();
+      const layer = makeOrdersRouteLayer({ stateRoot: () => root, issueLookup: issueLookup(openStates), hasPrd: () => true });
+      await bookWith(layer, '2026-07-18-first', 'PAN-1');
+      await requestOrdersRoute(layer, '/api/orders/2026-07-18-first', mutation('PATCH', { status: 'complete' }));
+
+      await expect(requestOrdersRoute(layer, '/api/orders/2026-07-18-first', mutation('PATCH', { status: 'ready' })))
+        .resolves.toEqual({
+          status: 400,
+          body: { error: 'Order book 2026-07-18-first must be draft before it can be queued' },
+        });
+      await expect(requestOrdersRoute(layer, '/api/orders/2026-07-18-first', mutation('PATCH', { status: 'running' })))
+        .resolves.toEqual({
+          status: 400,
+          body: { error: 'status may only transition to ready, draft, or complete through this route' },
+        });
+      await expect(requestOrdersRoute(layer, '/api/orders/2026-07-18-first'))
+        .resolves.toMatchObject({ status: 200, body: { status: 'complete' } });
+    });
+
+    it('starts a ready book whose landed issues are closed', async () => {
+      const root = gitFixture();
+      const states = new Map<string, OrderIssueState>([
+        ['PAN-1', { issue: 'PAN-1', open: false, parked: false }],
+        ['PAN-2', { issue: 'PAN-2', open: false, parked: false }],
+      ]);
+      const startOrderBook = vi.fn(async () => ({ runId: 'RUN-7' }));
+      const layer = makeOrdersRouteLayer({ stateRoot: () => root, issueLookup: issueLookup(states), hasPrd: () => true, startOrderBook });
+      await requestOrdersRoute(layer, '/api/orders', mutation('POST', { id: '2026-07-18-landed', name: 'Landed' }));
+      await requestOrdersRoute(layer, '/api/orders/2026-07-18-landed/items', mutation('POST', {
+        items: [{ issue: 'PAN-1', lane: 'A' }, { issue: 'PAN-2', lane: 'A' }],
+      }));
+      await setStatus(root, '2026-07-18-landed', 'ready');
+
+      await expect(requestOrdersRoute(layer, '/api/orders/2026-07-18-landed/start', mutation('POST')))
+        .resolves.toEqual({ status: 200, body: { ok: true, runId: 'RUN-7', warnings: [] } });
+      expect(startOrderBook).toHaveBeenCalledOnce();
+    });
+  });
+
   it('returns sequenced backlog candidates excluding every active-book member', async () => {
     const root = gitFixture();
     const layer = makeOrdersRouteLayer({ stateRoot: () => root });
