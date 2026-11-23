@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5597",
   "created": "2026-11-23T02:38:35.270Z",
-  "updated": "2026-11-23T02:41:34.048Z",
+  "updated": "2026-11-23T02:46:57.499Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -68,9 +68,22 @@
       "doneAt": "2026-11-23T02:41:29.721Z"
     },
     "api-phase-fields": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5597",
-      "claimedAt": "2026-11-23T02:41:34.048Z"
+      "claimedAt": "2026-11-23T02:41:34.048Z",
+      "doneAt": "2026-11-23T02:46:57.499Z"
+    },
+    "api-phase-fields.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T02:46:57.499Z"
+    },
+    "api-phase-fields.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T02:46:57.499Z"
+    },
+    "api-phase-fields.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T02:46:57.499Z"
     }
   }
 }
