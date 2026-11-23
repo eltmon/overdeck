@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5250",
   "created": "2026-11-23T23:10:09.644Z",
-  "updated": "2026-11-23T23:30:48.494Z",
+  "updated": "2026-11-23T23:30:52.615Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -222,6 +222,11 @@
     "wi9-cli-up-pin.ac4": {
       "status": "completed",
       "doneAt": "2026-11-23T23:30:48.493Z"
+    },
+    "wi11-old-reaper-protection": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5250",
+      "claimedAt": "2026-11-23T23:30:52.615Z"
     }
   }
 }
