@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5598",
   "created": "2026-11-23T02:56:35.201Z",
-  "updated": "2026-11-23T03:04:37.112Z",
+  "updated": "2026-11-23T03:04:45.673Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,6 +30,11 @@
     "route-scopes-orders.ac4": {
       "status": "completed",
       "doneAt": "2026-11-23T03:04:37.111Z"
+    },
+    "mcp-delete-body": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5598",
+      "claimedAt": "2026-11-23T03:04:45.672Z"
     }
   }
 }
