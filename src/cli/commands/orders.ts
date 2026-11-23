@@ -1,9 +1,19 @@
 import type { OrderBook, OrderBookLane } from '@overdeck/contracts';
 import { Command, InvalidArgumentError } from 'commander';
 
-import { getBookAsync, listBooks, normalizeOrderIssueId } from '../../lib/orders/resolver.js';
+import { deriveBookPhases, type OrderBookPhaseView } from '../../lib/orders/phase.js';
+import {
+  computeBookProgress,
+  ensureOrderIssueStore,
+  getBookAsync,
+  listBooks,
+  liveOrderIssueLookup,
+  normalizeOrderIssueId,
+} from '../../lib/orders/resolver.js';
+import type { OrderIssueLookup } from '../../lib/orders/types.js';
 import {
   addItems,
+  assertRestorable,
   createBook,
   moveItem,
   removeItem,
@@ -24,6 +34,11 @@ import { registerOrdersEditCommands } from './orders-edit.js';
 
 export type { OrdersCommandDeps } from './orders-shared.js';
 export { commandAction, commitOrders, formatBook, panDirFor, requireBook, resolveOrdersProject } from './orders-shared.js';
+
+export interface OrdersListing {
+  books: OrderBook[];
+  phases: Map<string, OrderBookPhaseView>;
+}
 
 interface OrdersAddOptions {
   lane?: OrderBookLane;
@@ -68,15 +83,22 @@ function parsePositiveInteger(value: string): number {
   return parsed;
 }
 
-export function formatBookList(books: readonly OrderBook[]): string {
+/** `active`, `queued #<n>`, `draft` or `archived`, with ` (finished)` when every issue is terminal. */
+function phaseLabel(view: OrderBookPhaseView | undefined, book: OrderBook): string {
+  if (!view) return book.status;
+  const base = view.phase === 'queued' && view.queuePosition !== null ? `queued #${view.queuePosition}` : view.phase;
+  return view.finished ? `${base} (finished)` : base;
+}
+
+export function formatBookList(books: readonly OrderBook[], phases: ReadonlyMap<string, OrderBookPhaseView>): string {
   if (books.length === 0) return 'No order books found.';
   const rows = books.map((book) => [
     book.id,
-    book.status,
+    phaseLabel(phases.get(book.id), book),
     String(book.items.length),
     book.name,
   ]);
-  const headers = ['ID', 'Status', 'Items', 'Name'];
+  const headers = ['ID', 'Phase', 'Items', 'Name'];
   const widths = headers.map((header, index) => Math.max(
     header.length,
     ...rows.map((row) => row[index]!.length),
@@ -108,8 +130,16 @@ export async function runOrdersCreate(name: string, deps: OrdersCommandDeps = {}
   return book;
 }
 
-export function runOrdersList(deps: OrdersCommandDeps = {}): OrderBook[] {
-  return listBooks(panDirFor(deps));
+export function runOrdersList(deps: OrdersCommandDeps = {}): OrdersListing {
+  const books = listBooks(panDirFor(deps));
+  // One issue-state read for every book, not one per book.
+  const issueIds = [...new Set(books.flatMap((book) => book.items.map((item) => item.issue.toUpperCase())))];
+  const state = (deps.issueLookup ?? liveOrderIssueLookup)(issueIds);
+  const issueLookup: OrderIssueLookup = (requested) => new Map(requested.flatMap((issueId) => {
+    const found = state.get(issueId.toUpperCase());
+    return found ? [[issueId.toUpperCase(), found] as const] : [];
+  }));
+  return { books, phases: deriveBookPhases(books, (book) => computeBookProgress(book, issueLookup)) };
 }
 
 export async function runOrdersShow(bookId: string, deps: OrdersCommandDeps = {}): Promise<OrderBook> {
@@ -214,6 +244,36 @@ export async function runOrdersQueue(bookId: string, deps: OrdersCommandDeps = {
   return queued;
 }
 
+export async function runOrdersUnqueue(bookId: string, deps: OrdersCommandDeps = {}): Promise<OrderBook> {
+  const panDir = panDirFor(deps);
+  const book = await requireBook(panDir, bookId);
+  if (book.status !== 'ready') throw new Error(`Order book ${bookId} must be queued before it can be moved back to draft`);
+  const draft = await setStatus(panDir, bookId, 'draft');
+  await commitOrders(panDir, `chore(orders): unqueue order book ${bookId}`);
+  return draft;
+}
+
+export async function runOrdersArchive(bookId: string, deps: OrdersCommandDeps = {}): Promise<OrderBook> {
+  const panDir = panDirFor(deps);
+  const book = await requireBook(panDir, bookId);
+  if (book.status !== 'draft' && book.status !== 'ready') {
+    throw new Error(`Order book ${bookId} must be draft or queued before it can be archived`);
+  }
+  const archived = await setStatus(panDir, bookId, 'complete');
+  await commitOrders(panDir, `chore(orders): archive order book ${bookId}`);
+  return archived;
+}
+
+export async function runOrdersUnarchive(bookId: string, deps: OrdersCommandDeps = {}): Promise<OrderBook> {
+  const panDir = panDirFor(deps);
+  const book = await requireBook(panDir, bookId);
+  if (book.status !== 'complete') throw new Error(`Order book ${bookId} must be archived before it can be restored`);
+  assertRestorable(panDir, book);
+  const restored = await setStatus(panDir, bookId, 'draft');
+  await commitOrders(panDir, `chore(orders): unarchive order book ${bookId}`);
+  return restored;
+}
+
 export function createOrdersCommand(): Command {
   const orders = new Command('orders')
     .description('Create and manage Flywheel order books');
@@ -232,8 +292,15 @@ export function createOrdersCommand(): Command {
     .option('--project <key>', 'Resolve the order book in another registered project')
     .option('--json', 'Print the books as JSON')
     .action((options: { project?: string; json?: boolean }) => commandAction(async () => {
-      const books = runOrdersList({ projectKey: options.project });
-      console.log(options.json ? JSON.stringify(books, null, 2) : formatBookList(books));
+      // A CLI process has no running issue service; load the shared issue cache so the
+      // Phase column can tell a finished book from an unfinished one.
+      const panDir = panDirFor({ projectKey: options.project });
+      await ensureOrderIssueStore().catch(() => undefined);
+      const { books, phases } = runOrdersList({ panDir });
+      console.log(options.json ? JSON.stringify(books, null, 2) : formatBookList(books, phases));
+      // Starting the issue service schedules background refresh work that would keep this
+      // one-shot read alive for seconds after the list is printed.
+      process.exit(0);
     }));
 
   orders
@@ -282,6 +349,30 @@ export function createOrdersCommand(): Command {
     .option('--project <key>', 'Resolve the order book in another registered project')
     .action((id: string, options: { project?: string }) => commandAction(async () => {
       console.log(formatBook(await runOrdersQueue(id, { projectKey: options.project })));
+    }));
+
+  orders
+    .command('unqueue <id>')
+    .description('Move a queued order book back to draft')
+    .option('--project <key>', 'Resolve the order book in another registered project')
+    .action((id: string, options: { project?: string }) => commandAction(async () => {
+      console.log(formatBook(await runOrdersUnqueue(id, { projectKey: options.project })));
+    }));
+
+  orders
+    .command('archive <id>')
+    .description('Archive an order book and free its issues')
+    .option('--project <key>', 'Resolve the order book in another registered project')
+    .action((id: string, options: { project?: string }) => commandAction(async () => {
+      console.log(formatBook(await runOrdersArchive(id, { projectKey: options.project })));
+    }));
+
+  orders
+    .command('unarchive <id>')
+    .description('Restore an archived order book as a draft')
+    .option('--project <key>', 'Resolve the order book in another registered project')
+    .action((id: string, options: { project?: string }) => commandAction(async () => {
+      console.log(formatBook(await runOrdersUnarchive(id, { projectKey: options.project })));
     }));
 
   orders

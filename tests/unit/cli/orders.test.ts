@@ -8,6 +8,7 @@ import {
   formatBook,
   formatBookList,
   runOrdersAdd,
+  runOrdersArchive,
   runOrdersCreate,
   runOrdersList,
   runOrdersMove,
@@ -15,6 +16,8 @@ import {
   runOrdersRemove,
   runOrdersShow,
   runOrdersStart,
+  runOrdersUnarchive,
+  runOrdersUnqueue,
 } from '../../../src/cli/commands/orders.js';
 import { addItems, createBook } from '../../../src/lib/orders/writer.js';
 import type { ProjectConfig } from '../../../src/lib/projects.js';
@@ -108,7 +111,8 @@ describe('pan orders commands', () => {
 
     const shown = await runOrdersShow(created.id, deps);
     expect(formatBook(shown)).toContain('"issue": "PAN-2"');
-    expect(formatBookList(runOrdersList(deps))).toContain('2026-07-18-refactor-campaign');
+    const listing = runOrdersList({ ...deps, issueLookup: () => new Map() });
+    expect(formatBookList(listing.books, listing.phases)).toContain('2026-07-18-refactor-campaign');
 
     const moved = await runOrdersMove(created.id, 'PAN-3', { lane: 'A', order: 1 }, deps);
     expect(moved.items).toEqual(expect.arrayContaining([
@@ -149,6 +153,9 @@ describe('pan orders commands', () => {
       'remove',
       'move',
       'queue',
+      'unqueue',
+      'archive',
+      'unarchive',
       'start',
       'rename',
       'set',
@@ -170,6 +177,10 @@ describe('pan orders commands', () => {
     expect(list.options.map((option) => option.long)).toEqual(['--project', '--json']);
     const show = command.commands.find((child) => child.name() === 'show')!;
     expect(show.options.map((option) => option.long)).toEqual(['--project', '--json']);
+    const help = command.helpInformation();
+    expect(help).toContain('Move a queued order book back to draft');
+    expect(help).toContain('Archive an order book and free its issues');
+    expect(help).toContain('Restore an archived order book as a draft');
   });
 
   it('add --prereqs --plan-at-pickup stores both on the item', async () => {
@@ -185,12 +196,14 @@ describe('pan orders commands', () => {
     const deps = { panDir, now: () => new Date(at), actor: 'operator' };
     const created = await runOrdersCreate('JSON Campaign', deps);
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
     const command = createOrdersCommand();
     mockGetProjectPanPaths.mockImplementation(() => ({ panDir }));
     mockGetProjectSync.mockImplementation((key: string) => (key === 'p' ? ({ path: '/fake/p' } as ProjectConfig) : null));
     await command.parseAsync(['list', '--project', 'p', '--json'], { from: 'user' });
-    const printed = JSON.parse(logSpy.mock.calls[0]![0] as string) as Array<{ id: string }>;
+    const printed = JSON.parse(logSpy.mock.calls.at(-1)![0] as string) as Array<{ id: string }>;
     expect(printed.map((book) => book.id)).toContain(created.id);
+    expect(exitSpy).toHaveBeenCalledWith(0);
   });
 
   it('resolves --project through the projects registry regardless of cwd', async () => {
@@ -204,7 +217,8 @@ describe('pan orders commands', () => {
       now: () => new Date(at),
     });
     expect(created.id).toBe('2026-07-18-cross-project');
-    expect(formatBookList(runOrdersList({ projectKey: 'other-project' }))).toContain('2026-07-18-cross-project');
+    const listing = runOrdersList({ projectKey: 'other-project', issueLookup: () => new Map() });
+    expect(formatBookList(listing.books, listing.phases)).toContain('2026-07-18-cross-project');
   });
 
   it('throws Unknown project for an unregistered --project key', () => {
@@ -240,6 +254,90 @@ describe('pan orders commands', () => {
 
     await expect(runOrdersQueue(created.id, deps))
       .rejects.toThrow(`Order book ${created.id} must be draft before it can be queued`);
+  });
+
+  it('unqueue moves a ready book to draft and commits', async () => {
+    const panDir = gitFixture();
+    const deps = { panDir, now: () => new Date(at) };
+    const created = await runOrdersCreate('Unqueueable', deps);
+    await runOrdersQueue(created.id, deps);
+
+    await expect(runOrdersUnqueue(created.id, deps)).resolves.toMatchObject({ status: 'draft' });
+    expect((await runOrdersShow(created.id, deps)).status).toBe('draft');
+    expect(git(['log', '-1', '--format=%s'], dirname(panDir))).toBe(`chore(orders): unqueue order book ${created.id}`);
+  });
+
+  it('archive refuses a book that is already archived', async () => {
+    const panDir = gitFixture();
+    const deps = { panDir, now: () => new Date(at) };
+    const created = await runOrdersCreate('Archivable', deps);
+    await runOrdersArchive(created.id, deps);
+    expect(git(['log', '-1', '--format=%s'], dirname(panDir))).toBe(`chore(orders): archive order book ${created.id}`);
+    const before = await runOrdersShow(created.id, deps);
+
+    await expect(runOrdersArchive(created.id, deps))
+      .rejects.toThrow(`Order book ${created.id} must be draft or queued before it can be archived`);
+    expect(await runOrdersShow(created.id, deps)).toEqual(before);
+  });
+
+  it('unarchive restores a complete book as draft', async () => {
+    const panDir = gitFixture();
+    const deps = { panDir, now: () => new Date(at) };
+    const created = await runOrdersCreate('Restorable', deps);
+    await runOrdersAdd(created.id, ['PAN-1'], {}, deps);
+    await runOrdersArchive(created.id, deps);
+
+    await expect(runOrdersUnarchive(created.id, deps)).resolves.toMatchObject({ status: 'draft' });
+    expect(git(['log', '-1', '--format=%s'], dirname(panDir))).toBe(`chore(orders): unarchive order book ${created.id}`);
+  });
+
+  it('unarchive refuses when an issue belongs to another non-archived book', async () => {
+    const panDir = gitFixture();
+    const deps = { panDir, now: () => new Date(at) };
+    const old = await runOrdersCreate('Old', deps);
+    await runOrdersAdd(old.id, ['PAN-1'], {}, deps);
+    await runOrdersArchive(old.id, deps);
+    const fresh = await runOrdersCreate('Fresh', deps);
+    await runOrdersAdd(fresh.id, ['PAN-1'], {}, deps);
+    await runOrdersQueue(fresh.id, deps);
+
+    await expect(runOrdersUnarchive(old.id, deps))
+      .rejects.toThrow(`Order book ${old.id} cannot be restored: PAN-1 already belongs to order book ${fresh.id}`);
+    expect((await runOrdersShow(old.id, deps)).status).toBe('complete');
+  });
+
+  it('list shows active, queued #2, draft and archived', async () => {
+    const panDir = gitFixture();
+    const deps = { panDir, now: () => new Date(at) };
+    const ids: string[] = [];
+    for (const [name, issue] of [['First', 'PAN-1'], ['Second', 'PAN-2'], ['Third', 'PAN-3'], ['Fourth', 'PAN-4']] as const) {
+      const created = await runOrdersCreate(name, deps);
+      await runOrdersAdd(created.id, [issue], {}, deps);
+      ids.push(created.id);
+    }
+    await runOrdersQueue(ids[0]!, deps);
+    await runOrdersQueue(ids[1]!, deps);
+    await runOrdersArchive(ids[3]!, deps);
+    const lookupWithClosed = (closed: string[]) => (requested: string[]) => new Map(requested.map((issue) => [
+      issue.toUpperCase(),
+      { issue: issue.toUpperCase(), open: !closed.includes(issue.toUpperCase()), parked: false },
+    ] as const));
+    const listLines = (closed: string[]) => {
+      const { books, phases } = runOrdersList({ ...deps, issueLookup: lookupWithClosed(closed) });
+      return formatBookList(books, phases).split('\n');
+    };
+    const phaseOf = (lines: string[], id: string) =>
+      lines.find((line) => line.startsWith(id))!.slice(id.length).trim().split(/\s{2,}/)[0];
+
+    const lines = listLines([]);
+    expect(lines[0]).toMatch(/^ID\s+Phase\s+Items\s+Name/);
+    expect(lines[0]).not.toContain('Status');
+    expect(phaseOf(lines, ids[0]!)).toBe('active');
+    expect(phaseOf(lines, ids[1]!)).toBe('queued #2');
+    expect(phaseOf(lines, ids[2]!)).toBe('draft');
+    expect(phaseOf(lines, ids[3]!)).toBe('archived');
+
+    expect(phaseOf(listLines(['PAN-1']), ids[0]!)).toBe('active (finished)');
   });
 
   it('queues a book in another registered project via --project from an unrelated cwd', async () => {

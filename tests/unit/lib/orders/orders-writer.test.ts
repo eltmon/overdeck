@@ -3,12 +3,12 @@
  * It writes files; the agent or operator that changed them commits — the door
  * itself never commits or pushes.
  */
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { getBookAsync } from '../../../../src/lib/orders/resolver.js';
-import { addItems, createBook, moveItem, setItemRequirements, setStatus } from '../../../../src/lib/orders/writer.js';
+import { addItems, assertRestorable, createBook, moveItem, setItemRequirements, setStatus } from '../../../../src/lib/orders/writer.js';
 
 const roots: string[] = [];
 const at = '2026-07-17T12:00:00.000Z';
@@ -89,5 +89,40 @@ describe('orders writer', () => {
       reason: expect.objectContaining({ message: 'Order book already exists: 2026-07-17-same' }),
     });
     expect((await getBookAsync(root, '2026-07-17-same'))?.name).toBe('Winner');
+  });
+
+  describe('assertRestorable', () => {
+    function snapshot(root: string): Record<string, string> {
+      const dir = join(root, 'orders');
+      return Object.fromEntries(readdirSync(dir).map((name) => [name, readFileSync(join(dir, name), 'utf8')]));
+    }
+
+    async function bookWith(root: string, id: string, issues: string[], status: 'ready' | 'complete') {
+      await createBook(root, { id, name: id, createdAt: at });
+      await addItems(root, id, issues.map((issue, index) => ({
+        issue, lane: 'A' as const, order: index + 1, prereqs: [], reVerify: false,
+      })), 'operator', at);
+      return setStatus(root, id, status, { at });
+    }
+
+    it('refuses a restore when an issue belongs to another live book', async () => {
+      const root = panFixture();
+      const archived = await bookWith(root, '2026-07-17-old', ['PAN-2', 'pan-1'], 'complete');
+      await bookWith(root, '2026-07-17-b', ['PAN-1'], 'ready');
+      const before = snapshot(root);
+      expect(() => assertRestorable(root, archived)).toThrow(
+        'Order book 2026-07-17-old cannot be restored: PAN-1 already belongs to order book 2026-07-17-b',
+      );
+      expect(snapshot(root)).toEqual(before);
+    });
+
+    it('allows a restore when the issues appear only in other archived books', async () => {
+      const root = panFixture();
+      const archived = await bookWith(root, '2026-07-17-old', ['PAN-1'], 'complete');
+      await bookWith(root, '2026-07-17-older', ['PAN-1'], 'complete');
+      const before = snapshot(root);
+      expect(() => assertRestorable(root, archived)).not.toThrow();
+      expect(snapshot(root)).toEqual(before);
+    });
   });
 });

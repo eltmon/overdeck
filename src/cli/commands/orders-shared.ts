@@ -9,6 +9,7 @@ import chalk from 'chalk';
 import { dirname, join } from 'node:path';
 
 import { getBookAsync } from '../../lib/orders/resolver.js';
+import type { OrderIssueLookup } from '../../lib/orders/types.js';
 import { commitPlanArtifacts, pushPlanArtifacts } from '../../lib/overdeck/plan-artifact-commit.js';
 import { surfacePlanArtifactPush } from '../../lib/overdeck/plan-artifact-push-report.js';
 import { getProjectPanPaths } from '../../lib/pan-dir/paths.js';
@@ -21,6 +22,7 @@ export interface OrdersCommandDeps {
   now?: () => Date;
   actor?: string;
   startOrderBook?: (bookId: string) => Promise<{ runId: string }>;
+  issueLookup?: OrderIssueLookup;
 }
 
 export interface OrdersProjectResolution {

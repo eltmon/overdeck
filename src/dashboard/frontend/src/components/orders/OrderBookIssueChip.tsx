@@ -23,14 +23,14 @@ export function OrderBookIssueChip({ issueId, compact = false }: { issueId: stri
   if (!membership?.item) return null;
   return (
     <a
-      href="/orders"
+      href={`/orders?book=${encodeURIComponent(membership.book.id)}`}
       data-section="OrderBookIssueChip"
       onClick={(event) => event.stopPropagation()}
       className="inline-flex shrink-0 items-center gap-1 text-[10px] text-muted-foreground hover:text-primary"
       title={`${membership.book.name} — ${membership.item.lane}${membership.item.order}`}
-      aria-label={`${membership.item.lane}${membership.item.order} · book · ${membership.book.name}`}
+      aria-label={`${membership.item.lane}${membership.item.order} in order book ${membership.book.name}`}
     >
-      <span className="shrink-0 rounded-[3px] border border-primary/30 bg-primary/[0.08] px-1.5 py-px font-mono text-[10px] text-foreground">{membership.item.lane}{membership.item.order} · book</span>
+      <span className="shrink-0 rounded-[3px] border border-primary/30 bg-primary/[0.08] px-1.5 py-px font-mono text-[10px] text-foreground">{membership.item.lane}{membership.item.order}</span>
       {!compact && <span className="max-w-24 truncate">{membership.book.name}</span>}
     </a>
   );

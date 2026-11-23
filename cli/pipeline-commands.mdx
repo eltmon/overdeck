@@ -271,7 +271,7 @@ pan orders start my-order-book
 | Command | What it does | Options |
 | --- | --- | --- |
 | `pan orders create <name>` | Creates a draft order book | `--project <key>` |
-| `pan orders list` | Lists order books | `--project <key>`, `--json` (prints the books as JSON) |
+| `pan orders list` | Lists order books with a `Phase` column: `active` (the book the Flywheel works from), `queued #<n>`, `draft` or `archived`, with ` (finished)` when every issue in the book has landed or is parked | `--project <key>`, `--json` (prints the books as JSON) |
 | `pan orders show <id>` | Shows an order book | `--project <key>`, `--json` (prints JSON; the default) |
 | `pan orders add <id> <issues...>` | Adds issues to an order book | `--lane A\|B` (default `A`), `--after <issue>`, `--reverify` (requires PRD re-verification before pickup), `--prereqs <issues>` (comma-separated issues that must land first), `--plan-at-pickup` (write the plan when the issue starts), `--project <key>` |
 | `pan orders remove <id> <issue>` | Removes an issue from an order book | `--project <key>` |
@@ -282,6 +282,9 @@ pan orders start my-order-book
 | `pan orders resume <id>` | Resumes pickup | `--reason <text>`, `--project <key>` |
 | `pan orders item <id> <issue>` | Changes an issue's prerequisites, re-verify, or plan-at-pickup requirement | `--prereqs <issues>` (`""` clears the list), `--reverify`/`--no-reverify`, `--plan-at-pickup`/`--no-plan-at-pickup`, `--project <key>` |
 | `pan orders queue <id>` | Marks a draft order book ready for dispatch | `--project <key>` |
+| `pan orders unqueue <id>` | Moves a queued order book back to draft | `--project <key>` |
+| `pan orders archive <id>` | Archives a draft or queued order book and frees its issues to join another book | `--project <key>` |
+| `pan orders unarchive <id>` | Restores an archived order book as a draft. Refused when one of its issues now belongs to another book that is not archived | `--project <key>` |
 | `pan orders start <id>` | Starts a Flywheel run bound to an order book | `--project <key>` |
 | `pan orders preview <id>` | Prints the brief the Flywheel receives for an order book | `--project <key>` |
 | `pan orders candidates` | Lists the top backlog issues that are in no order book | `--limit <n>` (1 to 100, default 10), `--project <key>` |

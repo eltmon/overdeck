@@ -15,20 +15,12 @@
  * membership consumer is `merge-eligibility.ts`.)
  */
 import { resolvePlanHome } from '../pan-dir/paths.js';
-import type { OrderBook } from '@overdeck/contracts';
-
+import { currentOrderBook } from '../orders/phase.js';
 import { listBooks } from '../orders/resolver.js';
 
 export interface ActiveOrderBookIssuesDeps {
   planHome?: (projectRoot: string) => string | null;
   listBooks?: typeof listBooks;
-}
-
-/** The book in flight: the running one, or the next one queued up ready. */
-export function currentOrderBook(books: readonly OrderBook[]): OrderBook | null {
-  return books.find(book => book.status === 'running')
-    ?? books.find(book => book.status === 'ready')
-    ?? null;
 }
 
 /**

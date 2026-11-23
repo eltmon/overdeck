@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { BackendPane, DerivedIssueState } from '@overdeck/contracts';
+import type { BackendPane, DerivedIssueState, OrderBook } from '@overdeck/contracts';
 
 import { deriveFlywheelStatus, freshnessFor, selectOpenStrikePr, type DeriveFlywheelStatusDeps } from '../../../../src/lib/flywheel/derive-status.js';
 import type { LegacyConversation } from '../../../../src/lib/overdeck/conversations.js';
@@ -22,6 +22,22 @@ vi.mock('../../../../src/lib/overdeck/derived-issue-state.js', () => ({
   prFromGhRow: vi.fn(() => null),
   mrFromGlabRow: vi.fn(() => null),
 }));
+
+// The default order-book summary reads books from disk and issue state from
+// the shared issue service; both are replaced so the default stays offline.
+const { mockListBooks } = vi.hoisted(() => ({ mockListBooks: vi.fn((): OrderBook[] => []) }));
+vi.mock('../../../../src/lib/orders/resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../src/lib/orders/resolver.js')>();
+  const closed = new Set(['PAN-1']);
+  return {
+    ...actual,
+    listBooks: mockListBooks,
+    computeBookProgress: (book: OrderBook) => actual.computeBookProgress(book, (ids) => new Map(ids.map((id) => [
+      id.toUpperCase(),
+      { issue: id.toUpperCase(), open: !closed.has(id.toUpperCase()), parked: false },
+    ] as const))),
+  };
+});
 
 const NOW = Date.parse('2026-09-23T10:00:00.000Z');
 
@@ -255,6 +271,48 @@ describe('deriveFlywheelStatus (PAN-3964 FR-1)', () => {
     expect(status.orderBook).toEqual({ id: 'book-1', name: 'Sept', status: 'running', landed: 1, total: 4 });
     expect(status.policies).toEqual({ auto_pickup_backlog: false, require_uat_before_merge: true, merge_train_enabled: false });
     expect(status.generatedAt).toBe('2026-09-23T10:00:00.000Z');
+  });
+
+  describe('default order-book summary (PAN-5597)', () => {
+    function orderBook(id: string, status: OrderBook['status'], issues: string[]): OrderBook {
+      const at = '2026-09-23T08:00:00.000Z';
+      return {
+        id,
+        name: `Book ${id}`,
+        status,
+        settings: { laneAConcurrency: 1, posture: 'open' },
+        items: issues.map((issue, index) => ({
+          issue, lane: 'A' as const, order: index + 1, prereqs: [], reVerify: false, addedAt: at, addedBy: 'operator',
+        })),
+        createdAt: at,
+        updatedAt: at,
+      };
+    }
+
+    it('reports a single ready book as the order book summary when nothing is running', async () => {
+      mockListBooks.mockReturnValueOnce([
+        orderBook('draft-1', 'draft', ['PAN-9']),
+        orderBook('ready-1', 'ready', ['PAN-1', 'PAN-2']),
+      ]);
+      const status = await deriveFlywheelStatus({
+        projectRoot: '/repos/overdeck',
+        deps: baseDeps({ runningBook: undefined }),
+      });
+      expect(mockListBooks).toHaveBeenCalledWith('/repos/overdeck/.pan');
+      expect(status.orderBook).toEqual({ id: 'ready-1', name: 'Book ready-1', status: 'ready', landed: 1, total: 2 });
+    });
+
+    it('reports no order book when only draft and complete books exist', async () => {
+      mockListBooks.mockReturnValueOnce([
+        orderBook('draft-1', 'draft', ['PAN-9']),
+        orderBook('done-1', 'complete', ['PAN-1']),
+      ]);
+      const status = await deriveFlywheelStatus({
+        projectRoot: '/repos/overdeck',
+        deps: baseDeps({ runningBook: undefined }),
+      });
+      expect(status.orderBook).toBeNull();
+    });
   });
 
   describe('tracker facts (PAN-4199 FR-2, FR-3)', () => {
