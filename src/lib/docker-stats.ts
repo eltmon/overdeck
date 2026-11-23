@@ -100,7 +100,7 @@ function parseBytes(s: string): number {
   return parseFloat(m[1]) * (BYTE_UNITS[m[2] ?? 'B'] ?? 1);
 }
 
-function parseMemUsage(s: string): { usage: number; limit: number } {
+export function parseMemUsage(s: string): { usage: number; limit: number } {
   const [a, b] = s.split('/').map(p => p.trim());
   return { usage: parseBytes(a ?? '0'), limit: parseBytes(b ?? '0') };
 }
