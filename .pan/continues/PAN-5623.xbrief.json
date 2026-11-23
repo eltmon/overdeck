@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5623",
   "created": "2026-11-23T20:20:25.006Z",
-  "updated": "2026-11-23T21:34:56.906Z",
+  "updated": "2026-11-23T21:35:05.120Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -289,7 +289,7 @@
       "doneAt": "2026-11-23T21:34:53.515Z"
     },
     "wi14-main-start": {
-      "status": "in_progress",
+      "status": "cancelled",
       "claimedBy": "agent-pan-5623",
       "claimedAt": "2026-11-23T21:34:56.906Z"
     }
