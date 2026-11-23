@@ -8,7 +8,8 @@
 import type { OrderBook } from '@overdeck/contracts';
 import { describe, expect, it, vi } from 'vitest';
 
-import { activeOrderBookIssues, currentOrderBook } from '../../../../src/lib/cloister/flywheel.js';
+import { activeOrderBookIssues } from '../../../../src/lib/cloister/flywheel.js';
+import { currentOrderBook } from '../../../../src/lib/orders/phase.js';
 
 const at = '2026-07-18T12:00:00.000Z';
 
