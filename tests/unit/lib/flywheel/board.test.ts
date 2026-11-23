@@ -96,6 +96,8 @@ describe('gateLabel (D9)', () => {
     expect(gateLabel('tsc:services/account/tsconfig.json')).toBe('typecheck (services/account/tsconfig.json)');
     expect(gateLabel('gate:lint:eslint')).toBe('lint');
     expect(gateLabel('build')).toBe('build');
+    expect(gateLabel('chain:typecheck')).toBe('typecheck');
+    expect(gateLabel('chain:lint:effect-diagnostics')).toBe('lint:effect-diagnostics');
   });
 });
 

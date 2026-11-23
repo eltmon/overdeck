@@ -9,18 +9,26 @@ import {
 } from './quality-gate-admission.js'
 
 /**
- * Run one heavy command (a `tsc` lane) under machine-wide gate admission
- * (PAN-5248). `scripts/tsc-admitted.mjs` loads this module through tsx and
- * calls {@link runAdmittedCommand}; the wrapper must stay transparent to the
- * ratchet scripts, so the child inherits stdio, its exit code passes through,
- * and every message of our own goes to stderr prefixed `[gate-admission]`.
+ * Run one heavy command under machine-wide gate admission (PAN-5248).
+ * `scripts/tsc-admitted.mjs` loads this module through tsx to admit a single
+ * `tsc` lane, and `scripts/gate-admitted.mjs` loads it to admit a whole chain
+ * of lanes (PAN-5617) and calls {@link runAdmittedCommand}; the wrapper must
+ * stay transparent to the ratchet scripts, so the child inherits stdio, its
+ * exit code passes through, and every message of our own goes to stderr
+ * prefixed `[gate-admission]`.
  *
- * Admission fails closed only on a memory timeout (exit 75, EX_TEMPFAIL);
- * every other admission failure runs the command unadmitted (D15).
+ * A single lane fails closed only on a memory timeout (exit 75, EX_TEMPFAIL);
+ * every other admission failure runs the command unadmitted (D15). A chain
+ * (`deps.failClosedOnTimeout`) fails closed on every admission timeout,
+ * because the timeout's last wait kind is often `queue` or `slots` even when
+ * memory is the real reason the queue is slow (PAN-5617 D6); only a setup
+ * failure that is not a timeout still runs it unadmitted.
  */
 
 const GiB = 1024 ** 3
 const WRAPPER_MAX_WAIT_MS = 30 * 60_000
+/** PAN-5617 D9: a whole chain waits once, behind holders that keep a slot for a whole chain. */
+export const CHAIN_MAX_WAIT_MS = 60 * 60_000
 export const EXIT_TEMPFAIL = 75
 const FORWARDED_SIGNALS = ['SIGINT', 'SIGTERM', 'SIGHUP'] as const
 
@@ -89,6 +97,19 @@ export function memoryTimeoutOf(error: unknown): { reason: MemoryWaitReason | un
   return { reason: candidate.lastMemory }
 }
 
+/** PAN-5617: the kind an admission timeout last waited on (null when unknown), or undefined for any other failure. */
+export function admissionTimeoutKindOf(error: unknown): QualityGateWaitReason['kind'] | null | undefined {
+  const candidate = error as { name?: unknown; lastWaitReason?: QualityGateWaitReason['kind'] | null } | null
+  if (candidate?.name !== 'QualityGateAdmissionTimeoutError') return undefined
+  return candidate.lastWaitReason ?? null
+}
+
+/** PAN-5617: refusal line for a chain whose admission timed out on anything but memory. */
+export function timeoutRefusalMessage(subject: string, maxWaitMs: number, kind: QualityGateWaitReason['kind'] | null): string {
+  const minutes = Math.round(maxWaitMs / 60_000)
+  return `[gate-admission] refusing to start ${subject}: waited ${minutes} minutes for admission (last waiting on ${kind ?? 'an unknown reason'})`
+}
+
 /** FR-9 refusal line shared by the wrapper and the Vitest globalSetup. */
 export function memoryRefusalMessage(subject: string, maxWaitMs: number, reason: MemoryWaitReason | undefined): string {
   const minutes = Math.round(maxWaitMs / 60_000)
@@ -102,6 +123,8 @@ export interface RunAdmittedDeps {
   warn?: (line: string) => void
   env?: NodeJS.ProcessEnv
   maxWaitMs?: number
+  /** PAN-5617 D6: exit 75 on any admission timeout, not only a memory one (set by scripts/gate-admitted.mjs). */
+  failClosedOnTimeout?: boolean
 }
 
 type ChildResult = { code: number | null; signal: NodeJS.Signals | null } | { error: Error }
@@ -159,6 +182,7 @@ export async function runAdmittedCommand(
   const maxWaitMs = deps.maxWaitMs ?? WRAPPER_MAX_WAIT_MS
 
   let handle: QualityGateAdmissionHandle | null = null
+  let proceedingUnadmitted = false
   if (!shouldBypassAdmission(env)) {
     try {
       handle = await (deps.acquire ?? acquireQualityGateAdmission)(
@@ -173,13 +197,25 @@ export async function runAdmittedCommand(
         warn(memoryRefusalMessage(footprintKey, maxWaitMs, memoryTimeout.reason))
         return EXIT_TEMPFAIL
       }
+      // PAN-5617 D6: a chain fails closed on every timeout; the last wait kind is often
+      // queue or slots even when memory is why the queue is slow.
+      const timeoutKind = deps.failClosedOnTimeout ? admissionTimeoutKindOf(error) : undefined
+      if (timeoutKind !== undefined) {
+        warn(timeoutRefusalMessage(footprintKey, maxWaitMs, timeoutKind))
+        return EXIT_TEMPFAIL
+      }
       warn(`[gate-admission] proceeding without admission: ${error instanceof Error ? error.message : String(error)}`)
+      proceedingUnadmitted = true
     }
   }
 
   const state: { sampler: PeakRssSampler | null } = { sampler: null }
   try {
-    const childEnv = handle ? { ...env, OVERDECK_GATE_ADMITTED: '1' } : env
+    // PAN-5617: an admitted chain marks its lanes admitted; a chain whose admission
+    // setup failed opts its lanes out, so they do not each fail the same way again.
+    const childEnv = handle
+      ? { ...env, OVERDECK_GATE_ADMITTED: '1' }
+      : proceedingUnadmitted ? { ...env, OVERDECK_GATE_ADMISSION: '0' } : env
     const result = await runChild(spawn, command, args, cwd, childEnv, (child) => {
       if (handle && child.pid !== undefined) state.sampler = startSampler(child.pid)
     })

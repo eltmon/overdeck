@@ -1,0 +1,153 @@
+{
+  "version": "1",
+  "issueId": "PAN-5617",
+  "created": "2026-11-23T18:07:48.377Z",
+  "updated": "2026-11-23T18:45:14.564Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "runner-unadmitted-env": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5617",
+      "claimedAt": "2026-11-23T18:07:48.376Z",
+      "doneAt": "2026-11-23T18:11:59.948Z"
+    },
+    "runner-unadmitted-env.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:11:59.948Z"
+    },
+    "runner-unadmitted-env.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:11:59.948Z"
+    },
+    "runner-unadmitted-env.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:11:59.948Z"
+    },
+    "runner-unadmitted-env.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:11:59.948Z"
+    },
+    "runner-unadmitted-env.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:11:59.948Z"
+    },
+    "runner-unadmitted-env.ac6": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:11:59.948Z"
+    },
+    "runner-unadmitted-env.ac7": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:11:59.948Z"
+    },
+    "gate-admitted-wrapper": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5617",
+      "claimedAt": "2026-11-23T18:12:21.249Z",
+      "doneAt": "2026-11-23T18:14:09.232Z"
+    },
+    "gate-admitted-wrapper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:14:09.232Z"
+    },
+    "gate-admitted-wrapper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:14:09.232Z"
+    },
+    "gate-admitted-wrapper.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:14:09.232Z"
+    },
+    "gate-admitted-wrapper.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:14:09.232Z"
+    },
+    "gate-admitted-wrapper.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:14:09.232Z"
+    },
+    "gate-admitted-wrapper.ac6": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:14:09.232Z"
+    },
+    "typecheck-chain": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5617",
+      "claimedAt": "2026-11-23T18:16:53.832Z",
+      "doneAt": "2026-11-23T18:26:46.655Z"
+    },
+    "board-chain-label": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5617",
+      "claimedAt": "2026-11-23T18:18:52.607Z",
+      "doneAt": "2026-11-23T18:20:06.266Z"
+    },
+    "board-chain-label.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:20:06.266Z"
+    },
+    "board-chain-label.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:20:06.266Z"
+    },
+    "docs-and-changelog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5617",
+      "claimedAt": "2026-11-23T18:20:20.725Z",
+      "doneAt": "2026-11-23T18:22:32.323Z"
+    },
+    "docs-and-changelog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:22:32.323Z"
+    },
+    "docs-and-changelog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:22:32.323Z"
+    },
+    "docs-and-changelog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:22:32.323Z"
+    },
+    "docs-and-changelog.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:22:32.323Z"
+    },
+    "typecheck-chain.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:26:46.655Z"
+    },
+    "typecheck-chain.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:26:46.655Z"
+    },
+    "typecheck-chain.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:26:46.655Z"
+    },
+    "lint-effect-diag-chain": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5617",
+      "claimedAt": "2026-11-23T18:26:54.681Z",
+      "doneAt": "2026-11-23T18:45:14.564Z"
+    },
+    "lint-effect-diag-chain.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:45:14.564Z"
+    },
+    "lint-effect-diag-chain.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:45:14.564Z"
+    },
+    "lint-effect-diag-chain.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:45:14.564Z"
+    },
+    "lint-effect-diag-chain.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T18:45:14.564Z"
+    }
+  }
+}

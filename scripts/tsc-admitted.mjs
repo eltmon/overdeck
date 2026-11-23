@@ -4,10 +4,12 @@
  *
  * Usage: node scripts/tsc-admitted.mjs <tsc args…>
  *
- * Every `tsc` lane of `npm run typecheck` and the lint ratchet scripts goes
- * through this wrapper, so overlapping typechecks queue for CPU and memory
- * instead of exhausting the host. It runs `node_modules/.bin/tsc` from the
- * current directory with inherited stdio and exits with tsc's exit code.
+ * Every `tsc` lane goes through this wrapper. Run alone, a lane queues for
+ * CPU and memory itself; inside `npm run typecheck` or `npm run
+ * lint:effect-diagnostics` it finds `OVERDECK_GATE_ADMITTED=1` from
+ * `scripts/gate-admitted.mjs` and runs tsc directly (PAN-5617). It runs
+ * `node_modules/.bin/tsc` from the current directory with inherited stdio
+ * and exits with tsc's exit code.
  * Its own messages go to stderr, prefixed `[gate-admission]`.
  *
  * Under CI, OVERDECK_GATE_ADMISSION=0 or OVERDECK_GATE_ADMITTED=1 it runs tsc
