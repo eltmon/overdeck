@@ -134,7 +134,7 @@ export function BookHeader({ book, project, onBookChange, onError, activeBookNam
   } else {
     actions = <>
       {!flywheelRunning && <button type="button" className={PRIMARY} disabled={busy} onClick={() => void startFlywheel()}>Start Flywheel</button>}
-      {flywheelRunning && !paused && <button type="button" className={BUTTON} onClick={() => setPausing(true)}>Pause pickup</button>}
+      {!paused && <button type="button" className={BUTTON} onClick={() => setPausing(true)}>Pause pickup</button>}
       {moveToDraft}
       {addIssues}
     </>;

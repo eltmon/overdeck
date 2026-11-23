@@ -112,6 +112,9 @@ describe('BookHeader', () => {
     const onStarted = vi.fn();
     const { rerender } = render(<BookHeader book={book()} flywheelRunning={false} onStarted={onStarted} />);
     expect(screen.getByText('This book is next, but the Flywheel is stopped.')).toBeInTheDocument();
+    for (const name of ['Pause pickup', 'Move back to draft', '+ Add issues']) {
+      expect(screen.getByRole('button', { name })).toBeInTheDocument();
+    }
     fireEvent.click(screen.getByRole('button', { name: 'Start Flywheel' }));
     await waitFor(() => expect(onStarted).toHaveBeenCalledWith('conv-1'));
     expect(fetchMock).toHaveBeenCalledWith('/api/orders/book-1/start', expect.objectContaining({ method: 'POST' }));
@@ -120,5 +123,9 @@ describe('BookHeader', () => {
     expect(screen.queryByRole('button', { name: 'Start Flywheel' })).toBeNull();
     expect(screen.getByText(/The Flywheel works from this book\. Its issues are cleared to start, and/)).toBeInTheDocument();
     expect(screen.getByText('pan start')).toHaveClass('font-mono');
+
+    rerender(<BookHeader book={book({ settings: { laneAConcurrency: 2, posture: 'drain' } })} flywheelRunning />);
+    expect(screen.getByText('Active · pickup paused')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Pause pickup' })).toBeNull();
   });
 });
