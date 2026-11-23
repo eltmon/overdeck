@@ -13,6 +13,7 @@ import {
   resetCachedDockerContainerLifecycleSnapshotForTests,
 } from '../../docker-stats.js';
 import { resetHostToolsForTests, setHostToolFinderForTests } from '../../host-tools.js';
+import { appendPipelineEntry } from '../../cloister/pipeline-journal.js';
 import type { ProjectConfig } from '../../projects.js';
 import {
   collectDockerContainerLifecycleSnapshot,
@@ -298,6 +299,53 @@ describe('evaluateWorkspaceStackHealth', () => {
     expect(recordWorkspaceStackHealthTransition('PAN-1140', { healthy: false, reasons: ['still broken'], lastObserved: now.toISOString() })).toBe(false);
     expect(recordWorkspaceStackHealthTransition('PAN-1140', { healthy: true, reasons: [], lastObserved: now.toISOString() })).toBe(false);
     expect(recordWorkspaceStackHealthTransition('PAN-1140', { healthy: false, reasons: ['broken again'], lastObserved: now.toISOString() })).toBe(true);
+  });
+});
+
+describe('reclaim-aware health (PAN-5623)', () => {
+  const API = 'myn-feature-min-1144-api-1';
+  const exitedApi = () => container({ name: API, status: 'Exited (0) 2 minutes ago', state: 'exited' });
+
+  it('reads an exited container named in expectedStopped as healthy and lists it as reclaimed', () => {
+    const health = evaluateWorkspaceStackHealth('MIN-1144', dockerProject, [exitedApi()], {
+      now,
+      expectedStopped: new Set([API]),
+    });
+    expect(health.healthy).toBe(true);
+    expect(health.reasons).toEqual([]);
+    expect(health.reclaimed).toEqual([API]);
+  });
+
+  it('keeps an exited container outside expectedStopped unhealthy', () => {
+    const health = evaluateWorkspaceStackHealth('MIN-1144', dockerProject, [
+      exitedApi(),
+      container({ name: 'myn-feature-min-1144-fe-1', status: 'Exited (137) 1 minute ago', state: 'exited' }),
+    ], { now, expectedStopped: new Set([API]) });
+    expect(health.healthy).toBe(false);
+    expect(health.reasons).toEqual(['myn-feature-min-1144-fe-1 service exited (137)']);
+    expect(health.reclaimed).toEqual([API]);
+  });
+
+  it('stays strict by default and turns lenient only for reclaimAware reads of an open reclaim', async () => {
+    const projectRoot = mkdtempSync(join(tmpdir(), 'pan-stack-health-'));
+    try {
+      const workspacePath = join(projectRoot, 'workspaces', 'feature-min-1144');
+      mkdirSync(workspacePath, { recursive: true });
+      appendPipelineEntry(workspacePath, {
+        type: 'stack.reclaimed', issueId: 'MIN-1144', source: 'stack-reclaim', data: { containers: [API] },
+      });
+      const options = { projectConfig: { ...dockerProject, path: projectRoot }, containers: [exitedApi()], workspacePath, now };
+
+      const strict = await getWorkspaceStackHealth('MIN-1144', options);
+      expect(strict.healthy).toBe(false);
+      expect(strict.reclaimed).toBeUndefined();
+
+      const aware = await getWorkspaceStackHealth('MIN-1144', { ...options, reclaimAware: true });
+      expect(aware.healthy).toBe(true);
+      expect(aware.reclaimed).toEqual([API]);
+    } finally {
+      rmSync(projectRoot, { recursive: true, force: true });
+    }
   });
 });
 
