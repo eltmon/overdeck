@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5598",
   "created": "2026-11-23T02:56:35.201Z",
-  "updated": "2026-11-23T02:56:35.201Z",
+  "updated": "2026-11-23T03:04:37.112Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,26 @@
   "sessionHistory": [],
   "items": {
     "route-scopes-orders": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5598",
-      "claimedAt": "2026-11-23T02:56:35.201Z"
+      "claimedAt": "2026-11-23T02:56:35.201Z",
+      "doneAt": "2026-11-23T03:04:37.111Z"
+    },
+    "route-scopes-orders.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:04:37.111Z"
+    },
+    "route-scopes-orders.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:04:37.111Z"
+    },
+    "route-scopes-orders.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:04:37.111Z"
+    },
+    "route-scopes-orders.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T03:04:37.111Z"
     }
   }
 }
