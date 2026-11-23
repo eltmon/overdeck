@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5250",
   "created": "2026-11-23T23:10:09.644Z",
-  "updated": "2026-11-23T23:14:02.187Z",
+  "updated": "2026-11-23T23:14:05.503Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,11 @@
     "wi2-idle-config-pin.ac4": {
       "status": "completed",
       "doneAt": "2026-11-23T23:14:02.187Z"
+    },
+    "wi3-usage-probe": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5250",
+      "claimedAt": "2026-11-23T23:14:05.503Z"
     }
   }
 }
