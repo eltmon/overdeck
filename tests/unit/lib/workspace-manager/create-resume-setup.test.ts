@@ -1,14 +1,23 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../../helpers/overdeck-test-db.js';
 
-const { mockExecAsync, mockCheckDiskFloor, mockReserveDiskFloor, mockEstimateWorkspaceDiskCost } = vi.hoisted(() => ({
+const {
+  mockExecAsync,
+  mockCheckDiskFloor,
+  mockReserveDiskFloor,
+  mockEstimateWorkspaceDiskCost,
+  mockCreateHumeConfig,
+  mockAddTunnelIngress,
+} = vi.hoisted(() => ({
   mockExecAsync: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
   mockCheckDiskFloor: vi.fn(),
   mockReserveDiskFloor: vi.fn(),
   mockEstimateWorkspaceDiskCost: vi.fn(),
+  mockCreateHumeConfig: vi.fn(),
+  mockAddTunnelIngress: vi.fn(),
 }));
 
 vi.mock('child_process', async () => {
@@ -34,6 +43,17 @@ vi.mock('../../../../src/lib/disk-floor.js', async (importOriginal) => ({
 vi.mock('../../../../src/lib/workspace/disk-cost.js', () => ({
   estimateWorkspaceDiskCost: mockEstimateWorkspaceDiskCost,
   invalidateWorkspaceDiskCostMemo: vi.fn(),
+}));
+
+// PAN-5489: the Hume and tunnel steps call external APIs; stand in for them.
+vi.mock('../../../../src/lib/hume.js', () => ({
+  createHumeConfig: mockCreateHumeConfig,
+  deleteHumeConfig: vi.fn(),
+}));
+
+vi.mock('../../../../src/lib/tunnel.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../src/lib/tunnel.js')>()),
+  addTunnelIngress: mockAddTunnelIngress,
 }));
 
 const isWorktreeAddCall = (command: unknown, args?: unknown): boolean =>
@@ -149,5 +169,92 @@ describe('createWorkspace: an aborted setup is resumed, not skipped (PAN-4171)',
     expect(second.success).toBe(false);
     expect(second.errors.join(' ')).toContain('already exists');
     expect(worktreeAddCount()).toBe(1);
+  });
+});
+
+describe('createWorkspace: a failed Hume step is re-run on the next create (PAN-5489)', () => {
+  let secretsDir: string;
+  const humeBlock = {
+    template_config_id: 't',
+    name_pattern: 'kaia-{{FEATURE_FOLDER}}',
+    byollm_url_pattern: 'https://x/{{FEATURE_FOLDER}}',
+  };
+  const keyNotFound = '[hume] API key not found: HUME_API_KEY is not set in the process environment';
+
+  beforeEach(() => {
+    installShouldFail = false;
+    // A sibling of the project directory: a secrets file inside the project is ignored.
+    secretsDir = mkdtempSync(join(tmpdir(), 'pan-5489-secrets-'));
+    mockCreateHumeConfig.mockReset();
+    mockCreateHumeConfig
+      .mockResolvedValueOnce({ success: false, steps: [keyNotFound] })
+      .mockResolvedValue({ success: true, steps: ['[hume] Created config'], configId: 'cfg-1', configName: 'kaia-feature-pan-4171' });
+    mockAddTunnelIngress.mockReset();
+  });
+
+  afterEach(() => {
+    rmSync(secretsDir, { recursive: true, force: true });
+  });
+
+  const humeProject = () => ({
+    ...projectConfig(),
+    workspace: { hume: humeBlock, env: { secrets_file: join(secretsDir, 'secrets.env') } },
+  });
+
+  it('keeps the setup marker and names the failing step when the Hume step fails', async () => {
+    const result = await createWorkspace({ projectConfig: humeProject(), featureName: 'pan-4171' });
+
+    expect(result.success).toBe(false);
+    expect(result.errors.join(' ')).toContain(`Hume EVI config setup failed: ${keyNotFound}`);
+    expect(isWorkspaceSetupIncomplete(workspacePath)).toBe(true);
+    expect(workspaceNeedsSetup(workspacePath)).toBe(true);
+  });
+
+  it('passes the project and its secrets_file to the Hume step', async () => {
+    await createWorkspace({ projectConfig: humeProject(), featureName: 'pan-4171' });
+
+    const options = mockCreateHumeConfig.mock.calls[0]?.[2];
+    expect(options).toMatchObject({
+      project: { key: 'Test', config: { workspace: { env: { secrets_file: join(secretsDir, 'secrets.env') } } } },
+    });
+  });
+
+  it('a retry re-runs the Hume step, writes .hume-config and clears the marker', async () => {
+    await createWorkspace({ projectConfig: humeProject(), featureName: 'pan-4171' });
+    const retry = await createWorkspace({ projectConfig: humeProject(), featureName: 'pan-4171' });
+
+    expect(retry.errors).toEqual([]);
+    expect(retry.success).toBe(true);
+    expect(mockCreateHumeConfig).toHaveBeenCalledTimes(2);
+    expect(readFileSync(join(workspacePath, '.hume-config'), 'utf8')).toContain('HUME_CONFIG_ID=cfg-1');
+    expect(isWorkspaceSetupIncomplete(workspacePath)).toBe(false);
+  });
+
+  it('a tunnel-only failure names the failing step and still clears the marker', async () => {
+    mockAddTunnelIngress.mockResolvedValue({
+      success: false,
+      steps: ['[tunnel] Read Cloudflare credentials', '[tunnel] Failed to get tunnel config: x'],
+    });
+    const tunnelProject = {
+      ...projectConfig(),
+      workspace: {
+        tunnel: {
+          provider: 'cloudflare' as const,
+          tunnel_id: 'tid',
+          account_id: 'aid',
+          zone_id: 'zid',
+          credentials_file: join(secretsDir, 'cert.pem'),
+          service_target: 'https://localhost',
+          hostnames: [],
+        },
+      },
+    };
+
+    const result = await createWorkspace({ projectConfig: tunnelProject, featureName: 'pan-4171' });
+
+    expect(result.success).toBe(false);
+    expect(result.errors.join(' ')).toContain('Tunnel setup failed: [tunnel] Failed to get tunnel config: x');
+    expect(mockCreateHumeConfig).not.toHaveBeenCalled();
+    expect(isWorkspaceSetupIncomplete(workspacePath)).toBe(false);
   });
 });

@@ -96,14 +96,14 @@ describe('resolveHumeApiKey (PAN-5489)', () => {
 describe('createHumeConfig key lookup (PAN-5489)', () => {
   it('sends the secrets_file key on its first Hume request', async () => {
     await writeFile(secretsPath, 'HUME_API_KEY=key-from-secrets\n');
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ configs_page: [{ id: 'cfg-9', name: 'kaia-feature-min-1' }] }), { status: 200 }));
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => new Response(JSON.stringify({ configs_page: [{ id: 'cfg-9', name: 'kaia-feature-min-1' }] }), { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
 
     const result = await createHumeConfig(humeConfig, placeholders, { project: project() });
 
     expect(result).toMatchObject({ success: true, configId: 'cfg-9' });
-    const firstInit = fetchMock.mock.calls[0]?.[1] as RequestInit;
-    expect((firstInit.headers as Record<string, string>)['X-Hume-Api-Key']).toBe('key-from-secrets');
+    const firstInit = fetchMock.mock.calls[0]?.[1];
+    expect((firstInit?.headers as Record<string, string>)['X-Hume-Api-Key']).toBe('key-from-secrets');
     expect(process.env.HUME_API_KEY).toBe('');
   });
 
