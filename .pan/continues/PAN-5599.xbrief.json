@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5599",
   "created": "2026-11-23T05:24:22.748Z",
-  "updated": "2026-11-23T05:41:04.210Z",
+  "updated": "2026-11-23T05:41:11.937Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -48,6 +48,11 @@
     "dispatch-finished-rule.ac2": {
       "status": "completed",
       "doneAt": "2026-11-23T05:41:04.210Z"
+    },
+    "order-issue-backfill-helper": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5599",
+      "claimedAt": "2026-11-23T05:41:11.937Z"
     }
   }
 }
