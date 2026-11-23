@@ -67,7 +67,7 @@ answers for three project shapes (PAN-4753 WI-4, PAN-3657):
 | --- | --- | --- |
 | GitHub monorepo | the cached open `gh pr list` rows | the row's review decision is approved, its checks are green and it is mergeable |
 | GitLab monorepo | the cached MR listing: every page of open MRs plus the newest 100 merged | the MR is open, not a draft and has no conflicts on the listing, and its own facts (`readGitLabMrFacts`: `glab mr view` plus the approvals endpoint) show a named approver, a green pipeline and mergeability |
-| Polyrepo | every writable member repo, each with its own forge and branch prefix (`memberReposForProject`) | every open PR/MR for the issue, across the member repos, is ready by its forge's rule |
+| Polyrepo | every writable member repo, each with its own forge and branch prefix (`memberReposForProject`) | every open PR/MR for the issue, across the member repos, is ready by its forge's rule; a GitHub member PR with no forge review decision is judged by its own facts (`readGitHubMemberReadyFacts`: a trusted `overdeck-verdict: APPROVED` marker no older than the head commit, or a trusted standing review of the head) |
 
 GitLab's list endpoint carries no `approved` and no `head_pipeline`, so a
 GitLab row is never ready from the listing alone. Each MR's facts are cached
@@ -76,6 +76,17 @@ that fails throws `ReadySetUnavailableError`, and an unread approval is never
 an approval. The reconciler then skips the tick instead of reading an empty
 ready set, which it would treat as authoritative and use to invalidate the live
 batch. The queue route reports the project's error instead.
+
+A polyrepo GitHub member row is judged on the listing alone when GitHub
+reported a review decision (`approved` or `changes-requested`) — most member
+repos leave branch protection off, so this read runs for the common
+undecided, open, green, mergeable row (PAN-5638). It is cached per
+`<repoPath>|<number>|<headSha>` for a minute, the same shape as the GitLab
+member cache, and a failed read throws `ReadySetUnavailableError` rather than
+answering "not ready". Promote eligibility for a polyrepo batch (the
+merge-train board's polyrepo cars and `postUatGenerationPromotePayload`) is
+not covered here; it is tracked in
+[PAN-5641](https://github.com/eltmon/overdeck/issues/5641).
 
 A polyrepo root is not a git repo, so its queue is ordered per member repo by
 `orderPolyrepoQueue` (`src/dashboard/server/services/polyrepo-queue.ts`).

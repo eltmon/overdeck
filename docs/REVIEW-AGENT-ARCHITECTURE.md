@@ -85,6 +85,18 @@ GitLab: approval is `glab mr approve`, which the gate reads as a named approver
 in `approved_by` (#4066 review; a green, conflict-free MR nobody approved is
 not approved). A rejection is an MR note, and there is no marker.
 
+**Polyrepo.** The verdict goes on every writable member's open PR/MR (PAN-5614,
+PAN-5638), GitHub members included. Every member is read first, so nothing is
+posted unless all of them could be read. On a GitHub member PR the operator
+opened, GitHub refuses the self-review the way it does everywhere else, and
+`postReviewVerdict` falls back to the `overdeck-verdict` marker comment.
+Polyrepo markers carry no `sha=`: a polyrepo review run id hashes the full
+composite anchor, not a single commit, so `reviewedHeadSha` never names a
+member head. A rejection is delivered to the work agent once any member, read
+again at verdict time, reports it — `getPrFacts` cannot see a GitHub member of
+a Linear- or GitLab-tracked project at all, so this re-read, not that single-PR
+lookup, is what drives the agent for a GitHub-only polyrepo issue.
+
 ---
 
 ## Review modes
