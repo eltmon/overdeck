@@ -76,6 +76,28 @@ describe('isConversationWorking', () => {
     const log = [work({ createdAt: new Date(NOW - 10_000).toISOString() })];
     expect(isConversationWorking(true, [], log, NOW)).toBe(true);
   });
+
+  // PAN-5633: a failed Codex turn writes the user prompt, then a "Turn failed" error row, and no reply.
+  it('a trailing error row after a user message is not working', () => {
+    const messages = [msg({ role: 'user', createdAt: new Date(NOW - 10_000).toISOString(), sequence: 1 })];
+    const log = [work({ tone: 'error', label: 'Turn failed', createdAt: new Date(NOW - 9_000).toISOString(), sequence: 2 })];
+    expect(isConversationWorking(true, messages, log, NOW)).toBe(false);
+  });
+
+  it('a user message after an error row is working', () => {
+    // A new prompt started the next turn.
+    const messages = [msg({ role: 'user', createdAt: new Date(NOW - 5_000).toISOString(), sequence: 3 })];
+    const log = [work({ tone: 'error', label: 'Turn failed', createdAt: new Date(NOW - 9_000).toISOString(), sequence: 2 })];
+    expect(isConversationWorking(true, messages, log, NOW)).toBe(true);
+  });
+
+  it('a failed tool row with toolInput mid-turn stays working', () => {
+    const messages = [
+      msg({ role: 'assistant', createdAt: new Date(NOW - 10_000).toISOString(), completedAt: new Date(NOW - 10_000).toISOString(), sequence: 1 }),
+    ];
+    const log = [work({ tone: 'error', toolInput: { command: 'x' }, createdAt: new Date(NOW - 5_000).toISOString(), sequence: 2 })];
+    expect(isConversationWorking(true, messages, log, NOW)).toBe(true);
+  });
 });
 
 describe('elided tool results (PAN-4558)', () => {

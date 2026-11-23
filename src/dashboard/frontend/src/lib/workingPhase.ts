@@ -199,6 +199,13 @@ export function isConversationWorking(
 
   const msgTs = Date.parse(lastMsg?.completedAt || lastMsg?.createdAt || '');
   const msgRecent = !lastMsg || Number.isNaN(msgTs) || nowMs - msgTs < TURN_STALL_MS;
+  // PAN-5633: a turn-end error row (Codex "Turn failed", ACP "Prompt failed", Prime "Turn failed")
+  // at or after the last message ends the turn, even though the last message is the user's.
+  // Claude Code failed tool results are also tone 'error' but carry toolInput; they are mid-turn.
+  if (lastWork?.tone === 'error' && !lastWork.toolInput) {
+    const errorTs = Date.parse(lastWork.createdAt || '');
+    if (!Number.isNaN(errorTs) && (!lastMsg || Number.isNaN(msgTs) || errorTs >= msgTs)) return false;
+  }
   if (msgRecent && (lastMsg?.role === 'user' || (lastMsg?.role === 'assistant' && !lastMsg.completedAt))) {
     return true;
   }
