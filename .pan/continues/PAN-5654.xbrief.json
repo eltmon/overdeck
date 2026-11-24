@@ -2,9 +2,15 @@
   "version": "1",
   "issueId": "PAN-5654",
   "created": "2026-11-24T00:52:28.291Z",
-  "updated": "2026-11-24T00:59:10.384Z",
+  "updated": "2026-11-24T01:24:13.096Z",
   "gitState": {},
-  "decisions": [],
+  "decisions": [
+    {
+      "id": "D-test-waived",
+      "summary": "Test gate waived: This is a CI/build-config fix (Gradle resolution of a test runtime dependency), not new behavior to cover with a new test. The existing Robolectric tests PushHandlerTest and PushNoticeTest (apps/mobile/android/app/src/test/java/ai/overdeck/app/, last touched at d383a96c622a1f770eb11accb7eed3b998da3724) already exercise the exact code path this issue fixes: both were run locally against the new offline wiring (pass) and against an empty dependency dir (fail with 'Path is not a file:'), per PRD AC-2/AC-3.",
+      "recordedAt": "2026-11-24T01:24:13.096Z"
+    }
+  ],
   "hazards": [],
   "resumePoint": null,
   "sessionHistory": [],
