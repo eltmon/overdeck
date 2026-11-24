@@ -6,6 +6,9 @@
 import type { BackendPane } from '@overdeck/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const idleStop = vi.hoisted(() => ({ startStackIdleStopService: vi.fn(), stopStackIdleStopService: vi.fn() }));
+vi.mock('../stack-idle-stop-service.js', () => idleStop);
+
 import type { GateStarvationRecord } from '../../../../lib/cloister/gate-starvation.js';
 import type { PipelineJournalEntry } from '../../../../lib/cloister/pipeline-journal.js';
 import type { QualityGateQueueSnapshot } from '../../../../lib/cloister/quality-gate-admission.js';
@@ -108,6 +111,7 @@ function world(overrides: Partial<StackReclaimServiceDeps> = {}) {
     }),
     emitActivity: vi.fn(),
     restore: vi.fn(async () => ({ kind: 'restored' as const, started: [], alreadyRunning: [], missing: [], refused: [] })),
+    isPinned: vi.fn((_workspacePath: string) => false),
     now: vi.fn(() => T0 + 30 * 60_000),
     ...overrides,
   };
@@ -585,5 +589,100 @@ describe('runStackRestorePoll (PAN-5623 WI-13)', () => {
     await vi.advanceTimersByTimeAsync(31_000);
     expect(deps.restore).toHaveBeenCalledTimes(2);
     expect(stackReclaimStateForTests()?.restoreIndex.has('MIN-1144')).toBe(true);
+  });
+});
+
+describe('reclaim reasons and pins (PAN-5250 WI-5)', () => {
+  const API = `${project('MIN-1144')}-api-1`;
+  const FE = `${project('MIN-1144')}-fe-1`;
+  const DEV = `${project('MIN-1144')}-dev-1`;
+  const IDLE: PipelineJournalEntry = {
+    at: SINCE, type: 'stack.reclaimed', issueId: 'MIN-1144',
+    data: { containers: [FE, DEV], services: ['fe', 'dev'], reason: 'idle' },
+  };
+  const MEMORY: PipelineJournalEntry = {
+    at: SINCE, type: 'stack.reclaimed', issueId: 'MIN-1144', data: { containers: [API], episodeSince: 'older' },
+  };
+  const workingPane = () => vi.fn(async () => [pane({ issue: 'MIN-1144', agentId: 'agent-min-1144', state: 'working' })]);
+
+  it('never restores an idle-only reclaim on a turn, even with a working work pane', async () => {
+    const { deps, journals } = world({ listPanes: workingPane() });
+    journals.set(wsPath('MIN-1144'), [IDLE]);
+    const state = createStackReclaimState();
+    state.seeded = true;
+    state.restoreIndex.set('MIN-1144', wsPath('MIN-1144'));
+
+    await runStackRestorePoll(deps, state);
+
+    expect(deps.restore).not.toHaveBeenCalled();
+    expect(state.restoreIndex.size).toBe(0);
+  });
+
+  it('restores once on a turn when a memory reclaim is open beside an idle one', async () => {
+    const { deps, journals } = world({ listPanes: workingPane() });
+    journals.set(wsPath('MIN-1144'), [IDLE, MEMORY]);
+    await runStackRestorePoll(deps, createStackReclaimState());
+    expect(deps.restore).toHaveBeenCalledExactlyOnceWith({ issueId: 'MIN-1144', workspacePath: wsPath('MIN-1144'), trigger: 'turn' });
+  });
+
+  it('seeds the index without idle-only journals', async () => {
+    const { deps, journals } = world({ listWorkspaces: vi.fn(() => [workspace('MIN-1144'), workspace('MIN-1146')]) });
+    journals.set(wsPath('MIN-1144'), [IDLE]);
+    journals.set(wsPath('MIN-1146'), [{ ...MEMORY, issueId: 'MIN-1146' }]);
+    const state = createStackReclaimState();
+    await runStackRestorePoll(deps, state);
+    expect([...state.restoreIndex]).toEqual([['MIN-1146', wsPath('MIN-1146')]]);
+  });
+
+  it('never makes a pinned workspace a reclaim candidate', async () => {
+    const { deps } = world({ isPinned: vi.fn(() => true) });
+    await expect(runStackReclaimPoll(deps, createStackReclaimState())).resolves.toEqual({ kind: 'idle', reason: 'no-candidates' });
+    expect(deps.stopContainer).not.toHaveBeenCalled();
+  });
+
+  it('stops nothing when a pin is written before the locked re-check', async () => {
+    let pinned = false;
+    const { deps } = world({ isPinned: vi.fn(() => pinned) });
+    const lock = deps.withLock.getMockImplementation()!;
+    deps.withLock.mockImplementation(async (lockPath, fn) => {
+      pinned = true;
+      return lock(lockPath, fn);
+    });
+    await expect(runStackReclaimPoll(deps, createStackReclaimState())).resolves.toEqual({ kind: 'idle', reason: 'changed-before-stop' });
+    expect(deps.appendEntry).not.toHaveBeenCalled();
+    expect(deps.stopContainer).not.toHaveBeenCalled();
+  });
+
+  it('still skips a candidate whose open memory reclaim holds a stopped container beside an idle one', async () => {
+    const { deps, journals } = world({ listRunningContainers: vi.fn(async () => [stackContainer('MIN-1144', 'fe')]) });
+    journals.set(wsPath('MIN-1144'), [IDLE, MEMORY]);
+    await expect(runStackReclaimPoll(deps, createStackReclaimState())).resolves.toEqual({ kind: 'idle', reason: 'no-candidates' });
+    expect(deps.stopContainer).not.toHaveBeenCalled();
+  });
+
+  it('passes the read-back when an older idle reclaim is already open', async () => {
+    const { deps, journals } = world();
+    journals.set(wsPath('MIN-1144'), [IDLE]);
+    const result = await runStackReclaimPoll(deps, createStackReclaimState());
+    expect(result).toEqual({ kind: 'reclaimed', issueId: 'MIN-1144', stopped: [API, FE], failed: [] });
+    expect(stoppedIds(deps)).toEqual([`id-${API}`, `id-${FE}`]);
+  });
+});
+
+describe('idle-stop service wiring (PAN-5250 WI-7)', () => {
+  it('starts the idle-stop service once with the reclaim service\'s pane, queue and verification reads', () => {
+    idleStop.startStackIdleStopService.mockClear();
+    idleStop.stopStackIdleStopService.mockClear();
+    const { deps } = world();
+    startStackReclaimService(deps);
+    startStackReclaimService(deps);
+    expect(idleStop.startStackIdleStopService).toHaveBeenCalledOnce();
+    expect(idleStop.startStackIdleStopService).toHaveBeenCalledWith({
+      listPanes: deps.listPanes,
+      readQueue: deps.readQueue,
+      verificationBusy: deps.verificationBusy,
+    });
+    stopStackReclaimService();
+    expect(idleStop.stopStackIdleStopService).toHaveBeenCalled();
   });
 });

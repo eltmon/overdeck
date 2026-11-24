@@ -40,6 +40,7 @@ import { evaluateIssueMergeGate } from '../../../lib/cloister/merge-gate.js';
 import {
   appendPipelineEntry,
   openStackReclaim,
+  reclaimRestoresOnTurn,
   reclaimedInEpisode,
   tryReadPipelineJournal,
   type PipelineJournalEntry,
@@ -58,6 +59,7 @@ import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
 import { resolveLaunchBackend } from '../../../lib/terminal-backends/launch.js';
 import { isUnsupported } from '../../../lib/terminal-backends/types.js';
 import { tryComposeProjectNameForWorkspace } from '../../../lib/workspace/stack-health.js';
+import { isStackPinned } from '../../../lib/workspace/stack-idle-config.js';
 import {
   issueInGateQueue,
   issuePanes,
@@ -78,6 +80,7 @@ import {
 import { restoreReclaimedStack, stackLockPath, withStackLock } from '../../../lib/workspace/stack-restore.js';
 import { listWorkspaces } from '../../../lib/workspaces/resolver.js';
 import type { WorkspaceRow } from '../../../lib/workspaces/types.js';
+import { startStackIdleStopService, stopStackIdleStopService } from './stack-idle-stop-service.js';
 
 export const STACK_RECLAIM_POLL_MS = 30_000;
 export const STACK_RESTORE_POLL_MS = 5_000;
@@ -112,6 +115,8 @@ export interface StackReclaimServiceDeps {
   stopContainer: (id: string) => Promise<DockerResult>;
   emitActivity: typeof emitActivityEntry;
   restore: typeof restoreReclaimedStack;
+  /** PAN-5250 FR-10: a pinned workspace is never reclaimed. */
+  isPinned: (workspacePath: string) => boolean;
   now: () => number;
 }
 
@@ -157,6 +162,7 @@ function resolveDeps(deps: Partial<StackReclaimServiceDeps> = {}): StackReclaimS
     stopContainer: deps.stopContainer ?? stopContainer,
     emitActivity: deps.emitActivity ?? emitActivityEntry,
     restore: deps.restore ?? restoreReclaimedStack,
+    isPinned: deps.isPinned ?? isStackPinned,
     now: deps.now ?? Date.now,
   };
 }
@@ -219,6 +225,7 @@ function buildCandidates(
     if (workspace.kind === 'main' || !workspace.issueId) continue;
     const issueId = workspace.issueId.toUpperCase();
     if (seen.has(issueId) || !deps.pathExists(workspace.path)) continue;
+    if (deps.isPinned(workspace.path)) continue;
     if (!deps.projectRegistered(issueId)) continue;
     const composeProject = deps.composeProjectFor(workspace.path, issueId);
     if (!composeProject) continue;
@@ -234,8 +241,11 @@ function buildCandidates(
     // issue, so it must not be reclaimed again. One whose containers are ALL
     // running again is effectively closed in practice — don't let it block
     // the issue forever just because no `stack.restored` entry was written.
+    // PAN-5250 D3: an idle-only open reclaim stopped its containers on purpose and
+    // waits for a spawn or `pan workspace up`; it must not block a memory reclaim
+    // of the containers still running.
     const open = openStackReclaim(journal);
-    if (open && open.containers.some((name) => !runningNames.has(name))) continue;
+    if (open && reclaimRestoresOnTurn(open) && open.containers.some((name) => !runningNames.has(name))) continue;
     if (!panesAllowReclaim(issuePanes(panes, issueId, workspace.path), deps.turnState).ok) continue;
     seen.add(issueId);
     candidates.push({ issueId, workspacePath: workspace.path, composeProject, containers });
@@ -261,6 +271,7 @@ async function recheckBeforeStop(
   const blocked = await headStillBlocked(deps, snapshot);
   if (!blocked.ok) return null;
   if (deps.verificationBusy(target.issueId)) return null;
+  if (deps.isPinned(target.workspacePath)) return null;
   const panes = await deps.listPanes();
   if (!panes || !panesAllowReclaim(issuePanes(panes, target.issueId, target.workspacePath), deps.turnState).ok) return null;
   const running = await deps.listRunningContainers();
@@ -377,9 +388,10 @@ export async function runStackReclaimPoll(
         },
       });
       // D5: appendPipelineEntry swallows write errors, so stop nothing unless the entry landed.
+      // PAN-5250 D4: compare the newest entry, not the union with an older open idle stop.
       const readBack = deps.readJournal(chosen.workspacePath);
       const open = readBack === null ? null : openStackReclaim(readBack);
-      if (!open || open.at !== written.at || open.containers.join('\n') !== names.join('\n')) {
+      if (!open || open.latestAt !== written.at || open.latestContainers.join('\n') !== names.join('\n')) {
         return { kind: 'idle' as const, reason: 'journal-unwritable' };
       }
       const stopped: string[] = [];
@@ -427,7 +439,7 @@ function seedRestoreIndex(deps: StackReclaimServiceDeps, state: StackReclaimStat
       allReadable = false;
       continue;
     }
-    if (openStackReclaim(journal)) {
+    if (reclaimRestoresOnTurn(openStackReclaim(journal))) {
       state.restoreIndex.set(workspace.issueId.toUpperCase(), workspace.path);
     }
   }
@@ -449,7 +461,8 @@ export async function runStackRestorePoll(deps: StackReclaimServiceDeps, state: 
     }
     const journal = deps.readJournal(workspacePath);
     if (journal === null) continue; // unreadable this tick — keep the entry, try again next tick.
-    if (!openStackReclaim(journal)) {
+    // PAN-5250 FR-8: an idle-only reclaim waits for a spawn, verification or `pan workspace up`.
+    if (!reclaimRestoresOnTurn(openStackReclaim(journal))) {
       state.restoreIndex.delete(issueId);
       state.restoreRetryAt.delete(issueId);
       continue;
@@ -513,6 +526,8 @@ export function startStackReclaimService(deps: Partial<StackReclaimServiceDeps> 
   reclaimTimer.unref?.();
   restoreTimer = setInterval(() => { void restoreOnce(s); }, STACK_RESTORE_POLL_MS);
   restoreTimer.unref?.();
+  // PAN-5250: the idle stop shares this service's pane, queue and verification reads.
+  startStackIdleStopService({ listPanes: s.deps.listPanes, readQueue: s.deps.readQueue, verificationBusy: s.deps.verificationBusy });
 }
 
 export function stopStackReclaimService(): void {
@@ -521,6 +536,7 @@ export function stopStackReclaimService(): void {
   reclaimTimer = null;
   restoreTimer = null;
   service = null;
+  stopStackIdleStopService();
 }
 
 /** Exported for tests: the running service's state, or null. */

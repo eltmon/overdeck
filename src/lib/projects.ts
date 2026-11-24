@@ -107,7 +107,7 @@ export interface WorkspaceConfig {
   repos?: RepoConfig[];
   dns?: { domain: string; entries: string[]; sync_method?: 'wsl2hosts' | 'hosts_file' | 'dnsmasq' };
   ports?: Record<string, { range: [number, number] }>;
-  docker?: { traefik?: string; compose_template?: string };
+  docker?: { traefik?: string; compose_template?: string; idle_stop?: { minutes?: number; services?: string[] } };
   database?: DatabaseConfig;
   agent?: { template_dir: string; templates?: Array<{ source: string; target: string }>; copy_dirs?: string[]; symlinks?: string[] };
   env?: { template?: string; secrets_file?: string; load?: boolean };

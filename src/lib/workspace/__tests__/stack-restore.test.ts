@@ -14,6 +14,7 @@ import {
   restoreReclaimedStack,
   restoreReclaimedStackForSpawn,
   stackLockPath,
+  wakeWorkspaceStack,
   withStackLock,
   type StackRestoreDeps,
 } from '../stack-restore.js';
@@ -221,6 +222,111 @@ describe('restoreReclaimedStack (PAN-5623)', () => {
     await expect(restoreReclaimedStack({ issueId: ISSUE, workspacePath: workspace, trigger: 'turn' }, w.deps))
       .resolves.toEqual({ kind: 'none' });
     expect(w.startContainer).toHaveBeenCalledOnce();
+  });
+});
+
+describe('restore of recorded services and the wake door (PAN-5250)', () => {
+  const DEV = 'myn-feature-min-1144-dev-1';
+  const FRONTEND = 'myn-feature-min-1144-frontend-1';
+  const INIT = 'myn-feature-min-1144-init-1';
+  const WAKEABLE: ReadonlySet<string> = new Set(['api', 'fe', 'frontend', 'server', 'dev']);
+
+  function idleReclaim(containers: string[], services: string[]): void {
+    appendPipelineEntry(workspace, {
+      type: 'stack.reclaimed',
+      issueId: ISSUE,
+      source: 'stack-idle-stop',
+      data: { containers, services, composeProject: PROJECT, reason: 'idle' },
+    });
+  }
+
+  it('starts a dev container its idle reclaim recorded, without reading the idle-stop config', async () => {
+    idleReclaim([FE, DEV], ['fe', 'dev']);
+    // The project config changed to services: [] after the stop; the restore door must not care.
+    const wakeableServices = vi.fn(() => new Set<string>());
+    const w = world([container(FE, 'exited'), container(DEV, 'exited')], { wakeableServices });
+    const result = await restoreReclaimedStack({ issueId: ISSUE, workspacePath: workspace, trigger: 'spawn' }, w.deps);
+    expect(result).toEqual({ kind: 'restored', started: [FE, DEV], alreadyRunning: [], missing: [], refused: [] });
+    expect(restored()).toHaveLength(1);
+    expect(wakeableServices).not.toHaveBeenCalled();
+  });
+
+  it('still refuses a postgres container with no recorded service', async () => {
+    const postgres = 'myn-feature-min-1144-postgres-1';
+    reclaim([postgres]);
+    const w = world([container(postgres, 'exited', { composeService: 'postgres' })]);
+    const result = await restoreReclaimedStack({ issueId: ISSUE, workspacePath: workspace, trigger: 'operator' }, w.deps);
+    expect(result).toEqual({ kind: 'restored', started: [], alreadyRunning: [], missing: [], refused: [postgres] });
+    expect(w.startContainer).not.toHaveBeenCalled();
+  });
+
+  it('refuses a container whose recorded service differs from its listed service', async () => {
+    idleReclaim([DEV], ['dev']);
+    const w = world([container(DEV, 'exited', { composeService: 'postgres' })]);
+    const result = await restoreReclaimedStack({ issueId: ISSUE, workspacePath: workspace, trigger: 'operator' }, w.deps);
+    expect(result).toMatchObject({ kind: 'restored', refused: [DEV] });
+  });
+
+  it('wake starts an exited frontend with no open reclaim and leaves init alone', async () => {
+    const w = world([container(FRONTEND, 'exited'), container(INIT, 'exited'), container(API, 'running')], {
+      wakeableServices: () => WAKEABLE,
+    });
+    const result = await wakeWorkspaceStack({ issueId: ISSUE, workspacePath: workspace, trigger: 'operator' }, w.deps);
+    expect(result).toEqual({ kind: 'woken', restored: { kind: 'none' }, started: [FRONTEND], alreadyRunning: [API] });
+    expect(w.startContainer).toHaveBeenCalledExactlyOnceWith(FRONTEND);
+    expect(w.emitActivity).toHaveBeenCalledWith(expect.objectContaining({ message: `stack-woken: ${ISSUE}` }));
+    expect(restored()).toHaveLength(0);
+  });
+
+  it('wake runs the restore door first and reports what it restored', async () => {
+    idleReclaim([DEV], ['dev']);
+    let devState = 'exited';
+    const w = world(null, {
+      wakeableServices: () => WAKEABLE,
+      listContainers: async () => [container(DEV, devState)],
+      startContainer: async () => { devState = 'running'; return { ok: true }; },
+    });
+    const result = await wakeWorkspaceStack({ issueId: ISSUE, workspacePath: workspace, trigger: 'operator' }, w.deps);
+    expect(result).toMatchObject({ kind: 'woken', started: [], alreadyRunning: [DEV] });
+    expect(result.kind === 'woken' && result.restored).toMatchObject({ kind: 'restored', started: [DEV] });
+    expect(restored()).toHaveLength(1);
+  });
+
+  it('wake records a fresh lifecycle snapshot when it started something', async () => {
+    const w = world([container(FRONTEND, 'exited')], { wakeableServices: () => WAKEABLE });
+    await wakeWorkspaceStack({ issueId: ISSUE, workspacePath: workspace, trigger: 'operator' }, w.deps);
+    expect(w.collect).toHaveBeenCalledOnce();
+    const idle = world([container(FRONTEND, 'running')], { wakeableServices: () => WAKEABLE });
+    await wakeWorkspaceStack({ issueId: ISSUE, workspacePath: workspace, trigger: 'operator' }, idle.deps);
+    expect(idle.collect).not.toHaveBeenCalled();
+  });
+
+  it('wake leaves a container of another compose project stopped', async () => {
+    const foreign = 'other-project-frontend-1';
+    const w = world([container(foreign, 'exited', { composeProject: 'other-project', composeService: 'frontend' })], {
+      wakeableServices: () => WAKEABLE,
+    });
+    const result = await wakeWorkspaceStack({ issueId: ISSUE, workspacePath: workspace, trigger: 'operator' }, w.deps);
+    expect(result).toEqual({ kind: 'woken', restored: { kind: 'none' }, started: [], alreadyRunning: [] });
+    expect(w.startContainer).not.toHaveBeenCalled();
+  });
+
+  it('wake returns failed when a start fails', async () => {
+    const w = world([container(FRONTEND, 'exited')], {
+      wakeableServices: () => WAKEABLE,
+      startContainer: async () => ({ ok: false, error: 'boom' }),
+    });
+    const result = await wakeWorkspaceStack({ issueId: ISSUE, workspacePath: workspace, trigger: 'operator' }, w.deps);
+    expect(result).toEqual({ kind: 'failed', error: `${FRONTEND}: boom`, failed: [FRONTEND] });
+  });
+
+  it('wake returns no-stack for a missing workspace or no compose project', async () => {
+    const w = world([], { wakeableServices: () => WAKEABLE });
+    await expect(wakeWorkspaceStack({ issueId: ISSUE, workspacePath: join(workspace, 'gone'), trigger: 'operator' }, w.deps))
+      .resolves.toEqual({ kind: 'no-stack', reason: 'no-workspace' });
+    const none = world([], { wakeableServices: () => WAKEABLE, composeProjectFor: () => null });
+    await expect(wakeWorkspaceStack({ issueId: ISSUE, workspacePath: workspace, trigger: 'operator' }, none.deps))
+      .resolves.toEqual({ kind: 'no-stack', reason: 'no-compose-project' });
   });
 });
 
