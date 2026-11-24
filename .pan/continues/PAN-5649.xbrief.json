@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5649",
   "created": "2026-11-24T02:25:08.097Z",
-  "updated": "2026-11-24T02:36:18.881Z",
+  "updated": "2026-11-24T02:36:23.876Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -84,6 +84,11 @@
     "wi5-idle-text.ac2": {
       "status": "completed",
       "doneAt": "2026-11-24T02:36:18.880Z"
+    },
+    "wi4-wake-host-handler": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5649",
+      "claimedAt": "2026-11-24T02:36:23.876Z"
     }
   }
 }
