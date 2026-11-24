@@ -73,6 +73,15 @@ describe('isAlive: the single liveness oracle (PAN-3849)', () => {
     await expect(isAlive('agent-x', deps)).resolves.toEqual({ alive: false, reason: 'pane-dead' });
   });
 
+  // PAN-5652 review: listPaneValues folds a failed listing into [], and a live
+  // session always lists a pane, so an empty listing is a failed probe.
+  it('returns runtime-indeterminate, not pane-dead, when an existing session lists no panes', async () => {
+    const deps = aliveDeps({ listPaneRows: vi.fn(async () => []) });
+    const verdict = await isAlive('agent-x', deps);
+    expect(verdict).toEqual({ alive: false, reason: 'runtime-indeterminate' });
+    expect(isConfirmedDead(verdict)).toBe(false);
+  });
+
   it('AC2: returns runtime-missing when a live pane has no harness process in its subtree', async () => {
     const deps = aliveDeps({ findRuntimePid: vi.fn(async () => null) });
     await expect(isAlive('agent-x', deps)).resolves.toEqual({ alive: false, reason: 'runtime-missing' });

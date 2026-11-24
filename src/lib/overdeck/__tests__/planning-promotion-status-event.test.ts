@@ -96,6 +96,12 @@ vi.mock('../../tmux.js', () => ({
   killSession: vi.fn(() => { testState.sessionAlive = false; return Effect.void; }),
   sessionExists: vi.fn(() => Effect.succeed(testState.sessionAlive)),
 }));
+// PAN-5652: the "work agent already running" check asks the liveness oracle.
+// These tests run with no work agent.
+vi.mock('../../agents/liveness.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../agents/liveness.js')>()),
+  isAlive: vi.fn(async () => ({ alive: false, reason: 'no-session' })),
+}));
 vi.mock('../../xbrief/quality-lint.js', () => ({
   assertPlanQuality: vi.fn(),
   PlanQualityLintError: class PlanQualityLintError extends Error {},
