@@ -84,16 +84,17 @@ TMUX_PROBE_HEADER_2="# Lower with: bash scripts/lint-liveness.sh --update"
 TMUX_SPEC="['\"](\\.{1,2}/)+(lib/)?tmux\\.js['\"]"
 TMUX_PROBE_NAME='\bsessionExists(Sync)?\b'
 # Static import (aliases and multi-line lists included), a dynamic-import
-# destructure, and the TmuxService member.
+# destructure, a member read off a dynamic import, and the TmuxService member.
 TMUX_PROBE_IMPORT="import[[:space:]]*\\{[^}]*${TMUX_PROBE_NAME}[^}]*\\}[[:space:]]*from[[:space:]]*${TMUX_SPEC}"
 TMUX_PROBE_DYNAMIC="\\{[^}]*${TMUX_PROBE_NAME}[^}]*\\}[[:space:]]*=[[:space:]]*await[[:space:]]+import\\([[:space:]]*${TMUX_SPEC}"
+TMUX_PROBE_IMPORTED_MEMBER="import\\([[:space:]]*${TMUX_SPEC}[[:space:]]*\\)\\)[[:space:]]*\\.[[:space:]]*sessionExists(Sync)?\\b"
 TMUX_PROBE_MEMBER='\btmux\.sessionExists(Sync)?\b'
 
 # The oracle itself and the module that defines the probe are not consumers.
 tmux_probe_files() {
   local root="$1"
   rg -l -U --multiline-dotall -g '*.ts' -g '*.tsx' -g '!*.test.ts' -g '!*.test.tsx' -g '!**/__tests__/**' \
-    -e "$TMUX_PROBE_IMPORT" -e "$TMUX_PROBE_DYNAMIC" -e "$TMUX_PROBE_MEMBER" "$root" 2>/dev/null \
+    -e "$TMUX_PROBE_IMPORT" -e "$TMUX_PROBE_DYNAMIC" -e "$TMUX_PROBE_IMPORTED_MEMBER" -e "$TMUX_PROBE_MEMBER" "$root" 2>/dev/null \
     | grep -v -x -e "$root/lib/agents/liveness.ts" -e "$root/lib/tmux.ts" | sort || true
 }
 
@@ -229,9 +230,10 @@ if [[ "${1:-}" == "--self-test" ]]; then
   printf '%s\n' 'import {' '  listSessionNames,' '  sessionExistsSync as hasSession,' "} from '../../../lib/tmux.js';" > "$fixture_dir/src/dashboard/server/routes/alias.ts"
   printf '%s\n' "const { createSession, sessionExists } = await import('../tmux.js');" > "$fixture_dir/src/lib/cloister/dynamic.ts"
   printf '%s\n' 'const alive = (id: string) => tmux.sessionExists(id);' > "$fixture_dir/src/lib/cloister/member.ts"
+  printf '%s\n' "const live = await Effect.runPromise((await import('../tmux.js')).sessionExists(id));" > "$fixture_dir/src/lib/cloister/imported-member.ts"
   printf '%s\n' "import { sessionExists } from '../terminal-backends/tmux.js';" > "$fixture_dir/src/lib/cloister/adapter.ts"
   seeded_counts=$(tmux_probe_counts "$fixture_dir/src")
-  for form in static alias dynamic member; do
+  for form in static alias dynamic member imported-member; do
     if ! grep -q "/$form.ts\$" <<< "$seeded_counts"; then
       echo "liveness self-test missed the seeded $form import of tmux sessionExists" >&2
       exit 2

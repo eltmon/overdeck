@@ -4,7 +4,8 @@ import { getAgentState } from '../agents.js';
 import type { Role } from '../agents.js';
 import { emitActivityEntry } from '../activity-logger.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
-import { agentPaneExists, closeAgentPaneDetailed } from '../terminal-backends/launch.js';
+import { closeAgentPaneDetailed } from '../terminal-backends/launch.js';
+import { probeAgentPane } from '../terminal-backends/agent-pane-io.js';
 import {
   decideAutonomousPlanDispatch,
   gatherAutonomousPlanDispatchInput,
@@ -106,7 +107,7 @@ const STARTING_WITHOUT_SESSION_GRACE_MS = 120_000;
  * as present, so a starting agent is never declared a crashed spawn on it.
  */
 async function rolePaneExists(agentId: string): Promise<boolean> {
-  return agentPaneExists(agentId).catch(() => true);
+  return (await probeAgentPane(agentId).catch(() => 'unknown' as const)) !== 'gone';
 }
 
 function isFreshStarting(state: { startedAt?: string }): boolean {
@@ -254,15 +255,15 @@ export async function onIssueStateChange(issueId: string, newState: string): Pro
   // dead one.
   const issueLower = normalizedIssueId.toLowerCase();
   const roleSessionId = role === 'work' ? `agent-${issueLower}` : `agent-${issueLower}-${role}`;
-  // PAN-5652: through the host's backend, so a Herdr pane is found and closed.
-  if (await agentPaneExists(roleSessionId).catch(() => false)) {
-    const message = `${normalizedIssueId}: killing stale ${role} session ${roleSessionId} before re-dispatch`;
+  // PAN-5652: through the host's backend, so a Herdr pane (and a legacy tmux
+  // session of the same name) is closed. Never throws.
+  const close = await closeAgentPaneDetailed(roleSessionId);
+  if (close.outcome === 'closed') {
+    const message = `${normalizedIssueId}: killed stale ${role} session ${roleSessionId} before re-dispatch`;
     console.log(`[cloister] ${message}`);
     emitActivityEntry({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
-    const close = await closeAgentPaneDetailed(roleSessionId);
-    if (close.outcome === 'failed') {
-      console.error(`[cloister] failed to kill stale session ${roleSessionId}: ${close.reason}`);
-    }
+  } else if (close.outcome === 'failed') {
+    console.error(`[cloister] failed to kill stale session ${roleSessionId}: ${close.reason}`);
   }
 
   try {
