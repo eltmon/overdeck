@@ -53,7 +53,7 @@ import {
 } from './stack-health.js';
 import { wakeableServicesForIssue } from './stack-idle-config.js';
 
-export type StackRestoreTrigger = 'turn' | 'spawn' | 'verification' | 'operator';
+export type StackRestoreTrigger = 'turn' | 'spawn' | 'verification' | 'operator' | 'browser' | 'dashboard';
 
 export type StackRestoreResult =
   | { kind: 'none' }

@@ -1,0 +1,216 @@
+{
+  "version": "1",
+  "issueId": "PAN-5649",
+  "created": "2026-11-24T02:25:08.097Z",
+  "updated": "2026-11-24T04:11:17.912Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-24T04:04Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-24T04:04:23.158Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-24T04:09Z] coderabbit → FINDINGS — seq 2",
+      "timestamp": "2026-11-24T04:09:35.549Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-24T04:11Z] review-agent → CHANGES-REQUESTED — seq 3",
+      "timestamp": "2026-11-24T04:11:17.912Z"
+    }
+  ],
+  "items": {
+    "wi1-wake-host-lib": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5649",
+      "claimedAt": "2026-11-24T02:25:08.097Z",
+      "doneAt": "2026-11-24T02:31:01.712Z"
+    },
+    "wi1-wake-host-lib.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-24T02:31:01.712Z"
+    },
+    "wi1-wake-host-lib.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-24T02:31:01.712Z"
+    },
+    "wi1-wake-host-lib.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-24T02:31:01.712Z"
+    },
+    "wi1-wake-host-lib.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-24T02:31:01.712Z"
+    },
+    "wi1-wake-host-lib.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-24T02:31:01.712Z"
+    },
+    "wi2-wake-router-file": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5649",
+      "claimedAt": "2026-11-24T02:31:08.913Z",
+      "doneAt": "2026-11-24T02:32:34.355Z"
+    },
+    "wi2-wake-router-file.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-24T02:32:34.355Z"
+    },
+    "wi2-wake-router-file.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-24T02:32:34.355Z"
+    },
+    "wi2-wake-router-file.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-24T02:32:34.355Z"
+    },
+    "wi2-wake-router-file.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-24T02:32:34.355Z"
+    },
+    "wi3-wake-triggers": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5649",
+      "claimedAt": "2026-11-24T02:32:38.550Z",
+      "doneAt": "2026-11-24T02:33:33.940Z"
+    },
+    "wi3-wake-triggers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-24T02:33:33.940Z"
+    },
+    "wi3-wake-triggers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-24T02:33:33.940Z"
+    },
+    "wi5-idle-text": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5649",
+      "claimedAt": "2026-11-24T02:33:45.576Z",
+      "doneAt": "2026-11-24T02:36:18.880Z"
+    },
+    "wi5-idle-text.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-24T02:36:18.880Z"
+    },
+    "wi5-idle-text.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-24T02:36:18.880Z"
+    },
+    "wi4-wake-host-handler": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5649",
+      "claimedAt": "2026-11-24T02:36:23.876Z",
+      "doneAt": "2026-11-24T02:53:29.493Z"
+    },
+    "wi4-wake-host-handler.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-24T02:53:29.493Z"
+    },
+    "wi4-wake-host-handler.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-24T02:53:29.493Z"
+    },
+    "wi4-wake-host-handler.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-24T02:53:29.493Z"
+    },
+    "wi4-wake-host-handler.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-24T02:53:29.493Z"
+    },
+    "wi4-wake-host-handler.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-24T02:53:29.493Z"
+    },
+    "wi4-wake-host-handler.ac6": {
+      "status": "completed",
+      "doneAt": "2026-11-24T02:53:29.493Z"
+    },
+    "wi4b-wake-rest-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5649",
+      "claimedAt": "2026-11-24T02:53:34.223Z",
+      "doneAt": "2026-11-24T03:05:22.063Z"
+    },
+    "wi4b-wake-rest-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-24T03:05:22.063Z"
+    },
+    "wi4b-wake-rest-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-24T03:05:22.063Z"
+    },
+    "wi4b-wake-rest-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-24T03:05:22.063Z"
+    },
+    "wi6-start-app-chip": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5649",
+      "claimedAt": "2026-11-24T03:05:26.235Z",
+      "doneAt": "2026-11-24T03:36:53.995Z"
+    },
+    "wi6-start-app-chip.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-24T03:36:53.995Z"
+    },
+    "wi6-start-app-chip.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-24T03:36:53.995Z"
+    },
+    "wi6-start-app-chip.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-24T03:36:53.995Z"
+    },
+    "wi6-start-app-chip.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-24T03:36:53.995Z"
+    },
+    "wi8-docs-changelog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5649",
+      "claimedAt": "2026-11-24T03:36:58.183Z",
+      "doneAt": "2026-11-24T03:37:53.640Z"
+    },
+    "wi8-docs-changelog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-24T03:37:53.640Z"
+    },
+    "wi8-docs-changelog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-24T03:37:53.640Z"
+    },
+    "wi8-docs-changelog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-24T03:37:53.640Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-24T04:04:23Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5649\n\nPull request: https://github.com/eltmon/overdeck/pull/5660 (head `8e3c8699`)\n\nSource: check_run:test\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-e2e\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/138205242694/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/45322848147/job/138205242694  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/__tests__/reactCompilerCoverage.test.ts\u001b[2m > \u001b[22mReact Compiler skip coverage\u001b[2m > \u001b[22mthe frontend tree matches scripts/react-compiler-skip-baseline.txt\n\u001b[31m\u001b[1mAssertionError\u001b[22m: React Compiler skip baseline mismatch:\n  src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureAppLink.tsx: 1 skip(s), baseline none ((BuildHIR::lowerStatement) Handle TryStatement with a finalizer ('finally') clause)\nA new skip: fix the component (docs/DASHBOARD-ARCHITECTURE.md, React Compiler). A stale row: run npx tsx src/dashboard/frontend/scripts/reactCompilerCoverage.ts --update.: expected { …(3) } to deeply equal { added: [], raised: [], stale: [] }\u001b[39m\n\n\u001b[32m- Expected\u001b[39m\n\u001b[31m+ Received\u001b[39m\n\n\u001b[2m  {\u001b[22m\n\u001b[32m-   \"added\": [],\u001b[39m\n\u001b[31m+   \"added\": [\u001b[39m\n\u001b[31m+     \"src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureAppLink.tsx\",\u001b[39m\n\u001b[31m+   ],\u001b[39m\n\u001b[2m    \"raised\": [],\u001b[22m\n\u001b[2m    \"stale\": [],\u001b[22m\n\u001b[2m  }\u001b[22m\n\n\u001b[36m \u001b[2m❯\u001b[22m src/__tests__/reactCompilerCoverage.test.ts:\u001b[2m83:29\u001b[22m\u001b[39m\n    \u001b[90m 81|\u001b[39m       'A new skip: fix the component (docs/DASHBOARD-ARCHITECTURE.md, …\n    \u001b[90m 82|\u001b[39m     ]\u001b[33m.\u001b[39m\u001b[34mjoin\u001b[39m(\u001b[32m'\\n'\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m 83|\u001b[39m     expect(result, message).toEqual({ added: [], raised: [], stale: []…\n    \u001b[90m   |\u001b[39m                             \u001b[31m^\u001b[39m\n    \u001b[90m 84|\u001b[39m   })\u001b[33m;\u001b[39m\n    \u001b[90m 85|\u001b[39m })\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\u001b[22m\u001b[39m\n\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m585 passed\u001b[39m\u001b[22m\u001b[90m (586)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    },
+    {
+      "seq": 2,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-24T04:09:35Z",
+      "markdownBody": "# CodeRabbit findings for PAN-5649 (PR #5660)\n\nCodeRabbit posted 17 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4675400887 · .pan/drafts/PAN-5649.md:45 [Minor]: Specify whether failed wakes are cached.\n  https://github.com/eltmon/overdeck/pull/5660#discussion_r4675400887\n- Thread 4675400895 · .pan/drafts/PAN-5649.md:217 [Minor]: Do not overwrite an installed wake router during the checkpoint.\n  https://github.com/eltmon/overdeck/pull/5660#discussion_r4675400895\n- Thread 4675400899 · .pan/drafts/PAN-5649.md:219 [Minor]: Verify which router answered the live probe.\n  https://github.com/eltmon/overdeck/pull/5660#discussion_r4675400899\n- Thread 4675400903 · .pan/drafts/PAN-5649.md:345 [Minor]: Document that unmarked workspace requests still pass through.\n  https://github.com/eltmon/overdeck/pull/5660#discussion_r4675400903\n- Thread 4675400911 · .pan/drafts/PAN-5649.md:346 [Minor]: Follow the label-host redirect in the curl example.\n  https://github.com/eltmon/overdeck/pull/5660#discussion_r4675400911\n- Thread 4675400918 · .pan/specs/2026-11-24-PAN-5649-opening-an-idle-stopped-workspace-app-starts-its-stack-again-traefik-fallback-wake-page-and-a-dashboard-start-app-action.xbrief.json:337 [Minor]: Make the clean-scan verify command exit 0 without a direct spec edit.\n  https://github.com/eltmon/overdeck/pull/5660#discussion_r4675400918\n- Thread 4675400921 · guides/docker-setup.mdx:103 [Minor]: State that the wake page is for trusted local callers.\n  https://github.com/eltmon/overdeck/pull/5660#discussion_r4675400921\n- Thread 4675400929 · src/dashboard/server/routes/workspace-wake.ts:159 [Minor]: Report \"no containers\" separately from \"already running.\"\n  https://github.com/eltmon/overdeck/pull/5660#discussion_r4675400929\n- Thread 4675400932 · src/dashboard/server/routes/workspace-wake.ts:166 [Minor]: Keep newly started containers out of `alreadyRunning`.\n  https://github.com/eltmon/overdeck/pull/5660#discussion_r4675400932\n- Thread 4675400937 · src/dashboard/server/routes/workspace-wake.ts:293 [Minor]: Give the wake page a recovery path when the dashboard loses the wake.\n  https://github.com/eltmon/overdeck/pull/5660#discussion_r4675400937\n- Thread 4675400941 · src/dashboard/server/routes/workspace-wake.ts:297 [Minor]: Detect when the app answers with a sign-in redirect.\n  https://github.com/eltmon/overdeck/pull/5660#discussion_r4675400941\n- Thread 4675400944 · src/dashboard/server/routes/workspace-wake.ts:373 [Major]: Stopped apps can wake when a Vite ping receives a Traefik 502.\n  https://github.com/eltmon/overdeck/pull/5660#discussion_r4675400944\n- Thread 4675400953 · src/dashboard/server/routes/workspace-wake.ts:384 [Minor]: Do not wait for two Docker commands before returning a wake response.\n  https://github.com/eltmon/overdeck/pull/5660#discussion_r4675400953\n- Thread 4675400958 · src/lib/workspace/workspace-wake-host.ts:60 [Minor]: Keep marked requests out of ordinary dashboard routes.\n  https://github.com/eltmon/overdeck/pull/5660#discussion_r4675400958\n- Thread 4675400968 · src/lib/workspace/workspace-wake-host.ts:145 [Minor]: Match double-quoted `Host` rules in the label reader.\n  https://github.com/eltmon/overdeck/pull/5660#discussion_r4675400968\n- Thread 4675400974 · src/lib/workspace/workspace-wake-host.ts:196 [Minor]: Check the compose project label on inspected containers before returning their host.\n  https://github.com/eltmon/overdeck/pull/5660#discussion_r4675400974\n- Thread 4675400977 · tests/lib/traefik.test.ts:81 [Minor]: Verify that dev mode creates the wake file.\n  https://github.com/eltmon/overdeck/pull/5660#discussion_r4675400977\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5660/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-5649 -m \"CodeRabbit <thread ids>: <what you changed>\"`.\n   If you only replied, you are done.\n5. If PR #5660 has already merged when you read this, stop: after the merge Overdeck files a follow-up issue\n   for every thread with no reply, no later commit to its file, and no re-review request naming its thread id."
+    },
+    {
+      "seq": 3,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-11-24T04:11:17Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-5649\n\n# Review — PAN-5649\n## Verdict: CHANGES REQUESTED — committed FeatureAppLink.tsx puts a try/finally inside StartAppButton, so the React Compiler skips it and CI `test-e2e` (reactCompilerCoverage) is red on this exact HEAD\n\n## Context\n- Run ID: agent-pan-5649-review-8e3c8699\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-5649/.pan/review/agent-pan-5649-review-8e3c8699/context.json\n- Branch / workspace: feature/pan-5649 / /home/eltmon/Projects/overdeck/workspaces/feature-pan-5649\n- PR: https://github.com/eltmon/overdeck/pull/5660\n- HEAD reviewed: 8e3c8699c915f9fe6c36da712126b3cd52234647\n- Base / prior cycle SHA: merge-base 26f06d9fe95 (main); no prior review cycle\n\n## Blocking Findings\n\n### [correctness] StartAppButton's try/finally makes the React Compiler skip the component; CI test-e2e fails — `src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureAppLink.tsx:72`\n- Severity: !\n- Classification / requirement scope: implementation defect; in_pr_scope (the component is new in this PR, commit ca35b512a56). Fails AC-9 (\"All: … lint … pass\") and leaves the required CI `test` job red.\n- Trigger and changed-code connection: `StartAppButton.onClick` runs `void (async () => { try { … } catch { … } finally { setPending(false); } })();` inside the component body. React Compiler (oxc-transform-react 0.152.0) cannot lower a `TryStatement` with a `finally` clause, so it reports a diagnostic and leaves the component uncompiled. `src/dashboard/frontend/src/__tests__/reactCompilerCoverage.test.ts` fails on any new skip not in `scripts/react-compiler-skip-baseline.txt`.\n- Expected / observed / impact: expected 0 skips for a new file. Observed: CI run 45322848147 (merge ref 4afd1c0 = 8e3c869 into main), job `test-e2e` → `FAIL src/__tests__/reactCompilerCoverage.test.ts > the frontend tree matches scripts/react-compiler-skip-baseline.txt`: `FeatureAppLink.tsx: 1 skip(s), baseline none ((BuildHIR::lowerStatement) Handle TryStatement with a finalizer ('finally') clause)`. 585 of 586 frontend test files passed; this is the only failure. The aggregate `test` check is red, so the PR cannot merge.\n- Evidence: reproduced locally with `skipCountForSource` from `scripts/reactCompilerCoverage.ts` on `git show HEAD:…/FeatureAppLink.tsx` → `{\"count\":1,\"firstMessage\":\"(BuildHIR::lowerStatement) Handle TryStatement with a finalizer ('finally') clause\"}`. Limitation: the workspace currently has an **uncommitted** edit to this file (`git status`: ` M …/FeatureAppLink.tsx`) that moves the fetch into a module-level `postWorkspaceWake` with try/catch only; the same check on that working-tree file returns `count: 0`. Reviews evaluate the committed HEAD, so it does not count until it is committed and pushed.\n- Fix: commit and push the pending working-tree change (or any equivalent that removes `finally` from the component, e.g. `.finally(() => setPending(false))` on the promise). Do not add a baseline row. Then confirm `npx vitest run src/__tests__/reactCompilerCoverage.test.ts` (from `src/dashboard/frontend`) and `FeatureAppLink.test.tsx` pass and that CI `test-e2e` goes green.\n\n## Non-blocking Findings\n\n1. **? Spec defect (FR-5, old-Vite fetch ping) — `src/dashboard/server/routes/workspace-wake.ts:372`.** FR-5 says destroying the socket of an `Accept: text/x-vite-ping` request makes the ping \"fail the same way\". Through Traefik it does not: when the upstream closes without a response, Traefik answers the client `502 Bad Gateway`, and a `mode: 'no-cors'` fetch resolves on any HTTP response, so a Vite ≤5 client would reload the stale tab, which then navigates and wakes the stack. The code follows the spec, so this is a spec issue, not an implementation defect. No current project is affected: overdeck uses Vite 8 and MYN uses Vite 7.1.7, and both ping with `new WebSocket(socketUrl, \"vite-ping\")` (checked `~/Projects/myn/frontend/node_modules/vite/dist/client/client.mjs:1009`), which the upgrade refusal handles correctly. Spec correction if older-Vite projects ever matter: answer the ping with a response the fetch rejects on (not possible for no-cors), or accept that old-Vite tabs wake.\n2. **? Redirect to a label host outside the wake domains — `workspace-wake.ts:384-389`.** Step (e) redirects to the label host without checking that the label host's domain is in `wakeDomains()`. If an operator changes `traefik.domain` away from `overdeck.localhost` and no project lists it, the overdeck template still labels `feature-pan-N.overdeck.localhost`, so the redirected request gets the FR-4 404. Edge case under default config; would be established by a non-default `traefik.domain`.\n3. **? Path-scoped label routers.** If a project's compose labels route a `feature-…` host only with `Host(…) && PathPrefix(…)`, paths outside the prefix fall to the wake router even while the app runs; a navigation then \"wakes\" an already-running stack and the page waits until its 2-minute message. Not seen in the overdeck or MYN templates; earlier behavior there was a Traefik 404.\n4. **Pre-existing pattern: wrapped listeners cannot be removed by `server.off(handler)`.** `setupWorkspaceWakeHost` copies the `setupKnowledgeViewerProxy` wrapper, so Effect's `server.off(\"request\", handler)` finalizer (`@effect/platform-node/dist/NodeHttpServer.js:129`) no longer finds the wrapped handler. Same as the existing knowledge-viewer wrapper; only matters at shutdown.\n5. **≉ Sync config reads on the request path.** `currentWakeDomains` (30 s cache) and `resolveProjectFromIssueSync` read config synchronously per wake request. No child processes (rule `no-execsync-server` holds); bounded and small.\n6. **Browsers without `Sec-Fetch-Mode`** (for example Safari before 16.4) treat every request as waking, so a subresource could start containers. Harm is limited to starting the issue's own stopped containers (NFR-3).\n\n## Coverage\n\n### Changed-file ledger (HEAD 8e3c869)\n| File | Status |\n| --- | --- |\n| src/dashboard/server/routes/dashboard-auth.ts | Reviewed. `isTrustedLocalNodeRequest` adapts a raw Node request to `isTrustedLocalCaller`; `localPeerKind` accepts a string `remoteAddress`. Funnel → false; bridge peer requires local rightmost XFF. |\n| src/dashboard/server/routes/workspace-wake.ts | Reviewed in full (handler order a–f, coordinator, page, upgrade refusal, router file, REST route). |\n| src/dashboard/server/server.ts | Reviewed. Wrapper installed after `holdRequestsUntilServed` and before terminal/linked/forward/KV setups (D14); held requests replay through the wrapped listener because `newListener` sees the wrapped function. Route layer added. |\n| src/lib/workspace/workspace-wake-host.ts | Reviewed. Pure rules, label-host reader with `CONTAINER_NAME_RE` and `execFile` argument arrays, 10 s timeout. No `src/dashboard/` import. |\n| src/lib/traefik.ts | Reviewed. Writes `workspace-wake.yml` next to `overdeck.yml`. |\n| src/lib/workspace/stack-restore.ts | Reviewed. Trigger union gains `browser`, `dashboard`. |\n| src/dashboard/server/services/stack-idle-stop-service.ts | Reviewed. FR-14 text. |\n| src/dashboard/frontend/…/FeatureAppLink.tsx | Reviewed (committed version). State table matches FR-12; `window.open` is the first statement after `stopPropagation` (H5). Blocking compiler skip above. |\n| src/dashboard/frontend/…/FeatureItem.tsx | Reviewed. Passes `issueId` and `stackHealth`; 1-line change. |\n| src/dashboard/frontend/…/ZoneCOverviewTabs/queries.ts | Reviewed. `reclaimed?: string[]`; query key `['workspace', issueId]` matches `useWorkspaceQuery` (queries.ts:456). |\n| tests/unit/lib/overdeck/no-loss-matrix.ts | Reviewed. Row added. |\n| src/dashboard/server/routes/__tests__/workspace-wake.test.ts | Reviewed. Covers every PRD WI-4 case incl. unmarked pass-through, upgrade refusal, TTLs with fake timers, REST mapping, 401, admin scope. |\n| src/lib/workspace/__tests__/workspace-wake-host.test.ts | Reviewed. |\n| src/dashboard/frontend/…/FeatureAppLink.test.tsx | Reviewed. Covers state table, open-before-fetch order, pending text, success/error toasts. |\n| src/lib/workspace/__tests__/stack-restore.test.ts, services/__tests__/stack-idle-stop-service.test.ts, tests/lib/traefik.test.ts | Reviewed. |\n| scripts/frontend-test-subset.txt | Reviewed. Adds FeatureAppLink.test.tsx so it runs on CI. |\n| docs/WORKSPACES-AND-PROJECTS.md, cli/workspace-commands.mdx, guides/docker-setup.mdx | Reviewed. Gap paragraphs replaced; `curl --retry` retries 503 by default. |\n| changelog.d/pan-5649.md, changelog.d/pan-5250.md | Reviewed. |\n| .pan/drafts, .pan/specs, .pan/continues | Not applicable as code; read the PRD as the requirement source. |\n\n### Dimensions\n- **Correctness:** dispatch only on marker + feature host (D12) verified in code and tests; held-request replay goes through the wrapper; coordinator joins in-flight calls, reuses non-failed outcomes 15 s, never rejects; status path reads memory only. Blocking compiler skip above.\n- **Security:** wake host self-gates on trusted local caller before any Docker call; a client-sent marker on a direct request only changes that caller's own response. Redirect `Location` is `https://<label host from Docker labels><request.url>`, so the host part cannot be attacker-chosen. Page escapes issue id and host, embeds values via JSON with `<` escaped, renders status via `textContent`, ships a restrictive CSP. Docker args are arrays with validated names. `~/.overdeck` is not mounted into workspace containers (template line 160), so a workspace dashboard skips the router-file write. No route-scopes row; unlisted → `admin` (test asserts it).\n- **Performance:** at most two `docker` calls per issue per 60 s for label hosts; one wake in flight per issue; page polls a memory-only endpoint every 2 s. No blocking child processes.\n- **Requirements/UX:** see matrix.\n\n### Acceptance criteria\n| AC | Status | Evidence |\n| --- | --- | --- |\n| 1 WI-1 lib tests | Met | CI test shards 1–4 pass on 8e3c869 |\n| 2 WI-2 traefik + live check | Met | traefik test in shards; commit e5271e357a2 body records \"Live check: wake host 200 …\"; `~/.overdeck/traefik/dynamic/workspace-wake.yml` absent now |\n| 3 WI-3 browser trigger | Met | stack-restore test in shards |\n| 4 WI-4 handler/route tests, route-scopes unchanged, no execSync, no lib/traefik import | Met | shards pass; `git diff --quiet main...HEAD -- route-scopes.ts` succeeds; both `git grep` checks empty |\n| 5 WI-5 idle text | Met | shards pass |\n| 6 WI-6 FeatureAppLink tests | Met (tests) | test-e2e ran 586 frontend files, only reactCompilerCoverage failed |\n| 8 WI-8 docs | Met | docs contain `workspace-wake.yml`, `__overdeck_wake/status`, `Retry-After`; gap text gone |\n| 9 All: typecheck, lint, circular, file-size | Unmet in CI aggregate | lint-group core/effect/skills/state pass; `overdeck/test` verification gate pass; but CI `test-e2e` red (compiler coverage) → required `test` red |\n| UAT (post-merge) | Unverified | not runnable pre-merge by design |\n\n## Verification\n- `gh pr checks feature/pan-5649` (HEAD 8e3c869): test-shard 1–4 pass, build (22) pass, lint-group (core/effect/skills/state) pass, lint pass, Clean install + server smoke pass, `overdeck/test` verification gate pass; **test-e2e fail**, **test fail** (aggregate); bare-host-linux and CodeRabbit pending.\n- `npm run lint:effect-diagnostics`: covered by CI `lint-group (effect)` pass on this HEAD; not rerun.\n- Local probe: `skipCountForSource` on committed FeatureAppLink.tsx → 1 skip; on the uncommitted working-tree version → 0.\n- Read-only checks: Traefik `tls.yml` holds `_wildcard.pan.localhost` and `_wildcard.myn.localhost` certs (redirect path from `pan.localhost` is served with a valid cert); MYN Vite 7.1.7 pings by WebSocket.\n- Full test suite not run (per role).\n\n## Scope Note\nThe work agent appears to be fixing the blocker in the working tree right now (uncommitted). Once that commit is pushed and CI `test-e2e` is green, nothing else in this review blocks.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-5649/.pan/review/agent-pan-5649-review-8e3c8699/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-5649 -m \"Fixed review issues\"`"
+    }
+  ]
+}

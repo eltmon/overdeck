@@ -1,0 +1,709 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-24T02:09:50Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5649: Opening an idle-stopped workspace app starts its stack again: Traefik fallback wake page and a dashboard start-app action",
+    "updated": "2026-11-24T02:24:41.892Z"
+  },
+  "plan": {
+    "id": "pan-5649",
+    "title": "Opening an idle-stopped workspace app starts its stack again: Traefik fallback wake page and a dashboard start-app action",
+    "status": "running",
+    "uid": "fe1834f5-3c16-4e34-8e21-33d458415fff",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-24T02:09:50Z",
+    "updated": "2026-11-24T02:24:41.892Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5649",
+        "label": "PAN-5649",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5250",
+        "label": "PAN-5250",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5649.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "workspace",
+      "docker",
+      "traefik",
+      "idle-stop",
+      "dashboard",
+      "frontend"
+    ],
+    "narratives": {
+      "Problem": "After PAN-5250 idle-stops a workspace's frontend, its app URL returns Traefik's 404 and the Command Deck app chip links to that 404. Only pan workspace up, a spawn or a verification brings it back, so the operator's bookmark and a work agent's own Playwright or curl check fail.",
+      "Proposal": "A lowest-priority Traefik router (separate dynamic file workspace-wake.yml, written by generateOverdeckTraefikConfig and by the dashboard at startup) sends feature-<issue>.<domain> hosts to the dashboard when no frontend router matches. The wake router's middleware adds an X-Overdeck-Wake-Router marker; the dashboard consumes only marked feature-host requests in a raw host-dispatched handler (knowledge-viewer pattern, wired before the terminal upgrade handler), accepts only trusted local callers, wakes only on navigations or header-less clients through a per-issue coordinator around wakeWorkspaceStack (trigger browser), redirects to the container's label host when it differs, and answers 503 + Retry-After with a self-contained page that reloads once the status path stops being answered by the dashboard. A new POST /api/workspaces/:issueId/wake (no route-scope row, so admin) backs a start app button in the Command Deck row. Docs and changelog replace the PAN-5250 gap notes.",
+      "NonGoals": "- Projects whose workspace hosts are served by a Traefik other than the managed overdeck-traefik container\n- Waking from api-feature-<issue> hosts or any host not starting with feature-\n- Changing the operator's projects.yaml (pan.localhost for overdeck) or workspace-data.ts frontendUrl derivation\n- Waiting server-side for the app to be ready\n- Waking from subresource, fetch or WebSocket requests\n- Any credential or token for the wake host\n- Changing the old reaper, the idle-stop rules or the restore door's container selection\n- Changing overdeck.yml.template\n- Touching src/dashboard/server/main.ts\n- A route-scopes.ts row and telemetry client-route entry for the wake route\n- Dispatching on Host shape without the Traefik marker header"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Auth: trusted local caller only (isTrustedLocalCaller via a raw-Node adapter), no token",
+        "rationale": "Agent curl/Playwright checks and bookmarks carry no token; the same rule already mints a full session, and the wake grants strictly less. Funnel and LAN get 404."
+      },
+      {
+        "summary": "Only navigations and header-less clients wake; subresources, fetch and WebSocket never do",
+        "rationale": "Blocks cross-site <img> wakes and stale-tab HMR pings while keeping curl, Playwright and page loads working."
+      },
+      {
+        "summary": "Wake router in a separate dynamic file written by both generateOverdeckTraefikConfig and the dashboard at startup",
+        "rationale": "pan reload never re-renders Traefik config; the dashboard-side write makes the deploy path carry the router with no mode-dependent content."
+      },
+      {
+        "summary": "Domain-agnostic HostRegexp ^feature-… with a dashboard-side wake-domain check",
+        "rationale": "One router covers every project domain on the shared Traefik without re-rendering; anchoring on feature- cannot shadow knowledge-, artifacts. or api-feature- hosts."
+      },
+      {
+        "summary": "Redirect to the frontend container's label host when it differs from the request host",
+        "rationale": "The overdeck project's dns.domain (pan.localhost) disagrees with the compose template (overdeck.localhost); without the redirect the page would reload forever on an unrouted host."
+      },
+      {
+        "summary": "Answer 503 + Retry-After immediately instead of holding the request",
+        "rationale": "curl -f fails until ready, curl --retry retries, Playwright goto does not throw, and no request is held for container start time."
+      },
+      {
+        "summary": "New journal-aware POST /api/workspaces/:issueId/wake instead of reusing stack/start",
+        "rationale": "stack/start runs docker compose start with no lock and no stack.restored entry, leaving the open reclaim open."
+      },
+      {
+        "summary": "Start app button opens the tab synchronously, then POSTs",
+        "rationale": "window.open after an await is popup-blocked; the opened tab lands on the wake page, which waits and reloads."
+      },
+      {
+        "summary": "Start app also shows for a fully stopped stack; unhealthy keeps no chip",
+        "rationale": "The wake starts old-reaper stops too; a crashed stack should not be papered over."
+      },
+      {
+        "summary": "Browser wakes restore gate-starvation reclaims too (same as pan workspace up)",
+        "rationale": "The app needs its api; stale tabs cannot trigger a wake, so only explicit intent restores."
+      },
+      {
+        "summary": "Dispatch only requests carrying the Traefik-set X-Overdeck-Wake-Router marker",
+        "rationale": "Overdeck workspace stacks run this dashboard server behind a Vite /ws proxy without changeOrigin, so their WebSocket upgrades arrive with feature-… Hosts; Host-only dispatch would break them."
+      },
+      {
+        "summary": "No route-scopes.ts row for the wake route (unlisted = admin)",
+        "rationale": "Any row also requires TELEMETRY_CLIENT_ROUTES and docs/TELEMETRY.md changes (route-scopes.test.ts:82); only the desktop Command Deck calls the route, and every browser session is admin. The issue named route-scopes.ts; this records the deviation."
+      },
+      {
+        "summary": "Vite ping requests on wake hosts fail (WebSocket 503, text/x-vite-ping socket destroyed)",
+        "rationale": "A stale tab must never turn its reconnect ping into a reload-navigation that wakes the stack or undoes a memory reclaim."
+      }
+    ],
+    "items": [
+      {
+        "id": "wi1-wake-host-lib",
+        "title": "Add the pure wake-host rules and label-host reader module",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-24T02:09:50Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-5649",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "backend",
+          "files_scope": [
+            "src/lib/workspace/workspace-wake-host.ts",
+            "src/lib/workspace/__tests__/workspace-wake-host.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/workspace/__tests__/workspace-wake-host.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "workspace-wake-host.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-2",
+            "NFR-3",
+            "NFR-5",
+            "FR-15"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-1 exactly: create src/lib/workspace/workspace-wake-host.ts with WAKE_HOST_RE, WAKE_STATUS_PATH, WAKE_HEADER, WAKE_ROUTER_HEADER, WORKSPACE_WAKE_DYNAMIC_FILE, isWakeRouterRequest, isVitePing, parseWakeHost, wakeDomains, currentWakeDomains (30 s cache), isWakingRequest, renderWorkspaceWakeTraefikConfig (exact YAML in the PRD, including the overdeck-workspace-wake-marker headers middleware), labelHostFromLabels and readWorkspaceLabelHost (docker ps -a by compose label, then one docker inspect of {{json .Config.Labels}}; resolveHostTool('docker') + promisified execFile, 10 s timeout). Import nothing from src/dashboard and not src/lib/traefik.ts. Write the tests listed in WI-1."
+        },
+        "items": [
+          {
+            "id": "wi1-wake-host-lib.ac1",
+            "title": "Given host 'feature-pan-5649.overdeck.localhost:443', parseWakeHost returns issueId 'PAN-5649' and domain 'overdeck.localhost'; it returns null for 'api-feature-pan-1.overdeck.localhost', 'knowledge-6f.overdeck.localhost' and 'overdeck.localhost'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-wake-host-lib.ac2",
+            "title": "isWakingRequest returns true for headers without sec-fetch-mode and for 'navigate', and returns false for 'no-cors', 'cors', 'websocket' and for Accept 'text/x-vite-ping'; isWakeRouterRequest returns false for a feature host without the x-overdeck-wake-router marker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-wake-host-lib.ac3",
+            "title": "renderWorkspaceWakeTraefikConfig(3011) produces YAML containing the router 'overdeck-workspace-wake', 'priority: 1', the middleware setting 'X-Overdeck-Wake-Router' and 'http://host.docker.internal:3011'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-wake-host-lib.ac4",
+            "title": "labelHostFromLabels('PAN-5649', ...) returns 'feature-pan-5649.overdeck.localhost' from a pan-fe router rule and ignores the api-feature rule and a 'feature-pan-56490' rule",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-wake-host-lib.ac5",
+            "title": "readWorkspaceLabelHost returns null without any docker call when the compose project fails CONTAINER_NAME_RE, and returns null when the injected runDocker returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi2-wake-router-file",
+        "title": "Write workspace-wake.yml from generateOverdeckTraefikConfig",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-24T02:09:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-5649",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "infra",
+          "files_scope": [
+            "src/lib/traefik.ts",
+            "tests/lib/traefik.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/lib/traefik.test.ts",
+            "npm run typecheck",
+            "test ! -e ~/.overdeck/traefik/dynamic/workspace-wake.yml"
+          ],
+          "expected_outputs": [
+            "traefik.test.ts passes including the workspace-wake.yml case",
+            "typecheck completes without errors",
+            "the live-check file is removed after the checkpoint"
+          ],
+          "traces": [
+            "FR-1",
+            "D6"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-2: in generateOverdeckTraefikConfig, after writing overdeck.yml, write join(TRAEFIK_DYNAMIC_DIR, WORKSPACE_WAKE_DYNAMIC_FILE) with renderWorkspaceWakeTraefikConfig(config.dashboard.api_port). Do not change overdeck.yml.template. Add the test in the existing 'traefik config generation' describe. Then run the PRD's live checkpoint: write ~/.overdeck/traefik/dynamic/workspace-wake.yml with npx tsx, curl the wake host and /api/health, check docker logs overdeck-traefik, then rm ~/.overdeck/traefik/dynamic/workspace-wake.yml and record the three results in the item commit body. Do not restart Traefik or the dashboard."
+        },
+        "items": [
+          {
+            "id": "wi2-wake-router-file.ac1",
+            "title": "Given generateOverdeckTraefikConfig() runs against a temp Traefik dir, then <dynamic>/workspace-wake.yml exists and contains 'overdeck-workspace-wake', 'priority: 1', 'X-Overdeck-Wake-Router' and the configured API port",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-wake-router-file.ac2",
+            "title": "When generateOverdeckTraefikConfig('dev') runs, it produces a workspace-wake.yml byte-identical to the production render, and the existing overdeck.yml expectations in traefik.test.ts still pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-wake-router-file.ac3",
+            "title": "The item commit body records the live check: the curl status of https://feature-pan-1.overdeck.localhost/ (not Traefik's 404 when the router loads), the unchanged /api/health status, and a Traefik log with no workspace-wake error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-wake-router-file.ac4",
+            "title": "When the checkpoint finishes, the agent deletes ~/.overdeck/traefik/dynamic/workspace-wake.yml from the host (test ! -e succeeds)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi3-wake-triggers",
+        "title": "Add the browser and dashboard restore triggers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-24T02:09:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-5649",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "backend",
+          "files_scope": [
+            "src/lib/workspace/stack-restore.ts",
+            "src/lib/workspace/__tests__/stack-restore.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/workspace/__tests__/stack-restore.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "stack-restore.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-3: extend StackRestoreTrigger with 'browser' | 'dashboard' and add the two test cases (activity details end with '(browser).'; stack.restored entry source 'stack-restore:browser')."
+        },
+        "items": [
+          {
+            "id": "wi3-wake-triggers.ac1",
+            "title": "wakeWorkspaceStack({ issueId, trigger: 'browser' }) with an exited frontend emits an activity entry whose details end with '(browser).'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-wake-triggers.ac2",
+            "title": "Given an open idle reclaim, a browser-triggered wake appends a stack.restored entry whose source is 'stack-restore:browser'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi4-wake-host-handler",
+        "title": "Serve the wake page on workspace app hosts from the dashboard",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-24T02:09:50Z",
+        "metadata": {
+          "difficulty": "expert",
+          "issueLabel": "pan-5649",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "backend",
+          "foundationFor": [
+            "wi4b-wake-rest-route",
+            "wi6-start-app-chip"
+          ],
+          "files_scope": [
+            "src/dashboard/server/routes/workspace-wake.ts",
+            "src/dashboard/server/routes/__tests__/workspace-wake.test.ts",
+            "src/dashboard/server/routes/dashboard-auth.ts",
+            "src/dashboard/server/server.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/workspace-wake.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular",
+            "git grep -n \"execSync\\|lib/traefik\" -- src/dashboard/server/routes/workspace-wake.ts"
+          ],
+          "expected_outputs": [
+            "workspace-wake.test.ts passes under fake timers",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle",
+            "git grep prints nothing"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "FR-10",
+            "NFR-1",
+            "NFR-2",
+            "NFR-5",
+            "NFR-6",
+            "D12",
+            "D14"
+          ],
+          "acJustification": "Security boundary with six independently observable behaviors (trust, validation, waking rules, redirect/status, dedupe, dispatch scope).",
+          "parallelSafeReason": "It owns its own new files plus two single-line edits (dashboard-auth.ts, server.ts) no other wave-1 item touches; its only file overlap is with wi4b, which a blocks edge serializes after it."
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-4 steps 1, 2 (everything except the REST route), the setupWorkspaceWakeHost line of step 3, and the step-6 tests except REST-route ones: isTrustedLocalNodeRequest in dashboard-auth.ts; in new routes/workspace-wake.ts the coordinator (requestWorkspaceWake with in-flight join and 15 s TTL, never rejects; getWorkspaceWakeStatus; resolveAppHost with 60 s cache), handleWakeHostRequest in the PRD's (a)-(f) order, setupWorkspaceWakeHost mirroring setupKnowledgeViewerProxy but dispatching only isWakeRouterRequest requests/upgrades (marker header + feature host; unmarked requests pass through untouched), destroying Vite-ping sockets, ensureWorkspaceWakeRouterFile (fs/promises, skip when the dynamic dir is missing, write only on change), wakePollDecision and renderWakePage (escaped, CSP header). Call setupWorkspaceWakeHost(nodeServer) right after holdRequestsUntilServed(nodeServer) and before setupTerminalWebSocket(nodeServer) in server.ts. Never touch main.ts."
+        },
+        "items": [
+          {
+            "id": "wi4-wake-host-handler.ac1",
+            "title": "Given a marked request with Host 'feature-pan-1.overdeck.localhost' from an untrusted peer, the handler returns 404 'Not found'; a trusted marked request for domain 'evil.test' or an unregistered project returns 404; neither wake nor readLabelHost is called in these cases",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-wake-host-handler.ac2",
+            "title": "Given a trusted marked request with no sec-fetch-mode, the handler returns 503 with 'Retry-After: 5' and 'x-overdeck-wake: 1' and calls wake once with trigger 'browser'; a 'no-cors' request returns 503 without calling wake, and an Accept 'text/x-vite-ping' request gets its socket destroyed with no status line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-wake-host-handler.ac3",
+            "title": "Given label host 'feature-pan-1.overdeck.localhost' and request host 'feature-pan-1.pan.localhost', the handler returns 307 to 'https://feature-pan-1.overdeck.localhost/x?y=1' without calling wake; GET /__overdeck_wake/status returns 200 JSON with 'state' and 'x-overdeck-wake' and never calls wake",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-wake-host-handler.ac4",
+            "title": "When two requestWorkspaceWake calls run concurrently, wake runs once; a call 10 s after completion returns the cached result and a call 16 s after completion starts a new wake (fake timers)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-wake-host-handler.ac5",
+            "title": "When a request or /ws/rpc upgrade has Host 'feature-pan-1.overdeck.localhost' but no x-overdeck-wake-router marker, it routes to the original listeners unchanged; a marked upgrade receives a 503 status line and an upgrade listener registered after setupWorkspaceWakeHost never sees it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-wake-host-handler.ac6",
+            "title": "ensureWorkspaceWakeRouterFile returns 'skipped' for a missing dynamic dir, 'written' on first call in a temp dir and 'unchanged' on the second",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi4b-wake-rest-route",
+        "title": "Add POST /api/workspaces/:issueId/wake with its no-loss row",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-24T02:09:50Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-5649",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "api",
+          "files_scope": [
+            "src/dashboard/server/routes/workspace-wake.ts",
+            "src/dashboard/server/routes/__tests__/workspace-wake.test.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/workspace-wake.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts src/dashboard/server/__tests__/route-scopes.test.ts",
+            "git diff --quiet origin/main -- src/dashboard/server/route-scopes.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all three test files pass",
+            "route-scopes.ts is unchanged",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-11",
+            "D9",
+            "D13"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-4 REST parts: workspaceWakeRouteLayer with HttpRouter.add(\\n  'POST',\\n  '/api/workspaces/:issueId/wake', ...) using rejectUnsafeDashboardMutationRequest then requestWorkspaceWake(id, 'dashboard'), mapping per FR-11; add workspaceWakeRouteLayer after knowledgeViewerRouteLayer in server.ts; add the WRITE row to no-loss-matrix.ts; leave route-scopes.ts unchanged (D13: unlisted = admin); add the REST-route tests including requiredScopeFor('POST','/api/workspaces/PAN-1/wake') === 'admin'."
+        },
+        "items": [
+          {
+            "id": "wi4b-wake-rest-route.ac1",
+            "title": "POST /api/workspaces/PAN-1/wake returns 200 with 'started' when the coordinator reports started, 404 for no-workspace, 409 for no-compose-project, 500 for failed and 400 for an invalid issue id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4b-wake-rest-route.ac2",
+            "title": "A POST without a dashboard credential returns 401 and does not call the coordinator",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4b-wake-rest-route.ac3",
+            "title": "no-loss-matrix.test.ts passes with the new 'POST /api/workspaces/:issueId/wake' row, and requiredScopeFor('POST', '/api/workspaces/PAN-1/wake') returns 'admin' with route-scopes.ts unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi5-idle-text",
+        "title": "Name the app URL in the idle-stop activity entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-24T02:09:50Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-5649",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "backend",
+          "files_scope": [
+            "src/dashboard/server/services/stack-idle-stop-service.ts",
+            "src/dashboard/server/services/__tests__/stack-idle-stop-service.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/stack-idle-stop-service.test.ts"
+          ],
+          "expected_outputs": [
+            "stack-idle-stop-service.test.ts passes with the new assertion"
+          ],
+          "traces": [
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-5: replace the two template-literal lines in idleActivityDetails with the PRD's 'after' text and add expect(details).toContain(\"open the app's URL\")."
+        },
+        "items": [
+          {
+            "id": "wi5-idle-text.ac1",
+            "title": "When an idle stop fires, the activity details contain \"open the app's URL\" and still contain 'pan workspace up <ISSUE>'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-idle-text.ac2",
+            "title": "The existing grace-clock test in stack-idle-stop-service.test.ts passes with the new text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi6-start-app-chip",
+        "title": "Show a start app action in the Command Deck row while the app is stopped",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-24T02:09:50Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-5649",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "frontend",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureAppLink.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureAppLink.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts"
+          ],
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/CommandDeck/ProjectTree/FeatureAppLink.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "FeatureAppLink.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-12",
+            "D10",
+            "D11",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-6: add reclaimed?: string[] to WorkspaceStackHealth in queries.ts; give FeatureAppLink issueId and stackHealth props and the state table; the start-app button opens frontendUrl synchronously first, then POSTs /api/workspaces/:issueId/wake with dashboardMutationJsonHeaders, shows 'starting…' while pending, toasts the result and invalidates ['workspace', issueId]; update the FeatureItem call site at line 843; update the header comment; write FeatureAppLink.test.tsx."
+        },
+        "items": [
+          {
+            "id": "wi6-start-app-chip.ac1",
+            "title": "Given stackHealth.reclaimed ['x-frontend-1'] and summary state 'healthy', the row renders data-testid 'feature-start-app' and no 'feature-open-frontend' link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-start-app-chip.ac2",
+            "title": "Given summary state 'stopped' the row renders the start-app button; given 'healthy' without reclaimed it renders the 'app ↗' link; given 'unhealthy' or no frontendUrl it renders nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-start-app-chip.ac3",
+            "title": "Clicking start app calls window.open with the frontend URL before fetch (invocation order), POSTs '/api/workspaces/PAN-1/wake', and renders 'starting…' disabled while the POST is pending",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-start-app-chip.ac4",
+            "title": "When the POST returns 500 with { error: 'boom' }, toast.error is called with 'boom'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi8-docs-changelog",
+        "title": "Document the app-URL wake and add the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-24T02:09:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-5649",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "docs",
+          "files_scope": [
+            "docs/WORKSPACES-AND-PROJECTS.md",
+            "guides/docker-setup.mdx",
+            "cli/workspace-commands.mdx",
+            "changelog.d/pan-5649.md",
+            "changelog.d/pan-5250.md"
+          ],
+          "verify_commands": [
+            "grep -c 'workspace-wake.yml' docs/WORKSPACES-AND-PROJECTS.md guides/docker-setup.mdx",
+            "grep -c 'Gap until PAN-5649' docs/WORKSPACES-AND-PROJECTS.md || true",
+            "grep -c 'Until \\[#5649\\]' cli/workspace-commands.mdx || true"
+          ],
+          "expected_outputs": [
+            "workspace-wake.yml appears in both files",
+            "the gap heading count is 0",
+            "the Until [#5649] count is 0"
+          ],
+          "traces": [
+            "FR-16"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-8 steps 1-5: replace the 'Gap until PAN-5649' paragraph in docs/WORKSPACES-AND-PROJECTS.md with the wake section; replace the 'Until [#5649]' paragraph in cli/workspace-commands.mdx and add the app-URL restart path plus the curl --retry example; describe workspace-wake.yml in guides/docker-setup.mdx; create changelog.d/pan-5649.md with the given text; remove the 'Until [#5649]' sentence from changelog.d/pan-5250.md if that file still exists."
+        },
+        "items": [
+          {
+            "id": "wi8-docs-changelog.ac1",
+            "title": "docs/WORKSPACES-AND-PROJECTS.md contains 'workspace-wake.yml', '__overdeck_wake/status' and 'Retry-After', and no longer contains 'Gap until PAN-5649'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-docs-changelog.ac2",
+            "title": "cli/workspace-commands.mdx tells the reader that opening a stopped app's URL starts it and shows 'curl --retry', and no longer contains 'Until [#5649]'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-docs-changelog.ac3",
+            "title": "guides/docker-setup.mdx contains workspace-wake.yml as a dashboard-written dynamic file, and changelog.d/pan-5649.md contains a '#### Improved' heading linking #5649",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wi1-wake-host-lib",
+        "to": "wi2-wake-router-file",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-wake-host-lib",
+        "to": "wi4-wake-host-handler",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-wake-triggers",
+        "to": "wi4-wake-host-handler",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4-wake-host-handler",
+        "to": "wi4b-wake-rest-route",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4b-wake-rest-route",
+        "to": "wi6-start-app-chip",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "22 files, within the 25-file limit. The subsystem count (9) comes from path-shaped docs (docs/, guides/, cli/, two changelog.d files each count separately) and two test roots; production code lives only in src/lib and src/dashboard. The issue is already the browser half split out of PAN-5250; the wake page, its REST route and the chip that opens it share one coordinator and one contract, so splitting further would ship a chip whose opened tab still 404s or a route nothing calls.",
+      "canonicalFilename": "2026-11-24-PAN-5649-opening-an-idle-stopped-workspace-app-starts-its-stack-again-traefik-fallback-wake-page-and-a-dashboard-start-app-action.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

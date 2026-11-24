@@ -1,5 +1,6 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { existsSync } from 'node:fs';
+import type { IncomingHttpHeaders } from 'node:http';
 import { networkInterfaces, type NetworkInterfaceInfo } from 'node:os';
 
 import { Option } from 'effect';
@@ -486,6 +487,11 @@ export function isTrustedLocalCaller(request: HttpServerRequest.HttpServerReques
   if (!hasProxyForwardingHeader(headers)) return true;
   if (!readRemoteAccessConfig().requireTokenMint) return true;
   return kind === 'bridge';
+}
+
+/** PAN-5649: isTrustedLocalCaller for a raw Node request (host-dispatched handlers that run before the Effect app). */
+export function isTrustedLocalNodeRequest(request: { headers: IncomingHttpHeaders; socket: { remoteAddress?: string } }): boolean {
+  return isTrustedLocalCaller({ headers: request.headers, remoteAddress: request.socket.remoteAddress ?? '' } as unknown as HttpServerRequest.HttpServerRequest);
 }
 
 /**

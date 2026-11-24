@@ -63,6 +63,24 @@ describe('traefik config generation', () => {
     expect(artifactRouter).toContain('service: overdeck-api');
     expect(artifactRouter).toContain('- "*.example.test"');
   });
+
+  it('writes the PAN-5649 workspace wake router file, identical in dev mode', async () => {
+    writeFileSync(join(tempDir, 'config.toml'), '[dashboard]\nport = 4101\napi_port = 4102\n');
+
+    const { generateOverdeckTraefikConfig } = await import('../../src/lib/traefik.js');
+
+    expect(generateOverdeckTraefikConfig()).toBe(true);
+    const wakePath = join(tempDir, 'traefik', 'dynamic', 'workspace-wake.yml');
+    const production = readFileSync(wakePath, 'utf-8');
+    expect(production).toContain('overdeck-workspace-wake');
+    expect(production).toContain('priority: 1');
+    expect(production).toContain('X-Overdeck-Wake-Router');
+    expect(production).toContain('http://host.docker.internal:4102');
+
+    rmSync(wakePath);
+    expect(generateOverdeckTraefikConfig('dev')).toBe(true);
+    expect(readFileSync(wakePath, 'utf-8')).toBe(production);
+  });
 });
 
 describe('traefik compose migration — PAN-4299', () => {

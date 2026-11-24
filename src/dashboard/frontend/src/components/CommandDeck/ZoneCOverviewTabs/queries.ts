@@ -393,6 +393,8 @@ export interface WorkspaceStackHealth {
   lastObserved: string;
   /** False when the workspace stack was never provisioned (no .devcontainer). */
   stackExpected?: boolean;
+  /** PAN-5623/PAN-5250: containers stopped on purpose (memory reclaim or idle stop). */
+  reclaimed?: string[];
 }
 
 export interface WorkspacePendingOperation {

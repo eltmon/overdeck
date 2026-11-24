@@ -133,6 +133,7 @@ describe('idle-stop service timeline', () => {
     expect(details).toContain('after 20 min unused');
     expect(details).toContain('1.3 GiB');
     expect(details).toContain(`pan workspace up ${ISSUE}`);
+    expect(details).toContain("open the app's URL");
   });
 
   it('restarts the grace when a browser connects, and stops 20 minutes after it closes', async () => {
