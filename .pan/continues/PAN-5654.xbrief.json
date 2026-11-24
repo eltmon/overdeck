@@ -1,0 +1,73 @@
+{
+  "version": "1",
+  "issueId": "PAN-5654",
+  "created": "2026-11-24T00:52:28.291Z",
+  "updated": "2026-11-24T01:24:13.096Z",
+  "gitState": {},
+  "decisions": [
+    {
+      "id": "D-test-waived",
+      "summary": "Test gate waived: This is a CI/build-config fix (Gradle resolution of a test runtime dependency), not new behavior to cover with a new test. The existing Robolectric tests PushHandlerTest and PushNoticeTest (apps/mobile/android/app/src/test/java/ai/overdeck/app/, last touched at d383a96c622a1f770eb11accb7eed3b998da3724) already exercise the exact code path this issue fixes: both were run locally against the new offline wiring (pass) and against an empty dependency dir (fail with 'Path is not a file:'), per PRD AC-2/AC-3.",
+      "recordedAt": "2026-11-24T01:24:13.096Z"
+    }
+  ],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "gradle-offline-robolectric": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5654",
+      "claimedAt": "2026-11-24T00:52:28.291Z",
+      "doneAt": "2026-11-24T00:56:03.924Z"
+    },
+    "gradle-offline-robolectric.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-24T00:56:03.924Z"
+    },
+    "gradle-offline-robolectric.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-24T00:56:03.924Z"
+    },
+    "gradle-offline-robolectric.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-24T00:56:03.924Z"
+    },
+    "gradle-offline-robolectric.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-24T00:56:03.924Z"
+    },
+    "ci-prefetch-and-offline-guard": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5654",
+      "claimedAt": "2026-11-24T00:56:13.559Z",
+      "doneAt": "2026-11-24T00:58:09.077Z"
+    },
+    "ci-prefetch-and-offline-guard.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-24T00:58:09.077Z"
+    },
+    "ci-prefetch-and-offline-guard.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-24T00:58:09.077Z"
+    },
+    "ci-prefetch-and-offline-guard.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-24T00:58:09.077Z"
+    },
+    "docs-mobile-readme-offline-robolectric": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5654",
+      "claimedAt": "2026-11-24T00:58:18.303Z",
+      "doneAt": "2026-11-24T00:59:10.383Z"
+    },
+    "docs-mobile-readme-offline-robolectric.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-24T00:59:10.383Z"
+    },
+    "docs-mobile-readme-offline-robolectric.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-24T00:59:10.383Z"
+    }
+  }
+}

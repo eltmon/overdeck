@@ -216,7 +216,14 @@ you"; a push after sign-out posts nothing. A tap opens `ai.overdeck.app:/open#v=
   `tests/fixtures/phone-push/sealed-question.json` (beside the iOS `sealed-push.json`), a payload
   sealed by `sodium-native`. `SealedBoxTest` opens it with `lazysodium-java`.
 - **JVM tests.** `cd apps/mobile/android && ./gradlew testDebugUnitTest` runs `SealedBoxTest` (plain
-  JUnit) and `PushNoticeTest` and `PushHandlerTest` (Robolectric).
+  JUnit) and `PushNoticeTest` and `PushHandlerTest` (Robolectric). Robolectric runs offline
+  (`robolectric.offline=true`). Gradle fetches its SDK 35 `android-all-instrumented` jar through
+  the `robolectricRuntime` configuration, and the `fetchRobolectricRuntime` task copies it into
+  `app/build/robolectric-runtime/`. This setup fetches one SDK's jar, so every Robolectric test
+  must pin the same SDK (today `@Config(sdk = 35)`). When you bump Robolectric or move the tests
+  to another SDK, update `robolectricAndroidAllVersion` in `app/build.gradle` to the matching
+  `android-all-instrumented` version; to use a second SDK, add a second `robolectricRuntime`
+  coordinate. A missing jar fails with `Unable to locate dependency` / `Path is not a file:`.
 
 ## Appearance
 
@@ -254,7 +261,10 @@ cd apps/mobile/android && ./gradlew testDebugUnitTest assembleDebug
 
 The root `npm test` does not run these tests. The CI job `mobile-android` runs the app tests, the
 web build, the Capacitor sync, `testDebugUnitTest` and `assembleDebug`, and uploads the `app-debug` APK. The `test`
-check requires it.
+check requires it. Before `testDebugUnitTest`, the job fetches the Robolectric runtime through
+Gradle (`./gradlew :app:fetchRobolectricRuntime`), retrying once on failure; after the unit tests,
+it fails the job if Robolectric wrote `~/.m2/repository/org/robolectric`, which would mean it fell
+back to its own network download instead of running offline.
 
 Device and emulator acceptance evidence goes in one file per issue, `acceptance/PAN-<n>.md`, with
 its screenshots beside it as `acceptance/pan-<n>-<step>.png`. `ACCEPTANCE.md` holds the evidence
