@@ -1,12 +1,13 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-23T23:11:53Z · model: claude-opus-5-5 · open: 954_
+_Last sequenced: 2026-11-24T00:13:29Z · model: claude-opus-5-5 · open: 955_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-5637 | S | critical | ok |  |  | In pipeline. Merge train never admits polyrepo issues touching CI-less member repos; add ci: none per repo so MYN infra/docs MRs merge |
 | 1 | PAN-5638 | M | critical | ok |  |  | In pipeline. Polyrepo review verdicts refuse GitHub member PRs and the ready set ignores verdict markers; MIN-1142 can't merge |
+| 2 | PAN-5652 | M | critical | ok |  |  | Herdr agents fail tmux has-session checks, so polyrepo merge aborts on live agents (MIN-1144). Merge routes: TENET-10 handoff. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 4 | PAN-5430 | S | medium | ok |  |  | Markdown Preview prints raw HTML (README logo <div>/<picture>) as text; render it via rehype-raw + rehype-sanitize in doc previews. |
 | 5 | PAN-5567 | S | high | ok |  |  | Codex app-server threads hardcode on-request/workspace-write, so Read-only and Full access settings never apply. |
@@ -970,6 +971,10 @@ New since the prior run and already in the pipeline, so it is pinned at rank 1. 
 
 New since the prior run and already in the pipeline, so it is pinned at rank 1. It replaces the PAN-5614 stopgap that refuses GitHub-member verdicts and teaches githubRows to read verdict markers, which unblocks polyrepo issues like MIN-1142 from reaching the merge train.
 
+### PAN-5652 (rank 2)
+
+New substrate bug: merge-ops.ts and several cloister modules test agent liveness with tmux has-session, which is always false on Herdr, the default backend. It failed the MIN-1144 polyrepo merge within 50 seconds while the agent was finishing the rebases, so it blocks polyrepo merges and sits beside the polyrepo merge cluster (PAN-5637, PAN-5638, PAN-5641) in a free rank slot. The fix routes these checks through liveness.ts and adds a ratchet; it touches merge routes, so it needs a supervised handoff.
+
 ### PAN-5013 (rank 3)
 
 Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.
@@ -1278,10 +1283,6 @@ Found cutting v0.65.0: CI was green but the local release check failed on two ho
 
 New CodeRabbit follow-up on the just-merged PAN-5623 stack-reclaim code, which stops and restarts workspace containers. Four Major findings touch reclaim correctness (re-reclaiming issues with an open reclaim, transient journal read failures, stale container snapshots after partial restores), so it ranks above routine CodeRabbit follow-ups as high-importance substrate hardening.
 
-### PAN-4566 (rank 71)
-
-Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback this fix routes failures to is on main and work can start.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1289,10 +1290,10 @@ Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback thi
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-23T23:11:53Z",
+  "generatedAt": "2026-11-24T00:13:29Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 954,
+  "openCount": 955,
   "nodes": [
     {
       "issue": "PAN-5637",
@@ -1317,6 +1318,19 @@ Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback thi
       "dependsOn": [],
       "why": "In pipeline. Polyrepo review verdicts refuse GitHub member PRs and the ready set ignores verdict markers; MIN-1142 can't merge",
       "rationale": "New since the prior run and already in the pipeline, so it is pinned at rank 1. It replaces the PAN-5614 stopgap that refuses GitHub-member verdicts and teaches githubRows to read verdict markers, which unblocks polyrepo issues like MIN-1142 from reaching the merge train.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5652",
+      "rank": 2,
+      "size": "M",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Herdr agents fail tmux has-session checks, so polyrepo merge aborts on live agents (MIN-1144). Merge routes: TENET-10 handoff.",
+      "rationale": "New substrate bug: merge-ops.ts and several cloister modules test agent liveness with tmux has-session, which is always false on Herdr, the default backend. It failed the MIN-1144 polyrepo merge within 50 seconds while the agent was finishing the rebases, so it blocks polyrepo merges and sits beside the polyrepo merge cluster (PAN-5637, PAN-5638, PAN-5641) in a free rank slot. The fix routes these checks through liveness.ts and adds a ratchet; it touches merge routes, so it needs a supervised handoff.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -14607,6 +14621,27 @@ Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback thi
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.8
+    },
+    {
+      "from": "PAN-5652",
+      "to": "PAN-3355",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-5652",
+      "to": "PAN-5013",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-5652",
+      "to": "PAN-5641",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
     },
     {
       "from": "PAN-750",
