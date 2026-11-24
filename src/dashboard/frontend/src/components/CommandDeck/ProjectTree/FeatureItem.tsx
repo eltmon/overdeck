@@ -840,7 +840,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
               🚆 {trainInfo.name} · {trainInfo.order}/{trainInfo.total}
             </span>
           )}
-          <FeatureAppLink frontendUrl={workspace?.frontendUrl} summary={uatStackSummary} />
+          <FeatureAppLink issueId={feature.issueId} frontendUrl={workspace?.frontendUrl} summary={uatStackSummary} stackHealth={workspace?.stackHealth} />
           {/* Merge-ready only — earlier phases have no stack, and a cached workspace query rendered a bogus chip for planning-phase issues (PAN-2996). */}
           {isReady && <FeatureUatChip summary={uatStackSummary} />}
           {prBadgeLink && <span data-section="PullRequestBadge" data-testid="feature-pr"><PullRequestBadge link={prBadgeLink} /></span>}
