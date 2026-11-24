@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5662",
   "created": "2026-11-24T07:26:43.859Z",
-  "updated": "2026-11-24T07:47:23.894Z",
+  "updated": "2026-11-24T07:49:48.216Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -134,9 +134,26 @@
       "doneAt": "2026-11-24T07:47:22.857Z"
     },
     "dollar-skills-menu": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5662",
-      "claimedAt": "2026-11-24T07:47:23.894Z"
+      "claimedAt": "2026-11-24T07:47:23.894Z",
+      "doneAt": "2026-11-24T07:49:48.216Z"
+    },
+    "dollar-skills-menu.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-24T07:49:48.216Z"
+    },
+    "dollar-skills-menu.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-24T07:49:48.216Z"
+    },
+    "dollar-skills-menu.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-24T07:49:48.216Z"
+    },
+    "dollar-skills-menu.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-24T07:49:48.216Z"
     }
   }
 }
