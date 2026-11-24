@@ -185,6 +185,7 @@ import { restartGateRouteLayer } from './routes/restart-gate.js';
 import { dashboardSessionPreflightRouteLayer, dashboardSessionRouteLayer } from './routes/dashboard-session.js';
 import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js';
 import { holdRequestsUntilServed, retryDashboardBind } from './server-bind.js';
+import { setupWorkspaceWakeHost } from './routes/workspace-wake.js';
 import { buildDashboardHealthResponse } from './health-response.js';
 
 // ─── Dual-runtime layers ──────────────────────────────────────────────────────
@@ -204,6 +205,8 @@ const HttpServerLive = Layer.unwrap(
     const bind = retryDashboardBind(NodeHttpServer.make(() => {
       const nodeServer = NodeHttp.createServer();
       holdRequestsUntilServed(nodeServer);
+      // PAN-5649 D14: before every other request/upgrade listener, so a marked wake-host request reaches none of them.
+      setupWorkspaceWakeHost(nodeServer);
       setupTerminalWebSocket(nodeServer);
       setupLinkedWebSocket(nodeServer);
       setupForwardWebSocket(nodeServer);
