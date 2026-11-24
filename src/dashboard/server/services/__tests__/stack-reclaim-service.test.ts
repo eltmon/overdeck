@@ -236,6 +236,83 @@ describe('runStackReclaimPoll (PAN-5623 WI-12)', () => {
     await expect(runStackReclaimPoll(deps, createStackReclaimState())).resolves.toEqual({ kind: 'idle', reason: 'no-candidates' });
   });
 
+  it('skips a candidate whose journal is unreadable (PAN-5648 journal-read-null.ac4)', async () => {
+    const { deps } = world();
+    deps.readJournal.mockReturnValue(null);
+    await expect(runStackReclaimPoll(deps, createStackReclaimState())).resolves.toEqual({ kind: 'idle', reason: 'no-candidates' });
+    expect(deps.stopContainer).not.toHaveBeenCalled();
+  });
+
+  it('excludes a candidate whose open reclaim still names a stopped container (PAN-5648 skip-open-reclaim.ac1)', async () => {
+    const olderSince = new Date(T0 - 3600_000).toISOString();
+    const { deps, journals } = world({
+      listRunningContainers: vi.fn(async () => [stackContainer('MIN-1144', 'api')]),
+    });
+    journals.set(wsPath('MIN-1144'), [{
+      at: olderSince, type: 'stack.reclaimed', issueId: 'MIN-1144',
+      data: { containers: [`${project('MIN-1144')}-api-1`, `${project('MIN-1144')}-fe-1`], episodeSince: olderSince },
+    }]);
+    await expect(runStackReclaimPoll(deps, createStackReclaimState())).resolves.toEqual({ kind: 'idle', reason: 'no-candidates' });
+    expect(deps.stopContainer).not.toHaveBeenCalled();
+  });
+
+  it('reclaims again once a stack.restored entry closes the older open reclaim (PAN-5648 skip-open-reclaim.ac2)', async () => {
+    const olderSince = new Date(T0 - 3600_000).toISOString();
+    const { deps, journals } = world();
+    journals.set(wsPath('MIN-1144'), [
+      {
+        at: olderSince, type: 'stack.reclaimed', issueId: 'MIN-1144',
+        data: { containers: [`${project('MIN-1144')}-api-1`, `${project('MIN-1144')}-fe-1`], episodeSince: olderSince },
+      },
+      { at: olderSince, type: 'stack.restored', issueId: 'MIN-1144' },
+    ]);
+    await expect(runStackReclaimPoll(deps, createStackReclaimState())).resolves.toMatchObject({ kind: 'reclaimed', issueId: 'MIN-1144' });
+    expect(journals.get(wsPath('MIN-1144'))!.at(-1)).toMatchObject({ type: 'stack.reclaimed', issueId: 'MIN-1144' });
+  });
+
+  it('reclaims again when an older open reclaim only names the container whose stop failed and is running again (PAN-5648 skip-open-reclaim.ac3)', async () => {
+    const olderSince = new Date(T0 - 3600_000).toISOString();
+    const { deps, journals } = world();
+    journals.set(wsPath('MIN-1144'), [{
+      at: olderSince, type: 'stack.reclaimed', issueId: 'MIN-1144',
+      data: { containers: [`${project('MIN-1144')}-api-1`], episodeSince: olderSince },
+    }]);
+    await expect(runStackReclaimPoll(deps, createStackReclaimState())).resolves.toMatchObject({ kind: 'reclaimed', issueId: 'MIN-1144' });
+    expect(journals.get(wsPath('MIN-1144'))!.at(-1)).toMatchObject({ type: 'stack.reclaimed', issueId: 'MIN-1144' });
+  });
+
+  it('checks every ranked candidate for a free blocker declaration, budgeting the merge gate to the top three (PAN-5648 blocker-scan-all.ac1)', async () => {
+    const issues = ['MIN-2001', 'MIN-2002', 'MIN-2003', 'MIN-2004'];
+    const { deps, journals, memory } = world({
+      listWorkspaces: vi.fn(() => issues.map((issue) => workspace(issue))),
+      listRunningContainers: vi.fn(async () => issues.flatMap((issue) => [stackContainer(issue, 'api')])),
+      mergeReady: vi.fn(async () => false),
+    });
+    issues.forEach((issue, index) => memory.set(`${project(issue)}-api-1`, (issues.length - index) * GiB));
+    journals.set(wsPath('MIN-2004'), [{ at: SINCE, type: 'blocked.declared', issueId: 'MIN-2004', data: { item: 'wi1', blockers: ['PAN-1'] } }]);
+
+    const result = await runStackReclaimPoll(deps, createStackReclaimState());
+
+    expect(result).toMatchObject({ kind: 'reclaimed', issueId: 'MIN-2004' });
+    expect(stoppedIds(deps)).toEqual([`id-${project('MIN-2004')}-api-1`]);
+    expect(deps.mergeReady).toHaveBeenCalledTimes(3);
+  });
+
+  it('gives up once the merge gate has been asked three times with nothing parked (PAN-5648 blocker-scan-all.ac2)', async () => {
+    const issues = ['MIN-3001', 'MIN-3002', 'MIN-3003', 'MIN-3004', 'MIN-3005'];
+    const { deps, memory } = world({
+      listWorkspaces: vi.fn(() => issues.map((issue) => workspace(issue))),
+      listRunningContainers: vi.fn(async () => issues.flatMap((issue) => [stackContainer(issue, 'api')])),
+      mergeReady: vi.fn(async () => false),
+    });
+    issues.forEach((issue, index) => memory.set(`${project(issue)}-api-1`, (issues.length - index) * GiB));
+
+    await expect(runStackReclaimPoll(deps, createStackReclaimState())).resolves.toEqual({ kind: 'idle', reason: 'none-parked' });
+
+    expect(deps.mergeReady).toHaveBeenCalledTimes(3);
+    expect(deps.stopContainer).not.toHaveBeenCalled();
+  });
+
   it('reclaims an issue with an idle work pane and a finished review pane', async () => {
     const { deps } = world({
       listPanes: vi.fn(async () => [
@@ -377,6 +454,25 @@ describe('runStackRestorePoll (PAN-5623 WI-13)', () => {
     expect(state.seeded).toBe(true);
   });
 
+  it('leaves seeded false when one workspace journal is unreadable, and indexes it once a later tick can read it (PAN-5648 journal-read-null.ac3)', async () => {
+    const { deps, journals } = world({ listWorkspaces: vi.fn(() => [workspace('MIN-1144'), workspace('MIN-1146')]) });
+    journals.set(wsPath('MIN-1144'), [RECLAIMED]);
+    journals.set(wsPath('MIN-1146'), [{ ...RECLAIMED, issueId: 'MIN-1146' }]);
+    deps.readJournal.mockImplementation((path: string) => (path === wsPath('MIN-1146') ? null : [...(journals.get(path) ?? [])]));
+    const state = createStackReclaimState();
+
+    await runStackRestorePoll(deps, state);
+
+    expect(state.seeded).toBe(false);
+    expect([...state.restoreIndex]).toEqual([['MIN-1144', wsPath('MIN-1144')]]);
+
+    deps.readJournal.mockImplementation((path: string) => [...(journals.get(path) ?? [])]);
+    await runStackRestorePoll(deps, state);
+
+    expect(state.seeded).toBe(true);
+    expect(state.restoreIndex.has('MIN-1146')).toBe(true);
+  });
+
   it('restores with trigger turn when a work pane is mid-turn, then drops the issue', async () => {
     const { deps, journals } = world({
       listPanes: vi.fn(async () => [pane({ issue: 'MIN-1144', agentId: 'agent-min-1144' })]),
@@ -415,10 +511,61 @@ describe('runStackRestorePoll (PAN-5623 WI-13)', () => {
     expect(state.restoreIndex.size).toBe(0);
   });
 
+  it('keeps an indexed reclaim when its journal is unreadable this tick, then restores once it is readable (PAN-5648 journal-read-null.ac2)', async () => {
+    const { deps, journals } = world({
+      listPanes: vi.fn(async () => [pane({ issue: 'MIN-1144', agentId: 'agent-min-1144' })]),
+      turnState: vi.fn((): TurnState => 'in-turn'),
+    });
+    journals.set(wsPath('MIN-1144'), [RECLAIMED]);
+    deps.readJournal.mockReturnValueOnce(null);
+    const state = createStackReclaimState();
+    state.seeded = true;
+    state.restoreIndex.set('MIN-1144', wsPath('MIN-1144'));
+
+    await runStackRestorePoll(deps, state);
+
+    expect(deps.restore).not.toHaveBeenCalled();
+    expect(state.restoreIndex.has('MIN-1144')).toBe(true);
+
+    await runStackRestorePoll(deps, state);
+
+    expect(deps.restore).toHaveBeenCalledExactlyOnceWith({ issueId: 'MIN-1144', workspacePath: wsPath('MIN-1144'), trigger: 'turn' });
+  });
+
   it('never reads the pane inventory with an empty index', async () => {
     const { deps } = world();
     await runStackRestorePoll(deps, createStackReclaimState());
     expect(deps.listPanes).not.toHaveBeenCalled();
+  });
+
+  it('measures the retry backoff from after the failed restore returns, not from before it (PAN-5648 retry-after-failure.ac1 ac2)', async () => {
+    let clock = T0;
+    const { deps, journals } = world({
+      now: vi.fn(() => clock),
+      listPanes: vi.fn(async () => [pane({ issue: 'MIN-1144', agentId: 'agent-min-1144', state: 'working' })]),
+      restore: vi.fn(async () => {
+        clock += 70_000; // the restore attempt itself took 70 s of wall time
+        return { kind: 'failed' as const, failed: [`${project('MIN-1144')}-api-1`], error: 'port is already allocated' };
+      }),
+    });
+    journals.set(wsPath('MIN-1144'), [RECLAIMED]);
+    const state = createStackReclaimState();
+
+    await runStackRestorePoll(deps, state);
+    expect(deps.restore).toHaveBeenCalledTimes(1);
+    const failedAt = clock; // T0 + 70_000
+
+    clock = failedAt + 5_000;
+    await runStackRestorePoll(deps, state);
+    expect(deps.restore).toHaveBeenCalledTimes(1);
+
+    clock = failedAt + 59_000;
+    await runStackRestorePoll(deps, state);
+    expect(deps.restore).toHaveBeenCalledTimes(1);
+
+    clock = failedAt + 60_000;
+    await runStackRestorePoll(deps, state);
+    expect(deps.restore).toHaveBeenCalledTimes(2);
   });
 
   it('retries a failed restore no sooner than 60 s later', async () => {

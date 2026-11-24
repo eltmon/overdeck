@@ -69,6 +69,21 @@ describe('panesAllowReclaim (PAN-5623)', () => {
     expect(panesAllowReclaim([pane({ agentId: 'a' })], at('in-turn'))).toEqual({ ok: false, reason: 'pane-in-turn' });
     expect(panesAllowReclaim([pane({ agentId: 'a' })], at('unknown'))).toEqual({ ok: false, reason: 'pane-unknown' });
   });
+
+  it('rejects a work pane whose state is unknown (PAN-5648 pane-known-idle.ac1)', () => {
+    expect(panesAllowReclaim([pane({ agentId: 'a', state: 'unknown' })], at('boundary')))
+      .toEqual({ ok: false, reason: 'pane-not-idle' });
+  });
+
+  it('rejects a work pane whose state is blocked (PAN-5648 pane-known-idle.ac2)', () => {
+    expect(panesAllowReclaim([pane({ agentId: 'a', state: 'blocked' })], at('boundary')))
+      .toEqual({ ok: false, reason: 'pane-not-idle' });
+  });
+
+  it('accepts a done or idle work pane at a turn boundary (PAN-5648 pane-known-idle.ac3)', () => {
+    expect(panesAllowReclaim([pane({ agentId: 'a', state: 'done' })], at('boundary'))).toEqual({ ok: true });
+    expect(panesAllowReclaim([pane({ agentId: 'a', state: 'idle' })], at('boundary'))).toEqual({ ok: true });
+  });
 });
 
 describe('panesNeedStack (PAN-5623)', () => {

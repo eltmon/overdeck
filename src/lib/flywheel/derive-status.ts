@@ -247,9 +247,20 @@ async function livePanes(
   return panes.filter((_pane, index) => verdicts[index] === true);
 }
 
-async function defaultJournalTail(workspacePath: string): Promise<readonly PipelineJournalEntry[]> {
+/**
+ * PAN-5648 r4672667750: a `limit`-at-read-time tail could be entirely
+ * `stack.*` housekeeping when 50+ of those trail the journal, losing a real
+ * pipeline entry (e.g. `blocked.declared`) the Flywheel still needs. Read
+ * the whole journal, drop housekeeping, then keep the last 50 of what's left.
+ */
+export async function readFlywheelJournalTail(workspacePath: string): Promise<readonly PipelineJournalEntry[]> {
   const { readPipelineJournal } = await import('../cloister/pipeline-journal.js');
-  return readPipelineJournal(workspacePath, { limit: JOURNAL_TAIL_LIMIT });
+  const entries = readPipelineJournal(workspacePath).filter((entry) => !isHousekeepingEntry(entry));
+  return entries.slice(-JOURNAL_TAIL_LIMIT);
+}
+
+async function defaultJournalTail(workspacePath: string): Promise<readonly PipelineJournalEntry[]> {
+  return readFlywheelJournalTail(workspacePath);
 }
 
 const JOURNAL_TAIL_LIMIT = 50;
