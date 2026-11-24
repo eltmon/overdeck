@@ -169,8 +169,9 @@ The stopped containers start again when:
 
 Opening a stopped workspace's app URL shows a short "Starting it…" page, starts
 the containers and loads the app once it answers. Scripts and agents get `503`
-with `Retry-After: 5` until then, so `curl --retry 12 --retry-delay 5 -f <url>`
-waits for it. While the app is stopped, the Command Deck issue row shows a
+with `Retry-After: 5` until then, so
+`curl --location --retry 12 --retry-delay 5 -f <url>` waits for it (`--location`
+follows the redirect to the host the app answers on). While the app is stopped, the Command Deck issue row shows a
 **start app** button in place of the `app ↗` link.
 
 ```bash

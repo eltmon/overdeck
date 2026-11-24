@@ -25,6 +25,8 @@ const execFileAsync = promisify(execFile);
 
 /** A workspace app host: `feature-<issue id, lower case>.<domain>`. */
 export const WAKE_HOST_RE = /^feature-([a-z0-9]+-[0-9]+)\.([a-z0-9.-]+)$/;
+/** The host shape the Traefik wake router matches (its HostRegexp rule), case-insensitive. */
+const WAKE_ROUTER_HOST_RE = /^feature-[a-z0-9]+-[0-9]+\..+$/i;
 /** Answered by the dashboard (never wakes) while the wake router serves the host. */
 export const WAKE_STATUS_PATH = '/__overdeck_wake/status';
 /** Response header that marks a dashboard wake answer (FR-8, FR-9). */
@@ -57,7 +59,9 @@ export function parseWakeHost(host: string | undefined): { issueId: string; doma
 /** FR-2: true when the request came through the wake router (marker `1`) and its Host is a workspace app host. */
 export function isWakeRouterRequest(headers: NodeHeaders): boolean {
   if (headerValue(headers, WAKE_ROUTER_HEADER)?.trim() !== '1') return false;
-  return parseWakeHost(headerValue(headers, 'host')) !== null;
+  // Match the wake router's own rule, not the stricter WAKE_HOST_RE: every request the
+  // router forwards is consumed, and the handler rejects an invalid host with 404.
+  return WAKE_ROUTER_HOST_RE.test((headerValue(headers, 'host') ?? '').trim());
 }
 
 /** FR-5: the `Accept: text/x-vite-ping` fetch an older Vite client sends to decide whether to reload a tab. */
@@ -142,7 +146,7 @@ export function renderWorkspaceWakeTraefikConfig(apiPort: number): string {
 }
 
 const ROUTER_RULE_KEY_RE = /^traefik\.http\.routers\.[^.]+\.rule$/;
-const HOST_IN_RULE_RE = /Host\(`([^`]+)`\)/g;
+const HOST_IN_RULE_RE = /Host\((?:`([^`]+)`|"([^"]+)")\)/g;
 
 /**
  * Label maps → the first host inside a `traefik.http.routers.*.rule`
@@ -154,7 +158,7 @@ export function labelHostFromLabels(issueId: string, labelMaps: ReadonlyArray<Re
     for (const [key, rule] of Object.entries(labels ?? {})) {
       if (!ROUTER_RULE_KEY_RE.test(key) || typeof rule !== 'string') continue;
       for (const match of rule.matchAll(HOST_IN_RULE_RE)) {
-        const host = match[1].trim().toLowerCase();
+        const host = (match[1] ?? match[2] ?? '').trim().toLowerCase();
         if (host.split('.')[0] === wantedLabel && host.includes('.')) return host;
       }
     }
@@ -200,7 +204,11 @@ export async function readWorkspaceLabelHost(
       if (!line.trim()) continue;
       try {
         const parsed: unknown = JSON.parse(line);
-        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) labelMaps.push(parsed as Record<string, string>);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) continue;
+        const labels = parsed as Record<string, string>;
+        // A name can be reused between `docker ps` and `docker inspect`; keep only this project's containers.
+        if (labels['com.docker.compose.project'] !== composeProject) continue;
+        labelMaps.push(labels);
       } catch {
         // A line that is not JSON is skipped.
       }

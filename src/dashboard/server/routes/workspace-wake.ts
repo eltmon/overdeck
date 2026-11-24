@@ -159,12 +159,13 @@ async function runWake(id: string, trigger: 'browser' | 'dashboard', d: Workspac
     if (result.kind === 'woken') {
       const restoredStarted = result.restored.kind === 'restored' ? result.restored.started : [];
       const restoredRunning = result.restored.kind === 'restored' ? result.restored.alreadyRunning : [];
-      status = {
-        issueId: id,
-        state: 'started',
-        started: [...new Set([...restoredStarted, ...result.started])],
-        alreadyRunning: [...new Set([...restoredRunning, ...result.alreadyRunning])],
-      };
+      const started = [...new Set([...restoredStarted, ...result.started])];
+      // A container the restore door started shows up running in the second listing; it was not already running.
+      const alreadyRunning = [...new Set([...restoredRunning, ...result.alreadyRunning])].filter((name) => !started.includes(name));
+      status = started.length === 0 && alreadyRunning.length === 0
+        // The compose project is bound but has no wakeable container: nothing was started and nothing runs.
+        ? { issueId: id, state: 'no-stack', reason: 'no-compose-project', started: [], alreadyRunning: [] }
+        : { issueId: id, state: 'started', started, alreadyRunning };
     } else if (result.kind === 'no-stack') {
       status = { issueId: id, state: 'no-stack', reason: result.reason, started: [], alreadyRunning: [] };
     } else {
@@ -282,6 +283,9 @@ export function renderWakePage(input: { issueId: string; host: string }): string
       show('Starting failed: ' + (body.error || 'unknown error') + '. Run pan workspace up ' + ISSUE_ID + ' in a terminal.');
     } else if (body.state === 'no-stack') {
       show(ISSUE_ID + ' has no Docker stack to start.');
+    } else if (body.state === 'idle') {
+      // The dashboard lost the wake (for example it restarted). Polling never starts a stack.
+      show('Nothing is starting ' + ISSUE_ID + "'s app. Reload this page to start it, or run pan workspace up " + ISSUE_ID + ' in a terminal.');
     } else if (body.state === 'started') {
       if (startedSince === null) startedSince = Date.now();
       if (Date.now() - startedSince > STARTED_LIMIT_MS) {
@@ -294,7 +298,9 @@ export function renderWakePage(input: { issueId: string; host: string }): string
     }
   }
   function poll() {
-    fetch(STATUS_PATH, { cache: 'no-store' }).then(function (res) {
+    // redirect: 'manual' — an app that redirects the probe to its sign-in page answers with an
+    // opaque redirect (status 0), which counts as "the app answers"; following it could be blocked by CSP.
+    fetch(STATUS_PATH, { cache: 'no-store', redirect: 'manual' }).then(function (res) {
       var hasWakeHeader = res.headers.has(WAKE_HEADER);
       if (wakePollDecision(res.status, hasWakeHeader) === 'reload') {
         location.reload();

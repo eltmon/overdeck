@@ -77,6 +77,10 @@ describe('isWakeRouterRequest (PAN-5649)', () => {
     expect(isWakeRouterRequest({ host: 'feature-pan-5649.overdeck.localhost' })).toBe(false);
   });
 
+  it('is true for any host the wake router matches, even one the handler will reject (CodeRabbit 4675400958)', () => {
+    expect(isWakeRouterRequest({ host: 'feature-pan-1.dev_test.localhost', 'x-overdeck-wake-router': '1' })).toBe(true);
+  });
+
   it('is false for the dashboard host with the marker', () => {
     expect(isWakeRouterRequest({ host: 'overdeck.localhost', 'x-overdeck-wake-router': '1' })).toBe(false);
   });
@@ -112,6 +116,12 @@ describe('labelHostFromLabels (PAN-5649)', () => {
     ).toBeNull();
   });
 
+  it('reads a double-quoted Host rule (CodeRabbit 4675400968)', () => {
+    expect(
+      labelHostFromLabels('PAN-5649', [{ 'traefik.http.routers.fe.rule': 'Host("feature-pan-5649.overdeck.localhost")' }]),
+    ).toBe('feature-pan-5649.overdeck.localhost');
+  });
+
   it('ignores labels that are not router rules', () => {
     expect(
       labelHostFromLabels('PAN-5649', [{ 'com.example.note': 'Host(`feature-pan-5649.overdeck.localhost`)' }]),
@@ -120,6 +130,17 @@ describe('labelHostFromLabels (PAN-5649)', () => {
 });
 
 describe('readWorkspaceLabelHost (PAN-5649)', () => {
+  it('ignores an inspected container of another compose project (CodeRabbit 4675400974)', async () => {
+    const runDocker = vi.fn(async (args: readonly string[]) => {
+      if (args[0] === 'ps') return 'pan-5649-frontend-1\n';
+      return JSON.stringify({
+        'com.docker.compose.project': 'someone-else',
+        'traefik.http.routers.x.rule': 'Host(`feature-pan-5649.evil.localhost`)',
+      });
+    });
+    expect(await readWorkspaceLabelHost('PAN-5649', 'overdeck-feature-pan-5649', { runDocker })).toBeNull();
+  });
+
   it('makes no docker call for an invalid compose project', async () => {
     const runDocker = vi.fn(async () => '');
     expect(await readWorkspaceLabelHost('PAN-5649', 'bad project;rm', { runDocker })).toBeNull();
@@ -136,9 +157,15 @@ describe('readWorkspaceLabelHost (PAN-5649)', () => {
     const runDocker = vi.fn(async (args: readonly string[]) => {
       if (args[0] === 'ps') return 'pan-5649-frontend-1\nbad name\npan-5649-server-1\n';
       return [
-        JSON.stringify({ 'traefik.http.routers.pan-fe-feature-pan-5649.rule': 'Host(`feature-pan-5649.overdeck.localhost`)' }),
+        JSON.stringify({
+          'com.docker.compose.project': 'overdeck-feature-pan-5649',
+          'traefik.http.routers.pan-fe-feature-pan-5649.rule': 'Host(`feature-pan-5649.overdeck.localhost`)',
+        }),
         'not json',
-        JSON.stringify({ 'traefik.http.routers.pan-api-feature-pan-5649.rule': 'Host(`api-feature-pan-5649.overdeck.localhost`)' }),
+        JSON.stringify({
+          'com.docker.compose.project': 'overdeck-feature-pan-5649',
+          'traefik.http.routers.pan-api-feature-pan-5649.rule': 'Host(`api-feature-pan-5649.overdeck.localhost`)',
+        }),
       ].join('\n');
     });
     expect(await readWorkspaceLabelHost('PAN-5649', 'overdeck-feature-pan-5649', { runDocker })).toBe('feature-pan-5649.overdeck.localhost');

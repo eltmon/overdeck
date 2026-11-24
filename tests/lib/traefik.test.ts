@@ -77,6 +77,7 @@ describe('traefik config generation', () => {
     expect(production).toContain('X-Overdeck-Wake-Router');
     expect(production).toContain('http://host.docker.internal:4102');
 
+    rmSync(wakePath);
     expect(generateOverdeckTraefikConfig('dev')).toBe(true);
     expect(readFileSync(wakePath, 'utf-8')).toBe(production);
   });

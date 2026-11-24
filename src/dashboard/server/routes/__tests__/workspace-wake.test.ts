@@ -200,6 +200,15 @@ describe('setupWorkspaceWakeHost dispatch (PAN-5649)', () => {
     expect(readLabelHost).not.toHaveBeenCalled();
   });
 
+  it('consumes a marked request for a host the wake router matches but the handler rejects (CodeRabbit 4675400958)', async () => {
+    const { deps, wake } = makeDeps();
+    harness = await startServer(deps);
+    const reply = await send(harness.port, { headers: { host: 'feature-pan-1.dev_test.localhost', ...MARKER } });
+    expect(reply.status).toBe(404);
+    expect(harness.requestListener).not.toHaveBeenCalled();
+    expect(wake).not.toHaveBeenCalled();
+  });
+
   it('destroys a Vite ping socket without a status line', async () => {
     const { deps, wake } = makeDeps();
     harness = await startServer(deps);
@@ -306,6 +315,27 @@ describe('requestWorkspaceWake (PAN-5649)', () => {
     expect(wake).toHaveBeenCalledTimes(2);
   });
 
+  it('keeps containers the restore door started out of alreadyRunning (CodeRabbit 4675400932)', async () => {
+    const wake = vi.fn(async (): Promise<StackWakeResult> => ({
+      kind: 'woken',
+      restored: { kind: 'restored', started: ['pan-1-frontend-1'], alreadyRunning: [], missing: [], refused: [] },
+      started: [],
+      alreadyRunning: ['pan-1-frontend-1', 'pan-1-server-1'],
+    }));
+    const { deps } = makeDeps({ wake });
+    expect(await requestWorkspaceWake('PAN-1', 'dashboard', deps)).toMatchObject({
+      state: 'started',
+      started: ['pan-1-frontend-1'],
+      alreadyRunning: ['pan-1-server-1'],
+    });
+  });
+
+  it('reports no-stack when the compose project has no wakeable container (CodeRabbit 4675400929)', async () => {
+    const wake = vi.fn(async (): Promise<StackWakeResult> => ({ kind: 'woken', restored: { kind: 'none' }, started: [], alreadyRunning: [] }));
+    const { deps } = makeDeps({ wake });
+    expect(await requestWorkspaceWake('PAN-1', 'dashboard', deps)).toMatchObject({ state: 'no-stack', reason: 'no-compose-project' });
+  });
+
   it('turns a thrown wake into failed and maps no-stack', async () => {
     const thrown = makeDeps({ wake: vi.fn(async () => { throw new Error('kaboom'); }) });
     expect(await requestWorkspaceWake('PAN-1', 'browser', thrown.deps)).toMatchObject({ state: 'failed', error: 'kaboom' });
@@ -348,6 +378,8 @@ describe('renderWakePage (PAN-5649)', () => {
     expect(html).not.toContain('<x>');
     expect(html).toContain(wakePollDecision.toString());
     expect(html).toContain('/__overdeck_wake/status');
+    expect(html).toContain("redirect: 'manual'");
+    expect(html).toContain("Nothing is starting");
   });
 });
 
