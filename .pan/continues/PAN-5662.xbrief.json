@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5662",
   "created": "2026-11-24T07:26:43.859Z",
-  "updated": "2026-11-24T07:47:22.857Z",
+  "updated": "2026-11-24T07:47:23.894Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -132,6 +132,11 @@
     "at-files-menu.ac5": {
       "status": "completed",
       "doneAt": "2026-11-24T07:47:22.857Z"
+    },
+    "dollar-skills-menu": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5662",
+      "claimedAt": "2026-11-24T07:47:23.894Z"
     }
   }
 }
