@@ -209,6 +209,13 @@ vi.mock('node:child_process', async (importActual) => {
   };
 });
 
+// PAN-5652: the role-pane check asks the liveness oracle, never tmux has-session.
+// Default: no agent there, matching the tmux mock's sessionExists(false).
+vi.mock('../../agents/liveness.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../agents/liveness.js')>()),
+  isAlive: vi.fn(async () => ({ alive: false, reason: 'no-session' })),
+}));
+
 vi.mock('../../tmux.js', async () => {
   const { Effect } = await import('effect');
   const effectMock = (initial?: unknown) => {

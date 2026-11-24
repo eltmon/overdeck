@@ -5,7 +5,7 @@ import type { Role } from '../agents.js';
 import { emitActivityEntry } from '../activity-logger.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { closeAgentPaneDetailed } from '../terminal-backends/launch.js';
-import { probeAgentPane } from '../terminal-backends/agent-pane-io.js';
+import { isAlive, isConfirmedDead } from '../agents/liveness.js';
 import {
   decideAutonomousPlanDispatch,
   gatherAutonomousPlanDispatchInput,
@@ -102,12 +102,14 @@ function roleFromAgentId(agentId: string, issueId: string): Role | null {
 const STARTING_WITHOUT_SESSION_GRACE_MS = 120_000;
 
 /**
- * PAN-5652: does the role's pane exist on the host's backend? tmux
- * has-session is false for every Herdr agent. A probe that cannot answer reads
- * as present, so a starting agent is never declared a crashed spawn on it.
+ * PAN-5652: is the role's agent still there? The liveness oracle asks the
+ * host's backend and, on a Herdr host, a legacy tmux session of the same name
+ * (tmux has-session alone is false for every Herdr agent). A probe that
+ * cannot answer reads as present, so a starting agent is never declared a
+ * crashed spawn on it.
  */
 async function rolePaneExists(agentId: string): Promise<boolean> {
-  return (await probeAgentPane(agentId).catch(() => 'unknown' as const)) !== 'gone';
+  return !isConfirmedDead(await isAlive(agentId));
 }
 
 function isFreshStarting(state: { startedAt?: string }): boolean {

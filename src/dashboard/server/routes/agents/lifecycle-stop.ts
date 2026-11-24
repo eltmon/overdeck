@@ -16,6 +16,7 @@ import { emitActivityEntry } from '../../../../lib/activity-logger.js';
 import { operatorInterventionEvent } from '../../../../lib/operator-interventions.js';
 import { stopWorkspaceDocker } from '../../../../lib/workspace-manager.js';
 import { agentPaneExists, closeAgentPane, closeAgentPaneDetailed } from '../../../../lib/terminal-backends/launch.js';
+import { isAlive } from '../../../../lib/agents/liveness.js';
 import {
   describeSweepProblems,
   describeUnpauseRestartProblems,
@@ -110,8 +111,8 @@ export function createAgentStopHandler(
       // disk. Emit agent.status_changed alongside it (not instead of it) so
       // agent.stopped's permission-request/session-index cleanup still runs,
       // and this fold (buildAgentControlEventPayload) carries stoppedByUser.
-      // PAN-5652: a live pane on the host's backend (tmux has-session misses Herdr).
-      const hasLiveTmuxSessionAfterStop = yield* Effect.promise(() => agentPaneExists(id).catch(() => false));
+      // PAN-5652: the liveness oracle (Herdr, then a legacy tmux session of the name).
+      const hasLiveTmuxSessionAfterStop = yield* Effect.promise(async () => (await isAlive(id)).alive);
       yield* saveAgentStateAndEmitEventProgram(stateAfterStop, {
         type: 'agent.status_changed',
         timestamp: new Date().toISOString(),
@@ -269,8 +270,8 @@ export const postAgentPauseRoute = HttpRouter.add(
     // append in one SQLite transaction.
     // PAN-2633: assert pane liveness at emission time so the reducer knows whether
     // this stop-shaped transition is idle-alive (preserve pending-input payload).
-    // PAN-5652: on the host's backend; tmux has-session misses every Herdr pane.
-    const hasLiveTmuxSession = yield* Effect.promise(() => agentPaneExists(id).catch(() => false));
+    // PAN-5652: the liveness oracle (Herdr, then a legacy tmux session of the name).
+    const hasLiveTmuxSession = yield* Effect.promise(async () => (await isAlive(id)).alive);
     yield* saveAgentStateAndEmitEventProgram(updatedState, {
       type: 'agent.status_changed',
       timestamp: new Date().toISOString(),
@@ -374,8 +375,8 @@ export const postAgentUnpauseRoute = HttpRouter.add(
     // append in one SQLite transaction.
     // PAN-2633: assert pane liveness at emission time so the reducer knows whether
     // this stop-shaped transition is idle-alive (preserve pending-input payload).
-    // PAN-5652: on the host's backend; tmux has-session misses every Herdr pane.
-    const hasLiveTmuxSession = yield* Effect.promise(() => agentPaneExists(id).catch(() => false));
+    // PAN-5652: the liveness oracle (Herdr, then a legacy tmux session of the name).
+    const hasLiveTmuxSession = yield* Effect.promise(async () => (await isAlive(id)).alive);
     yield* saveAgentStateAndEmitEventProgram(updatedState, {
       type: 'agent.status_changed',
       timestamp: new Date().toISOString(),

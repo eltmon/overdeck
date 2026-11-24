@@ -9,6 +9,7 @@ import { basename } from 'path';
 import { readLatestIndexedSessionId } from '../session-history.js';
 import { getAllSessionFiles, parseClaudeSession } from '../cost-parsers/jsonl-parser.js';
 import { isAlive } from '../agents/liveness.js';
+import { getAgentState } from '../agents/agent-state-read.js';
 import {
   getAllSpecialists,
   getSpecialistMetadata,
@@ -109,19 +110,33 @@ export function countContextTokens(name: SpecialistAgentName): number | null {
 }
 
 /**
- * Check if a specialist is currently running
+ * PAN-5652: a specialist session's state, from the liveness oracle (both
+ * backends; tmux has-session alone is false for every Herdr agent).
  *
- * PAN-5652: asks the liveness oracle, which covers both backends and the
- * crashed-harness case (session or pane left behind with no harness in it).
- * tmux has-session alone is false for every Herdr agent.
+ * The oracle looks for the agent's recorded harness and assumes claude-code
+ * when none is recorded. Specialist state does not record one, so a live pane
+ * whose claude-code process is missing (`runtime-missing`) is `running` when
+ * no harness is recorded: the pane holds a process the probe cannot name. A
+ * probe that cannot answer is `unknown`, never `stopped`.
+ */
+export async function specialistSessionState(session: string): Promise<'running' | 'stopped' | 'unknown'> {
+  const verdict = await isAlive(session);
+  if (verdict.alive) return 'running';
+  if (verdict.reason === 'runtime-indeterminate') return 'unknown';
+  if (verdict.reason === 'runtime-missing' && !getAgentState(session)?.harness) return 'running';
+  return 'stopped';
+}
+
+/**
+ * Check if a specialist is currently running
  *
  * @param name - Specialist name
  * @param projectKey - Optional project key for per-project specialists
- * @returns True if the oracle confirms the specialist's harness is running
+ * @returns True if the specialist's session is running (see `specialistSessionState`)
  */
 export async function isRunning(name: SpecialistAgentName, projectKey?: string): Promise<boolean> {
   try {
-    return (await isAlive(getTmuxSessionName(name, projectKey))).alive;
+    return (await specialistSessionState(getTmuxSessionName(name, projectKey))) === 'running';
   } catch {
     return false;
   }
