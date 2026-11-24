@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5662",
   "created": "2026-11-24T07:26:43.859Z",
-  "updated": "2026-11-24T07:51:06.185Z",
+  "updated": "2026-11-24T07:51:07.318Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -172,6 +172,11 @@
     "composer-placeholder.ac3": {
       "status": "completed",
       "doneAt": "2026-11-24T07:51:06.185Z"
+    },
+    "docs-composer-triggers": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5662",
+      "claimedAt": "2026-11-24T07:51:07.317Z"
     }
   }
 }
