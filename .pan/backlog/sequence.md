@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-24T00:33:23Z · model: claude-opus-5-5 · open: 957_
+_Last sequenced: 2026-11-24T01:03:45Z · model: claude-opus-5-5 · open: 956_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -85,7 +85,6 @@ _Last sequenced: 2026-11-24T00:33:23Z · model: claude-opus-5-5 · open: 957_
 | 68 | PAN-5228 | S | high | ok |  |  | Advisory CodeRabbit journal entries land last and hide stalled reviews from recoverStalledReviews and other last-entry readers. |
 | 69 | PAN-4344 | S | high | ok |  |  | Registered projects lack the agent main-push guard; ship a pre-push hook so agents cannot push to main outside overdeck |
 | 70 | PAN-4550 | XS | medium | ok |  |  | Two unit tests read host state (DASHSCOPE_BASE_URL, git-ignored .map files), so pan release check reports false reds locally |
-| 70 | PAN-5648 | S | low | ok |  |  | PR #5650 merged and issue is closed-out; only tracker close remains. Follow-up findings moved to PAN-5653. |
 | 71 | PAN-4566 | S | high | ok |  |  | A failed replayEvents leaves the coordinator un-bootstrapped; tab defers live events with no banner. PAN-4559 fallback has landed. |
 | 71 | PAN-5653 | S | high | ok |  |  | 3 CodeRabbit findings on merged PAN-5648; 2 Major: stack lock does not fence a stale holder, file-lock release can delete a new lock. |
 | 72 | PAN-5193 | XS | high | ok |  |  | PRD-first gate reads a short main stub before the full workspace draft and refuses finalize for epic children. |
@@ -1292,10 +1291,10 @@ Found cutting v0.65.0: CI was green but the local release check failed on two ho
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-24T00:33:23Z",
+  "generatedAt": "2026-11-24T01:03:45Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 957,
+  "openCount": 956,
   "nodes": [
     {
       "issue": "PAN-5637",
@@ -2341,19 +2340,6 @@ Found cutting v0.65.0: CI was green but the local release check failed on two ho
       "dependsOn": [],
       "why": "Two unit tests read host state (DASHSCOPE_BASE_URL, git-ignored .map files), so pan release check reports false reds locally",
       "rationale": "Found cutting v0.65.0: CI was green but the local release check failed on two host-dependent tests. XS fix that removes false reds from the release verb, so it sits above routine medium work.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5648",
-      "rank": 70,
-      "size": "S",
-      "importance": "low",
-      "score": 20,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "PR #5650 merged and issue is closed-out; only tracker close remains. Follow-up findings moved to PAN-5653.",
-      "rationale": "Its PR #5650 merged and the issue carries closed-out, so it is no longer workable; kept at its rank to avoid reshuffling until the tracker closes it.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -14649,13 +14635,6 @@ Found cutting v0.65.0: CI was green but the local release check failed on two ho
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.8
-    },
-    {
-      "from": "PAN-5648",
-      "to": "PAN-5653",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
     },
     {
       "from": "PAN-5652",
