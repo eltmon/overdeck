@@ -8,6 +8,7 @@ import {
   EMPTY_SKILL_COMMANDS,
   skillContextForConversation,
   toSkillSlashCommands,
+  useSkillMentionCommands,
   useSkillSlashCommands,
 } from '../skillSlashCommands';
 
@@ -123,5 +124,61 @@ describe('useSkillSlashCommands (PAN-5347)', () => {
     await act(async () => {});
 
     expect(warn).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('useSkillMentionCommands (PAN-5662)', () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  it('fetches once for codex when active turns true, and returns the mapped list', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ skills: [{ name: 'pan-flywheel', description: 'Run the flywheel', enabled: true }] }),
+    });
+    const { result, rerender } = renderHook(
+      ({ active }: { active: boolean }) => useSkillMentionCommands({
+        harness: 'codex', context: { conversationName: 'conv-a' }, active,
+      }),
+      { initialProps: { active: false } },
+    );
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result.current).toBe(EMPTY_SKILL_COMMANDS);
+
+    rerender({ active: true });
+
+    await waitFor(() => expect(result.current).not.toBe(EMPTY_SKILL_COMMANDS));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/skills/overrides?conversation=conv-a');
+    expect(result.current).toEqual([
+      { id: 'skill-pan-flywheel', label: '/pan-flywheel', description: 'Run the flywheel', insert: '/pan-flywheel ', category: 'Skills' },
+    ]);
+  });
+
+  it('never fetches for a harness without a skill mention form or an undefined context', async () => {
+    const { result: piResult, rerender: rerenderPi } = renderHook(
+      ({ active }: { active: boolean }) => useSkillMentionCommands({
+        harness: 'pi', context: { conversationName: 'conv-a' }, active,
+      }),
+      { initialProps: { active: false } },
+    );
+    rerenderPi({ active: true });
+
+    const { result: noContextResult, rerender: rerenderNoContext } = renderHook(
+      ({ active }: { active: boolean }) => useSkillMentionCommands({ harness: 'codex', context: undefined, active }),
+      { initialProps: { active: false } },
+    );
+    rerenderNoContext({ active: true });
+
+    await act(async () => {});
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(piResult.current).toBe(EMPTY_SKILL_COMMANDS);
+    expect(noContextResult.current).toBe(EMPTY_SKILL_COMMANDS);
   });
 });

@@ -8,6 +8,8 @@
  * - Auto-expands up to max-h-[200px], scrollable beyond that
  * - Draft persisted to localStorage (300ms debounce)
  * - Undo/redo via Lexical HistoryPlugin
+ * - Triggers (PAN-5662): `@` files, `$` skills and `/` commands open one shared
+ *   TriggerMenu; the default placeholder lists the triggers this composer offers
  */
 
 import { useEffect, useCallback, useMemo, useRef, useState, type RefObject } from 'react';
@@ -22,13 +24,27 @@ import {
   $getRoot,
   $createParagraphNode,
   $createTextNode,
+  $getSelection,
+  $isRangeSelection,
+  $isTextNode,
   KEY_ENTER_COMMAND,
   COMMAND_PRIORITY_HIGH,
 } from 'lexical';
+import { getHarnessBehavior } from '@overdeck/contracts';
 import type { Harness } from '../shared/ModelPicker';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 import { getSlashCommands, SLASH_COMMANDS, type SlashCommand } from './slashCommands';
-import { useSkillSlashCommands, type SkillSlashContext } from './skillSlashCommands';
+import { useSkillMentionCommands, useSkillSlashCommands, type SkillSlashContext } from './skillSlashCommands';
+import { TriggerMenu, caretAnchorRect, useTriggerMenuKeys } from './TriggerMenu';
+import {
+  composerPromptHint,
+  isWordStart,
+  mentionTriggerContext,
+  slashTriggerContext,
+  toSkillMentionItems,
+  type TriggerContext,
+} from './composerTriggers';
+import { useFileMentionItems } from './useFileMentionItems';
 import { loadDraft, saveDraft } from '../../lib/composerDraft';
 
 export { getSlashCommands, SLASH_COMMANDS };
@@ -40,7 +56,8 @@ export { loadDraft } from '../../lib/composerDraft';
 interface InnerPluginProps {
   conversationName: string;
   onCommandKeyDown: (key: 'Enter' | 'SteerEnter') => void;
-  onTextChange: (text: string) => void;
+  /** `beforeCaret` is the caret text node's text up to a collapsed caret, else null (PAN-5662). */
+  onTextChange: (text: string, beforeCaret: string | null, root: HTMLElement | null) => void;
   onSlashKey: (root: HTMLElement) => void;
 }
 
@@ -130,7 +147,15 @@ function ComposerPlugin({
     editor.read(() => {
       const text = $getRoot().getTextContent();
       latestTextRef.current = text;
-      onTextChange(text);
+      // An @ or $ token never contains whitespace, so it always lies inside
+      // the caret's text node (PAN-5662 D3).
+      let beforeCaret: string | null = null;
+      const selection = $getSelection();
+      if ($isRangeSelection(selection) && selection.isCollapsed()) {
+        const node = selection.anchor.getNode();
+        if ($isTextNode(node)) beforeCaret = node.getTextContent().slice(0, selection.anchor.offset);
+      }
+      onTextChange(text, beforeCaret, editor.getRootElement());
 
       if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
       draftTimerRef.current = setTimeout(() => {
@@ -167,6 +192,8 @@ export interface ComposerPromptEditorProps {
   slashCommandsEnabled?: boolean;
   /** The open conversation's skill scope (PAN-5347); the / menu's Skills group fetches from it. */
   skillContext?: SkillSlashContext;
+  /** Explorer root the @ menu searches (PAN-5662); null/undefined = no @ menu. */
+  fileRootId?: string | null;
   disabled?: boolean;
   placeholder?: string;
   onCommandKeyDown: (key: 'Enter' | 'SteerEnter') => void;
@@ -259,108 +286,54 @@ function filterCommands(commands: SlashCommand[], filter: string): SlashCommand[
   return rankWithinCategories(matches, normalizedFilter, aliasFilter);
 }
 
-function renderHighlightedText(text: string, filter: string, className: string) {
-  if (!filter) return text;
-
-  const normalizedText = text.toLowerCase();
-  const normalizedFilter = filter.toLowerCase();
-  const matchIndex = normalizedText.indexOf(normalizedFilter);
-
-  if (matchIndex < 0) return text;
-
-  const matchEnd = matchIndex + filter.length;
+export function SlashMenu({ commands, filter, selectedIndex, onSelect, onClose, anchorRect }: SlashMenuProps) {
+  const filtered = filterCommands(commands, filter);
+  if (filtered.length === 0) return null;
   return (
-    <>
-      {text.slice(0, matchIndex)}
-      <mark className={className}>{text.slice(matchIndex, matchEnd)}</mark>
-      {text.slice(matchEnd)}
-    </>
+    <TriggerMenu
+      items={filtered}
+      filter={filter}
+      selectedIndex={selectedIndex}
+      onSelect={onSelect}
+      onClose={onClose}
+      anchorRect={anchorRect}
+      ariaLabel="Slash commands"
+    />
   );
 }
 
-export function SlashMenu({ commands, filter, selectedIndex, onSelect, onClose, anchorRect }: SlashMenuProps) {
-  const filtered = filterCommands(commands, filter);
+// ─── Mention menus (@ files, $ skills) ─────────────────────────────────────────
 
-  const menuRef = useRef<HTMLDivElement>(null);
+type MentionChar = '@' | '$';
 
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (!target.closest(`.${styles.slashMenu}`)) {
-        onClose();
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [onClose]);
+const NO_MENTION_ITEMS: SlashCommand[] = [];
 
-  // Scroll the selected item into view
-  useEffect(() => {
-    if (menuRef.current) {
-      const selected = menuRef.current.querySelector('[aria-selected="true"]');
-      if (selected && typeof (selected as HTMLElement).scrollIntoView === 'function') {
-        (selected as HTMLElement).scrollIntoView({ block: 'nearest' });
-      }
-    }
-  }, [selectedIndex]);
+/** Stable trigger lists, so handleChange keeps its identity across renders. */
+const MENTION_CHARS: Record<'none' | 'files' | 'skills' | 'both', readonly MentionChar[]> = {
+  none: [],
+  files: ['@'],
+  skills: ['$'],
+  both: ['@', '$'],
+};
 
-  if (filtered.length === 0) return null;
+function mentionCharsFor(files: boolean, skills: boolean): readonly MentionChar[] {
+  if (files && skills) return MENTION_CHARS.both;
+  if (files) return MENTION_CHARS.files;
+  return skills ? MENTION_CHARS.skills : MENTION_CHARS.none;
+}
 
-  // Always position above the anchor (composer is at the bottom of the screen)
-  const left = anchorRect ? anchorRect.left : 0;
-  const bottom = anchorRect ? window.innerHeight - anchorRect.top + 4 : 0;
+/** The live @ or $ token before the caret, among the triggers this composer offers. */
+function mentionContextFor(beforeCaret: string | null, chars: readonly MentionChar[]): TriggerContext | null {
+  if (beforeCaret === null) return null;
+  for (const char of chars) {
+    const context = mentionTriggerContext(beforeCaret, char);
+    if (context) return context;
+  }
+  return null;
+}
 
-  // Group commands by category
-  const groupedCommands = filtered.reduce((acc, cmd) => {
-    const category = cmd.category || 'Commands';
-    if (!acc[category]) acc[category] = [];
-    acc[category].push(cmd);
-    return acc;
-  }, {} as Record<string, SlashCommand[]>);
-
-  const categories = Object.keys(groupedCommands);
-
-  return (
-    <div
-      ref={menuRef}
-      className={styles.slashMenu}
-      style={{ bottom, left }}
-      role="listbox"
-      aria-label="Slash commands"
-    >
-      {categories.map((category) => (
-        <div key={category}>
-          <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 px-3 py-1.5">
-            {category}
-          </div>
-          {groupedCommands[category].map((cmd) => {
-            const globalIndex = filtered.findIndex(c => c.id === cmd.id);
-            const labelMatches = filter ? cmd.label.toLowerCase().includes(filter.toLowerCase()) : false;
-            return (
-              <button
-                key={cmd.id}
-                className={`${styles.slashMenuItem} ${globalIndex === selectedIndex ? styles.slashMenuItemSelected : ''}`}
-                onClick={() => onSelect(cmd)}
-                role="option"
-                aria-selected={globalIndex === selectedIndex}
-              >
-                <span className={styles.slashMenuLabel}>
-                  {labelMatches
-                    ? renderHighlightedText(cmd.label, filter, styles.slashMenuMatch)
-                    : cmd.label}
-                </span>
-                <span className={styles.slashMenuDescription}>
-                  {labelMatches
-                    ? cmd.description
-                    : renderHighlightedText(cmd.description, filter, styles.slashMenuMatch)}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      ))}
-    </div>
-  );
+function mentionKey(context: TriggerContext | null): string | null {
+  return context ? `${context.char}:${context.index}` : null;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -370,8 +343,9 @@ export function ComposerPromptEditor({
   conversationName,
   harness = 'claude-code',
   skillContext,
+  fileRootId,
   disabled = false,
-  placeholder = 'Message the agent…',
+  placeholder,
   onCommandKeyDown,
   editorRef,
   onChange,
@@ -385,8 +359,27 @@ export function ComposerPromptEditor({
     harness, context: slashCommandsEnabled ? skillContext : undefined, active: isSlashMenuOpen,
   });
   const pendingSlashTriggerRef = useRef(false);
+  const lastTextRef = useRef(draft);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [menuAnchorRect, setMenuAnchorRect] = useState<DOMRect | null>(null);
+  const internalEditorRef = useRef<LexicalEditor | null>(null);
+
+  // @/$ menus open from text and caret changes, not keydown (PAN-5662 D4).
+  const skillMention = getHarnessBehavior(harness).capabilities.skillMention;
+  const skillMentionsEnabled = skillContext !== undefined && skillMention !== null;
+  // An explicit placeholder wins; otherwise list the triggers this composer offers (PAN-5662 D12).
+  const effectivePlaceholder = placeholder ?? composerPromptHint({
+    files: fileRootId != null,
+    skills: skillMentionsEnabled,
+    commands: slashCommandsEnabled,
+  });
+  const mentionChars = mentionCharsFor(Boolean(fileRootId), skillMentionsEnabled);
+  const [beforeCaret, setBeforeCaret] = useState<string | null>(null);
+  const [dismissedMention, setDismissedMention] = useState<string | null>(null);
+  const [mentionSelectedIndex, setMentionSelectedIndex] = useState(0);
+  const [mentionAnchorRect, setMentionAnchorRect] = useState<DOMRect | null>(null);
+  const mentionKeyRef = useRef<string | null>(null);
+  const mentionFilterKeyRef = useRef<string | null>(null);
 
   const initialConfig = {
     namespace: `composer:${conversationName}`,
@@ -404,58 +397,56 @@ export function ComposerPromptEditor({
   };
 
   const handleChange = useCallback(
-    (t: string) => {
+    (t: string, caretText: string | null, root: HTMLElement | null) => {
       setText(t);
-      if (pendingSlashTriggerRef.current && t.includes('/')) {
-        setIsSlashMenuOpen(true);
-        pendingSlashTriggerRef.current = false;
+      setBeforeCaret(caretText);
+      const context = mentionContextFor(caretText, mentionChars);
+      const key = mentionKey(context);
+      if (key !== mentionKeyRef.current) {
+        mentionKeyRef.current = key;
+        if (key === null) setDismissedMention(null);
+        else if (root) setMentionAnchorRect(caretAnchorRect(root));
       }
+      const filterKey = context ? `${key}:${context.filter}` : null;
+      if (filterKey !== mentionFilterKeyRef.current) {
+        mentionFilterKeyRef.current = filterKey;
+        setMentionSelectedIndex(0);
+      }
+      // A pending `/` keypress resolves on the first text change: it opens the
+      // menu only when the `/` landed at a word start (PAN-5662 D2), so `src/`
+      // and `and/or` stay plain text.
+      if (pendingSlashTriggerRef.current && t !== lastTextRef.current) {
+        pendingSlashTriggerRef.current = false;
+        // Judge the `/` just typed at the caret, not another `/` elsewhere in
+        // the prompt (`src| /model` + `/` must not open /model's menu).
+        const insertedAtWordStart = caretText === null
+          ? true
+          : caretText.endsWith('/') && isWordStart(caretText, caretText.length - 1);
+        setIsSlashMenuOpen(insertedAtWordStart && slashTriggerContext(t) !== null);
+      }
+      lastTextRef.current = t;
       onChange?.(t);
     },
-    [onChange],
+    [onChange, mentionChars, setDismissedMention, setMentionSelectedIndex],
   );
 
-  const slashContext = useMemo(() => {
-    const slashIdx = text.lastIndexOf('/');
-    if (slashIdx < 0) return null;
-
-    const afterSlash = text.slice(slashIdx + 1);
-
-    return {
-      slashIdx,
-      filterText: afterSlash,
-    };
-  }, [text]);
+  const slashContext = useMemo(() => slashTriggerContext(text), [text]);
 
   const slashCommands = useMemo(
     () => slashCommandsEnabled ? getSlashCommands(harness, skillCommands) : [],
     [harness, slashCommandsEnabled, skillCommands],
   );
   const filteredCommands = useMemo(
-    () => filterCommands(slashCommands, slashContext?.filterText ?? ''),
+    () => filterCommands(slashCommands, slashContext?.filter ?? ''),
     [slashCommands, slashContext],
   );
 
   const handleSlashKey = useCallback((root: HTMLElement) => {
     if (!slashCommandsEnabled) return;
-    const selection = window.getSelection();
-    let anchorRect: DOMRect | null = null;
-
-    if (selection && selection.rangeCount > 0) {
-      const range = selection.getRangeAt(0);
-      const rect = range.getBoundingClientRect();
-      if (rect.width > 0 || rect.height > 0 || rect.top > 0 || rect.left > 0 || rect.bottom > 0) {
-        anchorRect = rect;
-      }
-    }
-
-    if (!anchorRect) {
-      anchorRect = root.getBoundingClientRect();
-    }
-
-    setMenuAnchorRect(anchorRect);
+    // The menu opens on the text change that inserts the `/` (handleChange),
+    // so a `/` inside a word never opens it or fetches skills.
+    setMenuAnchorRect(caretAnchorRect(root));
     pendingSlashTriggerRef.current = true;
-    setIsSlashMenuOpen(true);
     setSelectedIndex(0);
   }, [slashCommandsEnabled]);
 
@@ -466,8 +457,8 @@ export function ComposerPromptEditor({
         editor.update(() => {
           const root = $getRoot();
           const fullText = root.getTextContent();
-          // Find the last '/' that triggered the menu and strip it + any filter chars after it
-          const slashIdx = slashContext?.slashIdx ?? fullText.lastIndexOf('/');
+          // Find the word-start '/' that triggered the menu and strip it + any filter chars after it
+          const slashIdx = (slashContext ?? slashTriggerContext(fullText))?.index ?? -1;
           const textBefore = slashIdx >= 0 ? fullText.slice(0, slashIdx) : fullText;
           // Replace editor content: text before the slash trigger + the selected command
           root.clear();
@@ -498,40 +489,80 @@ export function ComposerPromptEditor({
 
   useEffect(() => {
     setSelectedIndex(0);
-  }, [slashContext?.filterText]);
+  }, [slashContext?.filter]);
 
-  // Handle keyboard navigation in slash menu
-  useEffect(() => {
-    if (!isSlashMenuOpen || !slashContext) return;
+  const mentionContext = mentionContextFor(beforeCaret, mentionChars);
+  const mentionOpen = mentionContext !== null && dismissedMention !== mentionKey(mentionContext);
+  const { items: fileItems } = useFileMentionItems(
+    fileRootId ?? null,
+    mentionOpen && mentionContext.char === '@' ? mentionContext.filter : null,
+  );
+  const mentionSkills = useSkillMentionCommands({
+    harness,
+    context: skillContext,
+    active: mentionOpen && mentionContext.char === '$',
+  });
+  const skillItems = mentionContext?.char === '$' && skillMention
+    ? toSkillMentionItems(mentionSkills, skillMention, mentionContext.filter)
+    : NO_MENTION_ITEMS;
+  const mentionItems = mentionContext?.char === '@' ? fileItems : mentionContext?.char === '$' ? skillItems : NO_MENTION_ITEMS;
+  const mentionHint = mentionContext?.char === '@' && mentionContext.filter === '' ? 'Type to search files' : undefined;
+  // Keys are captured only while a menu is on screen: a $ token matching no skill shows nothing and leaves keys alone.
+  const mentionVisible = mentionOpen && (mentionItems.length > 0 || mentionHint !== undefined);
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        e.stopPropagation();
-        if (filteredCommands.length > 0) setSelectedIndex((i) => (i + 1) % filteredCommands.length);
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        e.stopPropagation();
-        if (filteredCommands.length > 0) setSelectedIndex((i) => (i - 1 + filteredCommands.length) % filteredCommands.length);
-      } else if (e.key === 'Enter') {
-        if (filteredCommands.length > 0 && filteredCommands[selectedIndex]) {
-          e.preventDefault();
-          e.stopPropagation();
-          handleSlashSelect(filteredCommands[selectedIndex]);
-        }
-      } else if (e.key === 'Escape') {
-        e.preventDefault();
-        e.stopPropagation();
-        handleSlashClose();
-      } else if (e.key === 'Tab') {
-        handleSlashClose();
-      }
-    };
+  const handleMentionSelect = (item: SlashCommand) => {
+    const editor = internalEditorRef.current;
+    if (!mentionContext || !editor) return;
+    const token = mentionContext.char + mentionContext.filter;
+    editor.update(() => {
+      const selection = $getSelection();
+      if (!$isRangeSelection(selection) || !selection.isCollapsed()) return;
+      const node = selection.anchor.getNode();
+      if (!$isTextNode(node)) return;
+      const offset = selection.anchor.offset;
+      const start = offset - token.length;
+      const nodeText = node.getTextContent();
+      if (start < 0 || nodeText.slice(start, offset) !== token) return;
+      // With the caret inside a token (`@Com|poser.tsx`), replace its rest too.
+      const tokenTail = /^\S*/.exec(nodeText.slice(offset))?.[0].length ?? 0;
+      node.spliceText(start, token.length + tokenTail, item.insert, true);
+    });
+    setMentionSelectedIndex(0);
+  };
+  const handleMentionSelectIndex = (index: number) => {
+    const item = mentionItems[index];
+    if (item) handleMentionSelect(item);
+  };
+  const handleMentionClose = () => {
+    setDismissedMention(mentionKey(mentionContext));
+  };
 
-    // Use capture phase so we intercept before Lexical's keydown handler
-    document.addEventListener('keydown', handleKeyDown, true);
-    return () => document.removeEventListener('keydown', handleKeyDown, true);
-  }, [isSlashMenuOpen, slashContext, selectedIndex, filteredCommands, handleSlashSelect, handleSlashClose]);
+  useTriggerMenuKeys({
+    open: mentionVisible,
+    rowCount: mentionItems.length,
+    selectedIndex: mentionSelectedIndex,
+    setSelectedIndex: setMentionSelectedIndex,
+    onSelectIndex: handleMentionSelectIndex,
+    onClose: handleMentionClose,
+    tabSelects: true,
+  });
+
+  // A live @/$ token wins over the / menu (PAN-5662 D5): `/review @fi` shows files.
+  const isSlashMenuVisible = isSlashMenuOpen && slashContext !== null && mentionContext === null;
+  const handleSlashSelectIndex = (index: number) => {
+    const command = filteredCommands[index];
+    if (command) handleSlashSelect(command);
+  };
+
+  useTriggerMenuKeys({
+    open: isSlashMenuVisible,
+    rowCount: filteredCommands.length,
+    selectedIndex,
+    setSelectedIndex,
+    onSelectIndex: handleSlashSelectIndex,
+    onClose: handleSlashClose,
+    tabSelects: false,
+  });
 
   return (
     <div style={{ position: 'relative' }}>
@@ -542,10 +573,10 @@ export function ComposerPromptEditor({
               <ContentEditable
                 className={styles.composerEditable}
                 onPaste={onPaste}
-                aria-placeholder={placeholder}
+                aria-placeholder={effectivePlaceholder}
                 placeholder={() =>
                   !text ? (
-                    <div className={styles.composerPlaceholder}>{placeholder}</div>
+                    <div className={styles.composerPlaceholder}>{effectivePlaceholder}</div>
                   ) : null
                 }
               />
@@ -559,17 +590,30 @@ export function ComposerPromptEditor({
             onTextChange={handleChange}
             onSlashKey={handleSlashKey}
           />
+          <EditorRefPlugin editorRef={internalEditorRef} />
           {editorRef && <EditorRefPlugin editorRef={editorRef} />}
         </div>
       </LexicalComposer>
-      {isSlashMenuOpen && filteredCommands.length > 0 && (
+      {isSlashMenuVisible && filteredCommands.length > 0 && (
         <SlashMenu
           commands={slashCommands}
-          filter={slashContext?.filterText ?? ''}
+          filter={slashContext.filter}
           selectedIndex={selectedIndex}
           onSelect={handleSlashSelect}
           onClose={handleSlashClose}
           anchorRect={menuAnchorRect}
+        />
+      )}
+      {mentionVisible && (
+        <TriggerMenu
+          items={mentionItems}
+          filter={mentionContext.filter}
+          selectedIndex={mentionSelectedIndex}
+          onSelect={handleMentionSelect}
+          onClose={handleMentionClose}
+          anchorRect={mentionAnchorRect}
+          ariaLabel={mentionContext.char === '@' ? 'Files' : 'Skills'}
+          hint={mentionHint}
         />
       )}
     </div>

@@ -94,6 +94,9 @@ vi.mock('lexical', () => ({
     createdTextNodes.push(text);
     return { text };
   },
+  $getSelection: () => null,
+  $isRangeSelection: () => false,
+  $isTextNode: () => false,
   KEY_ENTER_COMMAND: 'enter',
   COMMAND_PRIORITY_HIGH: 1,
   LexicalEditor: class {},

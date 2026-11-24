@@ -173,6 +173,26 @@ describe('composer skill commands (PAN-5347)', () => {
   });
 });
 
+describe('composer skill mentions (PAN-5662)', () => {
+  it('claude-code mentions as slash, codex as dollar, every other harness has none', () => {
+    const value = (harness: string) => contracts.getRuntimeBehavior(harness as never).capabilities.skillMention;
+    expect(value('claude-code')).toBe('slash');
+    expect(value('codex')).toBe('dollar');
+    for (const harness of ['pi', 'ohmypi', 'acp', 'kimi-code', 'opencode', 'muse', 'prime-agent', 'grok', 'antigravity']) {
+      expect(value(harness), harness).toBeNull();
+    }
+  });
+
+  it('skillSlashCommands is true exactly when skillMention is slash', () => {
+    const runtimes = getGlobalRegistry().getAll();
+    expect(runtimes.length).toBeGreaterThan(0);
+    for (const runtime of runtimes) {
+      const capabilities = contracts.getRuntimeBehavior(runtime.name).capabilities;
+      expect(capabilities.skillSlashCommands, runtime.name).toBe(capabilities.skillMention === 'slash');
+    }
+  });
+});
+
 describe('conversation skill apply (PAN-5465)', () => {
   it('claude-code hot-reloads, codex restarts, and every other harness gets no conversation packs', () => {
     const value = (harness: string) => contracts.getRuntimeBehavior(harness as never).capabilities.conversationSkillApply;

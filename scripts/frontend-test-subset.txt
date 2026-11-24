@@ -248,6 +248,9 @@ src/components/chat/__tests__/ComposerFooter.schedule.test.tsx
 src/components/chat/__tests__/ComposerFooter.send-now.test.tsx
 src/components/chat/__tests__/ComposerFooter.send-queue.test.tsx
 src/components/chat/__tests__/ComposerFooter.streaming-render-count.test.tsx
+src/components/chat/__tests__/ComposerPromptEditor.files.test.tsx
+src/components/chat/__tests__/ComposerPromptEditor.promptHint.test.tsx
+src/components/chat/__tests__/ComposerPromptEditor.skillMentions.test.tsx
 src/components/chat/__tests__/ComposerPromptEditor.skills.test.tsx
 src/components/chat/__tests__/ComposerPromptEditor.test.tsx
 src/components/chat/__tests__/ConversationAboutDrawer.test.tsx
@@ -268,10 +271,12 @@ src/components/chat/__tests__/PendingAgentRequestCard.test.tsx
 src/components/chat/__tests__/PullHereDialog.test.tsx
 src/components/chat/__tests__/ScheduledMessageRow.test.tsx
 src/components/chat/__tests__/SendModeMenu.test.tsx
+src/components/chat/__tests__/TriggerMenu.test.tsx
 src/components/chat/__tests__/VaultBrowseCopy.test.tsx
 src/components/chat/__tests__/VaultContinueDialog.test.tsx
 src/components/chat/__tests__/composerHeldMessages.test.tsx
 src/components/chat/__tests__/composerPathDrop.test.ts
+src/components/chat/__tests__/composerTriggers.test.ts
 src/components/chat/__tests__/conversationHistory.test.ts
 src/components/chat/__tests__/conversationMachineState.test.ts
 src/components/chat/__tests__/diffWindow.test.ts
@@ -284,6 +289,7 @@ src/components/chat/__tests__/skillSlashCommands.test.ts
 src/components/chat/__tests__/slashCommands.skills.test.ts
 src/components/chat/__tests__/useComposerRestoreTarget.test.tsx
 src/components/chat/__tests__/useConversationReferences.test.tsx
+src/components/chat/__tests__/useFileMentionItems.test.ts
 src/components/chat/__tests__/useFloatingPickerPosition.test.tsx
 src/components/chat/__tests__/useOlderHistory.test.ts
 src/components/chat/bookmarks/__tests__/BookmarksDrawer.test.tsx

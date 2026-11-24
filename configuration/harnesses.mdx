@@ -41,6 +41,8 @@ Harness-native slash commands are a separate lane and are not uniform. The compo
 
 Installed skills appear in their own **Skills** group, as `/<skill-name>`, on a harness that runs `/<skill>` as a skill itself (the `skillSlashCommands` capability; today only Claude Code). Unlike `/pan`, the dashboard never intercepts these; the harness receives and runs them. The group lists the skills enabled for the open conversation (or agent session), after its conversation, issue, project, and global overrides, the same way a launch decides what to hide, fetched from `GET /api/skills/overrides` only while the menu is open. Skill pack skills and the `pan` and `pan-handoff` skills are not listed: the composer itself handles `/pan …` and `/pan-handoff`.
 
+The composer's `$` menu lists the same skills on any harness that declares `skillMention`, and inserts the harness's own form: `/<skill-name>` for `slash` (Claude Code) or `$<skill-name>` for `dollar` (Codex). The `@` menu works under every harness, because it only inserts a file path.
+
 Managed Codex sessions use an isolated `CODEX_HOME`. On initialization and resume, Overdeck copies the Agent Skills standard directories synced by `pan sync` from `~/.agents/skills` into that home's `skills/` directory. Managed skills are refreshed additively, per-agent-only skill directories are preserved, and Codex still keeps its sessions and configuration inside the isolated home.
 
 ## Steering a running turn
@@ -1470,6 +1472,7 @@ name. Every field is required, so a harness cannot leave a decision undeclared.
 | `runsOnFlyMachine` | A conversation may be started on a Fly machine (`pan machines add-fly`). Claude Code and Codex declare it. |
 | `overdeckMcp` | Launches get the `overdeck` MCP server with a per-agent token. Claude Code, Codex, `acp`, `opencode` and `grok` declare it. |
 | `skillSlashCommands` | The composer `/` menu lists installed skills as `/<skill-name>` under a Skills group, because this harness runs a typed `/<skill>` command. Only Claude Code declares it. |
+| `skillMention` | How the composer `$` menu inserts a skill: `slash` writes `/<skill-name>` (Claude Code), `dollar` writes `$<skill-name>` (Codex), `null` means no `$` menu. |
 | `conversationSkillApply` | How pack skills added to a running conversation load (`pan skills add`, `add_skills`, **Add skills…**): `hot-reload` re-points the plugin dir and sends `/reload-plugins` (Claude Code); `restart` stores them and loads them on a resume (Codex); `null` means the harness gets no conversation packs, so the dashboard hides **Add skills…** and the route answers 409. |
 | `startupMenuStallSignal` | A launch that shows a blocking menu and has written no transcript 180 s later is reported as a startup stall (`paneQuestion`). Only Claude Code declares it (PAN-4242). |
 

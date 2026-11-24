@@ -1,0 +1,210 @@
+{
+  "version": "1",
+  "issueId": "PAN-5662",
+  "created": "2026-11-24T07:26:43.859Z",
+  "updated": "2026-11-24T08:22:38.833Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-24T08:22Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-24T08:22:38.833Z"
+    }
+  ],
+  "items": {
+    "capability-skill-mention": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5662",
+      "claimedAt": "2026-11-24T07:26:43.859Z",
+      "doneAt": "2026-11-24T07:28:33.573Z"
+    },
+    "capability-skill-mention.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-24T07:28:33.573Z"
+    },
+    "capability-skill-mention.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-24T07:28:33.573Z"
+    },
+    "capability-skill-mention.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-24T07:28:33.573Z"
+    },
+    "trigger-helpers": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5662",
+      "claimedAt": "2026-11-24T07:28:39.993Z",
+      "doneAt": "2026-11-24T07:29:58.511Z"
+    },
+    "trigger-helpers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-24T07:29:58.511Z"
+    },
+    "trigger-helpers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-24T07:29:58.511Z"
+    },
+    "trigger-helpers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-24T07:29:58.511Z"
+    },
+    "trigger-helpers.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-24T07:29:58.511Z"
+    },
+    "skill-mention-hook": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5662",
+      "claimedAt": "2026-11-24T07:30:05.872Z",
+      "doneAt": "2026-11-24T07:30:58.999Z"
+    },
+    "skill-mention-hook.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-24T07:30:58.999Z"
+    },
+    "skill-mention-hook.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-24T07:30:58.999Z"
+    },
+    "skill-mention-hook.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-24T07:30:58.999Z"
+    },
+    "shared-trigger-menu": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5662",
+      "claimedAt": "2026-11-24T07:31:00.147Z",
+      "doneAt": "2026-11-24T07:37:49.160Z"
+    },
+    "shared-trigger-menu.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-24T07:37:49.160Z"
+    },
+    "shared-trigger-menu.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-24T07:37:49.160Z"
+    },
+    "shared-trigger-menu.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-24T07:37:49.160Z"
+    },
+    "shared-trigger-menu.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-24T07:37:49.160Z"
+    },
+    "file-mention-hook": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5662",
+      "claimedAt": "2026-11-24T07:37:50.729Z",
+      "doneAt": "2026-11-24T07:39:04.658Z"
+    },
+    "file-mention-hook.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-24T07:39:04.658Z"
+    },
+    "file-mention-hook.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-24T07:39:04.658Z"
+    },
+    "file-mention-hook.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-24T07:39:04.658Z"
+    },
+    "at-files-menu": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5662",
+      "claimedAt": "2026-11-24T07:39:05.751Z",
+      "doneAt": "2026-11-24T07:47:22.857Z"
+    },
+    "at-files-menu.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-24T07:47:22.857Z"
+    },
+    "at-files-menu.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-24T07:47:22.857Z"
+    },
+    "at-files-menu.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-24T07:47:22.857Z"
+    },
+    "at-files-menu.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-24T07:47:22.857Z"
+    },
+    "at-files-menu.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-24T07:47:22.857Z"
+    },
+    "dollar-skills-menu": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5662",
+      "claimedAt": "2026-11-24T07:47:23.894Z",
+      "doneAt": "2026-11-24T07:49:48.216Z"
+    },
+    "dollar-skills-menu.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-24T07:49:48.216Z"
+    },
+    "dollar-skills-menu.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-24T07:49:48.216Z"
+    },
+    "dollar-skills-menu.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-24T07:49:48.216Z"
+    },
+    "dollar-skills-menu.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-24T07:49:48.216Z"
+    },
+    "composer-placeholder": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5662",
+      "claimedAt": "2026-11-24T07:49:49.206Z",
+      "doneAt": "2026-11-24T07:51:06.185Z"
+    },
+    "composer-placeholder.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-24T07:51:06.185Z"
+    },
+    "composer-placeholder.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-24T07:51:06.185Z"
+    },
+    "composer-placeholder.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-24T07:51:06.185Z"
+    },
+    "docs-composer-triggers": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5662",
+      "claimedAt": "2026-11-24T07:51:07.317Z",
+      "doneAt": "2026-11-24T07:51:56.806Z"
+    },
+    "docs-composer-triggers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-24T07:51:56.806Z"
+    },
+    "docs-composer-triggers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-24T07:51:56.806Z"
+    },
+    "docs-composer-triggers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-24T07:51:56.806Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-24T08:22:38Z",
+      "markdownBody": "# CodeRabbit findings for PAN-5662 (PR #5664)\n\nCodeRabbit posted 5 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4677267278 · features/conversations.mdx:160 [Minor]: Explain the `$` gate in the `$HOME` example.\n  https://github.com/eltmon/overdeck/pull/5664#discussion_r4677267278\n- Thread 4677267285 · src/dashboard/frontend/src/components/chat/ComposerPromptEditor.tsx:419 [Minor]: Validate the inserted slash, not another slash in the prompt.\n  https://github.com/eltmon/overdeck/pull/5664#discussion_r4677267285\n- Thread 4677267296 · src/dashboard/frontend/src/components/chat/ComposerPromptEditor.tsx:519 [Minor]: Replace the complete mention token when the caret is inside it.\n  https://github.com/eltmon/overdeck/pull/5664#discussion_r4677267296\n- Thread 4677267302 · src/dashboard/frontend/src/components/chat/TriggerMenu.tsx:159 [Minor]: Ignore composing key events before menu dispatch.\n  https://github.com/eltmon/overdeck/pull/5664#discussion_r4677267302\n- Thread 4677267306 · src/dashboard/frontend/src/components/chat/useFileMentionItems.ts:50 [Minor]: Clear the retained rows when the query changes.\n  https://github.com/eltmon/overdeck/pull/5664#discussion_r4677267306\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5664/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-5662 -m \"CodeRabbit <thread ids>: <what you changed>\"`.\n   If you only replied, you are done.\n5. If PR #5664 has already merged when you read this, stop: after the merge Overdeck files a follow-up issue\n   for every thread with no reply, no later commit to its file, and no re-review request naming its thread id."
+    }
+  ]
+}

@@ -4,6 +4,9 @@
  * capability). The list is scoped to the open conversation's own launch
  * context (cwd, issue) and per-conversation overrides, resolved server-side
  * by GET /api/skills/overrides?conversation=&cwd=&issue= (PAN-5347 WI-2).
+ *
+ * The composer's $ menu (PAN-5662) lists the same skills on harnesses that
+ * declare `skillMention`; useSkillMentionCommands shares the fetch below.
  */
 import { useEffect, useRef, useState } from 'react';
 import { getHarnessBehavior, type HarnessName } from '@overdeck/contracts';
@@ -96,9 +99,9 @@ export interface UseSkillSlashCommandsOptions {
  * keeping the previous list (or EMPTY_SKILL_COMMANDS) on failure; resets to
  * EMPTY_SKILL_COMMANDS whenever the context's query key changes.
  */
-export function useSkillSlashCommands({ harness, context, active }: UseSkillSlashCommandsOptions): readonly SlashCommand[] {
+function useSkillCommandsFetch(capable: boolean, context: SkillSlashContext | undefined, active: boolean): readonly SlashCommand[] {
   const key = context ? skillContextQuery(context).toString() : '';
-  const enabled = key !== '' && getHarnessBehavior(harness).capabilities.skillSlashCommands;
+  const enabled = key !== '' && capable;
   const [commands, setCommands] = useState<readonly SlashCommand[]>(EMPTY_SKILL_COMMANDS);
   const wasActiveRef = useRef(false);
   const warnedRef = useRef(false);
@@ -130,4 +133,17 @@ export function useSkillSlashCommands({ harness, context, active }: UseSkillSlas
   }, [active, enabled, key]);
 
   return enabled ? commands : EMPTY_SKILL_COMMANDS;
+}
+
+export function useSkillSlashCommands({ harness, context, active }: UseSkillSlashCommandsOptions): readonly SlashCommand[] {
+  return useSkillCommandsFetch(getHarnessBehavior(harness).capabilities.skillSlashCommands, context, active);
+}
+
+/**
+ * The $ menu's skills (PAN-5662): the same `/`-shaped skill commands, fetched
+ * only on harnesses that declare a `skillMention` form. The caller maps them
+ * to the harness's insert form with toSkillMentionItems.
+ */
+export function useSkillMentionCommands({ harness, context, active }: UseSkillSlashCommandsOptions): readonly SlashCommand[] {
+  return useSkillCommandsFetch(getHarnessBehavior(harness).capabilities.skillMention !== null, context, active);
 }
