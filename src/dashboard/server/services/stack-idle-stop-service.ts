@@ -140,8 +140,8 @@ function formatGib(bytes: number): string {
 function idleActivityDetails(issueId: string, names: readonly string[], idleMs: number, memoryBytes: number, failed: readonly string[]): string {
   const failedText = failed.length > 0 ? ` docker stop failed for ${failed.join(', ')}.` : '';
   return `Stopped ${names.join(', ')} after ${Math.round(idleMs / 60_000)} min unused, freeing ${formatGib(memoryBytes)} GiB. `
-    + `They start again when a test or UAT agent is spawned for ${issueId}, its verification starts, `
-    + `or you run: pan workspace up ${issueId}.${failedText}`;
+    + `They start again when you open the app's URL, a test or UAT agent is spawned for ${issueId}, `
+    + `its verification starts, or you run: pan workspace up ${issueId}.${failedText}`;
 }
 
 type LockedOutcome =
