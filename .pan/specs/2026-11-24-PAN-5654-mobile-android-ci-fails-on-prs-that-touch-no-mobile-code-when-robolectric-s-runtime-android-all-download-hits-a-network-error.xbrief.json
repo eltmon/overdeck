@@ -1,0 +1,262 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-24T00:21:13Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5654: mobile-android CI fails on PRs that touch no mobile code when Robolectric's runtime android-all download hits a network error",
+    "updated": "2026-11-24T00:32:37.589Z"
+  },
+  "plan": {
+    "id": "pan-5654",
+    "title": "mobile-android CI fails on PRs that touch no mobile code when Robolectric's runtime android-all download hits a network error",
+    "status": "proposed",
+    "uid": "48f48e90-89ac-4d42-b99b-b71ec22f0b35",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-24T00:21:13Z",
+    "updated": "2026-11-24T00:32:37.589Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5654",
+        "label": "PAN-5654",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "ci",
+      "mobile",
+      "android",
+      "robolectric",
+      "flake"
+    ],
+    "narratives": {
+      "Problem": "Robolectric 4.15.1 downloads its ~200 MB android-all-instrumented jar (SDK 35: 15-robolectric-12650502-i7) from Maven Central at test run time through its own MavenArtifactFetcher into ~/.m2, outside Gradle. The mobile-android CI job caches only Gradle, so every run downloads the jar and one transient network error fails the job and the required `test` aggregate check, even on PRs that touch no mobile code (PR #5607, PR #5651 on 2026-11-23).",
+      "Proposal": "Run Robolectric offline. A non-transitive Gradle configuration `robolectricRuntime` resolves the android-all jar through Gradle (cached in ~/.gradle locally and by setup-java's Gradle cache in CI), a `fetchRobolectricRuntime` Sync task copies it into app/build/robolectric-runtime, and every Test task depends on that task and passes robolectric.offline=true plus robolectric.dependency.dir. CI gains a separate prefetch step with exactly one retry, and a guard step asserting ~/.m2/repository/org/robolectric was never written. apps/mobile/README.md documents the mechanism and the version coupling. Full detail: .pan/drafts/PAN-5654.md.",
+      "NonGoals": "- Upgrading Robolectric, changing the pinned SDK 35, or adding Robolectric tests\n- Caching ~/.m2 in CI (only as the documented WI-1 fallback)\n- Retrying the `Android unit tests` step or adding continue-on-error anywhere\n- Changing assembleDebug, the APK upload, the workflow triggers, or other CI jobs\n- Path-filtering mobile-android to skip PRs without mobile changes\n- Putting the android-all jar on the unit-test classpath (testImplementation/testRuntimeOnly)\n- A changelog.d entry (CI-only change)\n- Any acceptance step that deletes or moves ~/.m2 or ~/.gradle"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Chose Gradle-managed offline Robolectric (robolectric.offline + robolectric.dependency.dir) over an actions/cache step on ~/.m2.",
+        "rationale": "The issue says to pick the option that also removes the download from local runs if no harder; offline mode does that and Gradle's resolver has its own HTTP retry. Verified in robolectric-4.15.1.jar bytecode that LegacyDependencyResolver reads both properties and LocalDependencyResolver expects <artifactId>-<version>.jar."
+      },
+      {
+        "summary": "Used a dedicated non-transitive configuration plus a Sync task instead of the issue's literal testRuntimeOnly suggestion.",
+        "rationale": "testRuntimeOnly would put the 200 MB framework jar on the unit-test classpath; Robolectric only needs a directory holding the file under its expected name."
+      },
+      {
+        "summary": "Kept one retry, on a separate prefetch step only.",
+        "rationale": "Issue rule 2: a cold Gradle cache still downloads, so one retry stays; scoping it to the fetch step avoids hiding flaky tests."
+      },
+      {
+        "summary": "Added a CI guard step `test ! -e $HOME/.m2/repository/org/robolectric` after the unit tests.",
+        "rationale": "On a fresh runner that directory exists only if Robolectric fell back to online resolution, so it proves the offline properties reached the test JVM; it deletes nothing."
+      },
+      {
+        "summary": "No changelog.d entry.",
+        "rationale": "The change alters only CI and the Android test build, not user-facing behavior."
+      }
+    ],
+    "items": [
+      {
+        "id": "gradle-offline-robolectric",
+        "title": "Resolve Robolectric's android-all jar through Gradle and run Robolectric offline",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-24T00:21:13Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-5654",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/android/app/build.gradle"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bun install --frozen-lockfile && npm --prefix apps/mobile run build && npm --prefix apps/mobile run cap:sync -- android",
+            "cd apps/mobile/android && ANDROID_HOME=$HOME/Android/Sdk ./gradlew :app:fetchRobolectricRuntime --no-daemon && ls app/build/robolectric-runtime/android-all-instrumented-15-robolectric-12650502-i7.jar",
+            "cd apps/mobile/android && ANDROID_HOME=$HOME/Android/Sdk ./gradlew :app:testDebugUnitTest --no-daemon"
+          ],
+          "expected_outputs": [
+            "app/build/robolectric-runtime/android-all-instrumented-15-robolectric-12650502-i7.jar exists",
+            "testDebugUnitTest BUILD SUCCESSFUL with passing TEST-ai.overdeck.app.PushHandlerTest.xml and TEST-ai.overdeck.app.PushNoticeTest.xml",
+            "with a one-off uncommitted edit pointing robolectric.dependency.dir at an empty build/robolectric-empty dir, PushNoticeTest fails and the output or JUnit XML contains 'Unable to locate dependency' or 'Path is not a file:'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 exactly in apps/mobile/android/app/build.gradle: add `def robolectricVersion = '4.15.1'` and `def robolectricAndroidAllVersion = '15-robolectric-12650502-i7'` with the coupling comment above `android {`; add `configurations { robolectricRuntime { transitive = false } }` immediately before `dependencies {`; replace the literal robolectric testImplementation with `\"org.robolectric:robolectric:$robolectricVersion\"` and add `robolectricRuntime \"org.robolectric:android-all-instrumented:$robolectricAndroidAllVersion\"`; after the dependencies block register `fetchRobolectricRuntime` (Sync from configurations.robolectricRuntime into layout.buildDirectory.dir('robolectric-runtime')) and configure every Test task with dependsOn plus systemProperty robolectric.offline=true and robolectric.dependency.dir. Local Gradle needs bun install, the web build, cap:sync android and ANDROID_HOME=$HOME/Android/Sdk first. Implementation checkpoint: if offline mode cannot be made to work, apply the PRD's documented fallback (actions/cache on ~/.m2/repository/org/robolectric plus a fetch-only `mvn -B dependency:get` step retried once; never retry the test task) and record it in continue.json. This machine already has the jar in ~/.m2, so a plain test pass proves nothing; run the empty-directory negative check from the PRD and never delete or move ~/.m2."
+        },
+        "items": [
+          {
+            "id": "gradle-offline-robolectric.ac1",
+            "title": "Given the new wiring, when `./gradlew :app:fetchRobolectricRuntime` runs, then it creates app/build/robolectric-runtime/android-all-instrumented-15-robolectric-12650502-i7.jar",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gradle-offline-robolectric.ac2",
+            "title": "When `./gradlew :app:testDebugUnitTest` runs, then PushHandlerTest and PushNoticeTest each produces a JUnit XML report with zero failures and zero errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gradle-offline-robolectric.ac3",
+            "title": "Given robolectric.dependency.dir temporarily points at an empty directory, when PushNoticeTest runs, then it fails and the Gradle output or JUnit XML contains 'Unable to locate dependency' or 'Path is not a file:' (proves offline mode is active)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gradle-offline-robolectric.ac4",
+            "title": "app/build.gradle contains a robolectricRuntime configuration with transitive = false, and no testImplementation or testRuntimeOnly line contains android-all",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-prefetch-and-offline-guard",
+        "title": "Add a one-retry Robolectric prefetch step and an offline guard step to the mobile-android CI job",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-24T00:21:13Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-5654",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".github/workflows/ci.yml"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node -e \"const y=require('yaml');const d=y.parse(require('fs').readFileSync('.github/workflows/ci.yml','utf8'));console.log(d.jobs['mobile-android'].steps.map(s=>s.name).join('\\n'))\"",
+            "git diff origin/main -- .github/workflows/ci.yml"
+          ],
+          "expected_outputs": [
+            "step order lists 'Sync Capacitor (Android)', 'Fetch the Robolectric runtime', 'Android unit tests', 'Check Robolectric ran offline', 'Assemble the debug APK'",
+            "diff adds only the two new steps and their comments inside the mobile-android job",
+            "the PR's mobile-android CI run shows all three Robolectric-related steps succeeding"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2 in .github/workflows/ci.yml, job mobile-android: between `Sync Capacitor (Android)` and `Android unit tests` insert step `Fetch the Robolectric runtime` (working-directory apps/mobile/android, run `./gradlew :app:fetchRobolectricRuntime --no-daemon || ./gradlew :app:fetchRobolectricRuntime --no-daemon`); between `Android unit tests` and `Assemble the debug APK` insert step `Check Robolectric ran offline` running `test ! -e \"$HOME/.m2/repository/org/robolectric\"`. Keep the PRD's comments. Change nothing else. Workflow edits must be pushed over SSH (gh OAuth token lacks the workflow scope): `git push git@github.com:eltmon/overdeck.git HEAD:feature/pan-5654` if HTTPS push is refused."
+        },
+        "items": [
+          {
+            "id": "ci-prefetch-and-offline-guard.ac1",
+            "title": "Given a mobile-android CI run, when Capacitor sync finishes, then the job runs `Fetch the Robolectric runtime` before `Android unit tests`, and that step retries `:app:fetchRobolectricRuntime` exactly once via `||`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-prefetch-and-offline-guard.ac2",
+            "title": "The `Check Robolectric ran offline` step fails the job when $HOME/.m2/repository/org/robolectric exists after the unit tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-prefetch-and-offline-guard.ac3",
+            "title": "The `Android unit tests` step preserves its original single `./gradlew testDebugUnitTest --no-daemon` command with no retry or continue-on-error, and the PR's mobile-android run passes all its steps",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-mobile-readme-offline-robolectric",
+        "title": "Document offline Robolectric and the version coupling in apps/mobile/README.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-24T00:21:13Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5654",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/README.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'robolectric.offline\\|robolectricRuntime\\|fetchRobolectricRuntime\\|robolectricAndroidAllVersion\\|org/robolectric' apps/mobile/README.md"
+          ],
+          "expected_outputs": [
+            "grep prints lines naming robolectric.offline, robolectricRuntime, fetchRobolectricRuntime, robolectricAndroidAllVersion and the ~/.m2/repository/org/robolectric check"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3 in apps/mobile/README.md: extend the `**JVM tests.**` bullet (about line 218) to say Robolectric runs offline, Gradle fetches the SDK 35 android-all-instrumented jar through robolectricRuntime, fetchRobolectricRuntime copies it into app/build/robolectric-runtime, and robolectricAndroidAllVersion in app/build.gradle must change with a Robolectric bump, that every Robolectric test must pin the same SDK (a second SDK needs a second robolectricRuntime coordinate), and that a missing jar fails with 'Unable to locate dependency' / 'Path is not a file:'. Extend the CI paragraph (about line 255) to say the job prefetches the runtime through Gradle with one retry and fails if Robolectric wrote ~/.m2/repository/org/robolectric. If WI-1 used its fallback, describe the fallback mechanism instead."
+        },
+        "items": [
+          {
+            "id": "docs-mobile-readme-offline-robolectric.ac1",
+            "title": "The JVM tests bullet in apps/mobile/README.md names robolectric.offline, robolectricRuntime, fetchRobolectricRuntime and robolectricAndroidAllVersion, and contains the rule that every Robolectric test pins the same SDK",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-mobile-readme-offline-robolectric.ac2",
+            "title": "The CI paragraph in apps/mobile/README.md contains the one-retry Gradle prefetch and the ~/.m2/repository/org/robolectric guard check",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "gradle-offline-robolectric",
+        "to": "ci-prefetch-and-offline-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "gradle-offline-robolectric",
+        "to": "docs-mobile-readme-offline-robolectric",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-24-PAN-5654-mobile-android-ci-fails-on-prs-that-touch-no-mobile-code-when-robolectric-s-runtime-android-all-download-hits-a-network-error.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
