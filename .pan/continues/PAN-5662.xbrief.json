@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5662",
   "created": "2026-11-24T07:26:43.859Z",
-  "updated": "2026-11-24T07:28:33.574Z",
+  "updated": "2026-11-24T07:28:39.994Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
     "capability-skill-mention.ac3": {
       "status": "completed",
       "doneAt": "2026-11-24T07:28:33.573Z"
+    },
+    "trigger-helpers": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5662",
+      "claimedAt": "2026-11-24T07:28:39.993Z"
     }
   }
 }
