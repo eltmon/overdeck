@@ -38,6 +38,7 @@ import { useSkillMentionCommands, useSkillSlashCommands, type SkillSlashContext 
 import { TriggerMenu, caretAnchorRect, useTriggerMenuKeys } from './TriggerMenu';
 import {
   composerPromptHint,
+  isWordStart,
   mentionTriggerContext,
   slashTriggerContext,
   toSkillMentionItems,
@@ -416,7 +417,12 @@ export function ComposerPromptEditor({
       // and `and/or` stay plain text.
       if (pendingSlashTriggerRef.current && t !== lastTextRef.current) {
         pendingSlashTriggerRef.current = false;
-        setIsSlashMenuOpen(slashTriggerContext(t) !== null);
+        // Judge the `/` just typed at the caret, not another `/` elsewhere in
+        // the prompt (`src| /model` + `/` must not open /model's menu).
+        const insertedAtWordStart = caretText === null
+          ? true
+          : caretText.endsWith('/') && isWordStart(caretText, caretText.length - 1);
+        setIsSlashMenuOpen(insertedAtWordStart && slashTriggerContext(t) !== null);
       }
       lastTextRef.current = t;
       onChange?.(t);
@@ -515,8 +521,11 @@ export function ComposerPromptEditor({
       if (!$isTextNode(node)) return;
       const offset = selection.anchor.offset;
       const start = offset - token.length;
-      if (start < 0 || node.getTextContent().slice(start, offset) !== token) return;
-      node.spliceText(start, token.length, item.insert, true);
+      const nodeText = node.getTextContent();
+      if (start < 0 || nodeText.slice(start, offset) !== token) return;
+      // With the caret inside a token (`@Com|poser.tsx`), replace its rest too.
+      const tokenTail = /^\S*/.exec(nodeText.slice(offset))?.[0].length ?? 0;
+      node.spliceText(start, token.length + tokenTail, item.insert, true);
     });
     setMentionSelectedIndex(0);
   };

@@ -156,8 +156,10 @@ example "Ask anything. @ files, &#36; skills, / commands".
 
 Arrow keys move through a menu, Enter or Tab inserts the selected row, and
 Escape closes it. In the `/` menu, Tab closes the menu instead. A trigger
-inside a word opens nothing, so an email address, `src/`, or `$HOME` stays
-plain text. The `@` menu is not offered for a linked conversation, a
+inside a word opens nothing, so an email address or `src/` stays plain text.
+The `$` menu also opens only while the text after `$` is empty or starts with
+a lowercase letter, as skill names do, so `$HOME` and `$5` stay plain text.
+The `@` menu is not offered for a linked conversation, a
 conversation whose folder is outside every project, or a conversation opened
 outside a project tab.
 

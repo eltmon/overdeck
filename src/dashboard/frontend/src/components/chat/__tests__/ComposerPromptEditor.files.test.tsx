@@ -46,6 +46,8 @@ Object.defineProperty(window, 'localStorage', { value: localStorageMock });
 
 let capturedRootElement: HTMLDivElement;
 let caretText = '';
+/** Caret offset in caretText; null = at the end. */
+let caretOffset: number | null = null;
 const spliceText = vi.fn();
 const fakeTextNode = {
   getTextContent: () => caretText,
@@ -55,7 +57,7 @@ const fakeSelection = {
   isCollapsed: () => true,
   anchor: {
     getNode: () => fakeTextNode,
-    get offset() { return caretText.length; },
+    get offset() { return caretOffset ?? caretText.length; },
   },
 };
 
@@ -118,9 +120,10 @@ vi.mock('lexical', () => ({
   LexicalEditor: class {},
 }));
 
-function type(text: string): void {
+function type(text: string, offset: number | null = null): void {
   act(() => {
     caretText = text;
+    caretOffset = offset;
     onChangePluginCallback?.({}, mockEditor, new Set());
   });
 }
@@ -137,6 +140,7 @@ describe('ComposerPromptEditor @ File menu (PAN-5662)', () => {
     localStorageMock.getItem.mockReturnValue(null);
     capturedRootElement = undefined as unknown as HTMLDivElement;
     caretText = '';
+    caretOffset = null;
     onChangePluginCallback = null;
     fileMentionCalls.length = 0;
   });
@@ -218,5 +222,33 @@ describe('ComposerPromptEditor @ File menu (PAN-5662)', () => {
     type('/review @comp');
     expect(screen.queryByRole('listbox', { name: 'Slash commands' })).not.toBeInTheDocument();
     expect(screen.getByRole('listbox', { name: 'Files' })).toBeInTheDocument();
+  });
+
+  it('replaces the whole token when the caret is inside it, keeping the text after it', () => {
+    renderEditor('project:overdeck');
+    // "Read @Comp|oserPromptEditor.tsx next": the caret sits after "@Comp".
+    type('Read @ComposerPromptEditor.tsx next', 'Read @Comp'.length);
+
+    fireEvent.keyDown(document, { key: 'Enter' });
+
+    // "@Comp" (5) plus the rest of the token after the caret; " next" stays.
+    expect(spliceText).toHaveBeenCalledWith(5, 5 + 'oserPromptEditor.tsx'.length, `@${COMPOSER_PATH} `, true);
+  });
+
+  it('opens no slash menu for a / typed inside a word, even when the prompt has another /command', () => {
+    renderEditor('project:overdeck');
+    type(' /model');
+    fireEvent.keyDown(capturedRootElement, { key: '/' });
+    type('src/ /model', 'src/'.length);
+
+    expect(screen.queryByRole('listbox', { name: 'Slash commands' })).not.toBeInTheDocument();
+  });
+
+  it('opens the slash menu for a / typed at a word start', () => {
+    renderEditor('project:overdeck');
+    fireEvent.keyDown(capturedRootElement, { key: '/' });
+    type('fix /');
+
+    expect(screen.getByRole('listbox', { name: 'Slash commands' })).toBeInTheDocument();
   });
 });

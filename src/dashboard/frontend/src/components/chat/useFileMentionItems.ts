@@ -41,7 +41,12 @@ export function useFileMentionItems(rootId: string | null, filter: string | null
           console.warn('[fileMentions] search failed:', error);
         });
     }, FILE_MENTION_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      // Rows answer one search; a closed menu or another query drops them, so
+      // reopening on the same query shows nothing until a fresh answer lands.
+      setAnswer(null);
+    };
   }, [query, rootId, filter]);
 
   // Unmount: drop any answer still in flight.

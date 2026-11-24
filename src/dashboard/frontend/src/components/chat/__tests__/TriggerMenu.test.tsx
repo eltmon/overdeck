@@ -92,6 +92,12 @@ describe('useTriggerMenuKeys', () => {
     expect(withRows.onSelectIndex).toHaveBeenCalledWith(0);
   });
 
+  it('ignores an IME confirmation Enter', () => {
+    const { onSelectIndex } = setup(true);
+    fireEvent.keyDown(document, { key: 'Enter', isComposing: true });
+    expect(onSelectIndex).not.toHaveBeenCalled();
+  });
+
   it('does not select on Enter with no rows', () => {
     const { onSelectIndex } = setup(true, 0);
     fireEvent.keyDown(document, { key: 'Enter' });

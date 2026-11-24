@@ -81,6 +81,26 @@ describe('useFileMentionItems (PAN-5662)', () => {
     expect(result.current.items.map(item => item.label)).toEqual(['Composer.tsx']);
   });
 
+  it('shows no rows when the menu reopens on the same query until a fresh answer lands', async () => {
+    const fresh = deferred<{ paths: string[] }>();
+    searchFiles.mockResolvedValueOnce({ paths: ['src/Old.ts'] }).mockReturnValueOnce(fresh.promise);
+    const { result, rerender } = renderHook(
+      ({ filter }: { filter: string | null }) => useFileMentionItems('project:x', filter),
+      { initialProps: { filter: 'comp' as string | null } },
+    );
+    await act(async () => { await vi.advanceTimersByTimeAsync(FILE_MENTION_DEBOUNCE_MS); });
+    expect(result.current.items.map(item => item.label)).toEqual(['Old.ts']);
+
+    rerender({ filter: null });
+    rerender({ filter: 'comp' });
+    expect(result.current.items).toEqual([]);
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(FILE_MENTION_DEBOUNCE_MS); });
+    expect(result.current.items).toEqual([]);
+    await act(async () => { fresh.resolve({ paths: ['src/New.ts'] }); });
+    expect(result.current.items.map(item => item.label)).toEqual(['New.ts']);
+  });
+
   it('yields no rows when the search rejects', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     searchFiles.mockRejectedValue(new Error('rpc down'));

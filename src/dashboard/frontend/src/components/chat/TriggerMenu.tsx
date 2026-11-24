@@ -157,6 +157,8 @@ export function useTriggerMenuKeys({
     if (!open) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      // An IME confirmation Enter belongs to the composition, never the menu.
+      if (e.isComposing) return;
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         e.stopPropagation();
