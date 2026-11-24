@@ -8,6 +8,8 @@
  * - Auto-expands up to max-h-[200px], scrollable beyond that
  * - Draft persisted to localStorage (300ms debounce)
  * - Undo/redo via Lexical HistoryPlugin
+ * - Triggers (PAN-5662): `@` files, `$` skills and `/` commands open one shared
+ *   TriggerMenu; the default placeholder lists the triggers this composer offers
  */
 
 import { useEffect, useCallback, useMemo, useRef, useState, type RefObject } from 'react';
@@ -34,7 +36,13 @@ import styles from '../CommandDeck/styles/command-deck.module.css';
 import { getSlashCommands, SLASH_COMMANDS, type SlashCommand } from './slashCommands';
 import { useSkillMentionCommands, useSkillSlashCommands, type SkillSlashContext } from './skillSlashCommands';
 import { TriggerMenu, caretAnchorRect, useTriggerMenuKeys } from './TriggerMenu';
-import { mentionTriggerContext, slashTriggerContext, toSkillMentionItems, type TriggerContext } from './composerTriggers';
+import {
+  composerPromptHint,
+  mentionTriggerContext,
+  slashTriggerContext,
+  toSkillMentionItems,
+  type TriggerContext,
+} from './composerTriggers';
 import { useFileMentionItems } from './useFileMentionItems';
 import { loadDraft, saveDraft } from '../../lib/composerDraft';
 
@@ -322,7 +330,7 @@ export function ComposerPromptEditor({
   skillContext,
   fileRootId,
   disabled = false,
-  placeholder = 'Message the agent…',
+  placeholder,
   onCommandKeyDown,
   editorRef,
   onChange,
@@ -344,6 +352,12 @@ export function ComposerPromptEditor({
   // @/$ menus open from text and caret changes, not keydown (PAN-5662 D4).
   const skillMention = getHarnessBehavior(harness).capabilities.skillMention;
   const skillMentionsEnabled = skillContext !== undefined && skillMention !== null;
+  // An explicit placeholder wins; otherwise list the triggers this composer offers (PAN-5662 D12).
+  const effectivePlaceholder = placeholder ?? composerPromptHint({
+    files: fileRootId != null,
+    skills: skillMentionsEnabled,
+    commands: slashCommandsEnabled,
+  });
   const mentionChars = useMemo<readonly MentionChar[]>(
     () => [...(fileRootId ? (['@'] as const) : []), ...(skillMentionsEnabled ? (['$'] as const) : [])],
     [fileRootId, skillMentionsEnabled],
@@ -549,10 +563,10 @@ export function ComposerPromptEditor({
               <ContentEditable
                 className={styles.composerEditable}
                 onPaste={onPaste}
-                aria-placeholder={placeholder}
+                aria-placeholder={effectivePlaceholder}
                 placeholder={() =>
                   !text ? (
-                    <div className={styles.composerPlaceholder}>{placeholder}</div>
+                    <div className={styles.composerPlaceholder}>{effectivePlaceholder}</div>
                   ) : null
                 }
               />
