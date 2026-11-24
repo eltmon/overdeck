@@ -21,7 +21,11 @@ import { readFile, stat, writeFile } from 'node:fs/promises';
 import type { Duplex } from 'node:stream';
 import { join } from 'node:path';
 
+import { Effect } from 'effect';
+import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
+
 import { loadConfigSync } from '../../../lib/config.js';
+import { parseIssueId } from '../../../lib/issue-id.js';
 import { TRAEFIK_DYNAMIC_DIR } from '../../../lib/paths.js';
 import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
 import { tryComposeProjectNameForWorkspace } from '../../../lib/workspace/stack-health.js';
@@ -39,7 +43,9 @@ import {
   WAKE_STATUS_PATH,
   WORKSPACE_WAKE_DYNAMIC_FILE,
 } from '../../../lib/workspace/workspace-wake-host.js';
-import { isTrustedLocalNodeRequest } from './dashboard-auth.js';
+import { jsonResponse } from '../http-helpers.js';
+import { isTrustedLocalNodeRequest, rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
+import { httpHandler } from './http-handler.js';
 
 export type WakeState = 'idle' | 'starting' | 'started' | 'failed' | 'no-stack';
 
@@ -488,3 +494,31 @@ export async function ensureWorkspaceWakeRouterFile(
     return 'skipped';
   }
 }
+
+// ─── REST route (FR-11, D9, D13) ──────────────────────────────────────────────
+
+/**
+ * The Command Deck's start-app action. It goes through the wake door so an open
+ * reclaim is closed with `stack.restored` (unlike `stack/start`). No
+ * route-scopes row: unlisted routes need `admin` (D13).
+ */
+export const workspaceWakeRouteLayer = HttpRouter.add(
+  'POST',
+  '/api/workspaces/:issueId/wake',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) return jsonResponse({ error: 'Invalid issue ID' }, { status: 400 });
+    const status = yield* Effect.promise(() => requestWorkspaceWake(issueId, 'dashboard'));
+    if (status.state === 'started') {
+      return jsonResponse({ state: 'started', started: status.started, alreadyRunning: status.alreadyRunning, appUrl: status.appUrl });
+    }
+    if (status.state === 'no-stack') {
+      return jsonResponse({ error: status.message }, { status: status.reason === 'no-compose-project' ? 409 : 404 });
+    }
+    return jsonResponse({ error: status.error ? `Starting ${status.issueId} failed: ${status.error}` : status.message }, { status: 500 });
+  })),
+);

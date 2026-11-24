@@ -185,7 +185,7 @@ import { restartGateRouteLayer } from './routes/restart-gate.js';
 import { dashboardSessionPreflightRouteLayer, dashboardSessionRouteLayer } from './routes/dashboard-session.js';
 import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js';
 import { holdRequestsUntilServed, retryDashboardBind } from './server-bind.js';
-import { setupWorkspaceWakeHost } from './routes/workspace-wake.js';
+import { setupWorkspaceWakeHost, workspaceWakeRouteLayer } from './routes/workspace-wake.js';
 import { buildDashboardHealthResponse } from './health-response.js';
 
 // ─── Dual-runtime layers ──────────────────────────────────────────────────────
@@ -496,6 +496,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   internalEventsRouteLayer,
   restartGateRouteLayer,
   knowledgeViewerRouteLayer,
+  workspaceWakeRouteLayer,
   environmentRouteLayer,
   pairingRouteLayer,
   anywhereRouteLayer,

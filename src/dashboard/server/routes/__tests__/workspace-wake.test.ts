@@ -4,8 +4,33 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { Effect } from 'effect';
+import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+// The REST route runs the coordinator with its default deps; these keep it off Docker.
+const routeMocks = vi.hoisted(() => ({
+  wakeWorkspaceStack: vi.fn(),
+  bypassAuth: true,
+}));
+vi.mock('../../../../lib/workspace/stack-restore.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../lib/workspace/stack-restore.js')>()),
+  wakeWorkspaceStack: routeMocks.wakeWorkspaceStack,
+}));
+vi.mock('../../../../lib/workspace/stack-idle-config.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../lib/workspace/stack-idle-config.js')>()),
+  workspacePathForIssue: () => null,
+}));
+vi.mock('../dashboard-auth.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../dashboard-auth.js')>();
+  return {
+    ...actual,
+    rejectUnsafeDashboardMutationRequest: (...args: Parameters<typeof actual.rejectUnsafeDashboardMutationRequest>) =>
+      routeMocks.bypassAuth ? null : actual.rejectUnsafeDashboardMutationRequest(...args),
+  };
+});
+
+import { requiredScopeFor } from '../../route-scopes.js';
 import type { StackWakeResult } from '../../../../lib/workspace/stack-restore.js';
 import {
   APP_HOST_TTL_MS,
@@ -16,6 +41,7 @@ import {
   setupWorkspaceWakeHost,
   WAKE_RESULT_TTL_MS,
   wakePollDecision,
+  workspaceWakeRouteLayer,
   type WorkspaceWakeDeps,
 } from '../workspace-wake.js';
 
@@ -341,5 +367,80 @@ describe('ensureWorkspaceWakeRouterFile (PAN-5649)', () => {
     await expect(ensureWorkspaceWakeRouterFile({ apiPort: 3011, dynamicDir: dir })).resolves.toBe('written');
     await expect(ensureWorkspaceWakeRouterFile({ apiPort: 3011, dynamicDir: dir })).resolves.toBe('unchanged');
     await expect(ensureWorkspaceWakeRouterFile({ apiPort: 4102, dynamicDir: dir })).resolves.toBe('written');
+  });
+});
+
+// ─── REST route (FR-11) ──────────────────────────────────────────────────────
+
+async function postWake(issueId: string) {
+  const request = HttpServerRequest.fromWeb(new Request(`http://localhost/api/workspaces/${issueId}/wake`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: '{}',
+  }));
+  const response = await Effect.runPromise(
+    Effect.scoped(
+      Effect.flatMap(HttpRouter.toHttpEffect(workspaceWakeRouteLayer), (app) =>
+        Effect.provideService(app, HttpServerRequest.HttpServerRequest, request)),
+    ),
+  );
+  const responseBody = response.body as { body?: Uint8Array } | null;
+  const text = responseBody?.body ? new TextDecoder().decode(responseBody.body) : '{}';
+  return { status: response.status, body: JSON.parse(text) as Record<string, unknown> };
+}
+
+describe('POST /api/workspaces/:issueId/wake (PAN-5649)', () => {
+  beforeEach(() => {
+    routeMocks.bypassAuth = true;
+    routeMocks.wakeWorkspaceStack.mockReset();
+  });
+
+  it('answers 200 with what it started', async () => {
+    routeMocks.wakeWorkspaceStack.mockResolvedValue(WOKEN);
+    const reply = await postWake('PAN-1');
+    expect(reply.status).toBe(200);
+    expect(reply.body).toMatchObject({ state: 'started', started: ['pan-1-frontend-1'], alreadyRunning: [], appUrl: null });
+    expect(routeMocks.wakeWorkspaceStack).toHaveBeenCalledExactlyOnceWith({ issueId: 'PAN-1', trigger: 'dashboard' });
+  });
+
+  it('answers 404 for no workspace and 409 for no compose project', async () => {
+    routeMocks.wakeWorkspaceStack.mockResolvedValue({ kind: 'no-stack', reason: 'no-workspace' });
+    expect((await postWake('PAN-1')).status).toBe(404);
+    resetWorkspaceWakeStateForTests();
+    routeMocks.wakeWorkspaceStack.mockResolvedValue({ kind: 'no-stack', reason: 'no-compose-project' });
+    const reply = await postWake('PAN-1');
+    expect(reply.status).toBe(409);
+    expect(reply.body.error).toBe('PAN-1 has no Docker stack to start.');
+  });
+
+  it('answers 500 with the error when the wake failed', async () => {
+    routeMocks.wakeWorkspaceStack.mockResolvedValue({ kind: 'failed', error: 'boom', failed: ['x'] });
+    const reply = await postWake('PAN-1');
+    expect(reply.status).toBe(500);
+    expect(reply.body.error).toContain('boom');
+  });
+
+  it('answers 400 for an invalid issue id', async () => {
+    const reply = await postWake('not_an_issue');
+    expect(reply.status).toBe(400);
+    expect(routeMocks.wakeWorkspaceStack).not.toHaveBeenCalled();
+  });
+
+  it('answers 401 without a dashboard credential and never wakes', async () => {
+    routeMocks.bypassAuth = false;
+    const previous = process.env.OVERDECK_INTERNAL_TOKEN;
+    process.env.OVERDECK_INTERNAL_TOKEN = 'workspace-wake-internal-token';
+    try {
+      const reply = await postWake('PAN-1');
+      expect(reply.status).toBe(401);
+      expect(routeMocks.wakeWorkspaceStack).not.toHaveBeenCalled();
+    } finally {
+      if (previous === undefined) delete process.env.OVERDECK_INTERNAL_TOKEN;
+      else process.env.OVERDECK_INTERNAL_TOKEN = previous;
+    }
+  });
+
+  it('needs the admin scope (no route-scopes row, D13)', () => {
+    expect(requiredScopeFor('POST', '/api/workspaces/PAN-1/wake')).toBe('admin');
   });
 });
