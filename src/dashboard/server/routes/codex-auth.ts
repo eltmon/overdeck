@@ -231,6 +231,7 @@ const postCodexReauthStatusRoute = HttpRouter.add(
         return jsonResponse({ completed: true, success: false, error: 'Re-auth session expired or invalid' });
       }
 
+      // Not an agent check (PAN-5652): the re-auth login runs in its own tmux session.
       const exists = yield* sessionExists(sessionName);
       if (exists) {
         return jsonResponse({ completed: false });

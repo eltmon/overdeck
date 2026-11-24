@@ -439,6 +439,7 @@ describe('lint-ratchet-audit.sh', () => {
   for (const [file, label] of [
     ['react-compiler-skip-baseline.txt', 'react-compiler skip baseline'],
     ['manual-memo-baseline.txt', 'manual-memo baseline'],
+    ['tmux-session-exists-baseline.txt', 'tmux sessionExists baseline'],
   ] as const) {
     it(`requires an issue reference to raise or add a ${label} row, and lowers freely (PAN-4561)`, () => {
       const seed = ['3 src/a.tsx', '2 src/b.tsx'];

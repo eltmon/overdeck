@@ -35,6 +35,8 @@ export async function detectPendingOperatorDecision(
   agentId: string,
   deps: PendingOperatorDecisionDeps = {},
 ): Promise<PendingOperatorDecision | null> {
+  // Not an agent check (PAN-5652): it gates the tmux pane read below (capture-pane);
+  // the JSONL AskUserQuestion check after it covers every backend.
   const sessionExists = deps.sessionExists
     ?? ((id: string) => Effect.runPromise(sessionExistsEffect(id)))
   const detectAwaitingInputForAgent = deps.detectAwaitingInputForAgent

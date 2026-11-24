@@ -84,7 +84,7 @@ import type { XBriefDocument, XBriefInspectionPolicy } from '../../../lib/xbrief
 import { findXBriefByIssue, readXBriefDocument } from '../../../lib/xbrief/xbrief-index.js';
 import { criticalPath, actionableDoc } from '../../../lib/xbrief/dag.js';
 import { getChangedFiles, getDiffBase, getDiffStat, type ChangedFile } from '../../../lib/cloister/review-context.js';
-import { capturePane, listSessionNames, sessionExists } from '../../../lib/tmux.js';
+import { capturePane, listSessionNames } from '../../../lib/tmux.js';
 import { runVerificationForIssue } from '../../../lib/cloister/verification-runner.js';
 import { loadWorkspaceMetadata, listWorkspaceMetadata } from '../../../lib/remote/workspace-metadata.js';
 import { loadConfigSync } from '../../../lib/config.js';

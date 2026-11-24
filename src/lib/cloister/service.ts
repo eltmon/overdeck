@@ -39,7 +39,6 @@ import { existsSync, writeFileSync, unlinkSync, readFileSync, readdirSync } from
 import { rm } from 'fs/promises';
 import { join } from 'path';
 import { AGENTS_DIR } from '../paths.js';
-import { sessionExists } from '../tmux.js';
 import { Effect } from 'effect';
 import { emitActivityEntry } from '../activity-logger.js';
 import { handleCloisterDomainEvent, parseSpecialistAgentSession } from './service-reactive.js';
@@ -312,10 +311,11 @@ export class CloisterService {
             clearedSpecialistCount++;
           } else if (runtimeState.state === 'active') {
             // Check if the process is actually alive — if not, the state is stale from a crash.
-            // For issue-scoped specialists, check the exact tmux session instead of the legacy
+            // For issue-scoped specialists, check the exact session instead of the legacy
             // project/type singleton lookup, which cannot represent PAN-754 session identity.
+            // PAN-5652: through the liveness oracle (tmux has-session misses Herdr agents).
             const stillRunning = parsed.issueId
-              ? await Effect.runPromise(sessionExists(entry.name))
+              ? !isConfirmedDead(await isAlive(entry.name))
               : await isSpecialistRunning(parsed.specialistType, parsed.projectKey);
             if (!stillRunning) {
               saveAgentRuntimeState(entry.name, {

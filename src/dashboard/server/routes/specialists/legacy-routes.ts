@@ -370,10 +370,11 @@ const postSpecialistsDoneRoute = HttpRouter.add(
         yield* Effect.promise(async () => {
           try {
             const workAgentId = `agent-${normalizedIssueId.toLowerCase()}`;
-            const { sessionExists } = await import('../../../../lib/tmux.js');
+            const { isAlive } = await import('../../../../lib/agents/liveness.js');
             const { messageAgent, spawnAgent, getAgentState } = await import('../../../../lib/agents.js');
 
-            if (await Effect.runPromise(sessionExists(workAgentId))) {
+            // PAN-5652: the liveness oracle; tmux has-session misses every Herdr agent.
+            if ((await isAlive(workAgentId)).alive) {
               // Agent is running — send rebase instructions directly
               const rebaseMsg = `MERGE CONFLICT: The merge-agent could not rebase your branch onto main due to conflicts. Please fix this now:\n\n1. git fetch origin main\n2. git rebase origin/main\n3. Resolve any conflicts (git add <file> && git rebase --continue)\n4. git push --force-with-lease\n5. Resubmit: curl -s -X POST http://localhost:3011/api/review/${normalizedIssueId}/request -H "Content-Type: application/json" -d "{}"\n\nConflict details: ${notes}`;
               await messageAgent(workAgentId, rebaseMsg);

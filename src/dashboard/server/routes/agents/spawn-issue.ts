@@ -683,6 +683,8 @@ export const spawnIssueAgentForRoute = (input: { body: unknown; internalRequest:
       }, { status: 409 });
     }
 
+    // Not an agent check (PAN-5652): sweeps a legacy tmux session of this name; the kill is
+    // tmux-only too. Herdr panes are guarded by the spawn path's agentPaneExists.
     yield* Effect.gen(function* () {
       const exists = yield* sessionExists(agentSessionName);
       if (exists) yield* killSession(agentSessionName);

@@ -4,7 +4,7 @@ import { promisify } from 'node:util';
 import { Effect } from 'effect';
 
 import { messageAgent, spawnAgent } from '../../../../lib/agents.js';
-import { isAlive } from '../../../../lib/agents/liveness.js';
+import { isAlive, isConfirmedDead } from '../../../../lib/agents/liveness.js';
 import {
   clearYieldForResume,
   decideResumeGate,
@@ -20,7 +20,6 @@ import type { MergeReadiness } from '../../../../lib/cloister/pr-facts.js';
 import type { VerificationRunnerOptions } from '../../../../lib/cloister/verification-types.js';
 import type { DerivedIssueState } from '@overdeck/contracts';
 import { rebaseFeatureBranch } from '../../../../lib/cloister/merge-rebase.js';
-import { sessionExists } from '../../../../lib/tmux.js';
 import type { MergeRunPatch, MergeRunPhase } from '../../services/merge-queue-service.js';
 
 const execAsync = promisify(exec);
@@ -680,14 +679,17 @@ export async function rebaseWithAgentFallback(options: {
           break;
         }
       } catch { /* fetch failed, retry */ }
-      if (!await Effect.runPromise(sessionExists(agentId))) {
+      // PAN-5652: the liveness oracle, never tmux has-session (false for every
+      // Herdr agent). Only a confirmed death ends the wait; a probe that cannot
+      // answer is not one.
+      if (isConfirmedDead(await isAlive(agentId))) {
         console.log(`[merge] Work agent ${agentId} stopped during rebase`);
         break;
       }
     }
 
     if (newHead) return { success: true, newHead };
-    if (!await Effect.runPromise(sessionExists(agentId))) {
+    if (isConfirmedDead(await isAlive(agentId))) {
       const agentReason = `Work agent ${agentId} stopped before completing the rebase onto ${targetBranch}`;
       return {
         success: false,

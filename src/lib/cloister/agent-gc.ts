@@ -1,7 +1,5 @@
 import { join } from 'node:path';
 
-import { Effect } from 'effect';
-
 import { listAgentStatesSync } from '../agents/agent-state.js';
 import { getOverdeckHome } from '../paths.js';
 import { emitActivityEntry } from '../activity-logger.js';
@@ -13,7 +11,7 @@ import {
   type RemoveAgentStateDirResult,
 } from '../agents/state-dir-removal.js';
 import { readLiveTrackerIssueState, type LiveTrackerIssueState } from './issue-closed.js';
-import { sessionExists } from '../tmux.js';
+import { isAlive, isConfirmedDead } from '../agents/liveness.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
 import { resolveProjectReposForIssue } from '../project-repos.js';
 import { listOpenPullRequestsSnapshot } from '../pipeline-membership-gather.js';
@@ -131,7 +129,8 @@ function defaultTerminalityDeps(): AgentGcTerminalityDeps {
     // readTrackerState below. There is no separate closedOut flag.
     hasClosedOutFlag: () => false,
     readTrackerState: readLiveTrackerIssueState,
-    hasLiveTmuxSession: (agentId) => Effect.runPromise(sessionExists(agentId)),
+    // PAN-5652: backend-aware; a probe that cannot answer preserves the agent.
+    hasLiveTmuxSession: async (agentId) => !isConfirmedDead(await isAlive(agentId)),
     hasOpenChangeRequest,
     hasInFlightReviewOrTest,
     log: (message) => console.log(message),

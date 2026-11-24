@@ -4,7 +4,7 @@ import { getAgentState } from '../agents.js';
 import type { Role } from '../agents.js';
 import { emitActivityEntry } from '../activity-logger.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
-import { sessionExists, killSession } from '../tmux.js';
+import { agentPaneExists, closeAgentPaneDetailed } from '../terminal-backends/launch.js';
 import {
   decideAutonomousPlanDispatch,
   gatherAutonomousPlanDispatchInput,
@@ -100,6 +100,15 @@ function roleFromAgentId(agentId: string, issueId: string): Role | null {
  */
 const STARTING_WITHOUT_SESSION_GRACE_MS = 120_000;
 
+/**
+ * PAN-5652: does the role's pane exist on the host's backend? tmux
+ * has-session is false for every Herdr agent. A probe that cannot answer reads
+ * as present, so a starting agent is never declared a crashed spawn on it.
+ */
+async function rolePaneExists(agentId: string): Promise<boolean> {
+  return agentPaneExists(agentId).catch(() => true);
+}
+
 function isFreshStarting(state: { startedAt?: string }): boolean {
   const startedAt = Date.parse(state.startedAt ?? '');
   return Number.isFinite(startedAt) && Date.now() - startedAt < STARTING_WITHOUT_SESSION_GRACE_MS;
@@ -117,7 +126,7 @@ async function activeRoleRunExists(issueId: string, role: Role, workspacePath?: 
     if (legacyState?.role === 'plan' && legacyState.status !== 'stopped' && legacyState.status !== 'error') {
       // S1 (age-aware): only a STALE 'starting' state with no live tmux
       // session is a crashed spawn; a fresh one is mid-startup (PAN-2159).
-      if (legacyState.status === 'starting' && !(await Effect.runPromise(sessionExists(legacyId)))) {
+      if (legacyState.status === 'starting' && !(await rolePaneExists(legacyId))) {
         return isFreshStarting(legacyState);
       }
       return true;
@@ -135,7 +144,7 @@ async function activeRoleRunExists(issueId: string, role: Role, workspacePath?: 
 
   // S1 (age-aware): only a STALE 'starting' state with no live tmux session
   // is a crashed spawn; a fresh one is mid-startup (PAN-2159).
-  if (stateRole === role && state.status === 'starting' && !(await Effect.runPromise(sessionExists(candidateId)))) {
+  if (stateRole === role && state.status === 'starting' && !(await rolePaneExists(candidateId))) {
     return isFreshStarting(state);
   }
 
@@ -245,14 +254,14 @@ export async function onIssueStateChange(issueId: string, newState: string): Pro
   // dead one.
   const issueLower = normalizedIssueId.toLowerCase();
   const roleSessionId = role === 'work' ? `agent-${issueLower}` : `agent-${issueLower}-${role}`;
-  if (await Effect.runPromise(sessionExists(roleSessionId))) {
+  // PAN-5652: through the host's backend, so a Herdr pane is found and closed.
+  if (await agentPaneExists(roleSessionId).catch(() => false)) {
     const message = `${normalizedIssueId}: killing stale ${role} session ${roleSessionId} before re-dispatch`;
     console.log(`[cloister] ${message}`);
     emitActivityEntry({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
-    try {
-      await Effect.runPromise(killSession(roleSessionId));
-    } catch (err) {
-      console.error(`[cloister] failed to kill stale session ${roleSessionId}:`, err instanceof Error ? err.message : String(err));
+    const close = await closeAgentPaneDetailed(roleSessionId);
+    if (close.outcome === 'failed') {
+      console.error(`[cloister] failed to kill stale session ${roleSessionId}: ${close.reason}`);
     }
   }
 
