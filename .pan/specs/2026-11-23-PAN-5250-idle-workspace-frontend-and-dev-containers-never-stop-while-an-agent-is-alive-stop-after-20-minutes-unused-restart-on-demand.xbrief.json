@@ -4,17 +4,17 @@
     "created": "2026-11-23T22:58:17Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5250: Idle workspace frontend and dev containers never stop while an agent is alive: stop after 20 minutes unused, restart on demand",
-    "updated": "2026-11-23T23:08:56.353Z"
+    "updated": "2026-11-23T23:09:57.556Z"
   },
   "plan": {
     "id": "pan-5250",
     "title": "Idle workspace frontend and dev containers never stop while an agent is alive: stop after 20 minutes unused, restart on demand",
-    "status": "proposed",
+    "status": "running",
     "uid": "eb5ef482-cdbf-46e6-9908-6f7a3034b4b8",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-23T22:58:17Z",
-    "updated": "2026-11-23T23:08:56.353Z",
+    "updated": "2026-11-23T23:09:57.556Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5250",
@@ -996,5 +996,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
