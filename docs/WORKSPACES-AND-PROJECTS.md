@@ -947,6 +947,8 @@ starts the whole union. Which trigger restores which reason:
 | `spawn` (any role except review) | any open reclaim |
 | `verification` (verification start, polyrepo post-rebase merge verification) | any open reclaim |
 | `operator` (`pan workspace up`) | any open reclaim, then every other exited wakeable container |
+| `browser` (a waking request on the app URL, PAN-5649) | any open reclaim, then every other exited wakeable container |
+| `dashboard` (the Command Deck `start app` action, PAN-5649) | any open reclaim, then every other exited wakeable container |
 
 The restore door starts a journaled container when its service is reclaimable
 (`api`, `fe`, `frontend`, `server`) or equals the service its reclaim entry
@@ -976,9 +978,71 @@ workspace:
 
 `OVERDECK_DISABLE_STACK_IDLE_STOP=1` disables it everywhere.
 
-**Gap until PAN-5649.** Opening an idle-stopped workspace's app URL returns
-Traefik's 404 and the `app ↗` chip is hidden. Run `pan workspace up <issue>`;
-every idle-stop activity entry names it.
+**Waking from the app URL (PAN-5649).** A stopped frontend container drops
+its Traefik label router, so its `feature-<issue>.<domain>` host would answer
+Traefik's 404. A lowest-priority wake router catches that host instead and
+sends it to the dashboard, which starts the stack and serves a wake page.
+
+- **The router file.** `~/.overdeck/traefik/dynamic/workspace-wake.yml` holds
+  one router, `overdeck-workspace-wake` (`priority: 1`, rule
+  ``HostRegexp(`^feature-[a-z0-9]+-[0-9]+\..+$`)``), whose middleware sets the
+  request header `X-Overdeck-Wake-Router: 1` and whose service is the
+  dashboard API port. `pan install`, `pan up` and `pan dev` write it
+  (`generateOverdeckTraefikConfig`), and the dashboard writes it at startup
+  when its content differs, so a `pan reload` deploy carries it. The dashboard
+  never creates a missing `dynamic/` directory. The rule is domain-agnostic and
+  anchored on `^feature-`, so it never shadows `api-feature-…`, `knowledge-…`
+  or `artifacts.…` hosts, and a label router always wins while the frontend
+  runs.
+- **Dispatch.** `setupWorkspaceWakeHost` (`src/dashboard/server/routes/workspace-wake.ts`)
+  wraps the raw Node server right after `holdRequestsUntilServed`. Every
+  request that carries the marker header and a `feature-<issue>.<domain>` Host
+  goes to the wake handler and never reaches a dashboard route or WebSocket
+  handler. A request without the marker passes through unchanged whatever its
+  Host: a workspace dashboard's Vite proxy forwards `/ws` with the browser's
+  `feature-…` Host.
+- **Who may wake.** Only a trusted local caller (`isTrustedLocalCaller`: a
+  loopback peer, or the managed Traefik on a Docker bridge with a local
+  forwarded client). No credential is needed, so a bookmark, an agent's `curl`
+  or Playwright works. A Tailscale Funnel or LAN caller gets `404 Not found`
+  and causes no Docker call. A host whose domain is not `traefik.domain` or a
+  project's `workspace.dns.domain`, or whose issue resolves to no registered
+  project, gets `404`.
+- **Waking requests.** Only a request with no `Sec-Fetch-Mode` header (curl,
+  scripts, Playwright's request API) or with `Sec-Fetch-Mode: navigate` (a page
+  load) starts containers. Subresource loads and fetches get an empty `503`; a
+  WebSocket upgrade gets `503` and is closed; a Vite ping
+  (`Accept: text/x-vite-ping`) has its socket destroyed, so a stale tab never
+  reloads itself into a wake.
+- **The response.** A waking request starts the wake and is answered at once
+  with `503`, `Retry-After: 5`, `Cache-Control: no-store` and
+  `x-overdeck-wake: 1`: the wake page for `Accept: text/html`, otherwise a
+  plain-text message. `curl -f` therefore fails until the app answers, and
+  `curl --retry` retries it.
+- **Readiness.** The wake page polls `/__overdeck_wake/status` every 2 s. While
+  the wake router serves the host, the dashboard answers it with JSON
+  (`issueId`, `state`, `message`, `appUrl`) and `x-overdeck-wake: 1`. Once the
+  label router is back, the same path reaches the app; a response without that
+  header and not 502/503/504 means the app answers, and the page reloads.
+- **Label-host redirect.** The handler reads the frontend router's host from
+  the compose project's container labels. When it differs from the request host
+  (for example `projects.yaml` sets `dns.domain: pan.localhost` while the
+  compose template routes `*.overdeck.localhost`), it answers `307` to the label
+  host before waking.
+- **Coordinator.** One wake runs per issue at a time and later requests join
+  it; a finished, non-failed outcome is reused for 15 s, and label hosts are
+  cached for 60 s.
+- **Triggers.** The wake host uses trigger `browser`; the Command Deck uses
+  `dashboard`. Both behave like `operator`: they restore any open reclaim, then
+  start every other exited wakeable container.
+- **The start-app action.** `POST /api/workspaces/:issueId/wake` runs the same
+  coordinator (200 started, 404 no workspace, 409 no compose project, 500
+  failed). It has no `route-scopes.ts` row, so it needs `admin`. The Command
+  Deck issue row shows a `start app` button instead of `app ↗` while
+  `stackHealth.reclaimed` is non-empty or the stack is stopped; the click opens
+  the app URL and posts the wake.
+- **Not covered.** A project whose workspace hosts run behind its own Traefik
+  instead of the managed `overdeck-traefik` container.
 
 **The old reaper.** `src/lib/cloister/idle-stack-reaper.ts` keeps its
 no-agent tiers, name matching and grace windows, but before either tier stops

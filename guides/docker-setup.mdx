@@ -100,7 +100,7 @@ Certificates aren't in this file: Traefik v3 reads them from `dynamic/tls.yml`. 
 
 ### Dynamic Configuration
 
-Overdeck writes two files in `dynamic/`. `overdeck.yml` routes `https://overdeck.localhost` (the `traefik.domain` value in `~/.overdeck/config.toml`) to the dashboard, and `tls.yml` lists every certificate and key pair in `certs/`. `pan install`, `pan up` and `pan dev` regenerate both. Overdeck doesn't write a dynamic file per workspace: route workspace containers with Docker labels, as in the [Docker Compose Template](#docker-compose-template) below. Traefik also picks up any file you add to `dynamic/` yourself.
+Overdeck writes three files in `dynamic/`. `overdeck.yml` routes `https://overdeck.localhost` (the `traefik.domain` value in `~/.overdeck/config.toml`) to the dashboard, and `tls.yml` lists every certificate and key pair in `certs/`. `workspace-wake.yml` is a lowest-priority router that sends a stopped workspace app's host to the dashboard's wake page, which starts the app's containers again. `pan install`, `pan up` and `pan dev` regenerate all three, and the dashboard also writes `workspace-wake.yml` when it starts. Overdeck doesn't write a dynamic file per workspace: route workspace containers with Docker labels, as in the [Docker Compose Template](#docker-compose-template) below. Traefik also picks up any file you add to `dynamic/` yourself.
 
 ## Certificate Generation
 

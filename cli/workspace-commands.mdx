@@ -164,11 +164,14 @@ The stopped containers start again when:
 
 - a test or UAT agent is spawned for the issue (any agent spawn except review starts them),
 - the issue's verification starts, including the polyrepo verification before a merge,
-- you run `pan workspace up <issue>`.
+- you run `pan workspace up <issue>`,
+- you open the app's URL.
 
-Until [#5649](https://github.com/eltmon/overdeck/issues/5649) ships, opening a
-stopped workspace's app URL shows Traefik's 404 page. Run
-`pan workspace up <issue>` first.
+Opening a stopped workspace's app URL shows a short "Starting it…" page, starts
+the containers and loads the app once it answers. Scripts and agents get `503`
+with `Retry-After: 5` until then, so `curl --retry 12 --retry-delay 5 -f <url>`
+waits for it. While the app is stopped, the Command Deck issue row shows a
+**start app** button in place of the `app ↗` link.
 
 ```bash
 pan workspace up MIN-123      # start the stopped containers
