@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5654",
   "created": "2026-11-24T00:52:28.291Z",
-  "updated": "2026-11-24T00:58:09.078Z",
+  "updated": "2026-11-24T00:58:18.303Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -48,6 +48,11 @@
     "ci-prefetch-and-offline-guard.ac3": {
       "status": "completed",
       "doneAt": "2026-11-24T00:58:09.077Z"
+    },
+    "docs-mobile-readme-offline-robolectric": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5654",
+      "claimedAt": "2026-11-24T00:58:18.303Z"
     }
   }
 }
