@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5649",
   "created": "2026-11-24T02:25:08.097Z",
-  "updated": "2026-11-24T02:53:29.493Z",
+  "updated": "2026-11-24T02:53:34.223Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -114,6 +114,11 @@
     "wi4-wake-host-handler.ac6": {
       "status": "completed",
       "doneAt": "2026-11-24T02:53:29.493Z"
+    },
+    "wi4b-wake-rest-route": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5649",
+      "claimedAt": "2026-11-24T02:53:34.223Z"
     }
   }
 }
