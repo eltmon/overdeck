@@ -1131,6 +1131,10 @@ it off. Conversations also settle themselves when their pull requests merge
 ([PAN-4653](https://github.com/eltmon/overdeck/issues/4653)); see
 [Pull requests on conversations](#pull-requests-on-conversations).
 
+Settling hides a conversation but leaves its unfinished work inside it. To
+have one conversation read the settled ones and take that work over, see
+[Consolidating conversations](#consolidating-conversations).
+
 A [scheduled run](#scheduled-runs) delivering its prompt also clears any
 settle or snooze on that conversation, so settling or snoozing never buries a
 conversation past its next scheduled run.
@@ -1159,7 +1163,7 @@ the row returns to normal. Both end the session; settling (above) does not:
 a settled conversation keeps running and can still be unsettled back to
 Inbox.
 
-## Consolidating a project's conversations
+## Consolidating conversations
 
 Consolidation makes one conversation the owner of everything a project's
 other conversations were doing. The agent reads every other unarchived
@@ -1170,9 +1174,9 @@ conversations it has emptied. It finishes with a ledger: one row per
 archived conversation, saying what it owned, where that work stands now, and
 what the consolidating conversation owns in its place.
 
-Settling and archiving only tidy the list. Consolidation reads the
-conversations first, so nothing a conversation promised is lost when its row
-goes away.
+Settling and archiving only tidy the list. Consolidation reads each
+conversation before it archives it, and carries forward the commitments it
+finds there.
 
 ### When to use it
 
@@ -1191,9 +1195,9 @@ goes away.
 
 ### Running it
 
-Consolidation is the `pan-consolidate-conversations` skill. It runs in
-Claude Code conversations, and the conversation you run it in becomes the
-owner. Start it in either way:
+Consolidation is the `pan-consolidate-conversations` skill, not a `pan`
+command. Run it in a Claude Code conversation; the conversation you run it
+in becomes the owner. Start it in either way:
 
 - Type `/pan-consolidate-conversations` in the composer. Typing `/pan-cons`
   is enough to find it under **Skills** in the menu.
@@ -1236,6 +1240,8 @@ dashboard must be running, because archiving goes through it.
 - **Running conversations**, as described in step 2.
 - **Other projects.** Only conversations in the current project's scope are
   read or archived.
+- **Conversations on other machines.** Rows listed from a linked machine
+  have no transcript on this machine, so they are left as they are.
 
 ### Undoing it
 
@@ -1244,8 +1250,8 @@ stay on disk. Restore any archived conversation with
 `pan unarchive-conversation <name>`, then [resume it](#resuming-a-stopped-conversation).
 The ledger lists every archived name so you can find it again.
 
-Agents that were reporting to an archived conversation with `pan tell` now
-have no listener. The ledger names them; check on them with `pan show`.
+Agents that were reporting to an archived conversation with `pan tell` keep
+running but now have no listener. Check on them with `pan show`.
 
 ## Resuming a stopped conversation
 

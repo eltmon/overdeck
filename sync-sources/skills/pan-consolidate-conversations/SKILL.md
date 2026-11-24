@@ -61,6 +61,9 @@ Exclude:
 - **yourself**;
 - **system conversations** — names that do not start with a `YYYYMMDD-` date
   (for example `sequencer-runner`). Never archive these.
+- **conversations on other machines** — rows with `origin: "linked"` (names
+  start with `@<machine>/`). Their transcripts are not on this machine; leave
+  them and list them in the ledger as not read.
 
 Rows with `status: ended` and no live session are already dead: archive them
 without a digest unless the title suggests real work.
