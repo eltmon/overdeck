@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-24T01:34:10Z · model: claude-opus-5-5 · open: 956_
+_Last sequenced: 2026-11-24T02:05:09Z · model: claude-opus-5-5 · open: 957_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -8,6 +8,7 @@ _Last sequenced: 2026-11-24T01:34:10Z · model: claude-opus-5-5 · open: 956_
 | 1 | PAN-5637 | S | critical | ok |  |  | In pipeline. Merge train never admits polyrepo issues touching CI-less member repos; add ci: none per repo so MYN infra/docs MRs merge |
 | 1 | PAN-5638 | M | critical | ok |  |  | In pipeline. Polyrepo review verdicts refuse GitHub member PRs and the ready set ignores verdict markers; MIN-1142 can't merge |
 | 1 | PAN-5654 | S | high | ok |  |  | In pipeline. mobile-android CI goes red on non-mobile PRs when Robolectric android-all download fails; cache the jar. |
+| 1 | PAN-5657 | S | high | ok |  |  | In pipeline. 7 CodeRabbit findings on merged PAN-5652; 2 Major: failed pane listing reads as pane-dead, legacy tmux agents read as gone. |
 | 2 | PAN-5652 | M | critical | ok |  |  | Herdr agents fail tmux has-session checks, so polyrepo merge aborts on live agents (MIN-1144). Merge routes: TENET-10 handoff. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 4 | PAN-5430 | S | medium | ok |  |  | Markdown Preview prints raw HTML (README logo <div>/<picture>) as text; render it via rehype-raw + rehype-sanitize in doc previews. |
@@ -976,6 +977,10 @@ New since the prior run and already in the pipeline, so it is pinned at rank 1. 
 
 Already in the pipeline, so pinned at rank 1. A flaky Robolectric runtime download turns the test aggregate red on PRs that touch no mobile code, as it did on PR #5651 for PAN-5250.
 
+### PAN-5657 (rank 1)
+
+New CodeRabbit follow-up on the merged PAN-5652 Herdr liveness fix, already in the pipeline, so pinned at rank 1. Two Major findings are liveness misreports in merge-ops and the cloister service, which is substrate hardening at the same tier as PAN-5653.
+
 ### PAN-5652 (rank 2)
 
 New substrate bug: merge-ops.ts and several cloister modules test agent liveness with tmux has-session, which is always false on Herdr, the default backend. It failed the MIN-1144 polyrepo merge within 50 seconds while the agent was finishing the rebases, so it blocks polyrepo merges and sits beside the polyrepo merge cluster (PAN-5637, PAN-5638, PAN-5641) in a free rank slot. The fix routes these checks through liveness.ts and adds a ratchet; it touches merge routes, so it needs a supervised handoff.
@@ -1280,10 +1285,6 @@ New pipeline bug placed in a freed critical-tier slot. Reviews whose reviewers d
 
 New issue from the Deft adoption PRD. Its dependency PAN-3308 has closed. The main-push guard exists only in the overdeck repo, so agents in other registered projects can still push to main, which is the PAN-2204 hazard class.
 
-### PAN-4550 (rank 70)
-
-Found cutting v0.65.0: CI was green but the local release check failed on two host-dependent tests. XS fix that removes false reds from the release verb, so it sits above routine medium work.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1291,10 +1292,10 @@ Found cutting v0.65.0: CI was green but the local release check failed on two ho
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-24T01:34:10Z",
+  "generatedAt": "2026-11-24T02:05:09Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 956,
+  "openCount": 957,
   "nodes": [
     {
       "issue": "PAN-5637",
@@ -1332,6 +1333,19 @@ Found cutting v0.65.0: CI was green but the local release check failed on two ho
       "dependsOn": [],
       "why": "In pipeline. mobile-android CI goes red on non-mobile PRs when Robolectric android-all download fails; cache the jar.",
       "rationale": "Already in the pipeline, so pinned at rank 1. A flaky Robolectric runtime download turns the test aggregate red on PRs that touch no mobile code, as it did on PR #5651 for PAN-5250.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5657",
+      "rank": 1,
+      "size": "S",
+      "importance": "high",
+      "score": 62,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline. 7 CodeRabbit findings on merged PAN-5652; 2 Major: failed pane listing reads as pane-dead, legacy tmux agents read as gone.",
+      "rationale": "New CodeRabbit follow-up on the merged PAN-5652 Herdr liveness fix, already in the pipeline, so pinned at rank 1. Two Major findings are liveness misreports in merge-ops and the cloister service, which is substrate hardening at the same tier as PAN-5653.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -14656,6 +14670,13 @@ Found cutting v0.65.0: CI was green but the local release check failed on two ho
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
+    },
+    {
+      "from": "PAN-5652",
+      "to": "PAN-5657",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.7
     },
     {
       "from": "PAN-750",
