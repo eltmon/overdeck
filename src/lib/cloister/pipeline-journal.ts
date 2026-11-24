@@ -123,19 +123,24 @@ function endsWithoutNewline(path: string): boolean {
 
 /**
  * Read the journal, oldest entry first. A malformed line is skipped rather
- * than throwing — a half-written line must not blind every reader.
+ * than throwing — a half-written line must not blind every reader. Returns
+ * `null` when the journal exists but cannot be read (e.g. it is a directory,
+ * or a permissions error), so a caller that must fail closed can tell that
+ * apart from a workspace that simply has no journal yet. Use
+ * `readPipelineJournal` when an empty result is an acceptable stand-in for
+ * "unreadable".
  */
-export function readPipelineJournal(
+export function tryReadPipelineJournal(
   workspacePath: string,
   opts: { limit?: number } = {},
-): PipelineJournalEntry[] {
+): PipelineJournalEntry[] | null {
   const path = pipelineJournalPath(workspacePath);
   if (!existsSync(path)) return [];
   let raw: string;
   try {
     raw = readFileSync(path, 'utf-8');
   } catch {
-    return [];
+    return null;
   }
   const entries: PipelineJournalEntry[] = [];
   for (const line of raw.split('\n')) {
@@ -148,6 +153,14 @@ export function readPipelineJournal(
     }
   }
   return opts.limit !== undefined && opts.limit >= 0 ? entries.slice(-opts.limit) : entries;
+}
+
+/** `tryReadPipelineJournal`, with an unreadable journal treated as empty. */
+export function readPipelineJournal(
+  workspacePath: string,
+  opts: { limit?: number } = {},
+): PipelineJournalEntry[] {
+  return tryReadPipelineJournal(workspacePath, opts) ?? [];
 }
 
 /**
@@ -172,21 +185,69 @@ export function lastPipelineStep(entries: readonly PipelineJournalEntry[]): Pipe
   return null;
 }
 
-export interface OpenStackReclaim { at: string; containers: string[]; composeProject: string | null }
+/** Why a reclaim stopped containers. An entry without `reason` predates PAN-5250 and is a memory reclaim. */
+export type StackReclaimReason = 'gate-starvation' | 'idle';
 
-/** PAN-5623: the newest `stack.*` entry when it is a reclaim with at least one container name; else null. */
+export interface OpenStackReclaim {
+  /** Newest open reclaim entry's timestamp. */
+  at: string;
+  /** Union, in journal order without duplicates, of every open reclaim entry's container names. */
+  containers: string[];
+  /** Newest open reclaim entry's compose project. */
+  composeProject: string | null;
+  /** Distinct reasons of the open reclaim entries. */
+  reasons: StackReclaimReason[];
+  /** PAN-5250 D4: the newest entry alone, for the stop sequences' read-back check. */
+  latestAt: string;
+  latestContainers: string[];
+  /** PAN-5250 FR-9: container name → the service its reclaim entry recorded (from paired data.containers/data.services). */
+  recordedServices: Record<string, string>;
+}
+
+function reclaimReason(entry: PipelineJournalEntry): StackReclaimReason {
+  return entry.data?.reason === 'idle' ? 'idle' : 'gate-starvation';
+}
+
+function recordedServicesOf(entry: PipelineJournalEntry): [string, string][] {
+  const names = Array.isArray(entry.data?.containers) ? entry.data.containers : [];
+  const services = Array.isArray(entry.data?.services) ? entry.data.services : [];
+  return names.flatMap((name: unknown, i): [string, string][] => {
+    const service: unknown = services[i];
+    return typeof name === 'string' && name.length > 0 && typeof service === 'string' ? [[name, service]] : [];
+  });
+}
+
+/**
+ * PAN-5623/PAN-5250: every `stack.reclaimed` entry after the newest `stack.restored`,
+ * merged. Entries without a valid container name are skipped. Null when nothing is open.
+ */
 export function openStackReclaim(entries: readonly PipelineJournalEntry[]): OpenStackReclaim | null {
+  const open: { entry: PipelineJournalEntry; containers: string[] }[] = [];
   for (let index = entries.length - 1; index >= 0; index -= 1) {
     const entry = entries[index];
-    if (!isHousekeepingEntry(entry)) continue;
-    if (entry.type !== 'stack.reclaimed') return null;
+    if (entry.type === 'stack.restored') break;
+    if (entry.type !== 'stack.reclaimed') continue;
     const raw = entry.data?.containers;
     const containers = Array.isArray(raw) ? raw.filter((name): name is string => typeof name === 'string' && name.length > 0) : [];
-    if (containers.length === 0) return null;
-    const project = entry.data?.composeProject;
-    return { at: entry.at, containers, composeProject: typeof project === 'string' ? project : null };
+    if (containers.length > 0) open.unshift({ entry, containers });
   }
-  return null;
+  if (open.length === 0) return null;
+  const latest = open[open.length - 1];
+  const project = latest.entry.data?.composeProject;
+  return {
+    at: latest.entry.at,
+    containers: [...new Set(open.flatMap((item) => item.containers))],
+    composeProject: typeof project === 'string' ? project : null,
+    reasons: [...new Set(open.map((item) => reclaimReason(item.entry)))],
+    latestAt: latest.entry.at,
+    latestContainers: latest.containers,
+    recordedServices: Object.fromEntries(open.flatMap(({ entry }) => recordedServicesOf(entry))),
+  };
+}
+
+/** PAN-5250 FR-8: whether the open reclaim may be restored by an agent turn. */
+export function reclaimRestoresOnTurn(open: OpenStackReclaim | null): boolean {
+  return open !== null && open.reasons.includes('gate-starvation');
 }
 
 /** PAN-5623 D8: whether this issue was already reclaimed in the episode that opened at `episodeSince`. */

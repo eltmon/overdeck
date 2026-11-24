@@ -40,8 +40,9 @@ import { evaluateIssueMergeGate } from '../../../lib/cloister/merge-gate.js';
 import {
   appendPipelineEntry,
   openStackReclaim,
-  readPipelineJournal,
+  reclaimRestoresOnTurn,
   reclaimedInEpisode,
+  tryReadPipelineJournal,
   type PipelineJournalEntry,
 } from '../../../lib/cloister/pipeline-journal.js';
 import {
@@ -58,6 +59,7 @@ import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
 import { resolveLaunchBackend } from '../../../lib/terminal-backends/launch.js';
 import { isUnsupported } from '../../../lib/terminal-backends/types.js';
 import { tryComposeProjectNameForWorkspace } from '../../../lib/workspace/stack-health.js';
+import { isStackPinned } from '../../../lib/workspace/stack-idle-config.js';
 import {
   issueInGateQueue,
   issuePanes,
@@ -78,6 +80,7 @@ import {
 import { restoreReclaimedStack, stackLockPath, withStackLock } from '../../../lib/workspace/stack-restore.js';
 import { listWorkspaces } from '../../../lib/workspaces/resolver.js';
 import type { WorkspaceRow } from '../../../lib/workspaces/types.js';
+import { startStackIdleStopService, stopStackIdleStopService } from './stack-idle-stop-service.js';
 
 export const STACK_RECLAIM_POLL_MS = 30_000;
 export const STACK_RESTORE_POLL_MS = 5_000;
@@ -104,13 +107,16 @@ export interface StackReclaimServiceDeps {
   listPanes: () => Promise<BackendPane[] | null>;
   turnState: (agentId: string) => TurnState;
   verificationBusy: (issueId: string) => boolean;
-  readJournal: (workspacePath: string) => PipelineJournalEntry[];
+  /** `null` when the journal exists but cannot be read; every call site fails closed on it. */
+  readJournal: (workspacePath: string) => PipelineJournalEntry[] | null;
   readMemoryBytes: (names: readonly string[]) => Promise<Map<string, number> | null>;
   mergeReady: (issueId: string) => Promise<boolean>;
   appendEntry: typeof appendPipelineEntry;
   stopContainer: (id: string) => Promise<DockerResult>;
   emitActivity: typeof emitActivityEntry;
   restore: typeof restoreReclaimedStack;
+  /** PAN-5250 FR-10: a pinned workspace is never reclaimed. */
+  isPinned: (workspacePath: string) => boolean;
   now: () => number;
 }
 
@@ -149,13 +155,14 @@ function resolveDeps(deps: Partial<StackReclaimServiceDeps> = {}): StackReclaimS
     turnState: deps.turnState ?? defaultTurnState,
     verificationBusy: deps.verificationBusy
       ?? ((issueId) => isVerificationWorkerActive(issueId) || readVerificationDispatchOwed(issueId) !== null),
-    readJournal: deps.readJournal ?? ((workspacePath) => readPipelineJournal(workspacePath)),
+    readJournal: deps.readJournal ?? ((workspacePath) => tryReadPipelineJournal(workspacePath)),
     readMemoryBytes: deps.readMemoryBytes ?? readContainerMemoryBytes,
     mergeReady: deps.mergeReady ?? (async (issueId) => (await evaluateIssueMergeGate(issueId)).ready),
     appendEntry: deps.appendEntry ?? appendPipelineEntry,
     stopContainer: deps.stopContainer ?? stopContainer,
     emitActivity: deps.emitActivity ?? emitActivityEntry,
     restore: deps.restore ?? restoreReclaimedStack,
+    isPinned: deps.isPinned ?? isStackPinned,
     now: deps.now ?? Date.now,
   };
 }
@@ -213,10 +220,12 @@ function buildCandidates(
 ): Omit<ReclaimCandidate, 'memoryBytes'>[] {
   const candidates: Omit<ReclaimCandidate, 'memoryBytes'>[] = [];
   const seen = new Set<string>();
+  const runningNames = new Set(running.map((container) => container.name));
   for (const workspace of deps.listWorkspaces()) {
     if (workspace.kind === 'main' || !workspace.issueId) continue;
     const issueId = workspace.issueId.toUpperCase();
     if (seen.has(issueId) || !deps.pathExists(workspace.path)) continue;
+    if (deps.isPinned(workspace.path)) continue;
     if (!deps.projectRegistered(issueId)) continue;
     const composeProject = deps.composeProjectFor(workspace.path, issueId);
     if (!composeProject) continue;
@@ -224,22 +233,24 @@ function buildCandidates(
     if (containers.length === 0) continue;
     if (issueInGateQueue(snapshot, issueId, workspace.path)) continue;
     if (deps.verificationBusy(issueId)) continue;
-    if (reclaimedInEpisode(deps.readJournal(workspace.path), record.since)) continue;
+    const journal = deps.readJournal(workspace.path);
+    if (journal === null) continue;
+    if (reclaimedInEpisode(journal, record.since)) continue;
+    // PAN-5648 r4672667681: an open reclaim (any episode) still holding a
+    // stopped container means Overdeck is mid-reclaim-or-restore for this
+    // issue, so it must not be reclaimed again. One whose containers are ALL
+    // running again is effectively closed in practice — don't let it block
+    // the issue forever just because no `stack.restored` entry was written.
+    // PAN-5250 D3: an idle-only open reclaim stopped its containers on purpose and
+    // waits for a spawn or `pan workspace up`; it must not block a memory reclaim
+    // of the containers still running.
+    const open = openStackReclaim(journal);
+    if (open && reclaimRestoresOnTurn(open) && open.containers.some((name) => !runningNames.has(name))) continue;
     if (!panesAllowReclaim(issuePanes(panes, issueId, workspace.path), deps.turnState).ok) continue;
     seen.add(issueId);
     candidates.push({ issueId, workspacePath: workspace.path, composeProject, containers });
   }
   return candidates;
-}
-
-/** FR-2 rule 8 (D7): an unresolved blocker declaration first, then the merge gate's own `ready`. */
-async function isParked(deps: StackReclaimServiceDeps, candidate: ReclaimCandidate): Promise<boolean> {
-  if (pendingDeclarations(deps.readJournal(candidate.workspacePath)).length > 0) return true;
-  try {
-    return await deps.mergeReady(candidate.issueId);
-  } catch {
-    return false;
-  }
 }
 
 /**
@@ -260,6 +271,7 @@ async function recheckBeforeStop(
   const blocked = await headStillBlocked(deps, snapshot);
   if (!blocked.ok) return null;
   if (deps.verificationBusy(target.issueId)) return null;
+  if (deps.isPinned(target.workspacePath)) return null;
   const panes = await deps.listPanes();
   if (!panes || !panesAllowReclaim(issuePanes(panes, target.issueId, target.workspacePath), deps.turnState).ok) return null;
   const running = await deps.listRunningContainers();
@@ -322,10 +334,28 @@ export async function runStackReclaimPoll(
   const memory = await deps.readMemoryBytes(candidates.flatMap((candidate) => candidate.containers.map((c) => c.name)));
   if (!memory) return idle('stats-unreadable');
 
-  // 7: the largest parked candidate among the top few.
+  // 7 (FR-2 rule 8 / FR-4): the largest parked candidate. A pending blocker
+  // declaration is free and checked for every candidate; the merge gate is
+  // a network call, so only the first MERGE_GATE_CANDIDATES candidates this
+  // poll — by rank, not by position in the scan — spend that budget.
   let target: ReclaimCandidate | null = null;
-  for (const candidate of rankCandidates(candidates, memory).slice(0, MERGE_GATE_CANDIDATES)) {
-    if (await isParked(deps, candidate)) {
+  let mergeGateCalls = 0;
+  for (const candidate of rankCandidates(candidates, memory)) {
+    const journal = deps.readJournal(candidate.workspacePath);
+    if (journal === null) continue;
+    if (pendingDeclarations(journal).length > 0) {
+      target = candidate;
+      break;
+    }
+    if (mergeGateCalls >= MERGE_GATE_CANDIDATES) continue;
+    mergeGateCalls += 1;
+    let ready: boolean;
+    try {
+      ready = await deps.mergeReady(candidate.issueId);
+    } catch {
+      ready = false;
+    }
+    if (ready) {
       target = candidate;
       break;
     }
@@ -358,8 +388,10 @@ export async function runStackReclaimPoll(
         },
       });
       // D5: appendPipelineEntry swallows write errors, so stop nothing unless the entry landed.
-      const open = openStackReclaim(deps.readJournal(chosen.workspacePath));
-      if (!open || open.at !== written.at || open.containers.join('\n') !== names.join('\n')) {
+      // PAN-5250 D4: compare the newest entry, not the union with an older open idle stop.
+      const readBack = deps.readJournal(chosen.workspacePath);
+      const open = readBack === null ? null : openStackReclaim(readBack);
+      if (!open || open.latestAt !== written.at || open.latestContainers.join('\n') !== names.join('\n')) {
         return { kind: 'idle' as const, reason: 'journal-unwritable' };
       }
       const stopped: string[] = [];
@@ -392,15 +424,26 @@ export async function runStackReclaimPoll(
   return { kind: 'reclaimed', issueId: chosen.issueId, stopped: outcome.stopped, failed: outcome.failed };
 }
 
-/** D15: seed the index once from every workspace journal, so open reclaims survive a restart (FR-7). */
+/**
+ * D15: seed the index once from every workspace journal, so open reclaims
+ * survive a restart (FR-7). A journal that cannot be read yet leaves
+ * `state.seeded` false so a later tick retries every workspace, rather than
+ * permanently missing the reclaim an unreadable journal was hiding.
+ */
 function seedRestoreIndex(deps: StackReclaimServiceDeps, state: StackReclaimState): void {
+  let allReadable = true;
   for (const workspace of deps.listWorkspaces()) {
     if (!workspace.issueId || !deps.pathExists(workspace.path)) continue;
-    if (openStackReclaim(deps.readJournal(workspace.path))) {
+    const journal = deps.readJournal(workspace.path);
+    if (journal === null) {
+      allReadable = false;
+      continue;
+    }
+    if (reclaimRestoresOnTurn(openStackReclaim(journal))) {
       state.restoreIndex.set(workspace.issueId.toUpperCase(), workspace.path);
     }
   }
-  state.seeded = true;
+  if (allReadable) state.seeded = true;
 }
 
 /** The restore poll (D15, WI-13): restores an open reclaim when its issue's agent is working or mid-turn. */
@@ -411,7 +454,15 @@ export async function runStackRestorePoll(deps: StackReclaimServiceDeps, state: 
   if (!panes) return;
   const now = deps.now();
   for (const [issueId, workspacePath] of [...state.restoreIndex]) {
-    if (!deps.pathExists(workspacePath) || !openStackReclaim(deps.readJournal(workspacePath))) {
+    if (!deps.pathExists(workspacePath)) {
+      state.restoreIndex.delete(issueId);
+      state.restoreRetryAt.delete(issueId);
+      continue;
+    }
+    const journal = deps.readJournal(workspacePath);
+    if (journal === null) continue; // unreadable this tick — keep the entry, try again next tick.
+    // PAN-5250 FR-8: an idle-only reclaim waits for a spawn, verification or `pan workspace up`.
+    if (!reclaimRestoresOnTurn(openStackReclaim(journal))) {
       state.restoreIndex.delete(issueId);
       state.restoreRetryAt.delete(issueId);
       continue;
@@ -420,7 +471,9 @@ export async function runStackRestorePoll(deps: StackReclaimServiceDeps, state: 
     if (!panesNeedStack(issuePanes(panes, issueId, workspacePath), deps.turnState)) continue;
     const result = await deps.restore({ issueId, workspacePath, trigger: 'turn' });
     if (result.kind === 'failed') {
-      state.restoreRetryAt.set(issueId, now + STACK_RESTORE_RETRY_MS);
+      // PAN-5648 r4672667721: measure the backoff from now, not from the
+      // tick's stale `now` — the restore call itself can take real time.
+      state.restoreRetryAt.set(issueId, deps.now() + STACK_RESTORE_RETRY_MS);
       console.warn(`[stack-reclaim] restore of ${issueId} failed: ${result.error}; retrying in ${STACK_RESTORE_RETRY_MS / 1000} s`);
       continue;
     }
@@ -473,6 +526,8 @@ export function startStackReclaimService(deps: Partial<StackReclaimServiceDeps> 
   reclaimTimer.unref?.();
   restoreTimer = setInterval(() => { void restoreOnce(s); }, STACK_RESTORE_POLL_MS);
   restoreTimer.unref?.();
+  // PAN-5250: the idle stop shares this service's pane, queue and verification reads.
+  startStackIdleStopService({ listPanes: s.deps.listPanes, readQueue: s.deps.readQueue, verificationBusy: s.deps.verificationBusy });
 }
 
 export function stopStackReclaimService(): void {
@@ -481,6 +536,7 @@ export function stopStackReclaimService(): void {
   reclaimTimer = null;
   restoreTimer = null;
   service = null;
+  stopStackIdleStopService();
 }
 
 /** Exported for tests: the running service's state, or null. */

@@ -140,6 +140,56 @@ list --stale`.
 - `pan workspace deep-clean` - interactive `git clean -fd` for a workspace
 - `pan workspace use-config` - apply a workspace config template
 - `pan workspace migrate`, `ssh`, `sync-auth`, `start`, `stop` - manage a remote Fly.io workspace
+- `pan workspace up` - start a workspace's stopped Docker containers (idle-stopped or memory-reclaimed)
+- `pan workspace pin`, `unpin` - keep a workspace's containers running, or allow idle stops again
+
+## Idle workspace containers
+
+A workspace's `frontend`, `fe` and `dev` containers stop on their own after
+20 minutes unused, even while the issue's work agent is running. A working
+agent alone does not keep them running: a Vite frontend holds about 1.3 GB
+whether or not anyone has the app open.
+
+A workspace counts as in use, and its containers keep running, while any of
+these holds:
+
+- A browser has the app open (an inbound connection to the container).
+- A session is attached to a container (`docker exec`, VS Code, a container quality gate).
+- A test or UAT agent runs for the issue.
+- The issue's verification runs, or one of its quality gates is queued or running.
+- The workspace is pinned with `pan workspace pin`.
+- Overdeck cannot read a container's state (it never stops what it cannot see).
+
+The stopped containers start again when:
+
+- a test or UAT agent is spawned for the issue (any agent spawn except review starts them),
+- the issue's verification starts, including the polyrepo verification before a merge,
+- you run `pan workspace up <issue>`.
+
+Until [#5649](https://github.com/eltmon/overdeck/issues/5649) ships, opening a
+stopped workspace's app URL shows Traefik's 404 page. Run
+`pan workspace up <issue>` first.
+
+```bash
+pan workspace up MIN-123      # start the stopped containers
+pan workspace pin MIN-123     # never stop this workspace's containers automatically
+pan workspace unpin MIN-123   # allow idle stops again
+```
+
+Change the timeout or the services per project in `~/.overdeck/projects.yaml`:
+
+```yaml
+projects:
+  myn:
+    workspace:
+      docker:
+        idle_stop:
+          minutes: 45            # default 20; 0 turns the idle stop off for this project
+          services: [fe, dev]    # default [frontend, fe, dev]
+```
+
+`OVERDECK_DISABLE_STACK_IDLE_STOP=1` in the dashboard's environment turns the
+idle stop off for every project.
 
 ## Main Project Branch Convention
 

@@ -34,6 +34,7 @@ function makeDeps(over: Partial<IdleStackReaperDeps> & {
     stopContainers: async (names) => { stopped.push(names); },
     now: over.now ?? (() => 1_000_000),
     graceMs: over.graceMs ?? 10_000,
+    isProtected: over.isProtected ?? (async () => false),
     fullStackGraceMs: over.fullStackGraceMs ?? 20_000,
   };
   return { deps, stopped };
@@ -66,6 +67,7 @@ describe('idle-stack reaper main-workspace exemption (PAN-1990)', () => {
       sessions: [],
       now: () => nowMs,
       graceMs: 10_000,
+      isProtected: async () => false,
     });
 
     await reconcileIdleWorkspaceStacks(deps); // starts the grace clock (would, if not exempt)
@@ -86,6 +88,7 @@ describe('idle-stack reaper main-workspace exemption (PAN-1990)', () => {
       sessions: [],
       now: () => nowMs,
       graceMs: 10_000,
+      isProtected: async () => false,
     });
 
     await reconcileIdleWorkspaceStacks(deps);

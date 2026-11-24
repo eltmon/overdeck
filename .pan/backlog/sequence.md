@@ -1,12 +1,14 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-23T23:11:53Z · model: claude-opus-5-5 · open: 954_
+_Last sequenced: 2026-11-24T01:03:45Z · model: claude-opus-5-5 · open: 956_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-5637 | S | critical | ok |  |  | In pipeline. Merge train never admits polyrepo issues touching CI-less member repos; add ci: none per repo so MYN infra/docs MRs merge |
 | 1 | PAN-5638 | M | critical | ok |  |  | In pipeline. Polyrepo review verdicts refuse GitHub member PRs and the ready set ignores verdict markers; MIN-1142 can't merge |
+| 1 | PAN-5654 | S | high | ok |  |  | In pipeline. mobile-android CI goes red on non-mobile PRs when Robolectric android-all download fails; cache the jar. |
+| 2 | PAN-5652 | M | critical | ok |  |  | Herdr agents fail tmux has-session checks, so polyrepo merge aborts on live agents (MIN-1144). Merge routes: TENET-10 handoff. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 4 | PAN-5430 | S | medium | ok |  |  | Markdown Preview prints raw HTML (README logo <div>/<picture>) as text; render it via rehype-raw + rehype-sanitize in doc previews. |
 | 5 | PAN-5567 | S | high | ok |  |  | Codex app-server threads hardcode on-request/workspace-write, so Read-only and Full access settings never apply. |
@@ -83,8 +85,8 @@ _Last sequenced: 2026-11-23T23:11:53Z · model: claude-opus-5-5 · open: 954_
 | 68 | PAN-5228 | S | high | ok |  |  | Advisory CodeRabbit journal entries land last and hide stalled reviews from recoverStalledReviews and other last-entry readers. |
 | 69 | PAN-4344 | S | high | ok |  |  | Registered projects lack the agent main-push guard; ship a pre-push hook so agents cannot push to main outside overdeck |
 | 70 | PAN-4550 | XS | medium | ok |  |  | Two unit tests read host state (DASHSCOPE_BASE_URL, git-ignored .map files), so pan release check reports false reds locally |
-| 70 | PAN-5648 | S | high | ok |  |  | 10 CodeRabbit findings on merged PAN-5623 stack reclaim; 4 Major: open-reclaim exclusion, journal read failures, restore snapshot refresh. |
 | 71 | PAN-4566 | S | high | ok |  |  | A failed replayEvents leaves the coordinator un-bootstrapped; tab defers live events with no banner. PAN-4559 fallback has landed. |
+| 71 | PAN-5653 | S | high | ok |  |  | 3 CodeRabbit findings on merged PAN-5648; 2 Major: stack lock does not fence a stale holder, file-lock release can delete a new lock. |
 | 72 | PAN-5193 | XS | high | ok |  |  | PRD-first gate reads a short main stub before the full workspace draft and refuses finalize for epic children. |
 | 73 | PAN-2940 | M | critical | ok |  |  | Three red-mains in one day from direct-push series bypassing PR CI |
 | 74 | PAN-3708 | M | critical | ok |  |  | pan strike dies at git worktree list on a polyrepo wrapper — the urgent-strike escape hatch is unavailable for MYN-class projects. |
@@ -970,6 +972,14 @@ New since the prior run and already in the pipeline, so it is pinned at rank 1. 
 
 New since the prior run and already in the pipeline, so it is pinned at rank 1. It replaces the PAN-5614 stopgap that refuses GitHub-member verdicts and teaches githubRows to read verdict markers, which unblocks polyrepo issues like MIN-1142 from reaching the merge train.
 
+### PAN-5654 (rank 1)
+
+Already in the pipeline, so pinned at rank 1. A flaky Robolectric runtime download turns the test aggregate red on PRs that touch no mobile code, as it did on PR #5651 for PAN-5250.
+
+### PAN-5652 (rank 2)
+
+New substrate bug: merge-ops.ts and several cloister modules test agent liveness with tmux has-session, which is always false on Herdr, the default backend. It failed the MIN-1144 polyrepo merge within 50 seconds while the agent was finishing the rebases, so it blocks polyrepo merges and sits beside the polyrepo merge cluster (PAN-5637, PAN-5638, PAN-5641) in a free rank slot. The fix routes these checks through liveness.ts and adds a ratchet; it touches merge routes, so it needs a supervised handoff.
+
 ### PAN-5013 (rank 3)
 
 Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.
@@ -1274,14 +1284,6 @@ New issue from the Deft adoption PRD. Its dependency PAN-3308 has closed. The ma
 
 Found cutting v0.65.0: CI was green but the local release check failed on two host-dependent tests. XS fix that removes false reds from the release verb, so it sits above routine medium work.
 
-### PAN-5648 (rank 70)
-
-New CodeRabbit follow-up on the just-merged PAN-5623 stack-reclaim code, which stops and restarts workspace containers. Four Major findings touch reclaim correctness (re-reclaiming issues with an open reclaim, transient journal read failures, stale container snapshots after partial restores), so it ranks above routine CodeRabbit follow-ups as high-importance substrate hardening.
-
-### PAN-4566 (rank 71)
-
-Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback this fix routes failures to is on main and work can start.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1289,10 +1291,10 @@ Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback thi
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-23T23:11:53Z",
+  "generatedAt": "2026-11-24T01:03:45Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 954,
+  "openCount": 956,
   "nodes": [
     {
       "issue": "PAN-5637",
@@ -1317,6 +1319,32 @@ Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback thi
       "dependsOn": [],
       "why": "In pipeline. Polyrepo review verdicts refuse GitHub member PRs and the ready set ignores verdict markers; MIN-1142 can't merge",
       "rationale": "New since the prior run and already in the pipeline, so it is pinned at rank 1. It replaces the PAN-5614 stopgap that refuses GitHub-member verdicts and teaches githubRows to read verdict markers, which unblocks polyrepo issues like MIN-1142 from reaching the merge train.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5654",
+      "rank": 1,
+      "size": "S",
+      "importance": "high",
+      "score": 75,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline. mobile-android CI goes red on non-mobile PRs when Robolectric android-all download fails; cache the jar.",
+      "rationale": "Already in the pipeline, so pinned at rank 1. A flaky Robolectric runtime download turns the test aggregate red on PRs that touch no mobile code, as it did on PR #5651 for PAN-5250.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5652",
+      "rank": 2,
+      "size": "M",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Herdr agents fail tmux has-session checks, so polyrepo merge aborts on live agents (MIN-1144). Merge routes: TENET-10 handoff.",
+      "rationale": "New substrate bug: merge-ops.ts and several cloister modules test agent liveness with tmux has-session, which is always false on Herdr, the default backend. It failed the MIN-1144 polyrepo merge within 50 seconds while the agent was finishing the rebases, so it blocks polyrepo merges and sits beside the polyrepo merge cluster (PAN-5637, PAN-5638, PAN-5641) in a free rank slot. The fix routes these checks through liveness.ts and adds a ratchet; it touches merge routes, so it needs a supervised handoff.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2316,19 +2344,6 @@ Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback thi
       "planning": "auto"
     },
     {
-      "issue": "PAN-5648",
-      "rank": 70,
-      "size": "S",
-      "importance": "high",
-      "score": 64,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "10 CodeRabbit findings on merged PAN-5623 stack reclaim; 4 Major: open-reclaim exclusion, journal read failures, restore snapshot refresh.",
-      "rationale": "New CodeRabbit follow-up on the just-merged PAN-5623 stack-reclaim code, which stops and restarts workspace containers. Four Major findings touch reclaim correctness (re-reclaiming issues with an open reclaim, transient journal read failures, stale container snapshots after partial restores), so it ranks above routine CodeRabbit follow-ups as high-importance substrate hardening.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4566",
       "rank": 71,
       "size": "S",
@@ -2338,6 +2353,19 @@ Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback thi
       "dependsOn": [],
       "why": "A failed replayEvents leaves the coordinator un-bootstrapped; tab defers live events with no banner. PAN-4559 fallback has landed.",
       "rationale": "Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback this fix routes failures to is on main and work can start.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5653",
+      "rank": 71,
+      "size": "S",
+      "importance": "high",
+      "score": 62,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "3 CodeRabbit findings on merged PAN-5648; 2 Major: stack lock does not fence a stale holder, file-lock release can delete a new lock.",
+      "rationale": "New CodeRabbit follow-up on the just-merged PAN-5648 stack-lock fixes. Two Major findings are lock races in the shared file-lock and stack lock that guard container stop/restore, so it ranks beside its parent as high-importance substrate hardening.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -14607,6 +14635,34 @@ Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback thi
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.8
+    },
+    {
+      "from": "PAN-5652",
+      "to": "PAN-3355",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-5652",
+      "to": "PAN-5013",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-5652",
+      "to": "PAN-5641",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
+    },
+    {
+      "from": "PAN-5654",
+      "to": "PAN-5250",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.5
     },
     {
       "from": "PAN-750",

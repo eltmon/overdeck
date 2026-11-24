@@ -10,9 +10,11 @@ import { appendPipelineEntry, readPipelineJournal } from '../../cloister/pipelin
 import type { ComposeContainer } from '../stack-reclaim-docker.js';
 import type { DockerContainerLifecycle } from '../stack-health.js';
 import {
+  STACK_LOCK_RENEW_MS,
   restoreReclaimedStack,
   restoreReclaimedStackForSpawn,
   stackLockPath,
+  wakeWorkspaceStack,
   withStackLock,
   type StackRestoreDeps,
 } from '../stack-restore.js';
@@ -21,6 +23,7 @@ const ISSUE = 'MIN-1144';
 const PROJECT = 'myn-feature-min-1144';
 const API = 'myn-feature-min-1144-api-1';
 const FE = 'myn-feature-min-1144-fe-1';
+const FRESH: DockerContainerLifecycle[] = [{ id: 'id-api', name: API, status: 'Up 1 second', state: 'running', composeProject: PROJECT }];
 
 let workspace: string;
 
@@ -72,6 +75,10 @@ function world(listed: ComposeContainer[] | null, overrides: Partial<StackRestor
       inLock = false;
     }
   });
+  // PAN-5648: stubbed so no door test runs real `docker ps` or writes the
+  // global lifecycle cache; a test that cares about the refresh overrides these.
+  const collect = vi.fn(async (): Promise<DockerContainerLifecycle[]> => []);
+  const record = vi.fn();
   const deps: Partial<StackRestoreDeps> = {
     composeProjectFor: () => PROJECT,
     readJournal,
@@ -80,9 +87,11 @@ function world(listed: ComposeContainer[] | null, overrides: Partial<StackRestor
     appendEntry,
     emitActivity,
     withLock,
+    collect,
+    record,
     ...overrides,
   };
-  return { deps, listContainers, startContainer, appendEntry, emitActivity, withLock, journalReadsInLock };
+  return { deps, listContainers, startContainer, appendEntry, emitActivity, withLock, journalReadsInLock, collect, record };
 }
 
 function restored() {
@@ -216,6 +225,144 @@ describe('restoreReclaimedStack (PAN-5623)', () => {
   });
 });
 
+describe('restore of recorded services and the wake door (PAN-5250)', () => {
+  const DEV = 'myn-feature-min-1144-dev-1';
+  const FRONTEND = 'myn-feature-min-1144-frontend-1';
+  const INIT = 'myn-feature-min-1144-init-1';
+  const WAKEABLE: ReadonlySet<string> = new Set(['api', 'fe', 'frontend', 'server', 'dev']);
+
+  function idleReclaim(containers: string[], services: string[]): void {
+    appendPipelineEntry(workspace, {
+      type: 'stack.reclaimed',
+      issueId: ISSUE,
+      source: 'stack-idle-stop',
+      data: { containers, services, composeProject: PROJECT, reason: 'idle' },
+    });
+  }
+
+  it('starts a dev container its idle reclaim recorded, without reading the idle-stop config', async () => {
+    idleReclaim([FE, DEV], ['fe', 'dev']);
+    // The project config changed to services: [] after the stop; the restore door must not care.
+    const wakeableServices = vi.fn(() => new Set<string>());
+    const w = world([container(FE, 'exited'), container(DEV, 'exited')], { wakeableServices });
+    const result = await restoreReclaimedStack({ issueId: ISSUE, workspacePath: workspace, trigger: 'spawn' }, w.deps);
+    expect(result).toEqual({ kind: 'restored', started: [FE, DEV], alreadyRunning: [], missing: [], refused: [] });
+    expect(restored()).toHaveLength(1);
+    expect(wakeableServices).not.toHaveBeenCalled();
+  });
+
+  it('still refuses a postgres container with no recorded service', async () => {
+    const postgres = 'myn-feature-min-1144-postgres-1';
+    reclaim([postgres]);
+    const w = world([container(postgres, 'exited', { composeService: 'postgres' })]);
+    const result = await restoreReclaimedStack({ issueId: ISSUE, workspacePath: workspace, trigger: 'operator' }, w.deps);
+    expect(result).toEqual({ kind: 'restored', started: [], alreadyRunning: [], missing: [], refused: [postgres] });
+    expect(w.startContainer).not.toHaveBeenCalled();
+  });
+
+  it('refuses a container whose recorded service differs from its listed service', async () => {
+    idleReclaim([DEV], ['dev']);
+    const w = world([container(DEV, 'exited', { composeService: 'postgres' })]);
+    const result = await restoreReclaimedStack({ issueId: ISSUE, workspacePath: workspace, trigger: 'operator' }, w.deps);
+    expect(result).toMatchObject({ kind: 'restored', refused: [DEV] });
+  });
+
+  it('wake starts an exited frontend with no open reclaim and leaves init alone', async () => {
+    const w = world([container(FRONTEND, 'exited'), container(INIT, 'exited'), container(API, 'running')], {
+      wakeableServices: () => WAKEABLE,
+    });
+    const result = await wakeWorkspaceStack({ issueId: ISSUE, workspacePath: workspace, trigger: 'operator' }, w.deps);
+    expect(result).toEqual({ kind: 'woken', restored: { kind: 'none' }, started: [FRONTEND], alreadyRunning: [API] });
+    expect(w.startContainer).toHaveBeenCalledExactlyOnceWith(FRONTEND);
+    expect(w.emitActivity).toHaveBeenCalledWith(expect.objectContaining({ message: `stack-woken: ${ISSUE}` }));
+    expect(restored()).toHaveLength(0);
+  });
+
+  it('wake runs the restore door first and reports what it restored', async () => {
+    idleReclaim([DEV], ['dev']);
+    let devState = 'exited';
+    const w = world(null, {
+      wakeableServices: () => WAKEABLE,
+      listContainers: async () => [container(DEV, devState)],
+      startContainer: async () => { devState = 'running'; return { ok: true }; },
+    });
+    const result = await wakeWorkspaceStack({ issueId: ISSUE, workspacePath: workspace, trigger: 'operator' }, w.deps);
+    expect(result).toMatchObject({ kind: 'woken', started: [], alreadyRunning: [DEV] });
+    expect(result.kind === 'woken' && result.restored).toMatchObject({ kind: 'restored', started: [DEV] });
+    expect(restored()).toHaveLength(1);
+  });
+
+  it('wake records a fresh lifecycle snapshot when it started something', async () => {
+    const w = world([container(FRONTEND, 'exited')], { wakeableServices: () => WAKEABLE });
+    await wakeWorkspaceStack({ issueId: ISSUE, workspacePath: workspace, trigger: 'operator' }, w.deps);
+    expect(w.collect).toHaveBeenCalledOnce();
+    const idle = world([container(FRONTEND, 'running')], { wakeableServices: () => WAKEABLE });
+    await wakeWorkspaceStack({ issueId: ISSUE, workspacePath: workspace, trigger: 'operator' }, idle.deps);
+    expect(idle.collect).not.toHaveBeenCalled();
+  });
+
+  it('wake leaves a container of another compose project stopped', async () => {
+    const foreign = 'other-project-frontend-1';
+    const w = world([container(foreign, 'exited', { composeProject: 'other-project', composeService: 'frontend' })], {
+      wakeableServices: () => WAKEABLE,
+    });
+    const result = await wakeWorkspaceStack({ issueId: ISSUE, workspacePath: workspace, trigger: 'operator' }, w.deps);
+    expect(result).toEqual({ kind: 'woken', restored: { kind: 'none' }, started: [], alreadyRunning: [] });
+    expect(w.startContainer).not.toHaveBeenCalled();
+  });
+
+  it('wake returns failed when a start fails', async () => {
+    const w = world([container(FRONTEND, 'exited')], {
+      wakeableServices: () => WAKEABLE,
+      startContainer: async () => ({ ok: false, error: 'boom' }),
+    });
+    const result = await wakeWorkspaceStack({ issueId: ISSUE, workspacePath: workspace, trigger: 'operator' }, w.deps);
+    expect(result).toEqual({ kind: 'failed', error: `${FRONTEND}: boom`, failed: [FRONTEND] });
+  });
+
+  it('wake returns no-stack for a missing workspace or no compose project', async () => {
+    const w = world([], { wakeableServices: () => WAKEABLE });
+    await expect(wakeWorkspaceStack({ issueId: ISSUE, workspacePath: join(workspace, 'gone'), trigger: 'operator' }, w.deps))
+      .resolves.toEqual({ kind: 'no-stack', reason: 'no-workspace' });
+    const none = world([], { wakeableServices: () => WAKEABLE, composeProjectFor: () => null });
+    await expect(wakeWorkspaceStack({ issueId: ISSUE, workspacePath: workspace, trigger: 'operator' }, none.deps))
+      .resolves.toEqual({ kind: 'no-stack', reason: 'no-compose-project' });
+  });
+});
+
+describe('restoreReclaimedStack snapshot refresh (PAN-5648 restore-refresh-snapshot, CodeRabbit r4672667736/787)', () => {
+  it('records the fresh snapshot before journaling stack.restored, and the result carries it (ac1)', async () => {
+    reclaim([API]);
+    const w = world([container(API, 'exited')]);
+    const record = vi.fn();
+
+    const result = await restoreReclaimedStack(
+      { issueId: ISSUE, workspacePath: workspace, trigger: 'turn' },
+      { ...w.deps, collect: async () => FRESH, record },
+    );
+
+    expect(result).toMatchObject({ kind: 'restored', started: [API], snapshot: FRESH });
+    expect(record).toHaveBeenCalledExactlyOnceWith(FRESH);
+    expect(record.mock.invocationCallOrder[0]).toBeLessThan(w.appendEntry.mock.invocationCallOrder[0]!);
+  });
+
+  it('on a partial failure, returns failed carrying the started name and a refreshed snapshot (ac2)', async () => {
+    reclaim([API, FE]);
+    const w = world([container(API, 'exited'), container(FE, 'exited')]);
+    w.startContainer.mockImplementation(async (name: string) =>
+      (name === FE ? { ok: false, error: 'port is already allocated' } : { ok: true }));
+    const record = vi.fn();
+
+    const result = await restoreReclaimedStack(
+      { issueId: ISSUE, workspacePath: workspace, trigger: 'turn' },
+      { ...w.deps, collect: async () => FRESH, record },
+    );
+
+    expect(result).toMatchObject({ kind: 'failed', failed: [FE], started: [API], snapshot: FRESH });
+    expect(record).toHaveBeenCalledExactlyOnceWith(FRESH);
+  });
+});
+
 describe('restoreReclaimedStackForSpawn (PAN-5623)', () => {
   const fresh: DockerContainerLifecycle[] = [{ id: 'id-api', name: API, status: 'Up 1 second', state: 'running', composeProject: PROJECT }];
 
@@ -229,17 +376,17 @@ describe('restoreReclaimedStackForSpawn (PAN-5623)', () => {
     expect(restored()[0]?.source).toBe('stack-restore:spawn');
   });
 
-  it('returns undefined and records nothing when nothing started', async () => {
+  it('returns a fresh recorded listing when every container is already running (PAN-5648 restore-refresh-snapshot.ac3)', async () => {
     reclaim([API]);
     const w = world([container(API, 'running')]);
     const collect = vi.fn(async () => fresh);
     const record = vi.fn();
-    await expect(restoreReclaimedStackForSpawn(ISSUE, workspace, { ...w.deps, collect, record })).resolves.toBeUndefined();
-    expect(collect).not.toHaveBeenCalled();
-    expect(record).not.toHaveBeenCalled();
+    const result = await restoreReclaimedStackForSpawn(ISSUE, workspace, { ...w.deps, collect, record });
+    expect(result).toBe(fresh);
+    expect(record).toHaveBeenCalledExactlyOnceWith(fresh);
   });
 
-  it('returns undefined without recording when the fresh listing fails or is empty', async () => {
+  it('returns undefined without recording when the fresh listing fails or is empty (PAN-5648 restore-refresh-snapshot.ac5)', async () => {
     for (const collect of [async () => { throw new Error('docker not found'); }, async () => []]) {
       rmSync(workspace, { recursive: true, force: true });
       workspace = mkdtempSync(join(tmpdir(), 'stack-restore-'));
@@ -249,6 +396,39 @@ describe('restoreReclaimedStackForSpawn (PAN-5623)', () => {
       await expect(restoreReclaimedStackForSpawn(ISSUE, workspace, { ...w.deps, collect, record })).resolves.toBeUndefined();
       expect(record).not.toHaveBeenCalled();
     }
+  });
+
+  it('on a partial failure, still returns the fresh listing with record called once (PAN-5648 restore-refresh-snapshot.ac2)', async () => {
+    reclaim([API, FE]);
+    const w = world([container(API, 'exited'), container(FE, 'exited')]);
+    w.startContainer.mockImplementation(async (name: string) =>
+      (name === FE ? { ok: false, error: 'port is already allocated' } : { ok: true }));
+    const record = vi.fn();
+
+    const result = await restoreReclaimedStackForSpawn(ISSUE, workspace, { ...w.deps, collect: async () => FRESH, record });
+
+    expect(result).toBe(FRESH);
+    expect(record).toHaveBeenCalledExactlyOnceWith(FRESH);
+  });
+
+  it('for "none", refreshes only when the newest stack.* entry is stack.restored, never touching docker otherwise (PAN-5648 restore-refresh-snapshot.ac4)', async () => {
+    appendPipelineEntry(workspace, { type: 'stack.reclaimed', issueId: ISSUE, data: { containers: [API], composeProject: PROJECT } });
+    appendPipelineEntry(workspace, { type: 'stack.restored', issueId: ISSUE, data: { containers: [API] } });
+    const restoredCase = world([]);
+    const collectRestored = vi.fn(async () => FRESH);
+    const recordRestored = vi.fn();
+    await expect(restoreReclaimedStackForSpawn(ISSUE, workspace, { ...restoredCase.deps, collect: collectRestored, record: recordRestored }))
+      .resolves.toBe(FRESH);
+    expect(collectRestored).toHaveBeenCalledOnce();
+    expect(recordRestored).toHaveBeenCalledExactlyOnceWith(FRESH);
+
+    rmSync(workspace, { recursive: true, force: true });
+    workspace = mkdtempSync(join(tmpdir(), 'stack-restore-'));
+    const bareCase = world([]);
+    const collectBare = vi.fn(async () => FRESH);
+    await expect(restoreReclaimedStackForSpawn(ISSUE, workspace, { ...bareCase.deps, collect: collectBare }))
+      .resolves.toBeUndefined();
+    expect(collectBare).not.toHaveBeenCalled();
   });
 });
 
@@ -264,5 +444,54 @@ describe('withStackLock (PAN-5623)', () => {
     const gone = join(workspace, 'reaped');
     await expect(withStackLock(stackLockPath(gone), async () => 'ran', 1_000)).rejects.toMatchObject({ code: 'ENOENT' });
     expect(existsSync(gone)).toBe(false);
+  });
+});
+
+describe('withStackLock lock renewal (PAN-5648 stack-lock-renew, CodeRabbit r4672667704 part a)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('touches the lock twice over 120000 ms while fn runs (ac1)', async () => {
+    const lockPath = stackLockPath(workspace);
+    const touch = vi.fn(async () => {});
+    const resultPromise = withStackLock(lockPath, async () => {
+      await vi.advanceTimersByTimeAsync(STACK_LOCK_RENEW_MS * 2);
+      return 'ran';
+    }, 1_000, { touch });
+
+    await expect(resultPromise).resolves.toBe('ran');
+    expect(touch).toHaveBeenCalledTimes(2);
+    expect(touch).toHaveBeenCalledWith(lockPath);
+  });
+
+  it('stops renewing once withStackLock has resolved (ac2)', async () => {
+    const lockPath = stackLockPath(workspace);
+    const touch = vi.fn(async () => {});
+    await withStackLock(lockPath, async () => {
+      await vi.advanceTimersByTimeAsync(STACK_LOCK_RENEW_MS);
+      return 'ran';
+    }, 1_000, { touch });
+    expect(touch).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(STACK_LOCK_RENEW_MS * 2);
+
+    expect(touch).toHaveBeenCalledTimes(1);
+  });
+
+  it('still resolves with fn\'s value when a renewal touch rejects (ac3)', async () => {
+    const lockPath = stackLockPath(workspace);
+    const touch = vi.fn(async () => { throw new Error('ENOENT'); });
+    const resultPromise = withStackLock(lockPath, async () => {
+      await vi.advanceTimersByTimeAsync(STACK_LOCK_RENEW_MS);
+      return 'ran';
+    }, 1_000, { touch });
+
+    await expect(resultPromise).resolves.toBe('ran');
+    expect(touch).toHaveBeenCalledTimes(1);
   });
 });

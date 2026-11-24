@@ -3,6 +3,8 @@ import { promisify } from 'util';
 
 import { emitActivityEntry } from '../activity-logger.js';
 import { listLiveAgentIds } from '../terminal-backends/inventory.js';
+import { isStackPinned, workspacePathForIssue } from '../workspace/stack-idle-config.js';
+import { probeContainerUsage } from '../workspace/stack-usage-probe.js';
 import { listWorkspaces } from '../workspaces/resolver.js';
 import { pruneVerificationRunArtifacts } from './verification-artifact.js';
 
@@ -144,6 +146,8 @@ export interface IdleStackReaperDeps {
   graceMs: number;
   /** Idle grace window for the full-stack tier in ms. */
   fullStackGraceMs: number;
+  /** PAN-5250 FR-14: true when the issue's workspace is pinned or a container is in use or unreadable. */
+  isProtected: (issueLower: string, containerNames: string[]) => Promise<boolean>;
 }
 
 function defaultDeps(): IdleStackReaperDeps {
@@ -177,6 +181,16 @@ function defaultDeps(): IdleStackReaperDeps {
     now: () => Date.now(),
     graceMs: GRACE_MS,
     fullStackGraceMs: FULL_STACK_GRACE_MS,
+    isProtected: async (issueLower, containerNames) => {
+      const workspacePath = workspacePathForIssue(issueLower.toUpperCase());
+      if (workspacePath && isStackPinned(workspacePath)) return true;
+      const usage = await probeContainerUsage(containerNames);
+      if (!usage) return true;
+      return containerNames.some((name) => {
+        const u = usage.get(name);
+        return u === undefined || u === 'unknown' || u.inboundConnections > 0 || u.execSessions > 0;
+      });
+    },
   };
 }
 
@@ -252,6 +266,10 @@ export async function reconcileIdleWorkspaceStacks(
       continue;
     }
     if (nowMs - since < d.graceMs) continue; // still within grace
+    if (await d.isProtected(issueLower, names)) {
+      firstIdleAt.delete(issueLower); // PAN-5250 FR-14: pinned or in use — restart the grace
+      continue;
+    }
 
     try {
       await d.stopContainers(names);
@@ -318,6 +336,10 @@ export async function reconcileIdleWorkspaceStacks(
     if (targets.length === 0) {
       firstIdleAt.delete(clockKey);
       continue; // only the dev container is left — nothing to reap
+    }
+    if (await d.isProtected(issueLower, targets)) {
+      firstIdleAt.delete(clockKey); // PAN-5250 FR-14: pinned or in use — restart the grace
+      continue;
     }
 
     try {

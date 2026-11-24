@@ -16,7 +16,7 @@ import { hasIssueToken } from './stack-health.js';
 /** `unknown`: the runtime mirror has no snapshot; `boundary`: between turns; `in-turn`: mid-turn. */
 export type TurnState = 'boundary' | 'in-turn' | 'unknown';
 
-export type PaneReclaimRefusal = 'pane-not-work' | 'pane-no-agent-id' | 'pane-working' | 'pane-in-turn' | 'pane-unknown';
+export type PaneReclaimRefusal = 'pane-not-work' | 'pane-no-agent-id' | 'pane-working' | 'pane-not-idle' | 'pane-in-turn' | 'pane-unknown';
 
 /** True when `child` equals `parent` or lies inside it. */
 export function isInsidePath(child: string, parent: string): boolean {
@@ -35,7 +35,11 @@ export function issuePanes(panes: readonly BackendPane[], issueId: string, works
 
 /**
  * FR-2 rule 7. `review` panes are ignored (review reads only the committed
- * diff). Every other pane must be an idle `work` pane at a turn boundary.
+ * diff). Every other pane must be a known-idle `work` pane at a turn
+ * boundary: `idle`, `done` or `exited` (PAN-5648 r4672667768) — not `done`
+ * alone, because Herdr reports a parked agent as `done`. `blocked` and
+ * `unknown` refuse, same as `working`: a pane state the reclaim cannot place
+ * is not evidence it is safe to stop.
  */
 export function panesAllowReclaim(
   panes: readonly BackendPane[],
@@ -46,6 +50,7 @@ export function panesAllowReclaim(
     if (pane.role !== 'work') return { ok: false, reason: 'pane-not-work' };
     if (!pane.agentId) return { ok: false, reason: 'pane-no-agent-id' };
     if (pane.state === 'working') return { ok: false, reason: 'pane-working' };
+    if (pane.state !== 'idle' && pane.state !== 'done' && pane.state !== 'exited') return { ok: false, reason: 'pane-not-idle' };
     const turn = turnState(pane.agentId);
     if (turn === 'in-turn') return { ok: false, reason: 'pane-in-turn' };
     if (turn === 'unknown') return { ok: false, reason: 'pane-unknown' };

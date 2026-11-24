@@ -164,6 +164,30 @@ export function registerWorkspaceCommands(program: Command): void {
     });
 
   workspace
+    .command('up <issueId>')
+    .description("Start a workspace's stopped Docker containers (idle-stopped or reclaimed)")
+    .action(async (issueId: string) => {
+      const { workspaceUpCommand } = await import('./workspace-stack.js');
+      await workspaceUpCommand(issueId);
+    });
+
+  workspace
+    .command('pin <issueId>')
+    .description("Keep a workspace's Docker containers running: never stop them automatically")
+    .action(async (issueId: string) => {
+      const { workspacePinCommand } = await import('./workspace-stack.js');
+      await workspacePinCommand(issueId);
+    });
+
+  workspace
+    .command('unpin <issueId>')
+    .description("Allow automatic stops of a workspace's idle Docker containers again")
+    .action(async (issueId: string) => {
+      const { workspaceUnpinCommand } = await import('./workspace-stack.js');
+      await workspaceUnpinCommand(issueId);
+    });
+
+  workspace
     .command('reap')
     .description('List or remove orphaned unhealthy workspace Docker stacks and orphaned workspace networks')
     .option('--days <days>', 'Minimum age in days', '7')

@@ -60,6 +60,7 @@ function dockerDeps(containers: string[], clock: { now: number }) {
     stopContainers: async (names) => { stopped.push(names); },
     now: () => clock.now,
     graceMs: 10_000,
+    isProtected: async () => false,
     fullStackGraceMs: 20_000,
   };
   return { deps, stopped };

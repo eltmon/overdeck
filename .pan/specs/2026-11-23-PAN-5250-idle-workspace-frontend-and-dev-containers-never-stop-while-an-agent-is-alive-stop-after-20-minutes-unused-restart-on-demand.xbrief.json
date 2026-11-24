@@ -1,0 +1,1000 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-23T22:58:17Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5250: Idle workspace frontend and dev containers never stop while an agent is alive: stop after 20 minutes unused, restart on demand",
+    "updated": "2026-11-23T23:09:57.556Z"
+  },
+  "plan": {
+    "id": "pan-5250",
+    "title": "Idle workspace frontend and dev containers never stop while an agent is alive: stop after 20 minutes unused, restart on demand",
+    "status": "running",
+    "uid": "eb5ef482-cdbf-46e6-9908-6f7a3034b4b8",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-23T22:58:17Z",
+    "updated": "2026-11-23T23:09:57.556Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5250",
+        "label": "PAN-5250",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5649",
+        "label": "PAN-5649 (sibling: browser wake)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5623",
+        "label": "PAN-5623 (memory reclaim this builds on)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "docker",
+      "workspace-stack",
+      "memory",
+      "idle-stop",
+      "cloister"
+    ],
+    "narratives": {
+      "Problem": "A workspace's Vite frontend (about 1.3 GB) and dev container run for as long as its agent lives, even when nobody has the app open. On 2026-11-14 seven unused frontends held 9.1 GB on a host that must keep MemAvailable at or above 8 GiB. The old idle-stack reaper stops UI containers only when no agent pane exists, and PAN-5623's memory reclaim acts only during gate-queue starvation on parked issues.",
+      "Proposal": "A primary-dashboard idle-stop service (started with the PAN-5623 reclaim service) polls every 60 s. For each issue workspace it selects running containers of its compose project whose service is a configured idle-stop service (default frontend, fe, dev), measures use (inbound non-loopback TCP connections from host /proc, exec sessions from docker inspect ExecIDs, test/uat panes, verification, gate queue, pin), and after 20 unused minutes stops them through PAN-5623's journal-before-stop sequence with a stack.reclaimed entry carrying reason 'idle'. The open reclaim becomes a union with reasons, so the turn restore applies only to memory reclaims while spawn, verification, polyrepo merge verification and the new pan workspace up restore idle stops. pan workspace pin/unpin hold a workspace. The browser wake path moved to sibling PAN-5649.",
+      "NonGoals": "- The browser wake path (Traefik fallback router, wake page, dashboard start-app action, chip change): moved to PAN-5649\n- Changing src/lib/cloister/idle-stack-reaper.ts beyond the WI-11 protection check (no-agent tiers, name matching, broken full-stack tier stay): PAN-3050\n- Stopping server, api, databases, caches or any service outside the configured idle-stop services\n- Persisting the idle clock across dashboard restarts\n- A dashboard UI or REST route for up/pin/unpin\n- Changing the pan status reclaim line text or src/lib/workspace/stack-health.ts\n- Adding keys to global config.yaml (schema.ts/merge.ts are at their caps)\n- Measuring container RSS for the gate admission queue\n- A docker exec fallback for the usage probe\n- Adding any line to src/dashboard/server/main.ts\n- Teaching work agents to wake their own stack (role-prompt change); PAN-5649's app-URL wake covers the browser case"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Split the browser wake path (operator opening the app URL, dashboard start-app action) into sibling PAN-5649",
+        "rationale": "With it the plan passes 25 files and 6 subsystems and needs its own auth design for a non-dashboard host; until it lands, pan workspace up is the operator path and every activity entry names it."
+      },
+      {
+        "summary": "Reuse PAN-5623's stack.reclaimed entry with data.reason 'idle' instead of a new entry type",
+        "rationale": "It inherits health leniency, spawn/verification restores, the stack lock and journal-before-stop crash safety; the reason keeps the turn restore away from idle stops."
+      },
+      {
+        "summary": "openStackReclaim returns the union of every reclaim after the newest stack.restored, with reasons and the newest entry for read-back",
+        "rationale": "An idle stop and a memory reclaim can both be open on one issue; reading only the newest entry would strand the first entry's containers."
+      },
+      {
+        "summary": "In use is measured (inbound connections, exec sessions, test/uat panes, verification, gate queue, pin), never inferred from pipeline phase labels",
+        "rationale": "A held-for-UAT PR can sit for days unused; an open tab, a UAT/test agent or a pin protects a real UAT session."
+      },
+      {
+        "summary": "Default idle-stop services are ['frontend', 'fe', 'dev']",
+        "rationale": "The issue proposes frontend/dev; MYN's frontend service is fe and fe is already a PAN-5623 reclaimable service."
+      },
+      {
+        "summary": "Per-project config in projects.yaml workspace.docker.idle_stop {minutes, services}, plus OVERDECK_DISABLE_STACK_IDLE_STOP=1",
+        "rationale": "Service names differ per project; global schema.ts/merge.ts are at their file-size caps."
+      },
+      {
+        "summary": "Pin is <workspace>/.overdeck/stack-pin.json and it also holds the memory reclaim",
+        "rationale": "Operator intent cannot be derived; a stack.* journal entry would close an open reclaim; a pin should mean never stop automatically."
+      },
+      {
+        "summary": "New verb pan workspace up (plus pin/unpin), since pan workspace start/stop belong to Fly remote workspaces",
+        "rationale": "The issue names pan workspace up; start is taken."
+      },
+      {
+        "summary": "Start the idle-stop service from startStackReclaimService, not main.ts",
+        "rationale": "main.ts is 997 of 1000 lines; both services are primary-dashboard-only."
+      },
+      {
+        "summary": "Leave the old idle-stack reaper unchanged",
+        "rationale": "Its tiers cover the no-agent case; its fixes belong to PAN-3050; wake starts what it stopped."
+      },
+      {
+        "summary": "Restore eligibility uses the service recorded in the reclaim entry, not the current idle-stop config",
+        "rationale": "Critique: emptying or changing services after a stop must never strand a stopped container."
+      },
+      {
+        "summary": "Keep the idle stop on by default with a stated rollout gap (FR-15) instead of opt-in until PAN-5649",
+        "rationale": "The issue asks for a default 20-minute stop; an open app is in use and never stops; pan workspace up and every spawn/verification restart it; PAN-5649 is sequenced next."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "27 files / 7 path groups: the critic showed the old idle-stack reaper ignores pins and browser use, so WI-11 (one source file plus the three existing reaper test files that need an injected dep) must ship with the pin it protects; the browser wake path was already split to PAN-5649.",
+      "canonicalFilename": "2026-11-23-PAN-5250-idle-workspace-frontend-and-dev-containers-never-stop-while-an-agent-is-alive-stop-after-20-minutes-unused-restart-on-demand.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "wi1-open-reclaim-union",
+        "title": "openStackReclaim returns the union of open reclaim entries with their reasons",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T22:58:17Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5250",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/pipeline-journal.ts",
+            "src/lib/cloister/__tests__/pipeline-journal.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/pipeline-journal.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "pipeline-journal.test.ts passes including the new union/reason/latest cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ],
+          "foundationFor": [
+            "wi4-restore-wake",
+            "wi5-reclaim-service-reasons",
+            "wi7-idle-stop-service"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-5250.md WI-1: replace OpenStackReclaim/openStackReclaim with the union form (containers union after the newest stack.restored, reasons, latestAt, latestContainers) and add reclaimRestoresOnTurn. An entry without data.reason reads as 'gate-starvation'. Exact before/after code is in the PRD. Also return recordedServices (container name -> service from paired data.containers/data.services)."
+        },
+        "items": [
+          {
+            "id": "wi1-open-reclaim-union.ac1",
+            "title": "Given a journal [reclaimed A (no reason), restored, reclaimed B (reason idle), reclaimed C (no reason)], when openStackReclaim runs, then it returns containers ['B','C'], reasons containing 'idle' and 'gate-starvation', and latestContainers ['C']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-open-reclaim-union.ac2",
+            "title": "Given a journal whose newest stack.* entry is stack.restored, when openStackReclaim runs, then it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-open-reclaim-union.ac3",
+            "title": "Given two open reclaims that name the same container, when openStackReclaim runs, then the union lists that name once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-open-reclaim-union.ac4",
+            "title": "Given an idle-only open reclaim, when reclaimRestoresOnTurn runs, then it returns false; given an open reclaim with one reason-less entry, then it returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-open-reclaim-union.ac5",
+            "title": "Given an entry with containers ['x-dev-1'] and services ['dev'], when openStackReclaim runs, then recordedServices maps 'x-dev-1' to 'dev'; an entry without services contributes nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi2-idle-config-pin",
+        "title": "Per-project idle-stop config and the stack pin file",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T22:58:17Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5250",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/projects.ts",
+            "src/lib/workspace/stack-idle-config.ts",
+            "src/lib/workspace/__tests__/stack-idle-config.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/workspace/__tests__/stack-idle-config.test.ts",
+            "npm run typecheck",
+            "git diff --numstat origin/main -- src/lib/projects.ts"
+          ],
+          "expected_outputs": [
+            "stack-idle-config.test.ts passes",
+            "typecheck completes without errors",
+            "numstat prints 1 1 for src/lib/projects.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-5250.md WI-2: extend the projects.ts docker type in place with idle_stop {minutes, services}; add stack-idle-config.ts with resolveIdleStopConfig, idleStopConfigForIssue, wakeableServicesForIssue (RECLAIMABLE ∪ defaults ∪ configured), workspacePathForIssue and the pin helpers (stackPinPath, isStackPinned, readStackPin, writeStackPin, removeStackPin). Defaults 20 minutes and ['frontend','fe','dev']; OVERDECK_DISABLE_STACK_IDLE_STOP=1, minutes 0 or empty services disable."
+        },
+        "items": [
+          {
+            "id": "wi2-idle-config-pin.ac1",
+            "title": "Given no project config, when resolveIdleStopConfig runs, then it returns enabled true, minutes 20 and services {frontend, fe, dev}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-idle-config-pin.ac2",
+            "title": "Given minutes 0, an empty services list, or env OVERDECK_DISABLE_STACK_IDLE_STOP=1, when resolveIdleStopConfig runs, then it returns enabled false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-idle-config-pin.ac3",
+            "title": "Given services ['fe','bad name',''], when resolveIdleStopConfig runs, then it returns services {fe}; given minutes -5, then minutes defaults to 20; given services [], wakeableServicesForIssue still includes dev, fe and api",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-idle-config-pin.ac4",
+            "title": "Given a stack-pin.json containing 'not json', when isStackPinned runs, then it returns true; writeStackPin creates .overdeck/ and removeStackPin returns false on a second call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi3-usage-probe",
+        "title": "Container usage probe: exec sessions and inbound non-loopback TCP connections",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T22:58:17Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5250",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspace/stack-usage-probe.ts",
+            "src/lib/workspace/__tests__/stack-usage-probe.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/workspace/__tests__/stack-usage-probe.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "stack-usage-probe.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-2",
+            "NFR-3",
+            "NFR-8"
+          ],
+          "acJustification": "Six criteria: the parser has distinct IPv4, IPv6, v4-mapped and outbound cases plus the inspect parser, the I/O fallbacks and the live checkpoint."
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-5250.md WI-3: one docker inspect ('{{.Name}}\\t{{.State.Pid}}\\t{{len .ExecIDs}}') for all names via promisified execFile and resolveHostTool, then fs/promises reads of /proc/<pid>/net/tcp and tcp6. Count ESTABLISHED (01) connections whose local port is a listening (0A) port and whose remote address is not loopback (D8). Unreadable -> 'unknown'. Includes a live implementation checkpoint against overdeck-traefik with a stated fallback."
+        },
+        "items": [
+          {
+            "id": "wi3-usage-probe.ac1",
+            "title": "Given a tcp table with a listener on port 3010 and an established connection from 192.168.0.2 to it, when countInboundConnections runs, then it returns 1; from 127.0.0.1 it returns 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-usage-probe.ac2",
+            "title": "Given an established connection on a non-listening local port, when countInboundConnections runs, then it returns 0; a tcp6 ::ffff:127.0.0.1 connection returns 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-usage-probe.ac3",
+            "title": "Given inspect output '/myn-feature-min-1-fe-1\\t1234\\t2', when parseInspectUsage runs, then it returns pid 1234 and execSessions 2 for 'myn-feature-min-1-fe-1'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-usage-probe.ac4",
+            "title": "Given pid 0 or a tcp read that rejects with EACCES, when probeContainerUsage runs, then that container maps to 'unknown'; a tcp6 ENOENT counts tcp only; a failed inspect returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-usage-probe.ac5",
+            "title": "Given the live checkpoint against overdeck-traefik, when the probe runs, then the PR description records whether it returned a non-unknown entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-usage-probe.ac6",
+            "title": "Given a listener only in tcp6 (::) and an established v4-mapped peer ::ffff:172.18.0.5 on that port, when countInboundConnections runs, then it returns 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi4-restore-wake",
+        "title": "Restore door accepts idle-stop services, and wakeWorkspaceStack starts exited restorable containers",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T22:58:17Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5250",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspace/stack-restore.ts",
+            "src/lib/workspace/__tests__/stack-restore.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/workspace/__tests__/stack-restore.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "stack-restore.test.ts passes",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-5250.md WI-4: add trigger 'operator'; the per-container check accepts a container in the compose project whose service is reclaimable or equals open.recordedServices[name] (never the current idle-stop config); add wakeableServices dep (default wakeableServicesForIssue) used only by wakeWorkspaceStack (restore door, then inside the stack lock start every exited container of the compose project whose service is wakeable; activity 'stack-woken: <ISSUE>')."
+        },
+        "items": [
+          {
+            "id": "wi4-restore-wake.ac1",
+            "title": "Given an open idle reclaim recording service 'dev' for an exited dev container of the issue's compose project, when restoreReclaimedStack runs, then it starts dev and journals stack.restored, even after the project config changed to services []",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-restore-wake.ac2",
+            "title": "Given an open reclaim naming a postgres container with no recorded service, when restoreReclaimedStack runs, then it refuses postgres and starts nothing for it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-restore-wake.ac3",
+            "title": "Given no open reclaim and an exited frontend plus an exited init in the compose project, when wakeWorkspaceStack runs, then it starts frontend only and returns kind 'woken'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-restore-wake.ac4",
+            "title": "Given an exited frontend of another compose project, when wakeWorkspaceStack runs, then it leaves it stopped; given a start failure, then it returns kind 'failed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi5-reclaim-service-reasons",
+        "title": "Memory reclaim service: turn restore only for gate-starvation reclaims, read-back on the newest entry, pins hold reclaims",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T22:58:17Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5250",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/stack-reclaim-service.ts",
+            "src/dashboard/server/services/__tests__/stack-reclaim-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/stack-reclaim-service.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "stack-reclaim-service.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-5250.md WI-5: read-back compares latestAt/latestContainers; seedRestoreIndex and runStackRestorePoll use reclaimRestoresOnTurn; add isPinned dep (default isStackPinned) checked in buildCandidates and recheckBeforeStop."
+        },
+        "items": [
+          {
+            "id": "wi5-reclaim-service-reasons.ac1",
+            "title": "Given an open reclaim whose only reason is idle and a work pane in state working, when the restore poll runs, then it never calls the restore door",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-reclaim-service-reasons.ac2",
+            "title": "Given an open reclaim with a gate-starvation entry and an idle entry and a working work pane, when the restore poll runs, then it calls the restore door once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-reclaim-service-reasons.ac3",
+            "title": "Given a pinned workspace, when the reclaim poll builds candidates, then that workspace is not a candidate; a pin written before the locked re-check returns idle 'changed-before-stop'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-reclaim-service-reasons.ac4",
+            "title": "Given an older idle reclaim already open, when the memory reclaim writes its entry, then the read-back passes and the containers are stopped",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi6-idle-stop-rules",
+        "title": "Pure idle-stop rules: target selection, in-use reasons and the idle clock",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T22:58:17Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5250",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspace/stack-idle-stop.ts",
+            "src/lib/workspace/__tests__/stack-idle-stop.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/workspace/__tests__/stack-idle-stop.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "stack-idle-stop.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-5250.md WI-6: idleStopTargets, workspaceInUse (reasons pinned, test-agent, verification, gate-queue, probe-unknown, exec-session, browser, in that order) and advanceIdleClock. Only test and uat pane roles count; a work pane never does."
+        },
+        "items": [
+          {
+            "id": "wi6-idle-stop-rules.ac1",
+            "title": "Given only a work pane in state working and usage {0 inbound, 0 exec}, when workspaceInUse runs, then it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-idle-stop-rules.ac2",
+            "title": "Given a uat pane, a test pane, a pin, verification busy, a gate-queue entry, an 'unknown' usage, an exec session, or an inbound connection, when workspaceInUse runs, then it returns the matching reason",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-idle-stop-rules.ac3",
+            "title": "Given a clock started at t0 and a 20-minute limit, when advanceIdleClock runs at t0+19 min, then it returns idle-waiting; at t0+20 min it returns due with idleMs 1200000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-idle-stop-rules.ac4",
+            "title": "Given an in-use step after idle steps, when advanceIdleClock runs, then it clears the clock and the next idle step returns idle-started",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-idle-stop-rules.ac5",
+            "title": "Given an exited frontend, a postgres container and a frontend of another compose project, when idleStopTargets runs, then it excludes all three",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi7-idle-stop-service",
+        "title": "Idle-stop service: 60 s poll, locked re-check, journal before docker stop, activity entry",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T22:58:17Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5250",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/stack-idle-stop-service.ts",
+            "src/dashboard/server/services/__tests__/stack-idle-stop-service.test.ts",
+            "src/dashboard/server/services/stack-reclaim-service.ts",
+            "src/dashboard/server/services/__tests__/stack-reclaim-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/stack-idle-stop-service.test.ts src/dashboard/server/services/__tests__/stack-reclaim-service.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "both test files pass under fake timers",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-1",
+            "NFR-3",
+            "NFR-4"
+          ],
+          "acJustification": "Six criteria: the service owns the clock, the stop sequence, the activity entry, the exemptions, deny-by-default and its wiring into the reclaim service; each is a distinct observable behavior."
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-5250.md WI-7: new stack-idle-stop-service.ts with runStackIdleStopPoll, start/stop functions; started and stopped from startStackReclaimService/stopStackReclaimService, which pass listPanes, readQueue and verificationBusy from their resolved deps (this module never imports stack-reclaim-service.ts). No main.ts change. stack-reclaim-service.test.ts mocks ../stack-idle-stop-service.js so its fake-timer tests never run real Docker reads."
+        },
+        "items": [
+          {
+            "id": "wi7-idle-stop-service.ac1",
+            "title": "Given one frontend target, no panes and usage {0,0}, when 19 polls run under fake timers, then nothing is stopped; on the 21st poll stopContainer receives the container id and the journal gains stack.reclaimed with reason 'idle'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-idle-stop-service.ac2",
+            "title": "Given an idle stop, when it completes, then one activity entry 'stack-idle-stopped: <ISSUE>' is emitted whose details contain 'after 20 min unused', 'GiB' and 'pan workspace up <ISSUE>'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-idle-stop-service.ac3",
+            "title": "Given an inbound connection at minute 15, when polls continue, then no stop happens at minute 21 and the stop happens 20 minutes after the connection closes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-idle-stop-service.ac4",
+            "title": "Given a uat pane, a test pane, a pin, verification busy, a gate-queue waiter or a null probe, when 60 polls run, then nothing is stopped; a working work pane alone does not prevent the stop",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-idle-stop-service.ac5",
+            "title": "Given listRunningContainers or listPanes returning null, readMemoryBytes returning null, or a journal append that does not land, when the poll runs, then no container is stopped",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-idle-stop-service.ac6",
+            "title": "Given stack-reclaim-service.test.ts with the idle-stop module mocked, when startStackReclaimService runs, then startStackIdleStopService is called once with listPanes, readQueue and verificationBusy",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi8-merge-ops-restore",
+        "title": "Polyrepo post-rebase merge verification restores a reclaimed stack before container gates",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T22:58:17Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5250",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/workspaces/merge-ops.ts",
+            "src/dashboard/server/routes/workspaces/__tests__/merge-ops-polyrepo-completeness.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/workspaces/__tests__/merge-ops-polyrepo-completeness.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "merge-ops-polyrepo-completeness.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-5250.md WI-8: call restoreReclaimedStack({ issueId, workspacePath, trigger: 'verification' }) immediately before runQualityGates in the polyrepo post-rebase verification loop; add the import. +2 lines (cap 1835)."
+        },
+        "items": [
+          {
+            "id": "wi8-merge-ops-restore.ac1",
+            "title": "Given a polyrepo merge with quality gates, when post-rebase verification runs, then restoreReclaimedStack is called with trigger 'verification' before runQualityGates (invocationCallOrder)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-merge-ops-restore.ac2",
+            "title": "Given the restore door returns kind 'failed', when verification continues, then runQualityGates still runs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi9-cli-up-pin",
+        "title": "pan workspace up, pin and unpin verbs with the user-facing CLI page",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T22:58:17Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5250",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/workspace.ts",
+            "src/cli/commands/workspace-stack.ts",
+            "src/cli/commands/__tests__/workspace-stack.test.ts",
+            "cli/workspace-commands.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/workspace-stack.test.ts",
+            "npm run typecheck",
+            "npm run build && node dist/cli/index.js workspace --help"
+          ],
+          "expected_outputs": [
+            "workspace-stack.test.ts passes",
+            "typecheck completes without errors",
+            "workspace --help lists up, pin and unpin"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "FR-12",
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-5250.md WI-9: register up/pin/unpin (lazy import like rebuild), implement them in workspace-stack.ts over wakeWorkspaceStack and the pin helpers, and add the verbs plus an 'Idle workspace containers' section (defaults, in-use list, restart paths, projects.yaml example, disable switches, the PAN-5649 404 gap) to cli/workspace-commands.mdx."
+        },
+        "items": [
+          {
+            "id": "wi9-cli-up-pin.ac1",
+            "title": "Given a workspace with an idle-stopped frontend, when pan workspace up runs, then it prints 'Started: <name>' and exits 0; a failed wake exits 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-cli-up-pin.ac2",
+            "title": "Given a workspace, when pan workspace pin runs, then <workspace>/.overdeck/stack-pin.json exists and the output names pan workspace unpin",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-cli-up-pin.ac3",
+            "title": "Given a pinned workspace, when pan workspace unpin runs twice, then the first run prints 'Unpinned <ISSUE>.' and the second prints '<ISSUE> was not pinned.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-cli-up-pin.ac4",
+            "title": "Given the built CLI, when node dist/cli/index.js workspace --help runs, then it lists up, pin and unpin; cli/workspace-commands.mdx contains '## Idle workspace containers', 'OVERDECK_DISABLE_STACK_IDLE_STOP' and states that a stopped app URL returns 404 until PAN-5649 with pan workspace up as the restart",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi11-old-reaper-protection",
+        "title": "The old idle-stack reaper skips pinned or in-use workspaces before stopping",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-23T22:58:17Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5250",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/idle-stack-reaper.ts",
+            "tests/unit/lib/cloister/idle-stack-reaper.test.ts",
+            "tests/unit/lib/cloister/idle-stack-reaper-backends.test.ts",
+            "tests/unit/lib/cloister/idle-stack-reaper-workspaces.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/idle-stack-reaper.test.ts tests/unit/lib/cloister/idle-stack-reaper-backends.test.ts tests/unit/lib/cloister/idle-stack-reaper-workspaces.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "the three reaper test files pass",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-5250.md WI-11: add isProtected dep to IdleStackReaperDeps (default: pinned via workspacePathForIssue + isStackPinned, or probeContainerUsage shows inbound/exec/unknown/null); call it before the stop in both tiers and clear the grace clock when true; add isProtected: async () => false to every existing deps builder in the three test files."
+        },
+        "items": [
+          {
+            "id": "wi11-old-reaper-protection.ac1",
+            "title": "Given an agent-less issue past the 10-minute grace whose isProtected returns true, when reconcileIdleWorkspaceStacks runs, then it stops nothing and restarts the grace clock",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-old-reaper-protection.ac2",
+            "title": "Given isProtected returning false, when reconcileIdleWorkspaceStacks runs past the grace window, then it stops the UI containers as before and the existing reaper tests pass unchanged apart from the injected dep",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-old-reaper-protection.ac3",
+            "title": "Given an issue with UI containers, when the reaper checks protection, then isProtected receives the issue's UI container names",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi10-docs-changelog",
+        "title": "Developer doc section and changelog entry for idle workspace containers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-23T22:58:17Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5250",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/WORKSPACES-AND-PROJECTS.md",
+            "changelog.d/pan-5250.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"## Idle workspace containers (PAN-5250)\" docs/WORKSPACES-AND-PROJECTS.md",
+            "grep -n \"stack-pin.json\" docs/WORKSPACES-AND-PROJECTS.md",
+            "test -f changelog.d/pan-5250.md"
+          ],
+          "expected_outputs": [
+            "the heading is found",
+            "stack-pin.json is found",
+            "the changelog file exists"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-5250.md WI-10: add '## Idle workspace containers (PAN-5250)' before '## No-loss discipline' in docs/WORKSPACES-AND-PROJECTS.md with the content listed in the PRD (service, candidates, seven in-use reasons, probe, clock, stop sequence, union reclaim and the trigger table, pin, CLI verbs, config keys, PAN-5649 gap, old reaper unchanged); add changelog.d/pan-5250.md with the PRD's text."
+        },
+        "items": [
+          {
+            "id": "wi10-docs-changelog.ac1",
+            "title": "Given the docs change, when docs/WORKSPACES-AND-PROJECTS.md is read, then it contains the heading '## Idle workspace containers (PAN-5250)' and the strings reason: 'idle', stack-pin.json and OVERDECK_DISABLE_STACK_IDLE_STOP",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi10-docs-changelog.ac2",
+            "title": "Given the docs change, when the section is read, then it states that a live work agent alone does not keep the containers running, that the turn trigger restores only gate-starvation reclaims, and that the old reaper skips pinned or in-use workspaces",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi10-docs-changelog.ac3",
+            "title": "Given changelog.d/pan-5250.md, when it is read, then it has a '#### Improved' heading and names pan workspace up and pan workspace pin",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wi1-open-reclaim-union",
+        "to": "wi4-restore-wake",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-idle-config-pin",
+        "to": "wi4-restore-wake",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-open-reclaim-union",
+        "to": "wi5-reclaim-service-reasons",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-idle-config-pin",
+        "to": "wi5-reclaim-service-reasons",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-usage-probe",
+        "to": "wi6-idle-stop-rules",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-open-reclaim-union",
+        "to": "wi7-idle-stop-service",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-idle-config-pin",
+        "to": "wi7-idle-stop-service",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-usage-probe",
+        "to": "wi7-idle-stop-service",
+        "type": "blocks"
+      },
+      {
+        "from": "wi5-reclaim-service-reasons",
+        "to": "wi7-idle-stop-service",
+        "type": "blocks"
+      },
+      {
+        "from": "wi6-idle-stop-rules",
+        "to": "wi7-idle-stop-service",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-idle-config-pin",
+        "to": "wi9-cli-up-pin",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4-restore-wake",
+        "to": "wi9-cli-up-pin",
+        "type": "blocks"
+      },
+      {
+        "from": "wi7-idle-stop-service",
+        "to": "wi10-docs-changelog",
+        "type": "blocks"
+      },
+      {
+        "from": "wi9-cli-up-pin",
+        "to": "wi10-docs-changelog",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-idle-config-pin",
+        "to": "wi11-old-reaper-protection",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-usage-probe",
+        "to": "wi11-old-reaper-protection",
+        "type": "blocks"
+      },
+      {
+        "from": "wi11-old-reaper-protection",
+        "to": "wi10-docs-changelog",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

@@ -876,6 +876,116 @@ it (worktree, local branch and registry row):
 The edit-workspace routes refuse any other scratch workspace with
 `NOT_AN_EDIT_WORKSPACE`, so a `pan workspace new` scratch row is never touched.
 
+## Idle workspace containers (PAN-5250)
+
+A workspace's Vite frontend holds about 1.3 GB whether or not anyone has the
+app open. The idle stop stops a workspace's `frontend`, `fe` and `dev`
+containers after 20 minutes unused, **even while its work agent runs**: a live
+work agent alone does not keep them running.
+
+**Where it runs.** `src/dashboard/server/services/stack-idle-stop-service.ts`,
+started and stopped by `startStackReclaimService` / `stopStackReclaimService`
+(the PAN-5623 memory reclaim service), so it runs in the primary dashboard
+only. It polls every 60 s and shares that service's pane inventory, gate queue
+and verification reads. The pure rules are in
+`src/lib/workspace/stack-idle-stop.ts`.
+
+**Candidates.** A workspace row that is not `kind: 'main'`, has an issue id, an
+existing path, a registered project with the idle stop enabled, and a compose
+project from `tryComposeProjectNameForWorkspace`. Its targets are the running
+containers with that exact `com.docker.compose.project` label whose
+`com.docker.compose.service` is an idle-stop service. Containers are never
+matched by name pattern.
+
+**In use.** A candidate is in use, and its idle clock is cleared, when any of
+these reasons holds (first match wins):
+
+| Reason | Fact |
+| --- | --- |
+| `pinned` | `<workspace>/.overdeck/stack-pin.json` exists (even unparsable) |
+| `test-agent` | a live pane for the issue has role `test` or `uat` |
+| `verification` | the verification worker is active or a dispatch is owed |
+| `gate-queue` | a gate-queue owner or waiter belongs to the issue |
+| `probe-unknown` | the usage probe could not read a target |
+| `exec-session` | a target has a running exec session |
+| `browser` | a target has an inbound connection |
+
+A live `work`, `review`, `plan`, `worker`, `strike` or `conversation` pane is
+not a reason. The usage probe (`src/lib/workspace/stack-usage-probe.ts`) runs
+one `docker inspect --format '{{.Name}}\t{{.State.Pid}}\t{{len .ExecIDs}}'`
+for all targets, then reads each container's `/proc/<pid>/net/tcp` and `tcp6`
+from the host. An inbound connection is an `ESTABLISHED` row whose local port
+the container also listens on and whose peer is not loopback, so healthchecks
+and in-container tools never count. A Docker healthcheck is itself a short exec
+session: a poll that samples one resets the clock, which only delays a stop.
+The probe is Linux only; elsewhere every container reads `probe-unknown` and
+nothing is stopped.
+
+**Clock.** An in-memory map, issue id to the first poll that saw the workspace
+not in use. Any in-use poll clears it, so a new browser connection restarts the
+20 minutes. A dashboard restart clears every clock.
+
+**Stop sequence.** For a due workspace, inside the stack lock
+(`<workspace>/.overdeck/stack-reclaim.lock`, 5 s timeout; a busy lock skips the
+workspace this poll): re-list running containers and require the same ids,
+state, compose project and services; re-read pins, panes, queue, verification
+and the usage probe; read container memory. Then journal `stack.reclaimed` with
+`source: 'stack-idle-stop'` and `data.reason: 'idle'` (plus `containers`,
+`containerIds`, `services`, `composeProject`, `memoryBytes`, `idleMs`), read
+the journal back, and only then `docker stop` each target by id. One activity
+entry `stack-idle-stopped: <ISSUE>` names the containers, the minutes, the
+memory freed and the restart command. Any unreadable fact stops nothing.
+
+**Open reclaim is a union.** `openStackReclaim` merges every `stack.reclaimed`
+entry after the newest `stack.restored`, with their distinct reasons (an entry
+without `reason` is a memory reclaim, `gate-starvation`). The restore door
+starts the whole union. Which trigger restores which reason:
+
+| Trigger | Restores |
+| --- | --- |
+| `turn` (an agent of the issue starts a turn, PAN-5623 restore poll) | only an open reclaim that includes `gate-starvation`; then the whole union |
+| `spawn` (any role except review) | any open reclaim |
+| `verification` (verification start, polyrepo post-rebase merge verification) | any open reclaim |
+| `operator` (`pan workspace up`) | any open reclaim, then every other exited wakeable container |
+
+The restore door starts a journaled container when its service is reclaimable
+(`api`, `fe`, `frontend`, `server`) or equals the service its reclaim entry
+recorded, so an idle-stopped `dev` restarts. It never reads the current
+idle-stop config, so changing the config never strands a stopped container.
+
+**Pins.** `pan workspace pin <issue>` writes
+`<workspace>/.overdeck/stack-pin.json`; `pan workspace unpin <issue>` removes
+it. A pin holds the idle stop, the PAN-5623 memory reclaim and the old
+reaper. Pinning does not start a stopped stack.
+
+**`pan workspace up <issue>`** runs `wakeWorkspaceStack`
+(`src/lib/workspace/stack-restore.ts`): the restore door, then every exited
+container of the compose project whose service is reclaimable, a default
+idle-stop service, or a configured one. One-shot services such as `init` are
+never started.
+
+**Configuration.** Per project in `~/.overdeck/projects.yaml`:
+
+```yaml
+workspace:
+  docker:
+    idle_stop:
+      minutes: 20                    # 0 disables it for the project
+      services: [frontend, fe, dev]  # an empty list disables it
+```
+
+`OVERDECK_DISABLE_STACK_IDLE_STOP=1` disables it everywhere.
+
+**Gap until PAN-5649.** Opening an idle-stopped workspace's app URL returns
+Traefik's 404 and the `app ↗` chip is hidden. Run `pan workspace up <issue>`;
+every idle-stop activity entry names it.
+
+**The old reaper.** `src/lib/cloister/idle-stack-reaper.ts` keeps its
+no-agent tiers, name matching and grace windows, but before either tier stops
+anything it skips an issue whose workspace is pinned or whose containers show
+an inbound connection, an exec session or an unreadable probe, and restarts
+that issue's grace clock.
+
 ## No-loss discipline
 
 This domain was built additively alongside the pre-existing PAN-428
