@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5662",
   "created": "2026-11-24T07:26:43.859Z",
-  "updated": "2026-11-24T07:37:49.161Z",
+  "updated": "2026-11-24T07:37:50.729Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -88,6 +88,11 @@
     "shared-trigger-menu.ac4": {
       "status": "completed",
       "doneAt": "2026-11-24T07:37:49.160Z"
+    },
+    "file-mention-hook": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5662",
+      "claimedAt": "2026-11-24T07:37:50.729Z"
     }
   }
 }
