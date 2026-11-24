@@ -2,12 +2,23 @@
   "version": "1",
   "issueId": "PAN-5250",
   "created": "2026-11-23T23:10:09.644Z",
-  "updated": "2026-11-23T23:36:56.211Z",
+  "updated": "2026-11-24T00:13:03.631Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-24T00:03Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-24T00:03:08.598Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-24T00:13Z] ci-monitor → FAILED — seq 2",
+      "timestamp": "2026-11-24T00:13:03.631Z"
+    }
+  ],
   "items": {
     "wi1-open-reclaim-union": {
       "status": "completed",
@@ -259,5 +270,21 @@
       "status": "completed",
       "doneAt": "2026-11-23T23:36:56.210Z"
     }
-  }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-24T00:03:08Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5250\n\nPull request: https://github.com/eltmon/overdeck/pull/5651 (head `5f89a4b7`)\n\nSource: check_run:mobile-android\n\n## Failing checks (1)\n\n### mobile-android\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/138108580201/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/45293677453/job/138108580201  \n```\ns/tests/testDebugUnitTest/index.html\n\n* Try:\n> Run with --scan to get full insights.\n\nBUILD FAILED in 21s\n##[error]Process completed with exit code 1.\nPost job cleanup.\n(node:3120) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.\n(Use `node --trace-deprecation ...` to show where the warning was created)\nPost job cleanup.\n[command]/usr/bin/git version\ngit version 2.56.1\nTemporarily overriding HOME='/home/runner/work/_temp/8f2a4e5a-33c5-4f3b-b94b-901c4b799bcd' before making global git config changes\nAdding repository directory to the temporary git global config as a safe directory\n[command]/usr/bin/git config --global --add safe.directory /home/runner/work/overdeck/overdeck\n[command]/usr/bin/git config --local --name-only --get-regexp core\\.sshCommand\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'core\\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp http\\.https\\:\\/\\/github\\.com\\/\\.extraheader\nhttp.https://github.com/.extraheader\n[command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'http\\.https\\:\\/\\/github\\.com\\/\\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\\.gitdir:\n[command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url\nCleaning up orphan processes\n##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-java@v4, actions/setup-node@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    },
+    {
+      "seq": 2,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-24T00:13:03Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5250\n\nPull request: https://github.com/eltmon/overdeck/pull/5651 (head `5f89a4b7`)\n\nSource: check_run:test\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (2)\n\n### test\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/138113986697/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/45293677453/job/138113986697  \n```\n2026-11-24T00:12:45.0440805Z Current runner version: '2.338.2'\n##[group]Runner Image Provisioner\nHosted Compute Agent\nVersion: 20261111.635\nCommit: b8a594ea514ff44cadb5342986c68b1eac6e22ed\nBuild Date: 2026-11-11T01:49:01Z\nWorker ID: {e3e7a4d2-d718-41b3-b6c8-2157bda54ef1}\nRegion: eastus\nCloud: Azure\n##[endgroup]\n##[group]Operating System\nUbuntu\n26.04.1\nLTS\n##[endgroup]\n##[group]Runner Image\nImage: ubuntu-26.04\nVersion: 20261116.202.1\nIncluded Software: https://github.com/actions/runner-images/blob/ubuntu26/20261116.202/images/ubuntu/Ubuntu2604-Readme.md\nImage Release: https://github.com/actions/runner-images/releases/tag/ubuntu26%2F20261116.202\n##[endgroup]\n##[group]GITHUB_TOKEN Permissions\nContents: read\nMetadata: read\nPackages: read\n##[endgroup]\nSecret source: Actions\nCache mode: write\nPrepare workflow directory\nPrepare all required actions\nComplete job name: test\n##[group]Run echo \"test-shard:     success\"\n\u001b[36;1mecho \"test-shard:     success\"\u001b[0m\n\u001b[36;1mecho \"test-e2e:       success\"\u001b[0m\n\u001b[36;1mecho \"mobile-android: failure\"\u001b[0m\n\u001b[36;1mecho \"integrations:   success\"\u001b[0m\n\u001b[36;1mtest \"success\" = success\u001b[0m\n\u001b[36;1mtest \"success\" = success\u001b[0m\n\u001b[36;1mtest \"failure\" = success\u001b[0m\n\u001b[36;1mtest \"success\" = success\u001b[0m\nshell: /usr/bin/bash -e {0}\nenv:\n  SKIP_DOCS_INDEX: 1\n  OVERDECK_TELEMETRY: 0\n##[endgroup]\ntest-shard:     success\ntest-e2e:       success\nmobile-android: failure\nintegrations:   success\n##[error]Process completed with exit code 1.\nCleaning up orphan processes\n```\n\n### mobile-android\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/138108580201/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/45293677453/job/138108580201  \n```\ns/tests/testDebugUnitTest/index.html\n\n* Try:\n> Run with --scan to get full insights.\n\nBUILD FAILED in 21s\n##[error]Process completed with exit code 1.\nPost job cleanup.\n(node:3120) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.\n(Use `node --trace-deprecation ...` to show where the warning was created)\nPost job cleanup.\n[command]/usr/bin/git version\ngit version 2.56.1\nTemporarily overriding HOME='/home/runner/work/_temp/8f2a4e5a-33c5-4f3b-b94b-901c4b799bcd' before making global git config changes\nAdding repository directory to the temporary git global config as a safe directory\n[command]/usr/bin/git config --global --add safe.directory /home/runner/work/overdeck/overdeck\n[command]/usr/bin/git config --local --name-only --get-regexp core\\.sshCommand\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'core\\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp http\\.https\\:\\/\\/github\\.com\\/\\.extraheader\nhttp.https://github.com/.extraheader\n[command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'http\\.https\\:\\/\\/github\\.com\\/\\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\\.gitdir:\n[command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url\nCleaning up orphan processes\n##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-java@v4, actions/setup-node@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ]
 }
