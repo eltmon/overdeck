@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5649",
   "created": "2026-11-24T02:25:08.097Z",
-  "updated": "2026-11-24T02:32:38.550Z",
+  "updated": "2026-11-24T02:33:33.940Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -58,9 +58,18 @@
       "doneAt": "2026-11-24T02:32:34.355Z"
     },
     "wi3-wake-triggers": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5649",
-      "claimedAt": "2026-11-24T02:32:38.550Z"
+      "claimedAt": "2026-11-24T02:32:38.550Z",
+      "doneAt": "2026-11-24T02:33:33.940Z"
+    },
+    "wi3-wake-triggers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-24T02:33:33.940Z"
+    },
+    "wi3-wake-triggers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-24T02:33:33.940Z"
     }
   }
 }
