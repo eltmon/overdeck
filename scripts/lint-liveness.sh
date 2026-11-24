@@ -83,18 +83,21 @@ TMUX_PROBE_HEADER_2="# Lower with: bash scripts/lint-liveness.sh --update"
 # '../tmux.js', '../../../lib/tmux.js'), never '../terminal-backends/tmux.js'.
 TMUX_SPEC="['\"](\\.{1,2}/)+(lib/)?tmux\\.js['\"]"
 TMUX_PROBE_NAME='\bsessionExists(Sync)?\b'
-# Static import (aliases and multi-line lists included), a dynamic-import
-# destructure, a member read off a dynamic import, and the TmuxService member.
+# Static import (aliases and multi-line lists included), a namespace import, a
+# dynamic-import destructure, a member read off a dynamic import, and the
+# TmuxService member. A selected file with no non-comment line naming the probe
+# (a namespace import used for other calls, a comment) yields no row.
 TMUX_PROBE_IMPORT="import[[:space:]]*\\{[^}]*${TMUX_PROBE_NAME}[^}]*\\}[[:space:]]*from[[:space:]]*${TMUX_SPEC}"
 TMUX_PROBE_DYNAMIC="\\{[^}]*${TMUX_PROBE_NAME}[^}]*\\}[[:space:]]*=[[:space:]]*await[[:space:]]+import\\([[:space:]]*${TMUX_SPEC}"
 TMUX_PROBE_IMPORTED_MEMBER="import\\([[:space:]]*${TMUX_SPEC}[[:space:]]*\\)\\)[[:space:]]*\\.[[:space:]]*sessionExists(Sync)?\\b"
 TMUX_PROBE_MEMBER='\btmux\.sessionExists(Sync)?\b'
+TMUX_PROBE_NAMESPACE="import[[:space:]]*\\*[[:space:]]*as[[:space:]]+[A-Za-z_\$][A-Za-z0-9_\$]*[[:space:]]+from[[:space:]]*${TMUX_SPEC}"
 
 # The oracle itself and the module that defines the probe are not consumers.
 tmux_probe_files() {
   local root="$1"
   rg -l -U --multiline-dotall -g '*.ts' -g '*.tsx' -g '!*.test.ts' -g '!*.test.tsx' -g '!**/__tests__/**' \
-    -e "$TMUX_PROBE_IMPORT" -e "$TMUX_PROBE_DYNAMIC" -e "$TMUX_PROBE_IMPORTED_MEMBER" -e "$TMUX_PROBE_MEMBER" "$root" 2>/dev/null \
+    -e "$TMUX_PROBE_IMPORT" -e "$TMUX_PROBE_DYNAMIC" -e "$TMUX_PROBE_IMPORTED_MEMBER" -e "$TMUX_PROBE_MEMBER" -e "$TMUX_PROBE_NAMESPACE" "$root" 2>/dev/null \
     | grep -v -x -e "$root/lib/agents/liveness.ts" -e "$root/lib/tmux.ts" | sort || true
 }
 
@@ -105,7 +108,7 @@ tmux_probe_counts() {
   while IFS= read -r file; do
     [[ -z "$file" ]] && continue
     n=$(grep -E "$TMUX_PROBE_NAME" "$file" | grep -cvE '^[[:space:]]*(//|\*|/\*)' || true)
-    echo "${n:-0} $file"
+    if (( ${n:-0} > 0 )); then echo "$n $file"; fi
   done < <(tmux_probe_files "$root") | sort -k2
 }
 
@@ -232,17 +235,22 @@ if [[ "${1:-}" == "--self-test" ]]; then
   printf '%s\n' 'const alive = (id: string) => tmux.sessionExists(id);' > "$fixture_dir/src/lib/cloister/member.ts"
   printf '%s\n' "const live = await Effect.runPromise((await import('../tmux.js')).sessionExists(id));" > "$fixture_dir/src/lib/cloister/imported-member.ts"
   printf '%s\n' "import { sessionExists } from '../terminal-backends/tmux.js';" > "$fixture_dir/src/lib/cloister/adapter.ts"
+  printf '%s\n' "import * as legacyTmux from '../tmux.js';" 'const live = await Effect.runPromise(legacyTmux.sessionExists(id));' > "$fixture_dir/src/lib/cloister/namespace.ts"
+  printf '%s\n' '// Unlike tmux.sessionExists, this supports Herdr.' 'export const probe = 1;' > "$fixture_dir/src/lib/cloister/comment.ts"
+  printf '%s\n' "import * as tmuxLib from '../tmux.js';" 'await tmuxLib.killSession(id);' > "$fixture_dir/src/lib/cloister/namespace-other.ts"
   seeded_counts=$(tmux_probe_counts "$fixture_dir/src")
-  for form in static alias dynamic member imported-member; do
+  for form in static alias dynamic member imported-member namespace; do
     if ! grep -q "/$form.ts\$" <<< "$seeded_counts"; then
       echo "liveness self-test missed the seeded $form import of tmux sessionExists" >&2
       exit 2
     fi
   done
-  if grep -q '/adapter.ts$' <<< "$seeded_counts"; then
-    echo "liveness self-test flagged the terminal-backends tmux adapter, which is not src/lib/tmux.ts" >&2
-    exit 2
-  fi
+  for form in adapter comment namespace-other; do
+    if grep -q "/$form.ts\$" <<< "$seeded_counts"; then
+      echo "liveness self-test flagged the seeded $form file, which does not probe src/lib/tmux.ts sessionExists" >&2
+      exit 2
+    fi
+  done
   static_row=$(grep '/static.ts$' <<< "$seeded_counts")
   if [[ -z "$(tmux_probe_report "$seeded_counts" "")" ]] \
     || [[ -z "$(tmux_probe_report "$static_row" "0 ${static_row#* }")" ]] \

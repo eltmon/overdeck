@@ -300,6 +300,10 @@ export async function isAliveOnTmux(agentId: string, deps: LivenessAsyncDeps = {
   // A tmux error is indeterminate, never "no session" — same rule as the legacy check.
   if (session === 'error') return INDETERMINATE;
   const panes = await listPaneRows(agentId);
+  // PAN-5652 review: a session that exists always lists at least one pane (a
+  // dead one still lists, with pane_dead=1). `listPaneValues` folds a failed
+  // listing into [], so an empty list is a failed probe, never `pane-dead`.
+  if (panes.length === 0) return INDETERMINATE;
   const livePanes = panes.filter((pane) => !pane.dead);
   if (livePanes.length === 0) return { alive: false, reason: 'pane-dead' };
   const harness = readHarness(agentId);

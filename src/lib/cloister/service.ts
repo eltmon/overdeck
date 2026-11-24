@@ -297,6 +297,7 @@ export class CloisterService {
     try {
       if (existsSync(AGENTS_DIR)) {
         const { isRunning: isSpecialistRunning } = await import('./specialists.js');
+        const { specialistSessionState } = await import('./specialists-status.js');
         const entries = readdirSync(AGENTS_DIR, { withFileTypes: true });
         for (const entry of entries) {
           if (!entry.isDirectory()) continue;
@@ -313,9 +314,10 @@ export class CloisterService {
             // Check if the process is actually alive — if not, the state is stale from a crash.
             // For issue-scoped specialists, check the exact session instead of the legacy
             // project/type singleton lookup, which cannot represent PAN-754 session identity.
-            // PAN-5652: through the liveness oracle (tmux has-session misses Herdr agents).
+            // PAN-5652: through the liveness oracle (tmux has-session misses Herdr agents);
+            // only a confirmed stop resets the state.
             const stillRunning = parsed.issueId
-              ? !isConfirmedDead(await isAlive(entry.name))
+              ? (await specialistSessionState(entry.name)) !== 'stopped'
               : await isSpecialistRunning(parsed.specialistType, parsed.projectKey);
             if (!stillRunning) {
               saveAgentRuntimeState(entry.name, {
