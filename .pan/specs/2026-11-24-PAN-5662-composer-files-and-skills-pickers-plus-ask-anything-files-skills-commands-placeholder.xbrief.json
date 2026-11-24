@@ -1,0 +1,779 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-24T07:20:16Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5662: Composer: @ files and $ skills pickers, plus 'Ask anything. @ files, $ skills, / commands' placeholder",
+    "updated": "2026-11-24T07:25:01.534Z"
+  },
+  "plan": {
+    "id": "pan-5662",
+    "title": "Composer: @ files and $ skills pickers, plus 'Ask anything. @ files, $ skills, / commands' placeholder",
+    "status": "proposed",
+    "uid": "157d145a-f10c-428f-b00e-7b1a8dc04efb",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-24T07:20:16Z",
+    "updated": "2026-11-24T07:25:01.534Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5662",
+        "label": "PAN-5662",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5662.md",
+        "label": "PRD PAN-5662",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "composer",
+      "frontend",
+      "skills",
+      "explorer",
+      "harness-capabilities"
+    ],
+    "narratives": {
+      "Problem": "The conversation composer has only the / trigger. Typing @ or $ does nothing and the placeholder reads 'Message the agent…', so file references and skills are not discoverable from the conversation tab.",
+      "Proposal": "Generalize the existing slash menu into one shared trigger menu (TriggerMenu.tsx, composerTriggers.ts pure helpers, one keyboard hook). Add an @ File menu that searches the conversation's explorer root through the existing pan.explorerSearchFiles RPC (root taken from useConversationChangesContext) and inserts '@<root-relative path> ' at the caret. Add a $ Skill menu over the same GET /api/skills/overrides list, gated and formatted by a new harness capability skillMention ('slash' for Claude Code inserts '/<name> ', 'dollar' for Codex inserts '$<name> ', null elsewhere). @ and $ detection is caret-aware and opens from text changes; / keeps its keydown path but opens only at a word start. The default placeholder becomes 'Ask anything. @ files, $ skills, / commands', listing only supported triggers. Full detail and decisions D1-D13 in .pan/drafts/PAN-5662.md.",
+      "NonGoals": "- No server change: no new route, RPC method or file lister (reuse pan.explorerSearchFiles).\n- No @ paths relative to a cwd that is a subfolder of the explorer root; inserted paths are root-relative.\n- No quoting or escaping of file paths that contain whitespace.\n- No @ or $ menus in the Home composer, the subagent composer, or a conversation mounted outside a Stage (popout/drawer).\n- No change to which skills are listed (same GET /api/skills/overrides result and intercepted-name filter as PAN-5347); no skill pack skills.\n- No structured skill input for Codex app-server; Codex receives the text '$<name> '.\n- No folder rows in the @ menu; files only.\n- No change to the / menu's contents, grouping, ranking or Tab-closes behavior beyond the word-start rule.\n- No harness-name comparisons (harness === '<name>') in new code."
+    },
+    "autoDecisions": [
+      {
+        "summary": "D1: add capability skillMention: 'slash' | 'dollar' | null and keep skillSlashCommands unchanged.",
+        "rationale": "skillSlashCommands still gates the / menu Skills group, so the four existing 'Codex fetches nothing' tests stay valid unedited; a contract test asserts skillSlashCommands === (skillMention === 'slash') so they never diverge."
+      },
+      {
+        "summary": "D2: / opens its menu only at a word start (prompt start or after whitespace).",
+        "rationale": "Without it, typing a path inside an @ token (@src/comp) pops the slash menu; every existing / test types / at position 0, and a mid-word / (src/, and/or) is never a command."
+      },
+      {
+        "summary": "D3: @ and $ detection and insertion are caret-aware inside the caret's Lexical text node (spliceText); / keeps whole-text context and root-rebuild insertion.",
+        "rationale": "@/$ tokens contain no whitespace so they always lie in one text node; splicing keeps text after the caret and line breaks, while / behavior stays byte-identical."
+      },
+      {
+        "summary": "D4: @/$ menus open from text changes (open while a context exists and was not dismissed), not from keydown.",
+        "rationale": "AltGr layouts deliver @ with Ctrl+Alt set, which the existing / keydown filter rejects; change-driven opening is layout-independent."
+      },
+      {
+        "summary": "D5: a live @/$ context hides the / menu and disables its key handler.",
+        "rationale": "Only one menu may own the keyboard; the caret is inside the @/$ token, so that menu is the relevant one."
+      },
+      {
+        "summary": "D6: a $ context is valid only while its filter is empty or matches /^[a-z][a-z0-9._:-]*$/; skill rows match the name only.",
+        "rationale": "Reconciles requirement 5 ($ after whitespace is a trigger) with the AC that 'echo $HOME' shows no menu: the menu opens on '$' and closes on the uppercase 'H'; '$5' never qualifies."
+      },
+      {
+        "summary": "D7: Tab selects in @ and $ menus; Tab still closes the / menu.",
+        "rationale": "Requirement 1 asks for Tab select and requirement 3 keeps / unchanged; the shared key hook takes a tabSelects flag."
+      },
+      {
+        "summary": "D8: ComposerFooter passes fileRootId from useConversationChangesContext()?.rootId; outside a Stage there is no @ menu.",
+        "rationale": "Reuses the root the conversation panel already computes, adds no request, needs no QueryClientProvider in ComposerFooter tests, and respects PlainChangesScope's no-request design."
+      },
+      {
+        "summary": "D9: insert root-relative paths from explorerSearchFiles.",
+        "rationale": "For project and issue roots this is the repo-relative path the issue asks for; cwd-relative paths are a NonGoal."
+      },
+      {
+        "summary": "D10/D11: empty @ filter shows a non-selectable 'Type to search files' hint; searches request limit 20; Enter submits normally when no rows are shown.",
+        "rationale": "The server returns nothing for an empty query; Enter-only-with-rows matches the existing / menu rule."
+      },
+      {
+        "summary": "D12/D13: placeholder is composed from fileRootId, skill context + skillMention, and slashCommandsEnabled (never the fetched list); an explicit placeholder prop wins; skill rows are labelled with the exact inserted form.",
+        "rationale": "Keeps fetch-only-while-open (PAN-5347 NFR) and lets SubagentComposer keep its own text; the label shows the operator what will be inserted."
+      },
+      {
+        "summary": "Codex $<name> live delivery is an implementation checkpoint with a fixed fallback (keep inserting $<name>, file a follow-up for structured skill input).",
+        "rationale": "The issue mandates $<name> for Codex and it is Codex's documented mention syntax, but delivery over codex app-server has not been observed in this codebase."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "15 files across one subsystem (dashboard composer) plus the contracts capability and docs; the @ and $ menus share one menu, one key handler and one caret plumbing, so splitting into sibling issues would duplicate the shared-menu refactor.",
+      "canonicalFilename": "2026-11-24-PAN-5662-composer-files-and-skills-pickers-plus-ask-anything-files-skills-commands-placeholder.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "capability-skill-mention",
+        "title": "Declare the skillMention harness capability (slash for Claude Code, dollar for Codex, null elsewhere)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-24T07:20:16Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5662",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/harness-capabilities.ts",
+            "tests/unit/lib/harness-capability-contract.test.ts",
+            "configuration/harnesses.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/harness-capability-contract.test.ts packages/contracts/src/harness-behavior.test.ts",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "harness-capability-contract.test.ts and harness-behavior.test.ts pass, including the new 'composer skill mentions (PAN-5662)' describe block",
+            "lint:docs reports no problems"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In packages/contracts/src/harness-capabilities.ts add `export type HarnessSkillMention = \"slash\" | \"dollar\"` after HarnessConversationSkillApply (line 21); add `readonly skillMention: HarnessSkillMention | null` after `readonly skillSlashCommands: boolean` (line 74) with a doc comment; add \"skillMention\" after \"skillSlashCommands\" in HARNESS_CAPABILITY_KEYS; set skillMention: \"slash\" in CLAUDE_CODE_CAPABILITIES, \"dollar\" in CODEX_CAPABILITIES, null in OHMYPI, ACP, KIMI_CODE, OPENCODE, MUSE, PRIME_AGENT (do not touch the spreading PI/GROK/ANTIGRAVITY objects). Do not change skillSlashCommands anywhere. In tests/unit/lib/harness-capability-contract.test.ts add describe('composer skill mentions (PAN-5662)') with two tests: claude-code 'slash', codex 'dollar', and pi/ohmypi/acp/kimi-code/opencode/muse/prime-agent/grok/antigravity null; and for every getGlobalRegistry().getAll() runtime, capabilities.skillSlashCommands === (capabilities.skillMention === 'slash'). In configuration/harnesses.mdx add a `skillMention` row after the `skillSlashCommands` row (line 1472) of the capability table; keep every $ inside backticks. If root `npm run typecheck` cannot see the new field, rebuild contracts with `cd packages/contracts && npm run build`."
+        },
+        "items": [
+          {
+            "id": "capability-skill-mention.ac1",
+            "title": "Given the runtime registry, when reading capabilities.skillMention, then claude-code returns 'slash', codex returns 'dollar', and every other registered runtime returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "capability-skill-mention.ac2",
+            "title": "Given every registered runtime, the contract test asserts skillSlashCommands === (skillMention === 'slash') and passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "capability-skill-mention.ac3",
+            "title": "configuration/harnesses.mdx renders a `skillMention` row in the capability table describing slash, dollar and null, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "trigger-helpers",
+        "title": "Add pure composer trigger helpers (detection, insert text, row mapping, placeholder)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-24T07:20:16Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5662",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "shared-trigger-menu",
+            "file-mention-hook",
+            "at-files-menu",
+            "dollar-skills-menu",
+            "composer-placeholder"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/composerTriggers.ts",
+            "src/dashboard/frontend/src/components/chat/__tests__/composerTriggers.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/composerTriggers.test.ts"
+          ],
+          "expected_outputs": [
+            "composerTriggers.test.ts passes with every named case from PRD WI-2"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-10",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Create src/dashboard/frontend/src/components/chat/composerTriggers.ts with no React, Lexical or DOM imports, exporting exactly: ComposerTriggerChar, TriggerContext {char,index,filter}, isWordStart, slashTriggerContext(text) (last '/' at a word start over the whole text; filter = rest, may contain spaces), mentionTriggerContext(beforeCaret, '@'|'$') (trailing whitespace-free token starting with the char at a word start; '$' also requires isSkillFilter), isSkillFilter (empty or /^[a-z][a-z0-9._:-]*$/), fileMentionInsert(path) => `@${path} `, skillMentionInsert(name, form) => '/name ' or '$name ', toSkillMentionItems(skillCommands, form, filter) (name derived from label '/<name>', case-insensitive substring on the name only, label = insert.trimEnd(), id 'mention-<name>', category 'Skills'), toFileMentionItems(paths) (label baseName, description parentPath from ../explorer/tree/explorer-tree-model, insert fileMentionInsert, id 'file-<path>', category 'Files'), composerPromptHint({files,skills,commands}) ('Ask anything. ' + parts in order '@ files', '$ skills', '/ commands' joined by ', '; no parts => 'Ask anything'). Item type is the existing SlashCommand from ./slashCommandTypes; HarnessSkillMention comes from @overdeck/contracts. Write __tests__/composerTriggers.test.ts with every case listed in PRD WI-2."
+        },
+        "items": [
+          {
+            "id": "trigger-helpers.ac1",
+            "title": "mentionTriggerContext returns null for 'foo@bar.com' ('@'), 'echo $HOME', 'costs $5' and 'foo$bar' ('$'), and returns filter 'comp' for '@comp' and 'pan-fly' for '$pan-fly'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "trigger-helpers.ac2",
+            "title": "slashTriggerContext returns null for 'look at src/' and 'and/or', and returns filter 'pan work' for '/pan work'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "trigger-helpers.ac3",
+            "title": "skillMentionInsert('docx','slash') returns '/docx ' and skillMentionInsert('docx','dollar') returns '$docx '; toFileMentionItems maps 'src/a/Composer.tsx' to label 'Composer.tsx', description 'src/a', insert '@src/a/Composer.tsx '",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "trigger-helpers.ac4",
+            "title": "composerPromptHint returns 'Ask anything. @ files, $ skills, / commands' for all three triggers, 'Ask anything. @ files, / commands' without skills, and 'Ask anything' for none",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "shared-trigger-menu",
+        "title": "Extract the shared TriggerMenu and key hook, and move the / menu onto it with the word-start rule",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-24T07:20:16Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-5662",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "at-files-menu",
+            "dollar-skills-menu"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/TriggerMenu.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/TriggerMenu.test.tsx",
+            "src/dashboard/frontend/src/components/chat/ComposerPromptEditor.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/TriggerMenu.test.tsx src/components/chat/__tests__/ComposerPromptEditor.test.tsx src/components/chat/__tests__/ComposerPromptEditor.skills.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "TriggerMenu.test.tsx passes and the two existing ComposerPromptEditor test files pass with no edits",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Create chat/TriggerMenu.tsx exporting TriggerMenu({items, filter, selectedIndex, onSelect, onClose, anchorRect, ariaLabel, hint?}) (today's SlashMenu body minus filtering: category grouping, same CSS classes, click-outside close, scroll selected into view, role=listbox, aria-label from props; empty items render a listbox with one non-option div.slashMenuHint when hint is set, else null; each row button gets onMouseDown={(e) => e.preventDefault()} so a click never moves focus or the caret out of the editor before onSelect runs; move renderHighlightedText here), useTriggerMenuKeys({open,rowCount,selectedIndex,setSelectedIndex,onSelectIndex,onClose,tabSelects}) (the capture-phase document keydown effect from ComposerPromptEditor lines 506-535; Tab selects when tabSelects && rowCount>0, else closes), and caretAnchorRect(root) (the selection-rect-or-root-bounds logic from handleSlashKey). In ComposerPromptEditor.tsx keep filterCommands and the exported SlashMenu with identical props, now rendering TriggerMenu with ariaLabel 'Slash commands'; use useTriggerMenuKeys with tabSelects:false; replace the lastIndexOf('/') slashContext with slashTriggerContext(text) and the `t.includes('/')` pending check in handleChange with slashTriggerContext(t) !== null; keep handleSlashSelect's root-rebuild insertion. Add `.slashMenuHint { padding: 8px 12px; font-size: 12px; color: var(--muted-foreground); }` after .slashMenuDescription in command-deck.module.css. Do not edit ComposerPromptEditor.test.tsx or ComposerPromptEditor.skills.test.tsx in this item."
+        },
+        "items": [
+          {
+            "id": "shared-trigger-menu.ac1",
+            "title": "Given this item's commit, ComposerPromptEditor.test.tsx and ComposerPromptEditor.skills.test.tsx each passes with zero changes to either file (git diff on them is empty)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shared-trigger-menu.ac2",
+            "title": "TriggerMenu renders a listbox whose aria-label equals the ariaLabel prop, and with empty items and a hint renders the hint text and no role=option element",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shared-trigger-menu.ac3",
+            "title": "useTriggerMenuKeys calls onSelectIndex(0) on Tab when tabSelects is true and calls onClose on Tab when tabSelects is false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shared-trigger-menu.ac4",
+            "title": "ComposerPromptEditor.tsx no longer contains `text.lastIndexOf('/')` and imports slashTriggerContext from ./composerTriggers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "file-mention-hook",
+        "title": "Add useFileMentionItems: debounced explorerSearchFiles lookup for the @ menu",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-24T07:20:16Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5662",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/useFileMentionItems.ts",
+            "src/dashboard/frontend/src/components/chat/__tests__/useFileMentionItems.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/useFileMentionItems.test.ts"
+          ],
+          "expected_outputs": [
+            "useFileMentionItems.test.ts passes under vi.useFakeTimers()"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Create chat/useFileMentionItems.ts exporting FILE_MENTION_DEBOUNCE_MS = 120, FILE_MENTION_LIMIT = 20, and useFileMentionItems(rootId: string | null, filter: string | null): { items: SlashCommand[] }. Null filter, null rootId or empty filter => items [] and no request. Otherwise, 120 ms after the last filter change call searchFiles(rootId, filter, FILE_MENTION_LIMIT) from ../explorer/explorer-rpc; drop answers whose request sequence is not the latest; success => toFileMentionItems(result.paths); failure => [] and one console.warn('[fileMentions] search failed:', err) per hook instance; clear the timer on change and unmount. Tests mock ../explorer/explorer-rpc and MUST use vi.useFakeTimers() + vi.advanceTimersByTimeAsync() (repo rule: never real setTimeout in delay tests)."
+        },
+        "items": [
+          {
+            "id": "file-mention-hook.ac1",
+            "title": "Given filter changes 'c' -> 'co' -> 'comp' within 120 ms, searchFiles is called exactly once, with ('project:x', 'comp', 20), after advancing fake timers 120 ms",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "file-mention-hook.ac2",
+            "title": "Given an empty filter or a null rootId, searchFiles is never called and items is empty",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "file-mention-hook.ac3",
+            "title": "Given an older query resolves after a newer one, items reflects the newer query's paths; given a rejected search, items is empty",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "at-files-menu",
+        "title": "Wire the @ File menu into the composer with caret-aware detection and insertion",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-24T07:20:16Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5662",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "dollar-skills-menu"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ComposerPromptEditor.tsx",
+            "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ComposerPromptEditor.test.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ComposerPromptEditor.skills.test.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ComposerPromptEditor.files.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/ComposerPromptEditor.files.test.tsx src/components/chat/__tests__/ComposerPromptEditor.test.tsx src/components/chat/__tests__/ComposerPromptEditor.skills.test.tsx src/components/chat/__tests__/ComposerFooter.test.tsx",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "all four test files pass",
+            "typecheck completes without errors",
+            "file-size guard passes with ComposerFooter.tsx and ComposerPromptEditor.tsx at or under 1000 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-9",
+            "NFR-5",
+            "NFR-6"
+          ],
+          "parallelSafeReason": "It runs in its own slot once shared-trigger-menu and file-mention-hook land; the only later items touching ComposerPromptEditor.tsx (dollar-skills-menu, composer-placeholder) are blocked behind it by edges."
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Add prop `fileRootId?: string | null` to ComposerPromptEditorProps. In ComposerPlugin.handleChange compute beforeCaret via $getSelection/$isRangeSelection/sel.isCollapsed()/$isTextNode(anchor node) => node.getTextContent().slice(0, sel.anchor.offset), else null, and pass it as a second argument to onTextChange. In the component keep beforeCaret state; atContext = fileRootId ? mentionTriggerContext(beforeCaret ?? '', '@') : null; open while atContext exists and dismissed !== `@:${index}` (Escape and click-outside set dismissed). Items from useFileMentionItems(fileRootId ?? null, atOpen ? atContext.filter : null). Render TriggerMenu ariaLabel 'Files' with hint 'Type to search files' when the filter is empty; keys via useTriggerMenuKeys tabSelects:true; anchor via caretAnchorRect when the menu opens. Selection: in editor.update, verify the anchor text node's text slice [offset - (1+filter.length), offset) equals '@'+filter, then node.spliceText(start, 1+filter.length, item.insert, true). While the @ menu is open, do not render the slash menu and pass open:false to the slash key hook. In ComposerFooter.tsx import useConversationChangesContext and pass fileRootId={changesContext?.rootId ?? null} (growth <= 4 lines; no new fetch). In ComposerPromptEditor.test.tsx and ComposerPromptEditor.skills.test.tsx add only `$getSelection: () => null, $isRangeSelection: () => false, $isTextNode: () => false` to the vi.mock('lexical') factory. New ComposerPromptEditor.files.test.tsx with its own lexical mock (fake collapsed selection, fake text node with getTextContent and a spliceText spy) and vi.mock('../useFileMentionItems') returning fixed items; cover the cases in PRD WI-5."
+        },
+        "items": [
+          {
+            "id": "at-files-menu.ac1",
+            "title": "Given fileRootId 'project:overdeck' and caret text '@comp', the composer renders a listbox named 'Files' whose row shows 'ComposerPromptEditor.tsx' with description 'src/dashboard/frontend/src/components/chat'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "at-files-menu.ac2",
+            "title": "When Enter (and separately Tab) is pressed on that row, the caret text node's spliceText is called with (start, 5, '@src/dashboard/frontend/src/components/chat/ComposerPromptEditor.tsx ', true)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "at-files-menu.ac3",
+            "title": "Given caret text 'foo@bar.com', or '@comp' with no fileRootId, no 'Files' listbox renders; given '@' alone the hint 'Type to search files' renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "at-files-menu.ac4",
+            "title": "ComposerFooter passes fileRootId from useConversationChangesContext()?.rootId, and ComposerFooter.test.tsx passes with its fetch-call assertions unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "at-files-menu.ac5",
+            "title": "Given an isolated Playwright browser profile and a claude-code conversation tab with a project cwd, when the operator types '@comp', then the Files menu shows repo files, and Enter inserts '@src/…/Composer….tsx ' into the composer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "skill-mention-hook",
+        "title": "Add useSkillMentionCommands gated by the skillMention capability",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-24T07:20:16Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5662",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/skillSlashCommands.ts",
+            "src/dashboard/frontend/src/components/chat/__tests__/skillSlashCommands.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/skillSlashCommands.test.ts src/components/chat/__tests__/slashCommands.skills.test.ts"
+          ],
+          "expected_outputs": [
+            "skillSlashCommands.test.ts passes including the new useSkillMentionCommands block; slashCommands.skills.test.ts passes unedited"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-7",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. In chat/skillSlashCommands.ts move the body of useSkillSlashCommands into a non-exported useSkillCommandsFetch(enabled, context, active) with identical behavior; useSkillSlashCommands passes enabled = key !== '' && capabilities.skillSlashCommands (unchanged); add exported useSkillMentionCommands({harness, context, active}) passing enabled = key !== '' && capabilities.skillMention !== null. Update the module header comment for the $ menu (PAN-5662). In __tests__/skillSlashCommands.test.ts add only a new describe('useSkillMentionCommands (PAN-5662)') block: codex with a context fetches once when active turns true and returns the mapped list; pi never fetches and returns EMPTY_SKILL_COMMANDS; undefined context never fetches. Leave the existing describe blocks unedited."
+        },
+        "items": [
+          {
+            "id": "skill-mention-hook.ac1",
+            "title": "Given harness 'codex' and a conversation context, useSkillMentionCommands calls fetch once with '/api/skills/overrides?conversation=…' when active turns true and returns the mapped skill commands",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-mention-hook.ac2",
+            "title": "Given harness 'pi' or an undefined context, useSkillMentionCommands never calls fetch and returns the EMPTY_SKILL_COMMANDS reference",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-mention-hook.ac3",
+            "title": "The existing useSkillSlashCommands codex no-fetch test (skillSlashCommands.test.ts, 'never fetches … for an incapable harness') passes with its lines unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dollar-skills-menu",
+        "title": "Wire the $ Skill menu into the composer with the harness's skill mention form",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-24T07:20:16Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5662",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ComposerPromptEditor.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ComposerPromptEditor.skillMentions.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/ComposerPromptEditor.skillMentions.test.tsx src/components/chat/__tests__/ComposerPromptEditor.files.test.tsx src/components/chat/__tests__/ComposerPromptEditor.skills.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ComposerPromptEditor.skillMentions.test.tsx passes and the files/skills editor tests stay green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. In ComposerPromptEditor.tsx read skillMention = getHarnessBehavior(harness).capabilities.skillMention; dollarContext = skillContext && skillMention ? mentionTriggerContext(beforeCaret ?? '', '$') : null; open/dismiss exactly as the @ menu with key `$:<index>`; mentionSkills = useSkillMentionCommands({harness, context: skillContext, active: dollarOpen}); items = toSkillMentionItems(mentionSkills, skillMention, filter). Render TriggerMenu ariaLabel 'Skills' only when items exist; keys via useTriggerMenuKeys tabSelects:true; selection reuses the @ menu's caret splice with token '$'+filter. A live $ context hides the slash menu. New ComposerPromptEditor.skillMentions.test.tsx (fake caret text node, fetch stubbed via vi.stubGlobal) covering claude-code '/pan-flywheel ', codex '$pan-flywheel ', 'echo $HOME' and 'foo$bar' (no menu, no fetch), and pi (no menu, no fetch). Implementation checkpoint: in a live Codex conversation select a skill from the $ menu, send, and confirm in the transcript that Codex used the skill; record the result in the PR description. Fallback if not recognized: keep inserting '$<name> ' and file a follow-up issue for structured skill input over app-server; never change the insert form."
+        },
+        "items": [
+          {
+            "id": "dollar-skills-menu.ac1",
+            "title": "Given harness claude-code with a skill context and caret text '$', a listbox named 'Skills' renders row '/pan-flywheel', and Enter calls spliceText(start, 1, '/pan-flywheel ', true)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dollar-skills-menu.ac2",
+            "title": "Given harness codex with a skill context and caret text '$fly', the 'Skills' listbox renders row '$pan-flywheel' and Enter inserts '$pan-flywheel '",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dollar-skills-menu.ac3",
+            "title": "Given caret text 'echo $HOME' or 'foo$bar', or harness 'pi', no 'Skills' listbox renders and fetch is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dollar-skills-menu.ac4",
+            "title": "Given an isolated Playwright browser profile and a claude-code conversation tab, when the operator types '$', then the Skills menu shows the same enabled skills as the / menu's Skills group, and Enter inserts '/<skill> '",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "composer-placeholder",
+        "title": "Compose the default empty-state prompt text from supported triggers and register new frontend tests in the CI subset",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-24T07:20:16Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5662",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ComposerPromptEditor.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ComposerPromptEditor.promptHint.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/ComposerPromptEditor.promptHint.test.tsx src/components/chat/__tests__/ComposerPromptEditor.test.tsx",
+            "grep -c 'ComposerPromptEditor.promptHint.test.tsx' scripts/frontend-test-subset.txt"
+          ],
+          "expected_outputs": [
+            "ComposerPromptEditor.promptHint.test.tsx and existing ComposerPromptEditor.test.tsx pass",
+            "grep prints 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. Remove the 'Message the agent…' default from ComposerPromptEditor's placeholder prop; compute effectivePlaceholder = placeholder ?? composerPromptHint({ files: fileRootId != null, skills: skillContext !== undefined && skillMention !== null, commands: slashCommandsEnabled }) and use it for aria-placeholder and the placeholder div; update the file header comment. New ComposerPromptEditor.promptHint.test.tsx reads aria-placeholder on the mocked contenteditable: claude-code + skill context + fileRootId => 'Ask anything. @ files, $ skills, / commands'; same without fileRootId => 'Ask anything. $ skills, / commands'; pi + skill context + root => 'Ask anything. @ files, / commands'; explicit placeholder 'Message x…' wins. Add these six lines to scripts/frontend-test-subset.txt in sorted position: src/components/chat/__tests__/ComposerPromptEditor.files.test.tsx, src/components/chat/__tests__/ComposerPromptEditor.promptHint.test.tsx, src/components/chat/__tests__/ComposerPromptEditor.skillMentions.test.tsx, src/components/chat/__tests__/TriggerMenu.test.tsx, src/components/chat/__tests__/composerTriggers.test.ts, src/components/chat/__tests__/useFileMentionItems.test.ts. This item is the only one that edits frontend-test-subset.txt."
+        },
+        "items": [
+          {
+            "id": "composer-placeholder.ac1",
+            "title": "Given claude-code with a skill context and fileRootId and no explicit prompt-text prop, the contenteditable's empty-state hint attribute reads 'Ask anything. @ files, $ skills, / commands'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-placeholder.ac2",
+            "title": "Given no fileRootId the empty-state hint omits '@ files'; given harness pi it omits '$ skills'; given an explicit prop value 'Message x…' it renders 'Message x…'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-placeholder.ac3",
+            "title": "scripts/frontend-test-subset.txt contains each of the six new test paths exactly once, in sorted position",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-composer-triggers",
+        "title": "Document the composer triggers and add the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-24T07:20:16Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5662",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/conversations.mdx",
+            "configuration/harnesses.mdx",
+            "configuration/skills.mdx",
+            "docs/CONTEXT-LAYERS.md",
+            ".overdeck/context/codebase/architecture.md",
+            "changelog.d/pan-5662.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n '### Composer triggers' features/conversations.mdx",
+            "grep -c 'skillMention' configuration/harnesses.mdx"
+          ],
+          "expected_outputs": [
+            "lint:docs reports no problems",
+            "grep prints one line for the new section",
+            "grep -c prints 2"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "FR-6",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. Every $ must sit inside inline code or be written &#36; (lint:docs, Mintlify math). (1) features/conversations.mdx: insert '### Composer triggers' before '### Sending to a busy agent' (line 144): the placeholder lists supported triggers; `@` at a word start searches the conversation's project or workspace files and inserts `@<path>`; `$` picks an enabled skill, inserted as `/<skill-name>` on Claude Code and `$<skill-name>` on Codex; `/` for commands; arrows move, Enter or Tab inserts (Tab closes the `/` menu), Escape closes; a trigger inside a word (an email address, `$HOME`) opens nothing; no `@` menu for linked conversations, folders outside every project, or a conversation opened outside a project tab. (2) configuration/harnesses.mdx 'Composer commands across harnesses': after the Skills-group paragraph add one paragraph on the `$` menu (`skillMention`: `slash` Claude Code, `dollar` Codex) and the `@` menu (every harness). (3) configuration/skills.mdx '## In the composer' (line 147): add a paragraph on the `$` menu and its two insert forms. (4) docs/CONTEXT-LAYERS.md: after 'declare `skillSlashCommands`.' (~line 222) append 'The `$` menu (PAN-5662) uses the same request on harnesses that declare `skillMention`.' (5) .overdeck/context/codebase/architecture.md line 272: append the TriggerMenu/composerTriggers/skillMention sentence from PRD WI-9; leave the last-verified line unchanged. (6) changelog.d/pan-5662.md with '#### New' and the bullet from PRD WI-9 (dollar written &#36;)."
+        },
+        "items": [
+          {
+            "id": "docs-composer-triggers.ac1",
+            "title": "features/conversations.mdx contains a '### Composer triggers' section that names the `@`, `$` and `/` triggers and both skill insert forms (`/<skill-name>` and `$<skill-name>`)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-composer-triggers.ac2",
+            "title": "configuration/harnesses.mdx and configuration/skills.mdx each contains a paragraph on the `$` menu naming the `skillMention` slash and dollar insert forms, and docs/CONTEXT-LAYERS.md contains `skillMention`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-composer-triggers.ac3",
+            "title": "changelog.d/pan-5662.md exists with a single '#### New' section linking issue #5662, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "capability-skill-mention",
+        "to": "trigger-helpers",
+        "type": "blocks"
+      },
+      {
+        "from": "capability-skill-mention",
+        "to": "skill-mention-hook",
+        "type": "blocks"
+      },
+      {
+        "from": "capability-skill-mention",
+        "to": "docs-composer-triggers",
+        "type": "blocks"
+      },
+      {
+        "from": "trigger-helpers",
+        "to": "shared-trigger-menu",
+        "type": "blocks"
+      },
+      {
+        "from": "trigger-helpers",
+        "to": "file-mention-hook",
+        "type": "blocks"
+      },
+      {
+        "from": "shared-trigger-menu",
+        "to": "at-files-menu",
+        "type": "blocks"
+      },
+      {
+        "from": "file-mention-hook",
+        "to": "at-files-menu",
+        "type": "blocks"
+      },
+      {
+        "from": "at-files-menu",
+        "to": "dollar-skills-menu",
+        "type": "blocks"
+      },
+      {
+        "from": "skill-mention-hook",
+        "to": "dollar-skills-menu",
+        "type": "blocks"
+      },
+      {
+        "from": "dollar-skills-menu",
+        "to": "composer-placeholder",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
