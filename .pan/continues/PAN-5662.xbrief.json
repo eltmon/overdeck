@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5662",
   "created": "2026-11-24T07:26:43.859Z",
-  "updated": "2026-11-24T07:29:58.511Z",
+  "updated": "2026-11-24T07:30:05.872Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -48,6 +48,11 @@
     "trigger-helpers.ac4": {
       "status": "completed",
       "doneAt": "2026-11-24T07:29:58.511Z"
+    },
+    "skill-mention-hook": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5662",
+      "claimedAt": "2026-11-24T07:30:05.872Z"
     }
   }
 }
