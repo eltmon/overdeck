@@ -580,9 +580,21 @@ jobs:
       - name: Sync Capacitor (Android)
         run: npm --prefix apps/mobile run cap:sync -- android
 
+      # PAN-5654: Gradle fetches Robolectric's android-all jar (the setup-java Gradle
+      # cache restores it on later runs). One retry covers a transient error on a cold
+      # cache; the test step below is never retried.
+      - name: Fetch the Robolectric runtime
+        working-directory: apps/mobile/android
+        run: ./gradlew :app:fetchRobolectricRuntime --no-daemon || ./gradlew :app:fetchRobolectricRuntime --no-daemon
+
       - name: Android unit tests
         working-directory: apps/mobile/android
         run: ./gradlew testDebugUnitTest --no-daemon
+
+      # PAN-5654: Robolectric runs offline. If it fell back to its own download, it
+      # would have written this directory on the fresh runner.
+      - name: Check Robolectric ran offline
+        run: test ! -e "$HOME/.m2/repository/org/robolectric"
 
       - name: Assemble the debug APK
         working-directory: apps/mobile/android

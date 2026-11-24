@@ -6,6 +6,12 @@ def uploadStorePassword = System.getenv("OVERDECK_UPLOAD_STORE_PASSWORD")
 def uploadKeyAlias = System.getenv("OVERDECK_UPLOAD_KEY_ALIAS")
 def uploadKeyPassword = System.getenv("OVERDECK_UPLOAD_KEY_PASSWORD")
 
+// PAN-5654: Robolectric runs offline. These two versions move together: the android-all
+// version is the one robolectric's DefaultSdkProvider maps to SDK 35, the level the tests pin
+// with @Config(sdk = 35). A mismatch fails the tests with "Unable to locate dependency".
+def robolectricVersion = '4.15.1'
+def robolectricAndroidAllVersion = '15-robolectric-12650502-i7'
+
 android {
     namespace = "ai.overdeck.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -51,6 +57,10 @@ repositories {
     }
 }
 
+configurations {
+    robolectricRuntime { transitive = false }
+}
+
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
@@ -61,12 +71,27 @@ dependencies {
     implementation 'net.java.dev.jna:jna:5.14.0@aar'
     implementation "com.google.firebase:firebase-messaging:$firebaseMessagingVersion"
     testImplementation "junit:junit:$junitVersion"
-    testImplementation 'org.robolectric:robolectric:4.15.1'
+    testImplementation "org.robolectric:robolectric:$robolectricVersion"
+    robolectricRuntime "org.robolectric:android-all-instrumented:$robolectricAndroidAllVersion"
     testImplementation 'com.goterl:lazysodium-java:5.1.0'
     testImplementation 'net.java.dev.jna:jna:5.14.0'
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')
+}
+
+// PAN-5654: Gradle fetches Robolectric's android-all jar (cached in ~/.gradle, and by
+// setup-java's Gradle cache in CI), so a test run never downloads it through Robolectric's
+// own MavenArtifactFetcher.
+def robolectricDependencyDir = layout.buildDirectory.dir('robolectric-runtime').get().asFile
+def fetchRobolectricRuntime = tasks.register('fetchRobolectricRuntime', Sync) {
+    from configurations.robolectricRuntime
+    into robolectricDependencyDir
+}
+tasks.withType(Test).configureEach {
+    dependsOn fetchRobolectricRuntime
+    systemProperty 'robolectric.offline', 'true'
+    systemProperty 'robolectric.dependency.dir', robolectricDependencyDir.absolutePath
 }
 
 apply from: 'capacitor.build.gradle'
