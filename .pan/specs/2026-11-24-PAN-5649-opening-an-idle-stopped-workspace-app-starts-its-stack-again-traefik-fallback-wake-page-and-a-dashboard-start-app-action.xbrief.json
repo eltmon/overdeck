@@ -4,17 +4,17 @@
     "created": "2026-11-24T02:09:50Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5649: Opening an idle-stopped workspace app starts its stack again: Traefik fallback wake page and a dashboard start-app action",
-    "updated": "2026-11-24T02:23:34.897Z"
+    "updated": "2026-11-24T02:24:41.892Z"
   },
   "plan": {
     "id": "pan-5649",
     "title": "Opening an idle-stopped workspace app starts its stack again: Traefik fallback wake page and a dashboard start-app action",
-    "status": "proposed",
+    "status": "running",
     "uid": "fe1834f5-3c16-4e34-8e21-33d458415fff",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-24T02:09:50Z",
-    "updated": "2026-11-24T02:23:34.897Z",
+    "updated": "2026-11-24T02:24:41.892Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5649",
@@ -705,5 +705,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
