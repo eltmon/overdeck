@@ -4,17 +4,17 @@
     "created": "2026-11-24T00:21:13Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5654: mobile-android CI fails on PRs that touch no mobile code when Robolectric's runtime android-all download hits a network error",
-    "updated": "2026-11-24T00:32:37.589Z"
+    "updated": "2026-11-24T00:52:12.437Z"
   },
   "plan": {
     "id": "pan-5654",
     "title": "mobile-android CI fails on PRs that touch no mobile code when Robolectric's runtime android-all download hits a network error",
-    "status": "proposed",
+    "status": "running",
     "uid": "48f48e90-89ac-4d42-b99b-b71ec22f0b35",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-24T00:21:13Z",
-    "updated": "2026-11-24T00:32:37.589Z",
+    "updated": "2026-11-24T00:52:12.437Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5654",
@@ -258,5 +258,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
