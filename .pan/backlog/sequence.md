@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-24T04:09:37Z · model: claude-opus-5-5 · open: 957_
+_Last sequenced: 2026-11-24T07:28:01Z · model: claude-opus-5-5 · open: 960_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -9,6 +9,7 @@ _Last sequenced: 2026-11-24T04:09:37Z · model: claude-opus-5-5 · open: 957_
 | 1 | PAN-5638 | M | critical | ok |  |  | In pipeline. Polyrepo review verdicts refuse GitHub member PRs and the ready set ignores verdict markers; MIN-1142 can't merge |
 | 1 | PAN-5654 | S | high | ok |  |  | In pipeline. mobile-android CI goes red on non-mobile PRs when Robolectric android-all download fails; cache the jar. |
 | 1 | PAN-5657 | S | high | ok |  |  | In pipeline. 7 CodeRabbit findings on merged PAN-5652; 2 Major: failed pane listing reads as pane-dead, legacy tmux agents read as gone. |
+| 1 | PAN-5662 | M | medium | ok |  |  | In pipeline. Composer @ files and $ skills pickers plus an 'Ask anything' placeholder listing triggers; one shared trigger menu. |
 | 2 | PAN-5652 | M | critical | ok |  |  | Herdr agents fail tmux has-session checks, so polyrepo merge aborts on live agents (MIN-1144). Merge routes: TENET-10 handoff. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 4 | PAN-5430 | S | medium | ok |  |  | Markdown Preview prints raw HTML (README logo <div>/<picture>) as text; render it via rehype-raw + rehype-sanitize in doc previews. |
@@ -21,6 +22,7 @@ _Last sequenced: 2026-11-24T04:09:37Z · model: claude-opus-5-5 · open: 957_
 | 10 | PAN-5523 | S | high | ok |  |  | pan conversations move/heal send raw fetch with no token, so routes refuse with Missing origin; same fix pattern as in-pipeline PAN-5516. |
 | 10 | PAN-5625 | M | critical | ok |  |  | Approved green PR for new standalone project BT-1 sits 'held'; train never batches and per-PR scheduler defers forever. |
 | 10 | PAN-5641 | M | critical | ok |  | PAN-5637, PAN-5638 | Polyrepo UAT batch promote and train board read one PR from the non-git root, so no MYN batch can land; walk member repos. |
+| 10 | PAN-5663 | S | critical | ok |  |  | Close-out row 6 requires Overdeck's own CI job names from any project lacking main_verify_required_checks, so it never passes. |
 | 11 | PAN-4553 | S | critical | ok |  |  | Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges. |
 | 11 | PAN-5640 | S | high | needs-refinement |  | PAN-5637 | Overlaps PAN-5641 (derived state reads MRs at non-git polyrepo root); unique part: glab MR list omits head_pipeline, never green. |
 | 12 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
@@ -85,6 +87,7 @@ _Last sequenced: 2026-11-24T04:09:37Z · model: claude-opus-5-5 · open: 957_
 | 67 | PAN-2706 | M | high | needs-refinement |  |  | Ghost test sessions absorb every test dispatch |
 | 68 | PAN-5228 | S | high | ok |  |  | Advisory CodeRabbit journal entries land last and hide stalled reviews from recoverStalledReviews and other last-entry readers. |
 | 69 | PAN-4344 | S | high | ok |  |  | Registered projects lack the agent main-push guard; ship a pre-push hook so agents cannot push to main outside overdeck |
+| 69 | PAN-5661 | S | high | ok |  |  | Issue panel says 'Nothing needs you yet' while the Flywheel holds the issue as needs-you; read needsYouIssueIds in StatusNarrative. |
 | 70 | PAN-4550 | XS | medium | ok |  |  | Two unit tests read host state (DASHSCOPE_BASE_URL, git-ignored .map files), so pan release check reports false reds locally |
 | 71 | PAN-4566 | S | high | ok |  |  | A failed replayEvents leaves the coordinator un-bootstrapped; tab defers live events with no banner. PAN-4559 fallback has landed. |
 | 71 | PAN-5653 | S | high | ok |  |  | 3 CodeRabbit findings on merged PAN-5648; 2 Major: stack lock does not fence a stale holder, file-lock release can delete a new lock. |
@@ -981,6 +984,10 @@ Already in the pipeline, so pinned at rank 1. A flaky Robolectric runtime downlo
 
 New CodeRabbit follow-up on the merged PAN-5652 Herdr liveness fix, already in the pipeline, so pinned at rank 1. Two Major findings are liveness misreports in merge-ops and the cloister service, which is substrate hardening at the same tier as PAN-5653.
 
+### PAN-5662 (rank 1)
+
+New issue already in the pipeline, so it is pinned at rank 1 and not re-ranked. It is a discoverability feature: one shared trigger menu for /, @ and $ in the conversation composer, with harness-declared skill invocation forms.
+
 ### PAN-5652 (rank 2)
 
 New substrate bug: merge-ops.ts and several cloister modules test agent liveness with tmux has-session, which is always false on Herdr, the default backend. It failed the MIN-1144 polyrepo merge within 50 seconds while the agent was finishing the rebases, so it blocks polyrepo merges and sits beside the polyrepo merge cluster (PAN-5637, PAN-5638, PAN-5641) in a free rank slot. The fix routes these checks through liveness.ts and adds a ratchet; it touches merge routes, so it needs a supervised handoff.
@@ -1023,11 +1030,15 @@ Rank unchanged; PAN-5516 closed, so that dependency is removed.
 
 ### PAN-5625 (rank 10)
 
-New bug with live evidence: the merge train and the per-PR auto-merge scheduler each defer to the other, so an approved, green PR in a new standalone GitHub project never merges. That blocks the pipeline's final step for every newly registered project, so it ranks with the other merge-path blockers.
+New bug with live evidence: the merge train and the per-PR auto-merge scheduler each defer to the other, so an approved, green PR in a new standalone GitHub project never merges. That blocks the pipeline's final step for every newly registered project, so it ranks with the other merge-path blockers. A 2026-11-24 comment adds that a PR merged by hand outside the train never runs the post-merge lifecycle, leaving the issue stuck in review; scope grows but the rank holds.
 
 ### PAN-5641 (rank 10)
 
 New since the prior run. It is the last step before a polyrepo batch can merge: in-pipeline PAN-5637 and PAN-5638 fix admission and verdicts, but promote eligibility and the board still read one PR from the non-git MYN root. The fix site and the reuse of memberReposForProject are named, so it is ok and ranks just behind its in-pipeline siblings.
+
+### PAN-5663 (rank 10)
+
+New bug with a verified cause: DEFAULT_MAIN_VERIFY_REQUIRED_CHECKS in src/lib/lifecycle/dod-gate.ts holds Overdeck's job names, so pan close fails row 6 for every other project that has not set the list. It blocks the pipeline's final step for every newly registered project, with only a hand-edited projects.yaml workaround, so it ranks beside PAN-5625, which came out of the same BT-1 close-out.
 
 ### PAN-4553 (rank 11)
 
@@ -1277,14 +1288,6 @@ Synthesis fires 42s after spawn and mislabels reviewers-with-reports-on-disk as 
 
 Triage: verify whether a never-kicked-off test session can still absorb dispatch under the current liveness model. Rank held.
 
-### PAN-5228 (rank 68)
-
-New pipeline bug placed in a freed critical-tier slot. Reviews whose reviewers die after a CodeRabbit post are never re-dispatched, and PAN-5218 widened the masking.
-
-### PAN-4344 (rank 69)
-
-New issue from the Deft adoption PRD. Its dependency PAN-3308 has closed. The main-push guard exists only in the overdeck repo, so agents in other registered projects can still push to main, which is the PAN-2204 hazard class.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1292,10 +1295,10 @@ New issue from the Deft adoption PRD. Its dependency PAN-3308 has closed. The ma
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-24T04:09:37Z",
+  "generatedAt": "2026-11-24T07:28:01Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 957,
+  "openCount": 960,
   "nodes": [
     {
       "issue": "PAN-5637",
@@ -1346,6 +1349,19 @@ New issue from the Deft adoption PRD. Its dependency PAN-3308 has closed. The ma
       "dependsOn": [],
       "why": "In pipeline. 7 CodeRabbit findings on merged PAN-5652; 2 Major: failed pane listing reads as pane-dead, legacy tmux agents read as gone.",
       "rationale": "New CodeRabbit follow-up on the merged PAN-5652 Herdr liveness fix, already in the pipeline, so pinned at rank 1. Two Major findings are liveness misreports in merge-ops and the cloister service, which is substrate hardening at the same tier as PAN-5653.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5662",
+      "rank": 1,
+      "size": "M",
+      "importance": "medium",
+      "score": 62,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline. Composer @ files and $ skills pickers plus an 'Ask anything' placeholder listing triggers; one shared trigger menu.",
+      "rationale": "New issue already in the pipeline, so it is pinned at rank 1 and not re-ranked. It is a discoverability feature: one shared trigger menu for /, @ and $ in the conversation composer, with harness-declared skill invocation forms.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1488,7 +1504,7 @@ New issue from the Deft adoption PRD. Its dependency PAN-3308 has closed. The ma
       "condition": "ok",
       "dependsOn": [],
       "why": "Approved green PR for new standalone project BT-1 sits 'held'; train never batches and per-PR scheduler defers forever.",
-      "rationale": "New bug with live evidence: the merge train and the per-PR auto-merge scheduler each defer to the other, so an approved, green PR in a new standalone GitHub project never merges. That blocks the pipeline's final step for every newly registered project, so it ranks with the other merge-path blockers.",
+      "rationale": "New bug with live evidence: the merge train and the per-PR auto-merge scheduler each defer to the other, so an approved, green PR in a new standalone GitHub project never merges. That blocks the pipeline's final step for every newly registered project, so it ranks with the other merge-path blockers. A 2026-11-24 comment adds that a PR merged by hand outside the train never runs the post-merge lifecycle, leaving the issue stuck in review; scope grows but the rank holds.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1505,6 +1521,19 @@ New issue from the Deft adoption PRD. Its dependency PAN-3308 has closed. The ma
       ],
       "why": "Polyrepo UAT batch promote and train board read one PR from the non-git root, so no MYN batch can land; walk member repos.",
       "rationale": "New since the prior run. It is the last step before a polyrepo batch can merge: in-pipeline PAN-5637 and PAN-5638 fix admission and verdicts, but promote eligibility and the board still read one PR from the non-git MYN root. The fix site and the reuse of memberReposForProject are named, so it is ok and ranks just behind its in-pipeline siblings.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5663",
+      "rank": 10,
+      "size": "S",
+      "importance": "critical",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Close-out row 6 requires Overdeck's own CI job names from any project lacking main_verify_required_checks, so it never passes.",
+      "rationale": "New bug with a verified cause: DEFAULT_MAIN_VERIFY_REQUIRED_CHECKS in src/lib/lifecycle/dod-gate.ts holds Overdeck's job names, so pan close fails row 6 for every other project that has not set the list. It blocks the pipeline's final step for every newly registered project, with only a hand-edited projects.yaml workaround, so it ranks beside PAN-5625, which came out of the same BT-1 close-out.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2341,6 +2370,19 @@ New issue from the Deft adoption PRD. Its dependency PAN-3308 has closed. The ma
       "dependsOn": [],
       "why": "Registered projects lack the agent main-push guard; ship a pre-push hook so agents cannot push to main outside overdeck",
       "rationale": "New issue from the Deft adoption PRD. Its dependency PAN-3308 has closed. The main-push guard exists only in the overdeck repo, so agents in other registered projects can still push to main, which is the PAN-2204 hazard class.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5661",
+      "rank": 69,
+      "size": "S",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Issue panel says 'Nothing needs you yet' while the Flywheel holds the issue as needs-you; read needsYouIssueIds in StatusNarrative.",
+      "rationale": "New substrate-improvement bug with a clear root cause and fix: StatusNarrative.tsx derives needsYou from pipeline state only, so Flywheel needs-you items (already in the frontend as needsYouIssueIds) never reach the issue panel, and an unplanned idle issue reads as 'Planning what to build'. The label sets a high floor and it directly serves the operator's UI-discoverability priority, but it unblocks no other work, so it sits with the other high, small substrate bugs at rank 69.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -14677,6 +14719,20 @@ New issue from the Deft adoption PRD. Its dependency PAN-3308 has closed. The ma
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.7
+    },
+    {
+      "from": "PAN-5662",
+      "to": "PAN-660",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-5663",
+      "to": "PAN-5625",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
     },
     {
       "from": "PAN-750",
