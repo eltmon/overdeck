@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-24T01:03:45Z · model: claude-opus-5-5 · open: 956_
+_Last sequenced: 2026-11-24T01:34:10Z · model: claude-opus-5-5 · open: 956_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -201,7 +201,7 @@ _Last sequenced: 2026-11-24T01:03:45Z · model: claude-opus-5-5 · open: 956_
 | 179 | PAN-3307 | XS | high | ok |  |  | commitlint scope-enum lists 11 scopes, 14 real ones are missing, and it still names the removed beads scope — trains everyone to ignore it. |
 | 180 | PAN-5250 | M | high | ok |  |  | Idle workspace frontend and dev containers never stop while an agent lives; ~9 GB held by unviewed Vite containers. |
 | 181 | PAN-2642 | XL | high | ok | ✓ |  | Cost strategy: waste detection over budget policing |
-| 181 | PAN-5649 | M | medium | ok |  | PAN-5250 | Browser half of PAN-5250 restart-on-demand: Traefik fallback wake page and a dashboard start-app action for stopped stacks. |
+| 181 | PAN-5649 | M | medium | ok |  | PAN-5250 | Browser half of PAN-5250 restart-on-demand (wake page, start-app action); PAN-5250 merged, so it can start now. |
 | 182 | PAN-1868 | XS | high | ok |  |  | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
 | 183 | PAN-4847 | S | high | ok |  |  | Remote reap silently skips review request when a background writer dirties a tracked file; pipeline stalls at PR-open. |
 | 184 | PAN-1042 | S | high | ok |  |  | cost_events retention: 14 months of granular rows accumulating with ad-hoc partial deletions |
@@ -1291,7 +1291,7 @@ Found cutting v0.65.0: CI was green but the local release check failed on two ho
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-24T01:03:45Z",
+  "generatedAt": "2026-11-24T01:34:10Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 956,
@@ -3847,8 +3847,8 @@ Found cutting v0.65.0: CI was green but the local release check failed on two ho
       "dependsOn": [
         "PAN-5250"
       ],
-      "why": "Browser half of PAN-5250 restart-on-demand: Traefik fallback wake page and a dashboard start-app action for stopped stacks.",
-      "rationale": "New issue split from PAN-5250 during planning; it depends on PAN-5250's wake door, so it ranks directly behind it as medium-importance UI follow-up.",
+      "why": "Browser half of PAN-5250 restart-on-demand (wake page, start-app action); PAN-5250 merged, so it can start now.",
+      "rationale": "PAN-5250 merged on 2026-11-24, which clears this issue's only dependency; rank held directly behind it as medium-importance UI follow-up.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -14656,13 +14656,6 @@ Found cutting v0.65.0: CI was green but the local release check failed on two ho
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
-    },
-    {
-      "from": "PAN-5654",
-      "to": "PAN-5250",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.5
     },
     {
       "from": "PAN-750",
