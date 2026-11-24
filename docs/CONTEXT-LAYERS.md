@@ -219,7 +219,8 @@ states a launch of that conversation applies — its own cwd, issue, and
 per-conversation overrides — falling back to the `cwd`/`issue` query
 parameters for an agent session, which has no conversation row of its own.
 The dashboard composer's `/` menu uses this to list skills on harnesses that
-declare `skillSlashCommands`.
+declare `skillSlashCommands`. The `$` menu (PAN-5662) uses the same request
+on harnesses that declare `skillMention`.
 
 Each group header shows a `<on> on · <total>` count. Groups start
 collapsed, except a group holding a row with an explicit choice made in this

@@ -141,6 +141,26 @@ outside the repository, a click opens the file in your editor as before. The
 path that a Read, Write or Edit row shows when you expand it is plain text;
 the chip is in the tool's output.
 
+### Composer triggers
+
+The composer's placeholder lists the triggers the conversation supports, for
+example "Ask anything. @ files, &#36; skills, / commands".
+
+- Type `@` at the start of a word to search the files of the conversation's
+  project or workspace. Picking one inserts `@<path>`, with the path relative
+  to that project or workspace.
+- Type `$` at the start of a word to pick one of the conversation's enabled
+  skills. It is inserted the way the harness runs a skill: `/<skill-name>` on
+  Claude Code and `$<skill-name>` on Codex. Other harnesses show no `$` menu.
+- Type `/` at the start of a word for commands.
+
+Arrow keys move through a menu, Enter or Tab inserts the selected row, and
+Escape closes it. In the `/` menu, Tab closes the menu instead. A trigger
+inside a word opens nothing, so an email address, `src/`, or `$HOME` stays
+plain text. The `@` menu is not offered for a linked conversation, a
+conversation whose folder is outside every project, or a conversation opened
+outside a project tab.
+
 ### Sending to a busy agent
 
 The composer's **Send** menu sets how your next message reaches an agent that
