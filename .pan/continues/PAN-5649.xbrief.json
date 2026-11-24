@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5649",
   "created": "2026-11-24T02:25:08.097Z",
-  "updated": "2026-11-24T02:25:08.097Z",
+  "updated": "2026-11-24T02:31:01.712Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,30 @@
   "sessionHistory": [],
   "items": {
     "wi1-wake-host-lib": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5649",
-      "claimedAt": "2026-11-24T02:25:08.097Z"
+      "claimedAt": "2026-11-24T02:25:08.097Z",
+      "doneAt": "2026-11-24T02:31:01.712Z"
+    },
+    "wi1-wake-host-lib.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-24T02:31:01.712Z"
+    },
+    "wi1-wake-host-lib.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-24T02:31:01.712Z"
+    },
+    "wi1-wake-host-lib.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-24T02:31:01.712Z"
+    },
+    "wi1-wake-host-lib.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-24T02:31:01.712Z"
+    },
+    "wi1-wake-host-lib.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-24T02:31:01.712Z"
     }
   }
 }
