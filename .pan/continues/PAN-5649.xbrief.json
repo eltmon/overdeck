@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5649",
   "created": "2026-11-24T02:25:08.097Z",
-  "updated": "2026-11-24T03:36:53.995Z",
+  "updated": "2026-11-24T03:36:58.183Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -154,6 +154,11 @@
     "wi6-start-app-chip.ac4": {
       "status": "completed",
       "doneAt": "2026-11-24T03:36:53.995Z"
+    },
+    "wi8-docs-changelog": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5649",
+      "claimedAt": "2026-11-24T03:36:58.183Z"
     }
   }
 }
