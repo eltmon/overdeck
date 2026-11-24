@@ -320,6 +320,22 @@ describe('restore of recorded services and the wake door (PAN-5250)', () => {
     expect(result).toEqual({ kind: 'failed', error: `${FRONTEND}: boom`, failed: [FRONTEND] });
   });
 
+  it('a browser wake names its trigger in the activity entry (PAN-5649)', async () => {
+    const w = world([container(FRONTEND, 'exited')], { wakeableServices: () => WAKEABLE });
+    const result = await wakeWorkspaceStack({ issueId: ISSUE, workspacePath: workspace, trigger: 'browser' }, w.deps);
+    expect(result).toMatchObject({ kind: 'woken', started: [FRONTEND] });
+    const details = w.emitActivity.mock.calls.map(([entry]) => (entry as { details?: string }).details ?? '');
+    expect(details.some((text) => text.endsWith('(browser).'))).toBe(true);
+  });
+
+  it('a browser wake closes an idle reclaim with source stack-restore:browser (PAN-5649)', async () => {
+    idleReclaim([FRONTEND], ['frontend']);
+    const w = world([container(FRONTEND, 'exited')], { wakeableServices: () => WAKEABLE });
+    await wakeWorkspaceStack({ issueId: ISSUE, workspacePath: workspace, trigger: 'browser' }, w.deps);
+    expect(restored()).toHaveLength(1);
+    expect(restored()[0]).toMatchObject({ source: 'stack-restore:browser', data: expect.objectContaining({ trigger: 'browser' }) });
+  });
+
   it('wake returns no-stack for a missing workspace or no compose project', async () => {
     const w = world([], { wakeableServices: () => WAKEABLE });
     await expect(wakeWorkspaceStack({ issueId: ISSUE, workspacePath: join(workspace, 'gone'), trigger: 'operator' }, w.deps))
