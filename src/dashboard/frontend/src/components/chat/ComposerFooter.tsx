@@ -21,6 +21,7 @@ import type { LexicalEditor } from 'lexical';
 import { $createParagraphNode, $createTextNode, $getRoot } from 'lexical';
 import { ComposerPromptEditor, loadDraft } from './ComposerPromptEditor';
 import { skillContextForConversation } from './skillSlashCommands';
+import { useConversationChangesContext } from './conversationChanges/ConversationChangesScope';
 import { hasDragPaths, readDragPaths } from '../../lib/explorer-drag-paths';
 import { insertPathsIntoComposer } from './composerPathDrop';
 import { clearDraft } from '../../lib/composerDraft';
@@ -138,6 +139,7 @@ function ComposerFooterInput({
   const [harness, setHarness] = useState<Harness>(conversation.harness ?? 'claude-code');
   const [deliverAs, setDeliverAs] = useState<DeliverAs>('auto');
   const [compactPending, setCompactPending] = useState(false);
+  const fileRootId = useConversationChangesContext()?.rootId ?? null;
   // `sending`, pending attachments, and their upload pump live in the module-level
   // composerStore, keyed by conversation name (the same key drafts use). The
   // PAN-1591 Stage renders only the active pane, so switching conversations
@@ -793,6 +795,7 @@ function ComposerFooterInput({
           conversationName={conversation.name}
           harness={harness}
           skillContext={skillContextForConversation(conversation)}
+          fileRootId={fileRootId}
           disabled={isDisabled}
           onCommandKeyDown={handleCommandKey}
           editorRef={editorRef}
