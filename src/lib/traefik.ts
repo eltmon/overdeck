@@ -12,6 +12,7 @@ import { execSync } from 'child_process';
 import { TRAEFIK_DYNAMIC_DIR, TRAEFIK_CERTS_DIR, TRAEFIK_DIR, SYNC_SOURCES } from './paths.js';
 import { loadConfigSync } from './config.js';
 import { loadProjectsConfigSync } from './projects.js';
+import { renderWorkspaceWakeTraefikConfig, WORKSPACE_WAKE_DYNAMIC_FILE } from './workspace/workspace-wake-host.js';
 
 /**
 /**
@@ -74,6 +75,8 @@ export function generateOverdeckTraefikConfig(mode?: TraefikRenderMode): boolean
   mkdirSync(TRAEFIK_DYNAMIC_DIR, { recursive: true });
   const outputPath = join(TRAEFIK_DYNAMIC_DIR, 'overdeck.yml');
   writeFileSync(outputPath, content, 'utf-8');
+  // PAN-5649: the workspace wake router lives in its own dynamic file (mode-independent).
+  writeFileSync(join(TRAEFIK_DYNAMIC_DIR, WORKSPACE_WAKE_DYNAMIC_FILE), renderWorkspaceWakeTraefikConfig(config.dashboard.api_port), 'utf-8');
   return true;
 }
 
