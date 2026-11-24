@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-24T06:56:05Z · model: claude-opus-5-5 · open: 958_
+_Last sequenced: 2026-11-24T04:09:37Z · model: claude-opus-5-5 · open: 957_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -85,7 +85,6 @@ _Last sequenced: 2026-11-24T06:56:05Z · model: claude-opus-5-5 · open: 958_
 | 67 | PAN-2706 | M | high | needs-refinement |  |  | Ghost test sessions absorb every test dispatch |
 | 68 | PAN-5228 | S | high | ok |  |  | Advisory CodeRabbit journal entries land last and hide stalled reviews from recoverStalledReviews and other last-entry readers. |
 | 69 | PAN-4344 | S | high | ok |  |  | Registered projects lack the agent main-push guard; ship a pre-push hook so agents cannot push to main outside overdeck |
-| 69 | PAN-5661 | S | high | ok |  |  | Issue panel says 'Nothing needs you yet' while the Flywheel holds the issue as needs-you; read needsYouIssueIds in StatusNarrative. |
 | 70 | PAN-4550 | XS | medium | ok |  |  | Two unit tests read host state (DASHSCOPE_BASE_URL, git-ignored .map files), so pan release check reports false reds locally |
 | 71 | PAN-4566 | S | high | ok |  |  | A failed replayEvents leaves the coordinator un-bootstrapped; tab defers live events with no banner. PAN-4559 fallback has landed. |
 | 71 | PAN-5653 | S | high | ok |  |  | 3 CodeRabbit findings on merged PAN-5648; 2 Major: stack lock does not fence a stale holder, file-lock release can delete a new lock. |
@@ -1293,10 +1292,10 @@ New issue from the Deft adoption PRD. Its dependency PAN-3308 has closed. The ma
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-24T06:56:05Z",
+  "generatedAt": "2026-11-24T04:09:37Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 958,
+  "openCount": 957,
   "nodes": [
     {
       "issue": "PAN-5637",
@@ -2342,19 +2341,6 @@ New issue from the Deft adoption PRD. Its dependency PAN-3308 has closed. The ma
       "dependsOn": [],
       "why": "Registered projects lack the agent main-push guard; ship a pre-push hook so agents cannot push to main outside overdeck",
       "rationale": "New issue from the Deft adoption PRD. Its dependency PAN-3308 has closed. The main-push guard exists only in the overdeck repo, so agents in other registered projects can still push to main, which is the PAN-2204 hazard class.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5661",
-      "rank": 69,
-      "size": "S",
-      "importance": "high",
-      "score": 72,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Issue panel says 'Nothing needs you yet' while the Flywheel holds the issue as needs-you; read needsYouIssueIds in StatusNarrative.",
-      "rationale": "New substrate-improvement bug with a clear root cause and fix: StatusNarrative.tsx derives needsYou from pipeline state only, so Flywheel needs-you items (already in the frontend as needsYouIssueIds) never reach the issue panel, and an unplanned idle issue reads as 'Planning what to build'. The label sets a high floor and it directly serves the operator's UI-discoverability priority, but it unblocks no other work, so it sits with the other high, small substrate bugs at rank 69.",
       "gate": "auto",
       "planning": "auto"
     },
