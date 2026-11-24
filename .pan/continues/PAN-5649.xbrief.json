@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5649",
+  "created": "2026-11-24T02:25:08.097Z",
+  "updated": "2026-11-24T02:25:08.097Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "wi1-wake-host-lib": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5649",
+      "claimedAt": "2026-11-24T02:25:08.097Z"
+    }
+  }
+}
