@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5649",
   "created": "2026-11-24T02:25:08.097Z",
-  "updated": "2026-11-24T02:33:33.940Z",
+  "updated": "2026-11-24T02:33:45.576Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -70,6 +70,11 @@
     "wi3-wake-triggers.ac2": {
       "status": "completed",
       "doneAt": "2026-11-24T02:33:33.940Z"
+    },
+    "wi5-idle-text": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5649",
+      "claimedAt": "2026-11-24T02:33:45.576Z"
     }
   }
 }
