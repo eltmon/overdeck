@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5654",
   "created": "2026-11-24T00:52:28.291Z",
-  "updated": "2026-11-24T00:58:18.303Z",
+  "updated": "2026-11-24T00:59:10.384Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,9 +50,18 @@
       "doneAt": "2026-11-24T00:58:09.077Z"
     },
     "docs-mobile-readme-offline-robolectric": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5654",
-      "claimedAt": "2026-11-24T00:58:18.303Z"
+      "claimedAt": "2026-11-24T00:58:18.303Z",
+      "doneAt": "2026-11-24T00:59:10.383Z"
+    },
+    "docs-mobile-readme-offline-robolectric.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-24T00:59:10.383Z"
+    },
+    "docs-mobile-readme-offline-robolectric.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-24T00:59:10.383Z"
     }
   }
 }
