@@ -625,37 +625,57 @@ already queued, without killing them:
   delivery guarantee). Detection never changes an admission decision — it only
   reads the queue `fitsAloneAboveHardReserve` already computes. Freeing the
   memory a starved queue waits on is the stack reclaim below.
-- **Stack reclaim (PAN-5623).** While a starvation episode is open and its
-  head still cannot start alone above the hard reserve, the primary
-  dashboard's 30 s poll (`services/stack-reclaim-service.ts`) stops the
-  workspace stack containers of one parked issue. Only the services `api`,
-  `fe`, `frontend` and `server` are reclaimable; `dev`, databases and caches
-  are never stopped, and a container belongs to an issue only through its
-  exact `com.docker.compose.project` label. An issue is a candidate only when
-  all of these hold: a non-main workspace of a registered project whose
+- **Stack reclaim (PAN-5623, follow-up PAN-5648).** While a starvation episode
+  is open and its head still cannot start alone above the hard reserve, the
+  primary dashboard's 30 s poll (`services/stack-reclaim-service.ts`) stops
+  the workspace stack containers of one parked issue. Only the services
+  `api`, `fe`, `frontend` and `server` are reclaimable; `dev`, databases and
+  caches are never stopped, and a container belongs to an issue only through
+  its exact `com.docker.compose.project` label. An issue is a candidate only
+  when all of these hold: a non-main workspace of a registered project whose
   directory exists; at least one running reclaimable container in its compose
   project; no gate-queue owner or waiter for the issue or its workspace path;
-  no active verification worker and no owed verification dispatch; not already
-  reclaimed in this episode; every live pane of the issue (review panes
-  ignored) is an idle `work` pane at a turn boundary; and the issue is parked,
-  meaning an unresolved `blocked.declared` or a merge gate that answers
-  `ready` (approval alone is not enough: green checks, mergeability and the
-  UAT policy must also pass). The poll stops at most one issue, the one with
-  the most container memory (ties by issue id), and at most once per issue per
-  episode. Inside the per-workspace stack lock
-  (`<workspace>/.overdeck/stack-reclaim.lock`) it re-checks every fact from
-  fresh reads, journals `stack.reclaimed` naming the containers and their ids,
-  reads the entry back, and only then runs `docker stop <id>`, so a crash
-  never leaves stopped containers with no record. The stack starts again
+  no active verification worker and no owed verification dispatch; not
+  already reclaimed in this episode, and any open reclaim from an earlier
+  episode has every container it named running again — one still naming a
+  stopped container is not a candidate, so an overlapping reclaim can never
+  stop containers a still-open reclaim is tracking and lose them; every live
+  pane of the issue (review panes ignored) is a known-idle `work` pane at a
+  turn boundary (`idle`, `done` or `exited` — not `idle` alone, since Herdr
+  reports a parked agent as `done`); and
+  the issue is parked, meaning an unresolved `blocked.declared` or a merge
+  gate that answers `ready` (approval alone is not enough: green checks,
+  mergeability and the UAT policy must also pass). The poll ranks every
+  candidate by container memory (ties by issue id) and picks the first that
+  is parked: a pending blocker declaration is free to check and selects
+  immediately for any ranked candidate, but the merge gate itself — a network
+  call — is asked for at most the three largest candidates without one per
+  poll, so a blocked candidate ranked below that budget is never starved by
+  candidates ahead of it that were never parked. The poll stops at most one
+  issue, and at most once per issue per episode. Inside the per-workspace
+  stack lock (`<workspace>/.overdeck/stack-reclaim.lock`) it re-checks every
+  fact from fresh reads, journals `stack.reclaimed` naming the containers and
+  their ids, reads the entry back, and only then runs `docker stop <id>`, so a
+  crash never leaves stopped containers with no record. While a holder runs
+  inside the lock it re-touches the lock file every 60 s, so a reclaim or
+  restore that runs close to the lock's 5-minute stale threshold is never
+  mistaken for a crashed holder and reclaimed out from under it; release
+  removes the lock file only when its content still matches the token this
+  acquisition wrote, so a holder whose lock was already reclaimed as stale
+  never deletes a lock another process now owns. The stack starts again
   (`restoreReclaimedStack`, `workspace/stack-restore.ts`) when the issue next
   needs it, through one of three triggers (`turn`, `spawn`, `verification`):
   a non-review pane is working or mid-turn (the 5 s restore poll),
   an agent is spawned for it (the spawn gate and the dashboard spawn route,
   before their health reads), or its verification starts. A failed
   `docker start` journals nothing, and the turn trigger retries it no sooner
-  than 60 s later. `pan status` prints "stopped to free memory" for such a
-  stack instead of STACK BROKEN, while gating health reads stay strict. To
-  start one by hand: `docker start <names>` (the activity entry prints the
+  than 60 s after that failed attempt itself returns (not 60 s after the poll
+  that triggered it, so a slow attempt cannot be retried early). `pan status`
+  prints "stopped to free memory" for such a stack instead of STACK BROKEN
+  while gating health reads stay strict, and when no agent runs for the
+  issue it lists the stack under a "Stacks Stopped To Free Memory" section
+  instead of leaving it out of both that section and Broken Workspace Stacks.
+  To start one by hand: `docker start <names>` (the activity entry prints the
   exact command).
 - **Admitted past CPU pressure (PAN-5520, PAN-5588).** CPU contention slows a
   gate down but does not break it, so the CPU wait has a bound,

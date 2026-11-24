@@ -24,6 +24,7 @@ const {
   reclaimedInEpisode,
   pipelineJournalPath,
   readPipelineJournal,
+  tryReadPipelineJournal,
 } = await import('../pipeline-journal.js');
 
 let workspace: string;
@@ -119,6 +120,20 @@ describe('readPipelineJournal', () => {
     }
     expect(readPipelineJournal(workspace, { limit: 2 }).map((e) => e.type))
       .toEqual(['review.dispatched', 'review.verdict']);
+  });
+});
+
+describe('tryReadPipelineJournal (PAN-5648 journal-read-null.ac1)', () => {
+  it('returns null when the journal path is a directory, but readPipelineJournal falls back to []', () => {
+    mkdirSync(pipelineJournalPath(workspace), { recursive: true });
+
+    expect(tryReadPipelineJournal(workspace)).toBeNull();
+    expect(readPipelineJournal(workspace)).toEqual([]);
+  });
+
+  it('returns [] from both when the journal is simply missing', () => {
+    expect(tryReadPipelineJournal(workspace)).toEqual([]);
+    expect(readPipelineJournal(workspace)).toEqual([]);
   });
 });
 

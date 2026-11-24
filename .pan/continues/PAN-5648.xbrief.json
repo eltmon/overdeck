@@ -1,0 +1,207 @@
+{
+  "version": "1",
+  "issueId": "PAN-5648",
+  "created": "2026-11-23T23:03:53.057Z",
+  "updated": "2026-11-23T23:44:20.632Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "journal-read-null": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5648",
+      "claimedAt": "2026-11-23T23:03:53.057Z",
+      "doneAt": "2026-11-23T23:08:45.632Z"
+    },
+    "journal-read-null.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:08:45.632Z"
+    },
+    "journal-read-null.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:08:45.632Z"
+    },
+    "journal-read-null.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:08:45.632Z"
+    },
+    "journal-read-null.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:08:45.632Z"
+    },
+    "skip-open-reclaim": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5648",
+      "claimedAt": "2026-11-23T23:08:53.133Z",
+      "doneAt": "2026-11-23T23:11:58.731Z"
+    },
+    "skip-open-reclaim.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:11:58.731Z"
+    },
+    "skip-open-reclaim.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:11:58.731Z"
+    },
+    "skip-open-reclaim.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:11:58.731Z"
+    },
+    "blocker-scan-all": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5648",
+      "claimedAt": "2026-11-23T23:12:07.256Z",
+      "doneAt": "2026-11-23T23:14:59.757Z"
+    },
+    "blocker-scan-all.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:14:59.757Z"
+    },
+    "blocker-scan-all.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:14:59.757Z"
+    },
+    "retry-after-failure": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5648",
+      "claimedAt": "2026-11-23T23:15:06.819Z",
+      "doneAt": "2026-11-23T23:17:41.956Z"
+    },
+    "retry-after-failure.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:17:41.956Z"
+    },
+    "retry-after-failure.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:17:41.956Z"
+    },
+    "journal-tail-filter": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5648",
+      "claimedAt": "2026-11-23T23:17:49.300Z",
+      "doneAt": "2026-11-23T23:20:35.328Z"
+    },
+    "journal-tail-filter.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:20:35.328Z"
+    },
+    "journal-tail-filter.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:20:35.328Z"
+    },
+    "file-lock-owner": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5648",
+      "claimedAt": "2026-11-23T23:20:42.472Z",
+      "doneAt": "2026-11-23T23:24:07.816Z"
+    },
+    "file-lock-owner.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:24:07.816Z"
+    },
+    "file-lock-owner.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:24:07.816Z"
+    },
+    "file-lock-owner.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:24:07.816Z"
+    },
+    "stack-lock-renew": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5648",
+      "claimedAt": "2026-11-23T23:24:14.958Z",
+      "doneAt": "2026-11-23T23:27:33.747Z"
+    },
+    "stack-lock-renew.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:27:33.747Z"
+    },
+    "stack-lock-renew.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:27:33.747Z"
+    },
+    "stack-lock-renew.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:27:33.747Z"
+    },
+    "restore-refresh-snapshot": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5648",
+      "claimedAt": "2026-11-23T23:27:41.985Z",
+      "doneAt": "2026-11-23T23:36:16.324Z"
+    },
+    "restore-refresh-snapshot.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:36:16.324Z"
+    },
+    "restore-refresh-snapshot.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:36:16.324Z"
+    },
+    "restore-refresh-snapshot.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:36:16.324Z"
+    },
+    "restore-refresh-snapshot.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:36:16.324Z"
+    },
+    "restore-refresh-snapshot.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:36:16.324Z"
+    },
+    "status-reclaimed-no-agent": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5648",
+      "claimedAt": "2026-11-23T23:36:24.098Z",
+      "doneAt": "2026-11-23T23:39:13.965Z"
+    },
+    "status-reclaimed-no-agent.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:39:13.965Z"
+    },
+    "status-reclaimed-no-agent.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:39:13.965Z"
+    },
+    "pane-known-idle": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5648",
+      "claimedAt": "2026-11-23T23:39:22.311Z",
+      "doneAt": "2026-11-23T23:42:20.028Z"
+    },
+    "pane-known-idle.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:42:20.028Z"
+    },
+    "pane-known-idle.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:42:20.028Z"
+    },
+    "pane-known-idle.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:42:20.028Z"
+    },
+    "docs-pipeline-gates": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5648",
+      "claimedAt": "2026-11-23T23:42:29.098Z",
+      "doneAt": "2026-11-23T23:44:20.632Z"
+    },
+    "docs-pipeline-gates.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:44:20.632Z"
+    },
+    "docs-pipeline-gates.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:44:20.632Z"
+    },
+    "docs-pipeline-gates.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-23T23:44:20.632Z"
+    }
+  }
+}
