@@ -307,6 +307,20 @@ type MentionChar = '@' | '$';
 
 const NO_MENTION_ITEMS: SlashCommand[] = [];
 
+/** Stable trigger lists, so handleChange keeps its identity across renders. */
+const MENTION_CHARS: Record<'none' | 'files' | 'skills' | 'both', readonly MentionChar[]> = {
+  none: [],
+  files: ['@'],
+  skills: ['$'],
+  both: ['@', '$'],
+};
+
+function mentionCharsFor(files: boolean, skills: boolean): readonly MentionChar[] {
+  if (files && skills) return MENTION_CHARS.both;
+  if (files) return MENTION_CHARS.files;
+  return skills ? MENTION_CHARS.skills : MENTION_CHARS.none;
+}
+
 /** The live @ or $ token before the caret, among the triggers this composer offers. */
 function mentionContextFor(beforeCaret: string | null, chars: readonly MentionChar[]): TriggerContext | null {
   if (beforeCaret === null) return null;
@@ -358,10 +372,7 @@ export function ComposerPromptEditor({
     skills: skillMentionsEnabled,
     commands: slashCommandsEnabled,
   });
-  const mentionChars = useMemo<readonly MentionChar[]>(
-    () => [...(fileRootId ? (['@'] as const) : []), ...(skillMentionsEnabled ? (['$'] as const) : [])],
-    [fileRootId, skillMentionsEnabled],
-  );
+  const mentionChars = mentionCharsFor(Boolean(fileRootId), skillMentionsEnabled);
   const [beforeCaret, setBeforeCaret] = useState<string | null>(null);
   const [dismissedMention, setDismissedMention] = useState<string | null>(null);
   const [mentionSelectedIndex, setMentionSelectedIndex] = useState(0);
@@ -410,7 +421,7 @@ export function ComposerPromptEditor({
       lastTextRef.current = t;
       onChange?.(t);
     },
-    [onChange, mentionChars],
+    [onChange, mentionChars, setDismissedMention, setMentionSelectedIndex],
   );
 
   const slashContext = useMemo(() => slashTriggerContext(text), [text]);
@@ -474,7 +485,7 @@ export function ComposerPromptEditor({
     setSelectedIndex(0);
   }, [slashContext?.filter]);
 
-  const mentionContext = useMemo(() => mentionContextFor(beforeCaret, mentionChars), [beforeCaret, mentionChars]);
+  const mentionContext = mentionContextFor(beforeCaret, mentionChars);
   const mentionOpen = mentionContext !== null && dismissedMention !== mentionKey(mentionContext);
   const { items: fileItems } = useFileMentionItems(
     fileRootId ?? null,
@@ -485,44 +496,37 @@ export function ComposerPromptEditor({
     context: skillContext,
     active: mentionOpen && mentionContext.char === '$',
   });
-  const skillItems = useMemo(
-    () => (mentionContext?.char === '$' && skillMention ? toSkillMentionItems(mentionSkills, skillMention, mentionContext.filter) : NO_MENTION_ITEMS),
-    [mentionContext, mentionSkills, skillMention],
-  );
+  const skillItems = mentionContext?.char === '$' && skillMention
+    ? toSkillMentionItems(mentionSkills, skillMention, mentionContext.filter)
+    : NO_MENTION_ITEMS;
   const mentionItems = mentionContext?.char === '@' ? fileItems : mentionContext?.char === '$' ? skillItems : NO_MENTION_ITEMS;
   const mentionHint = mentionContext?.char === '@' && mentionContext.filter === '' ? 'Type to search files' : undefined;
   // Keys are captured only while a menu is on screen: a $ token matching no skill shows nothing and leaves keys alone.
   const mentionVisible = mentionOpen && (mentionItems.length > 0 || mentionHint !== undefined);
 
-  const handleMentionSelect = useCallback(
-    (item: SlashCommand) => {
-      const editor = internalEditorRef.current;
-      if (!mentionContext || !editor) return;
-      const token = mentionContext.char + mentionContext.filter;
-      editor.update(() => {
-        const selection = $getSelection();
-        if (!$isRangeSelection(selection) || !selection.isCollapsed()) return;
-        const node = selection.anchor.getNode();
-        if (!$isTextNode(node)) return;
-        const offset = selection.anchor.offset;
-        const start = offset - token.length;
-        if (start < 0 || node.getTextContent().slice(start, offset) !== token) return;
-        node.spliceText(start, token.length, item.insert, true);
-      });
-      setMentionSelectedIndex(0);
-    },
-    [mentionContext],
-  );
-  const handleMentionSelectIndex = useCallback(
-    (index: number) => {
-      const item = mentionItems[index];
-      if (item) handleMentionSelect(item);
-    },
-    [mentionItems, handleMentionSelect],
-  );
-  const handleMentionClose = useCallback(() => {
+  const handleMentionSelect = (item: SlashCommand) => {
+    const editor = internalEditorRef.current;
+    if (!mentionContext || !editor) return;
+    const token = mentionContext.char + mentionContext.filter;
+    editor.update(() => {
+      const selection = $getSelection();
+      if (!$isRangeSelection(selection) || !selection.isCollapsed()) return;
+      const node = selection.anchor.getNode();
+      if (!$isTextNode(node)) return;
+      const offset = selection.anchor.offset;
+      const start = offset - token.length;
+      if (start < 0 || node.getTextContent().slice(start, offset) !== token) return;
+      node.spliceText(start, token.length, item.insert, true);
+    });
+    setMentionSelectedIndex(0);
+  };
+  const handleMentionSelectIndex = (index: number) => {
+    const item = mentionItems[index];
+    if (item) handleMentionSelect(item);
+  };
+  const handleMentionClose = () => {
     setDismissedMention(mentionKey(mentionContext));
-  }, [mentionContext]);
+  };
 
   useTriggerMenuKeys({
     open: mentionVisible,
@@ -536,13 +540,10 @@ export function ComposerPromptEditor({
 
   // A live @/$ token wins over the / menu (PAN-5662 D5): `/review @fi` shows files.
   const isSlashMenuVisible = isSlashMenuOpen && slashContext !== null && mentionContext === null;
-  const handleSlashSelectIndex = useCallback(
-    (index: number) => {
-      const command = filteredCommands[index];
-      if (command) handleSlashSelect(command);
-    },
-    [filteredCommands, handleSlashSelect],
-  );
+  const handleSlashSelectIndex = (index: number) => {
+    const command = filteredCommands[index];
+    if (command) handleSlashSelect(command);
+  };
 
   useTriggerMenuKeys({
     open: isSlashMenuVisible,
