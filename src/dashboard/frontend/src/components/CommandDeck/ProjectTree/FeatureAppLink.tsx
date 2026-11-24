@@ -60,6 +60,30 @@ export function FeatureAppLink({ issueId, frontendUrl, summary, stackHealth }: {
   );
 }
 
+type WakeOutcome = { ok: true; started: string[] } | { ok: false; error: string };
+
+/**
+ * POSTs the wake route and never rejects. Kept outside the component: the React
+ * Compiler cannot compile a try/finally inside one (reactCompilerCoverage).
+ */
+async function postWorkspaceWake(issueId: string): Promise<WakeOutcome> {
+  try {
+    const response = await fetch(`/api/workspaces/${encodeURIComponent(issueId)}/wake`, {
+      method: 'POST',
+      headers: await dashboardMutationJsonHeaders(),
+      body: '{}',
+    });
+    const body = await response.json().catch(() => ({})) as { error?: unknown; started?: unknown };
+    if (!response.ok) {
+      return { ok: false, error: typeof body.error === 'string' ? body.error : `Starting ${issueId} failed (${response.status})` };
+    }
+    const started = Array.isArray(body.started) ? body.started.filter((name): name is string => typeof name === 'string') : [];
+    return { ok: true, started };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : `Starting ${issueId} failed` };
+  }
+}
+
 /** PAN-5649: opens the app tab first (inside the click, so it is not a blocked popup), then wakes the stack. */
 function StartAppButton({ issueId, frontendUrl }: { issueId: string; frontendUrl: string }) {
   const queryClient = useQueryClient();
@@ -69,27 +93,15 @@ function StartAppButton({ issueId, frontendUrl }: { issueId: string; frontendUrl
     event.stopPropagation();
     window.open(frontendUrl, '_blank', 'noopener,noreferrer');
     setPending(true);
-    void (async () => {
-      try {
-        const response = await fetch(`/api/workspaces/${encodeURIComponent(issueId)}/wake`, {
-          method: 'POST',
-          headers: await dashboardMutationJsonHeaders(),
-          body: '{}',
-        });
-        const body = await response.json().catch(() => ({})) as { error?: unknown; started?: unknown };
-        if (response.ok) {
-          const started = Array.isArray(body.started) ? body.started.filter((name): name is string => typeof name === 'string') : [];
-          toast.success(started.length > 0 ? `Started ${started.join(', ')}` : `${issueId} app is already running`);
-          void queryClient.invalidateQueries({ queryKey: ['workspace', issueId] });
-        } else {
-          toast.error(typeof body.error === 'string' ? body.error : `Starting ${issueId} failed (${response.status})`);
-        }
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : `Starting ${issueId} failed`);
-      } finally {
-        setPending(false);
+    void postWorkspaceWake(issueId).then((outcome) => {
+      setPending(false);
+      if (outcome.ok) {
+        toast.success(outcome.started.length > 0 ? `Started ${outcome.started.join(', ')}` : `${issueId} app is already running`);
+        void queryClient.invalidateQueries({ queryKey: ['workspace', issueId] });
+      } else {
+        toast.error(outcome.error);
       }
-    })();
+    });
   };
 
   return (
