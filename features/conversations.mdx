@@ -1159,6 +1159,94 @@ the row returns to normal. Both end the session; settling (above) does not:
 a settled conversation keeps running and can still be unsettled back to
 Inbox.
 
+## Consolidating a project's conversations
+
+Consolidation makes one conversation the owner of everything a project's
+other conversations were doing. The agent reads every other unarchived
+conversation in the project, works out what each one still owed you, checks
+each of those items against the live state of the repository, the tracker
+and CI, takes over the ones that are still open, and archives the
+conversations it has emptied. It finishes with a ledger: one row per
+archived conversation, saying what it owned, where that work stands now, and
+what the consolidating conversation owns in its place.
+
+Settling and archiving only tidy the list. Consolidation reads the
+conversations first, so nothing a conversation promised is lost when its row
+goes away.
+
+### When to use it
+
+- **Your list has outgrown your memory.** A project collects conversations
+  quickly: several titled "New conversation", a few that each started an
+  issue, one steering a long-running fix, and a Settled section of twenty or
+  more that the idle sweep put away while they still had follow-ups pending.
+  Once you can no longer say which conversation handles what, consolidate.
+  The ledger answers that question, and the list shrinks to the
+  conversations that are actually working.
+- **You are returning to a project after a break.** Open a new conversation
+  in the project and consolidate from it. The ledger is a briefing on where
+  every work stream stopped, checked against what has happened since (merged
+  pull requests, CI on `main`, issue state), so you start from current facts
+  instead of reopening old conversations one at a time.
+
+### Running it
+
+Consolidation is the `pan-consolidate-conversations` skill. It runs in
+Claude Code conversations, and the conversation you run it in becomes the
+owner. Start it in either way:
+
+- Type `/pan-consolidate-conversations` in the composer. Typing `/pan-cons`
+  is enough to find it under **Skills** in the menu.
+- Ask in plain words, for example "take over all the conversations in this
+  project" or "consolidate conversations".
+
+Run it from a conversation in the project you want to consolidate. The
+dashboard must be running, because archiving goes through it.
+
+### What it does
+
+1. **Scopes the project.** It takes every unarchived conversation whose
+   project is yours, plus conversations with no project whose working
+   directory is inside your project. That second rule catches the rows a
+   `/clear` continuation leaves behind. Settled and snoozed conversations
+   are included, because settling only moves a row and does not finish its
+   work.
+2. **Leaves running conversations alone.** A conversation that is mid-turn,
+   or whose agent still has background work such as a watch loop or a long
+   build, stays open. The ledger names each one and says why.
+3. **Digests each conversation.** It reads your messages and the agent's
+   last replies and lists the pending commitments: promised follow-ups,
+   items waiting on a deploy or an approval, agents the conversation was
+   steering, and questions you never answered.
+4. **Verifies before it adopts.** A conversation's last report can be hours
+   or days old, so each commitment is checked against live state (`pan
+   show`, the pull request, the newest decisive CI run on `main`, the
+   deployed build) before the agent takes it over. Work that finished in the
+   meantime is reported as done.
+5. **Archives.** It archives the conversations that are not running and
+   then refetches the list to confirm only the expected rows remain.
+6. **Acts and reports.** It does the next step of each adopted commitment
+   that is its to do, and it brings every decision that belongs to you back
+   as a question. It does not decide those for you.
+
+### What it never touches
+
+- **Itself**, and **system conversations**: rows whose names do not start
+  with a `YYYYMMDD-` date, such as `sequencer-runner`.
+- **Running conversations**, as described in step 2.
+- **Other projects.** Only conversations in the current project's scope are
+  read or archived.
+
+### Undoing it
+
+Archiving stops a conversation's agent session, but its row and transcript
+stay on disk. Restore any archived conversation with
+`pan unarchive-conversation <name>`, then [resume it](#resuming-a-stopped-conversation).
+The ledger lists every archived name so you can find it again.
+
+Agents that were reporting to an archived conversation with `pan tell` now
+have no listener. The ledger names them; check on them with `pan show`.
+
 ## Resuming a stopped conversation
 
 A stopped conversation keeps its row and its transcript. Resume starts its
