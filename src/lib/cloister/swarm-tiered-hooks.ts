@@ -17,10 +17,9 @@
  * failure logs loudly and never blocks the merge loop.
  */
 
-import { Effect } from 'effect';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
-import { sessionExists } from '../tmux.js';
+import { isAlive, isConfirmedDead } from '../agents/liveness.js';
 import { loadConfigSync as loadYamlConfig } from '../config-yaml.js';
 import { resolveTieredExecutionEnabled, type ValidatedTieredExecutionConfig } from '../agents/tier-table.js';
 import { resolveTier } from '../agents/resolve-tier.js';
@@ -63,7 +62,8 @@ const defaultDeps: FireTieredCommitHooksDeps = {
   getHeadSha: async (workspacePath) =>
     (await execAsync('git rev-parse HEAD', { cwd: workspacePath })).stdout.trim(),
   listAssignments: listSlotAssignments,
-  isSessionAlive: (sessionName) => Effect.runPromise(sessionExists(sessionName)),
+  // PAN-5652: backend-aware; only a confirmed death respawns the supervisor.
+  isSessionAlive: async (agentId) => !isConfirmedDead(await isAlive(agentId)),
   broadcast: broadcastCommit,
   ensureSupervisor: spawnTierSupervisor,
   deliverReview: deliverCommitForReview,

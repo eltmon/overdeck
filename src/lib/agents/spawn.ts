@@ -27,7 +27,7 @@ import type { RuntimeName } from '../runtimes/types.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { hostDisplayName, hostTransportFor } from '../runtimes/host-transport.js';
 import { writeBridgeToken } from '../bridge-token.js';
-import { exactPaneTarget, sessionExists, setOption } from '../tmux.js';
+import { exactPaneTarget, setOption } from '../tmux.js';
 import { agentPaneExists, closeBackendPane, launchAgentPane, resolveLaunchBackend } from '../terminal-backends/launch.js';
 import { AgentNameTakenError } from '../terminal-backends/types.js';
 import { AgentAlreadyRunningError, claimAgentStart, type StartClaim } from './start-claim.js';

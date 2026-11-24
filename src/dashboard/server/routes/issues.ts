@@ -76,7 +76,7 @@ import { LinearClient } from '../services/linear-client.js';
 import { GitHubClient, type GitHubClientError, type GitHubClientShape, type GitHubIssue } from '../services/github-client.js';
 import { RallyClient } from '../services/rally-client.js';
 import { TrackerApiError } from '../services/typed-errors.js';
-import { killSession, listSessionNames, sessionExists } from '../../../lib/tmux.js';
+import { killSession, listSessionNames } from '../../../lib/tmux.js';
 import { loadRemoteAgentState } from '../../../lib/remote/remote-agents.js';
 import { saveAgentStateAndEmitEvent, saveAgentStateAndEmitEventProgram } from '../services/agent-projection.js';
 import { countPendingAskUserQuestionsForAgent } from '../../../lib/agent-enrichment.js';

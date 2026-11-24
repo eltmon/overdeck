@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   rebaseFeatureBranch: vi.fn(),
   reportCommitStatus: vi.fn(async () => undefined),
   sessionExists: vi.fn(),
+  isAlive: vi.fn(),
   setMergeRun: vi.fn(),
   getMergeRun: vi.fn((): { phase: string } | null => null),
   getPendingOperation: vi.fn((): { type: string; status: string } | null => null),
@@ -123,6 +124,11 @@ vi.mock('../../../../../lib/tmux.js', () => ({  // PAN-3917 (W6): the backend in
   listPaneValuesSync: () => [],
   listPaneValues: async () => [],
  sessionExists: mocks.sessionExists }));
+// PAN-5652: the rebase wait asks the liveness oracle, never tmux has-session.
+vi.mock('../../../../../lib/agents/liveness.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../../lib/agents/liveness.js')>()),
+  isAlive: mocks.isAlive,
+}));
 vi.mock('../../../../../lib/forge.js', async (importOriginal) => ({
   getForgeAdapter: vi.fn(() => ({ commentOnArtifact: vi.fn(), mergeReviewArtifact: mocks.mergeReviewArtifact })),
   parseArtifactRef: (await importOriginal<typeof import('../../../../../lib/forge.js')>()).parseArtifactRef,
@@ -171,6 +177,7 @@ describe('triggerMerge server rebase escalation', () => {
     mocks.mergeReviewArtifact.mockResolvedValue(undefined);
     mocks.messageAgent.mockResolvedValue({ delivered: true });
     mocks.sessionExists.mockReturnValue(Effect.succeed(false));
+    mocks.isAlive.mockResolvedValue({ alive: false, reason: 'no-session' });
     mocks.exec.mockImplementation(async (command) => ({
       stdout: command.includes('git rev-parse HEAD') ? `${HEAD_SHA}\n` : command.includes('git rev-parse origin/') ? 'old-head\n' : '',
       stderr: '',
@@ -417,7 +424,7 @@ describe('triggerMerge server rebase escalation', () => {
 
   it('queues a retry when a non-conflict rebase times out with the agent still running', async () => {
     mocks.rebaseFeatureBranch.mockReturnValue(Effect.fail(new Error('git fetch failed')));
-    mocks.sessionExists.mockReturnValue(Effect.succeed(true));
+    mocks.isAlive.mockResolvedValue({ alive: true, paneAlive: true });
 
     const resultPromise = triggerMerge('PAN-3110');
     await vi.advanceTimersByTimeAsync(30 * 60 * 1000);

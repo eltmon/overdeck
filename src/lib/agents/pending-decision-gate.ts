@@ -35,6 +35,9 @@ export async function detectPendingOperatorDecision(
   agentId: string,
   deps: PendingOperatorDecisionDeps = {},
 ): Promise<PendingOperatorDecision | null> {
+  // Not an agent check (PAN-5652): it gates the tmux pane read below (capture-pane).
+  // The transcript AskUserQuestion check after it is backend-independent; other
+  // pane prompts on a Herdr agent are not seen here yet.
   const sessionExists = deps.sessionExists
     ?? ((id: string) => Effect.runPromise(sessionExistsEffect(id)))
   const detectAwaitingInputForAgent = deps.detectAwaitingInputForAgent

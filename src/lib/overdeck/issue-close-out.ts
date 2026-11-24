@@ -10,7 +10,7 @@ import type { DodRowId } from '../lifecycle/dod.js';
 import { getAgentState, normalizeAgentId } from '../agents.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { resolveGitHubIssue, resolveTrackerType } from '../tracker-utils.js';
-import { sessionExists } from '../tmux.js';
+import { isAlive, isConfirmedDead } from '../agents/liveness.js';
 import { resolveIssueProjectPath } from './issue-reads.js';
 import { archiveIssueWorkspaceRow } from './workspace-hygiene.js';
 
@@ -222,8 +222,11 @@ async function hasActiveAgentForIssue(issueId: string, allowPausedMerged = false
 
   return Effect.runPromise(Effect.gen(function* () {
     // Only query tmux for valid session names (GitHub IDs like owner/repo#123 produce invalid names)
-    if (VALID_TMUX_NAME_RE.test(agentId) && (yield* sessionExists(agentId))) return true;
-    if (VALID_TMUX_NAME_RE.test(planningId) && (yield* sessionExists(planningId))) return true;
+    // PAN-5652: the liveness oracle (tmux has-session misses every Herdr agent).
+    // A probe that cannot answer counts as active, so close-out waits.
+    const live = (id: string) => Effect.promise(async () => !isConfirmedDead(await isAlive(id)));
+    if (VALID_TMUX_NAME_RE.test(agentId) && (yield* live(agentId))) return true;
+    if (VALID_TMUX_NAME_RE.test(planningId) && (yield* live(planningId))) return true;
 
     const agentState = getAgentState(agentId);
     if (agentState && !isInactiveAgentStatus(agentState.status) && !isPausedMergedAgentSafe(agentState, allowPausedMerged)) return true;

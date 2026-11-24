@@ -36,7 +36,6 @@ import { commitPlanArtifacts, planArtifactCommitMessage } from './plan-artifact-
 import { pushFeatureBranch } from './feature-branch-push.js';
 import { loadRemoteAgentState } from '../remote/remote-agents.js';
 import { resolveGitHubIssue, resolveTrackerType } from '../tracker-utils.js';
-import { sessionExists } from '../tmux.js';
 import { agentPaneExists, closeAgentPane } from '../terminal-backends/launch.js';
 import { findPlan, findWorkspaceDraftPlan, readPlan } from '../xbrief/io.js';
 import { formatPlanFinalizedTrailer, planFinalizedHash } from '../xbrief/plan-finalized.js';
@@ -716,7 +715,8 @@ export async function completePlanningForIssue(options: {
     // planning finishes, but the user may have already clicked "Start Agent". Resetting the
     // issue to Planned would undo that and flash the card back to To Do.
     const workAgentSession = `agent-${issueLower}`;
-    const workAgentAlreadyRunning = await Effect.runPromise(sessionExists(workAgentSession));
+    // PAN-5652: the host's backend; tmux has-session misses every Herdr agent.
+    const workAgentAlreadyRunning = await agentPaneExists(workAgentSession).catch(() => false);
     if (workAgentAlreadyRunning) {
       console.log(`[complete-planning] Work agent ${workAgentSession} is already running — skipping status reset to Planned`);
     }

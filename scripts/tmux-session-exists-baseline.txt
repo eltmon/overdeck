@@ -1,0 +1,31 @@
+# tmux sessionExists ratchet baseline (PAN-5652). Rows: <count> <path>.
+# Lower with: bash scripts/lint-liveness.sh --update
+3 src/cli/commands/answer.ts
+2 src/cli/commands/start-fresh-session.ts
+2 src/cli/commands/strike.ts
+2 src/cli/commands/workspace-migrate.ts
+4 src/dashboard/server/pty-hub-attach.ts
+2 src/dashboard/server/routes/agents/spawn-issue.ts
+2 src/dashboard/server/routes/claude-code.ts
+2 src/dashboard/server/routes/codex-auth.ts
+2 src/dashboard/server/routes/terminals.ts
+2 src/dashboard/server/routes/workspace-registry.ts
+2 src/dashboard/server/services/terminal-service.ts
+2 src/dashboard/server/sharing/terminal-bridge.ts
+4 src/dashboard/server/ws-terminal.ts
+5 src/lib/agents/delivery.ts
+4 src/lib/agents/pending-decision-gate.ts
+5 src/lib/agents/runtime-command.ts
+6 src/lib/agents/termination.ts
+2 src/lib/lifecycle/teardown-workspace.ts
+1 src/lib/overdeck/agents.ts
+5 src/lib/overdeck/conversation-forks.ts
+4 src/lib/overdeck/conversation-liveness.ts
+3 src/lib/overdeck/infra.ts
+4 src/lib/pi-ask-modal.ts
+3 src/lib/runtimes/claude-code.ts
+3 src/lib/runtimes/ohmypi.ts
+4 src/lib/session-pane-choice.ts
+2 src/lib/terminal-backends/agent-pane-io.ts
+6 src/lib/terminal-backends/launch.ts
+2 src/lib/terminal-backends/tmux.ts

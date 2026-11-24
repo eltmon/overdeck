@@ -368,6 +368,14 @@ bypasses it.
    before any rebase, so a conflict that appears after approval never reaches
    this step; the conflict-repair patrol handles it (PAN-4384).
 
+   The wait for the agent's push (and a polyrepo merge's wait for every
+   repository's rebased branch) lasts up to 30 minutes, polling every
+   5 seconds. It ends early only when the liveness oracle
+   (`src/lib/agents/liveness.ts`, `isConfirmedDead(await isAlive(agentId))`)
+   confirms the work agent is gone; a probe that cannot answer keeps the wait
+   going. tmux `has-session` is never the test, because it is false for every
+   Herdr agent (PAN-5652).
+
 Content failures — red CI, a closed or draft PR, unresolved conflicts — are
 visible directly on the PR; there is no separate failure status to set.
 

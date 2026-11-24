@@ -15,9 +15,8 @@
 import { existsSync } from 'fs';
 import { stat } from 'fs/promises';
 import { join } from 'path';
-import { Effect } from 'effect';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
-import { sessionExists, isPaneDead } from '../tmux.js';
+import { isAlive, isConfirmedDead } from '../agents/liveness.js';
 
 export type ReviewSubRole = 'security' | 'correctness' | 'performance' | 'requirements';
 
@@ -108,28 +107,17 @@ interface ReviewerState {
         }
       }
 
-      // Check if the tmux session is dead
-      try {
-        const dead = await Effect.runPromise(isPaneDead(s.sessionId));
-        if (dead) {
-          s.settled = true;
-          if (!existsSync(s.outputPath)) {
-            s.stalledAt = now; // → missing
-          } else if (s.lastModifiedMs > 0 && now - s.lastModifiedMs <= staleAfterMs) {
-            s.stalledAt = now; // session died before file settled → stalled
-          }
-          // else: file exists and mtime settled → done
-          continue;
+      // Check if the reviewer is gone. PAN-5652: the liveness oracle covers
+      // tmux and Herdr; a probe that cannot answer is not a death.
+      if (isConfirmedDead(await isAlive(s.sessionId))) {
+        s.settled = true;
+        if (!existsSync(s.outputPath)) {
+          s.stalledAt = now; // → missing
+        } else if (s.lastModifiedMs > 0 && now - s.lastModifiedMs <= staleAfterMs) {
+          s.stalledAt = now; // session died before file settled → stalled
         }
-      } catch {
-        // Session may not exist
-        const exists = await Effect.runPromise(sessionExists(s.sessionId));
-        if (!exists) {
-          s.settled = true;
-          if (!existsSync(s.outputPath)) {
-            s.stalledAt = now;
-          }
-        }
+        // else: file exists and mtime settled → done
+        continue;
       }
 
       // Hard timeout

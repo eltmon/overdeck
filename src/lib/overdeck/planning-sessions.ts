@@ -25,8 +25,8 @@ import { createJiraTrackerForProject } from '../tracker/factory.js';
 import { transitionJiraIssue } from '../tracker/jira-lifecycle.js';
 import { requireModelOverride } from '../model-validation.js';
 import { resolveGitHubIssue, resolveTrackerType } from '../tracker-utils.js';
-import { killSession, listSessionNames, sessionExists } from '../tmux.js';
-import { closeAgentPane } from '../terminal-backends/launch.js';
+import { listSessionNames } from '../tmux.js';
+import { closeAgentPane, closeAgentPaneDetailed } from '../terminal-backends/launch.js';
 import { canUseHarness } from '../harness-policy.js';
 import { EFFORT_LEVELS, isEffortLevel, KNOWN_HARNESSES } from '@overdeck/contracts';
 import type { RuntimeName } from '../runtimes/types.js';
@@ -671,15 +671,12 @@ export function restartFromPlan(options: {
       return jsonResponse({ success: false, error: 'Workspace not found' }, { status: 404 });
     }
 
-    // 2. Kill work agent tmux session and remove agent state dir
+    // 2. Kill work agent session and remove agent state dir. PAN-5652: through
+    // the host's backend, so a Herdr pane is closed too (never throws).
     yield* Effect.promise(async () => {
       const workAgentSession = `agent-${issueLower}`;
-      try {
-        if (await Effect.runPromise(sessionExists(workAgentSession))) {
-          await Effect.runPromise(killSession(workAgentSession));
-          console.log(`[restart-from-plan] Killed work agent session ${workAgentSession}`);
-        }
-      } catch { /* non-fatal */ }
+      const close = await closeAgentPaneDetailed(workAgentSession);
+      if (close.outcome === 'closed') console.log(`[restart-from-plan] Killed work agent session ${workAgentSession}`);
       const agentStateDir = join(homedir(), '.overdeck', 'agents', `agent-${issueLower}`);
       if (existsSync(agentStateDir)) {
         try {

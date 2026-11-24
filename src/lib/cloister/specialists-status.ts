@@ -6,12 +6,9 @@
 
 import { existsSync } from 'fs';
 import { basename } from 'path';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-import { Effect } from 'effect';
 import { readLatestIndexedSessionId } from '../session-history.js';
 import { getAllSessionFiles, parseClaudeSession } from '../cost-parsers/jsonl-parser.js';
-import { listPaneValues, sessionExists } from '../tmux.js';
+import { isAlive } from '../agents/liveness.js';
 import {
   getAllSpecialists,
   getSpecialistMetadata,
@@ -19,8 +16,6 @@ import {
   type LegacySpecialistRuntimeStatus,
   type SpecialistAgentName,
 } from './specialists-registry.js';
-
-const execAsync = promisify(exec);
 
 function readRecordedClaudeSessionId(tmuxSession: string): string | null {
   return readLatestIndexedSessionId(tmuxSession);
@@ -114,29 +109,19 @@ export function countContextTokens(name: SpecialistAgentName): number | null {
 }
 
 /**
- * Check if a specialist is currently running in tmux
+ * Check if a specialist is currently running
+ *
+ * PAN-5652: asks the liveness oracle, which covers both backends and the
+ * crashed-harness case (session or pane left behind with no harness in it).
+ * tmux has-session alone is false for every Herdr agent.
  *
  * @param name - Specialist name
  * @param projectKey - Optional project key for per-project specialists
- * @returns True if specialist has an active tmux session
+ * @returns True if the oracle confirms the specialist's harness is running
  */
 export async function isRunning(name: SpecialistAgentName, projectKey?: string): Promise<boolean> {
-  const tmuxSession = getTmuxSessionName(name, projectKey);
-
   try {
-    const exists = await Effect.runPromise(sessionExists(tmuxSession));
-    if (!exists) return false;
-    // Session exists — but check if the pane actually has a running process.
-    // When Claude Code crashes, the pane's process exits but the tmux session persists,
-    // making has-session return success even though nothing is running.
-    const panePid = (await listPaneValues(tmuxSession, '#{pane_pid}'))[0]?.trim() ?? '';
-    if (!panePid) return false;
-    // Check if the pane's process has any child processes (Claude Code / bash)
-    const { stdout: children } = await execAsync(
-      `ps --ppid ${panePid} --no-headers 2>/dev/null || echo ""`,
-      { encoding: 'utf-8' }
-    );
-    return children.trim().length > 0;
+    return (await isAlive(getTmuxSessionName(name, projectKey))).alive;
   } catch {
     return false;
   }

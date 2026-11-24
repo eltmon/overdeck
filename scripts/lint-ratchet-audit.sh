@@ -27,6 +27,7 @@ EFFECT_FACADES_BASELINE="scripts/effect-facades-baseline.txt"
 HARNESS_BRANCHES_BASELINE="scripts/harness-branches-baseline.txt"
 REACT_COMPILER_SKIP_BASELINE="scripts/react-compiler-skip-baseline.txt"
 MANUAL_MEMO_BASELINE="scripts/manual-memo-baseline.txt"
+TMUX_PROBE_BASELINE="scripts/tmux-session-exists-baseline.txt"
 ESLINT_ALLOWLIST="eslint-any-allowlist.json"
 ESLINT_COMPILER_ALLOWLIST="eslint-react-compiler-allowlist.json"
 ISSUE_REF_RE='([A-Z]+-[0-9]+|#[0-9]+)'
@@ -168,7 +169,8 @@ count_path_baseline_at() {
     sed -E '/^[[:space:]]*(#|$)/d' | sort -u
 }
 
-# Rows are "<count> <path>" (harness branches PAN-4562; React Compiler skips
+# Rows are "<count> <path>" (harness branches PAN-4562; tmux sessionExists
+# PAN-5652; React Compiler skips
 # and manual memo PAN-4561). Compare by <path>: a lowered count is free; a
 # raised count or a new row is an increase. Across a merge commit's parents
 # the highest count per path is the old value.
@@ -304,6 +306,7 @@ audit_commit() {
     count_path_baseline_increases_for_commit "$HARNESS_BRANCHES_BASELINE" "harness branches baseline" "$commit" "${parents[@]}"
     count_path_baseline_increases_for_commit "$REACT_COMPILER_SKIP_BASELINE" "react-compiler skip baseline" "$commit" "${parents[@]}"
     count_path_baseline_increases_for_commit "$MANUAL_MEMO_BASELINE" "manual-memo baseline" "$commit" "${parents[@]}"
+    count_path_baseline_increases_for_commit "$TMUX_PROBE_BASELINE" "tmux sessionExists baseline" "$commit" "${parents[@]}"
   )
 
   if [[ -z "$increases" ]]; then
@@ -331,11 +334,11 @@ commits_for_file() {
   fi
 }
 
-for file in "$ESLINT_ALLOWLIST" "$ESLINT_COMPILER_ALLOWLIST" "$CIRCULAR_BASELINE" "$EFFECT_DIAG_BASELINE" "$EFFECT_FACADES_BASELINE" "$HARNESS_BRANCHES_BASELINE" "$REACT_COMPILER_SKIP_BASELINE" "$MANUAL_MEMO_BASELINE"; do
+for file in "$ESLINT_ALLOWLIST" "$ESLINT_COMPILER_ALLOWLIST" "$CIRCULAR_BASELINE" "$EFFECT_DIAG_BASELINE" "$EFFECT_FACADES_BASELINE" "$HARNESS_BRANCHES_BASELINE" "$REACT_COMPILER_SKIP_BASELINE" "$MANUAL_MEMO_BASELINE" "$TMUX_PROBE_BASELINE"; do
   while IFS= read -r commit; do
     [[ -z "$commit" ]] && continue
     audit_commit "$commit"
   done < <(commits_for_file "$file")
 done
 
-echo "✓ ratchet audit passed (no unaudited ESLint/compiler/memo/circular/Effect/harness-branch ratchet increases)"
+echo "✓ ratchet audit passed (no unaudited ESLint/compiler/memo/circular/Effect/harness-branch/tmux-probe ratchet increases)"

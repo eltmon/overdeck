@@ -15,22 +15,22 @@ import {
   type PersistedAgentHealthState,
   type ResolvedPersistedAgentHealthState,
 } from '../../lib/agents/health.js';
-import { capturePane, sessionExists } from '../../lib/tmux.js';
+import { isAlive } from '../../lib/agents/liveness.js';
+import { readAgentPaneText } from '../../lib/terminal-backends/agent-pane-io.js';
 
 /**
- * Check if agent tmux session is alive.
+ * Check if the agent is alive on the host's terminal backend.
+ *
+ * PAN-5652: the liveness oracle and the backend's pane reader. tmux
+ * has-session and capture-pane both miss every Herdr agent. A pane that cannot
+ * be read leaves a live agent alive with no output.
  */
 export const checkAgentHealth = (agentId: string) =>
-  Effect.gen(function* () {
-    const alive = yield* sessionExists(agentId);
-    if (!alive) {
-      return { alive: false };
-    }
-
-    const stdout = yield* Effect.promise(() => capturePane(agentId, 5));
-
+  Effect.promise(async (): Promise<{ alive: boolean; lastOutput?: string }> => {
+    if (!(await isAlive(agentId)).alive) return { alive: false };
+    const stdout = await readAgentPaneText(agentId, 5).catch(() => '');
     return { alive: true, lastOutput: stdout.trim() };
-  }).pipe(Effect.catch(() => Effect.succeed({ alive: false })));
+  });
 
 function runtimeHealthState(
   runtime: AgentRuntimeSnapshot | null,

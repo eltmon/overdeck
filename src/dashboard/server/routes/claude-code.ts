@@ -87,6 +87,7 @@ const postClaudeCodeUpgradeRoute = HttpRouter.add(
         );
       }
 
+      // Not an agent check (PAN-5652): the upgrade runs in its own tmux session.
       const exists = yield* sessionExists(UPGRADE_SESSION_NAME);
       if (exists) {
         return jsonResponse({ sessionName: UPGRADE_SESSION_NAME, alreadyRunning: true }, { status: 409 });

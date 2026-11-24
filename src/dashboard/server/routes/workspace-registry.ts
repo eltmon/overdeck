@@ -639,6 +639,7 @@ const postWorkspaceRegistryRunRoute = HttpRouter.add(
 
     // One live run session per workspace: a second Run re-focuses the first
     // rather than stacking duplicate servers on the same port.
+    // Not an agent check (PAN-5652): the Run command lives in its own tmux session.
     const sessionName = runSessionName(id);
     if (yield* sessionExists(sessionName)) {
       return jsonResponse({ sessionName, command, alreadyRunning: true }, { status: 409 });

@@ -804,7 +804,7 @@ async function deliverKeyedViaTmux(
  * session needs no check here — tmux send-keys itself errors loudly on it.)
  */
 async function assertTmuxTargetCanReceive(normalizedId: string, caller: string): Promise<void> {
-  const alive = await Effect.runPromise(sessionExists(normalizedId));
+  const alive = await Effect.runPromise(sessionExists(normalizedId)); // tmux tier only, not an agent check (PAN-5652)
   if (!alive) return; // send-keys will fail loudly on its own for a missing session
   const paneDead = await Effect.runPromise(isPaneDead(normalizedId));
   if (paneDead) {

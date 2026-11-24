@@ -561,6 +561,16 @@ read-model `AgentSnapshot`, the `agent.status_changed` payload and the work-agen
 object. The shared reducer fills whichever name an event omits, so stored events that carry only
 `hasLiveTmuxSession` still set `hasLivePane`. Readers use `hasLivePane`.
 
+**No new agent check asks tmux `sessionExists`** (PAN-5652). `sessionExists` and
+`sessionExistsSync` in `src/lib/tmux.ts` run `tmux has-session`, which is false for every Herdr
+agent. Ask agent liveness with `isAlive` (`src/lib/agents/liveness.ts`) and pane presence with
+`agentPaneExists` or `probeAgentPane` (`src/lib/terminal-backends/`). `scripts/lint-liveness.sh`
+counts each `src/` file that imports the tmux probe against
+`scripts/tmux-session-exists-baseline.txt`; a new file or a higher count fails, and raising a row
+needs an issue reference. The remaining rows are tmux-only sessions (upgrade, login, Run and
+terminal attach), the tmux backend adapter, and known agent-check debt (`overdeck/agents.ts`,
+`agents/termination.ts`, `agents/pending-decision-gate.ts`).
+
 **No reader filters on `tmuxActive`** (#4109). `listRunningAgents()` still returns the flag, but it
 is tmux session presence only, so it is `false` for every Herdr agent. The former readers now read
 the selected backend's live inventory (`listLiveAgentIds` / `listLiveAgentPanes` in

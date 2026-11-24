@@ -15,7 +15,7 @@ import { getAgentState, saveAgentStateSync, stopAgent, spawnAgent, spawnRun, get
 import { resolveRelaunchEffort } from '../agents/relaunch-effort.js';
 import type { HandoffContext } from './handoff-context.js';
 import { captureHandoffContext, buildHandoffPrompt } from './handoff-context.js';
-import { sessionExists } from '../tmux.js';
+import { isAlive, isConfirmedDead } from '../agents/liveness.js';
 import { requireModelOverride } from '../model-validation.js';
 
 /**
@@ -187,8 +187,9 @@ async function waitForIdle(agentId: string, timeoutMs: number): Promise<boolean>
   const startTime = Date.now();
 
   while (Date.now() - startTime < timeoutMs) {
-    // Check if agent session still exists
-    if (!(await Effect.runPromise(sessionExists(agentId)))) {
+    // PAN-5652: the liveness oracle, not tmux has-session (false for every
+    // Herdr agent, which made this return at once while the agent worked).
+    if (isConfirmedDead(await isAlive(agentId))) {
       return true; // Agent is gone, consider it idle
     }
 

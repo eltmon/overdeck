@@ -29,7 +29,7 @@ import { findProjectByTeam } from '../../../../lib/projects.js';
 import { isOverdeckOwnedOnlyStatus } from '../../../../lib/state-plane.js';
 import { isIntegrationPermissionError, verifyAppCanMerge, type GitHubPullRequestState } from '../../../../lib/github-app.js';
 import { resolveGitHubIssue } from '../../../../lib/tracker-utils.js';
-import { sessionExists } from '../../../../lib/tmux.js';
+import { isAlive, isConfirmedDead } from '../../../../lib/agents/liveness.js';
 import { resolveIssueWorkspaceSyncTarget } from '../../../../lib/workspaces/resolver.js';
 import { appendPipelineEntry } from '../../../../lib/cloister/pipeline-journal.js';
 import { getIssueWorkspacePath } from '../../../../lib/overdeck/issue-projects.js';
@@ -625,15 +625,15 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
           }
         }
 
-        if (!await Effect.runPromise(sessionExists(agentId))) break;
+        if (isConfirmedDead(await isAlive(agentId))) break; // PAN-5652: tmux has-session is false for every Herdr agent
       }
 
       if (pushedRepos.size !== activeRepos.length) {
         const remaining = activeRepos
           .filter(repo => !pushedRepos.has(repo.repoKey))
           .map(repo => repo.repoKey);
-        const agentRunning = await Effect.runPromise(sessionExists(agentId));
-        const error = !agentRunning
+        const agentStopped = isConfirmedDead(await isAlive(agentId));
+        const error = agentStopped
           ? `Work agent ${agentId} stopped before completing polyrepo rebases for ${remaining.join(', ')}`
           : `Work agent did not push rebased branches for ${remaining.join(', ')} within ${REBASE_TIMEOUT_MS / 60000} minutes`;
         for (const repoKey of remaining) {
@@ -886,7 +886,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
         : `MERGE REQUESTED: The human has clicked MERGE for ${issueId}. Please rebase onto ${targetBranch} and push:\n\n1. git fetch origin ${targetBranch}\n2. git rebase origin/${targetBranch}\n3. If conflicts: resolve them, git add, git rebase --continue\n4. git push --force-with-lease\n\nAfter pushing, the server will handle verification and merge automatically. Do NOT run gh pr merge yourself.`;
 
       setStatus(issueId, { step: 'rebasing' });
-      console.log(`[merge] Rebasing ${branchName} onto ${targetBranch} for ${issueId} (agent=${await Effect.runPromise(sessionExists(agentId)) ? 'running' : 'stopped'})...`);
+      console.log(`[merge] Rebasing ${branchName} onto ${targetBranch} for ${issueId} (agent=${(await isAlive(agentId)).alive ? 'running' : 'not confirmed running'})...`);
       beginShipLog(issueId);
       appendShipLog(issueId, `Ship started: rebasing ${branchName} onto ${targetBranch}…`, 'rebasing');
 

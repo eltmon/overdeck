@@ -83,6 +83,7 @@ async function killTmuxSessionsImpl(issueLower: string): Promise<StepResult> {
     `planning-${issueLower}`,
     `strike-${issueLower}`,
   ];
+  // Not an agent check (PAN-5652): this step sweeps tmux sessions by name; the kill is tmux-only.
   for (const session of exactPatterns) {
     if (await Effect.runPromise(sessionExists(session))) {
       try {
