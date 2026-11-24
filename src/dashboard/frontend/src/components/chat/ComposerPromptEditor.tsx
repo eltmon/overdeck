@@ -28,12 +28,13 @@ import {
   KEY_ENTER_COMMAND,
   COMMAND_PRIORITY_HIGH,
 } from 'lexical';
+import { getHarnessBehavior } from '@overdeck/contracts';
 import type { Harness } from '../shared/ModelPicker';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 import { getSlashCommands, SLASH_COMMANDS, type SlashCommand } from './slashCommands';
-import { useSkillSlashCommands, type SkillSlashContext } from './skillSlashCommands';
+import { useSkillMentionCommands, useSkillSlashCommands, type SkillSlashContext } from './skillSlashCommands';
 import { TriggerMenu, caretAnchorRect, useTriggerMenuKeys } from './TriggerMenu';
-import { mentionTriggerContext, slashTriggerContext, type TriggerContext } from './composerTriggers';
+import { mentionTriggerContext, slashTriggerContext, toSkillMentionItems, type TriggerContext } from './composerTriggers';
 import { useFileMentionItems } from './useFileMentionItems';
 import { loadDraft, saveDraft } from '../../lib/composerDraft';
 
@@ -341,7 +342,12 @@ export function ComposerPromptEditor({
   const internalEditorRef = useRef<LexicalEditor | null>(null);
 
   // @/$ menus open from text and caret changes, not keydown (PAN-5662 D4).
-  const mentionChars = useMemo<readonly MentionChar[]>(() => (fileRootId ? ['@'] : []), [fileRootId]);
+  const skillMention = getHarnessBehavior(harness).capabilities.skillMention;
+  const skillMentionsEnabled = skillContext !== undefined && skillMention !== null;
+  const mentionChars = useMemo<readonly MentionChar[]>(
+    () => [...(fileRootId ? (['@'] as const) : []), ...(skillMentionsEnabled ? (['$'] as const) : [])],
+    [fileRootId, skillMentionsEnabled],
+  );
   const [beforeCaret, setBeforeCaret] = useState<string | null>(null);
   const [dismissedMention, setDismissedMention] = useState<string | null>(null);
   const [mentionSelectedIndex, setMentionSelectedIndex] = useState(0);
@@ -460,8 +466,19 @@ export function ComposerPromptEditor({
     fileRootId ?? null,
     mentionOpen && mentionContext.char === '@' ? mentionContext.filter : null,
   );
-  const mentionItems = mentionContext?.char === '@' ? fileItems : NO_MENTION_ITEMS;
+  const mentionSkills = useSkillMentionCommands({
+    harness,
+    context: skillContext,
+    active: mentionOpen && mentionContext.char === '$',
+  });
+  const skillItems = useMemo(
+    () => (mentionContext?.char === '$' && skillMention ? toSkillMentionItems(mentionSkills, skillMention, mentionContext.filter) : NO_MENTION_ITEMS),
+    [mentionContext, mentionSkills, skillMention],
+  );
+  const mentionItems = mentionContext?.char === '@' ? fileItems : mentionContext?.char === '$' ? skillItems : NO_MENTION_ITEMS;
   const mentionHint = mentionContext?.char === '@' && mentionContext.filter === '' ? 'Type to search files' : undefined;
+  // Keys are captured only while a menu is on screen: a $ token matching no skill shows nothing and leaves keys alone.
+  const mentionVisible = mentionOpen && (mentionItems.length > 0 || mentionHint !== undefined);
 
   const handleMentionSelect = useCallback(
     (item: SlashCommand) => {
@@ -494,7 +511,7 @@ export function ComposerPromptEditor({
   }, [mentionContext]);
 
   useTriggerMenuKeys({
-    open: mentionOpen,
+    open: mentionVisible,
     rowCount: mentionItems.length,
     selectedIndex: mentionSelectedIndex,
     setSelectedIndex: setMentionSelectedIndex,
@@ -563,7 +580,7 @@ export function ComposerPromptEditor({
           anchorRect={menuAnchorRect}
         />
       )}
-      {mentionOpen && (
+      {mentionVisible && (
         <TriggerMenu
           items={mentionItems}
           filter={mentionContext.filter}
@@ -571,7 +588,7 @@ export function ComposerPromptEditor({
           onSelect={handleMentionSelect}
           onClose={handleMentionClose}
           anchorRect={mentionAnchorRect}
-          ariaLabel="Files"
+          ariaLabel={mentionContext.char === '@' ? 'Files' : 'Skills'}
           hint={mentionHint}
         />
       )}
