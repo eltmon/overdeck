@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5649",
   "created": "2026-11-24T02:25:08.097Z",
-  "updated": "2026-11-24T02:31:08.913Z",
+  "updated": "2026-11-24T02:32:34.355Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -36,9 +36,26 @@
       "doneAt": "2026-11-24T02:31:01.712Z"
     },
     "wi2-wake-router-file": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5649",
-      "claimedAt": "2026-11-24T02:31:08.913Z"
+      "claimedAt": "2026-11-24T02:31:08.913Z",
+      "doneAt": "2026-11-24T02:32:34.355Z"
+    },
+    "wi2-wake-router-file.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-24T02:32:34.355Z"
+    },
+    "wi2-wake-router-file.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-24T02:32:34.355Z"
+    },
+    "wi2-wake-router-file.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-24T02:32:34.355Z"
+    },
+    "wi2-wake-router-file.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-24T02:32:34.355Z"
     }
   }
 }
