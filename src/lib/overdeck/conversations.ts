@@ -847,7 +847,7 @@ export function reactivateConversationForSpawn(opts: {
   if (!id) return;
   db.prepare(`
     UPDATE conversations
-    SET cwd = ?, issue_id = ?, model = ?, harness = ?, archived_at = NULL
+    SET cwd = ?, issue_id = ?, model = ?, harness = ?, archived_at = NULL, stopped_on_purpose_at = NULL
     WHERE id = ?
   `).run(opts.cwd, opts.issueId ?? null, nullIfEmpty(opts.model), opts.harness ?? null, id);
   if (opts.claudeSessionId) {

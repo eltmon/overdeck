@@ -10,10 +10,14 @@ import { join } from 'node:path';
 const TEST_HOME = join(tmpdir(), `stop-clear-chain-${Date.now()}-${Math.random().toString(36).slice(2)}`);
 process.env.OVERDECK_HOME = TEST_HOME;
 
-const { closeConversationPane } = vi.hoisted(() => ({ closeConversationPane: vi.fn().mockResolvedValue(undefined) }));
+const { closeConversationPane, conversationHarnessAlive } = vi.hoisted(() => ({
+  closeConversationPane: vi.fn().mockResolvedValue(undefined),
+  conversationHarnessAlive: vi.fn().mockResolvedValue(false),
+}));
 vi.mock('../conversation-liveness.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../conversation-liveness.js')>()),
   closeConversationPane,
+  conversationHarnessAlive,
 }));
 vi.mock('../companion-terminal/index.js', () => ({ closeCompanionTerminalForOwner: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('../../../dashboard/server/services/conversation-attachments.js', () => ({
@@ -23,8 +27,9 @@ vi.mock('../../../dashboard/server/services/conversation-attachments.js', () => 
 
 const { closeOverdeckDatabase } = await import('../infra.js');
 const { createConversation, getConversationByName, markConversationEnded, setClearedToConvId, archiveConversation } = await import('../conversations.js');
-const { handleConversationStop } = await import('../conversation-runtime.js');
+const { handleConversationResume, handleConversationStop } = await import('../conversation-runtime.js');
 const { conversationStoppedSince } = await import('../conversation-stop-marks.js');
+const { closeOverdeckDatabase: reopenDatabase } = await import('../infra.js');
 
 const CWD = join(TEST_HOME, 'projects', 'fixture');
 const PARENT_ENDED_AT_MS = 1_700_000_000_000;
@@ -101,5 +106,23 @@ describe('handleConversationStop records a deliberate stop (PAN-5091)', () => {
     await handleConversationStop(conv.name, {});
     expect(conversationStoppedSince(conv.name, before)).toBe(true);
     expect(getConversationByName(conv.name)?.status).toBe('ended');
+  });
+
+  it('the mark is on the row, so it outlives the dashboard process (PAN-5673)', async () => {
+    const conv = createConversation({ name: 'stop-mark-durable', tmuxSession: 'conv-stop-mark-durable', cwd: CWD, harness: 'claude-code' });
+    const before = Date.now();
+    await handleConversationStop(conv.name, {});
+    reopenDatabase(); // the next read opens overdeck.db again, as a restarted dashboard does
+    expect(conversationStoppedSince(conv.name, before)).toBe(true);
+  });
+
+  it('re-attaching a resume to a live harness clears the mark (PAN-5673)', async () => {
+    const conv = createConversation({ name: 'stop-mark-reattach', tmuxSession: 'conv-stop-mark-reattach', cwd: CWD, harness: 'claude-code' });
+    const before = Date.now();
+    await handleConversationStop(conv.name, {});
+    expect(conversationStoppedSince(conv.name, before)).toBe(true);
+    conversationHarnessAlive.mockResolvedValueOnce(true);
+    await handleConversationResume(conv.name, {}, { resolveSessionFile: async () => null });
+    expect(conversationStoppedSince(conv.name, 0)).toBe(false);
   });
 });

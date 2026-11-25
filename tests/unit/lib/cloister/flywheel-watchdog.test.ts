@@ -8,11 +8,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../../../../src/lib/activity-logger.js', () => ({ emitActivityEntry: vi.fn() }));
 vi.mock('../../../../src/lib/agents/liveness.js', () => ({ isAlive: vi.fn() }));
 vi.mock('../../../../src/lib/agents/delivery.js', () => ({ deliverAgentMessage: vi.fn() }));
+const flywheelActions = vi.hoisted(() => ({ resumeFlywheel: vi.fn(async () => ({ session: 'conv-flywheel' })) }));
+vi.mock('../../../../src/lib/flywheel/actions.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../src/lib/flywheel/actions.js')>()),
+  resumeFlywheel: flywheelActions.resumeFlywheel,
+}));
 
 import {
   __resetFlywheelWatchdogStateForTests,
   FLYWHEEL_RESUME_MAX_ATTEMPTS,
   FLYWHEEL_RESUME_RETRY_MS,
+  resumeFlywheelThroughRoute,
   watchFlywheelLoop,
   type FlywheelPaneState,
   type FlywheelResumeOutcome,
@@ -324,6 +330,85 @@ describe('watchFlywheelLoop (PAN-5667)', () => {
       expect(h.resume).toHaveBeenCalledTimes(FLYWHEEL_RESUME_MAX_ATTEMPTS);
       expect(h.log).toHaveBeenLastCalledWith(expect.stringContaining('stopped trying'), 'warn');
     });
+  });
+});
+
+describe('watchFlywheelLoop and a deliberate pause across a dashboard restart (PAN-5673)', () => {
+  const DASHBOARD = 'http://127.0.0.1:3011';
+  let home: string;
+
+  beforeEach(async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(START);
+    __resetFlywheelWatchdogStateForTests();
+    flywheelActions.resumeFlywheel.mockClear();
+    const { mkdirSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    home = join(tmpdir(), `pan-5673-watchdog-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    mkdirSync(join(home, 'projects', 'fixture'), { recursive: true });
+    process.env.OVERDECK_HOME = home;
+    vi.resetModules();
+    // The deacon's resume reaches the dashboard's route handler, in this process.
+    vi.stubGlobal('fetch', async (_url: URL, init: RequestInit) => {
+      const { postFlywheelResumePayload } = await import('../../../../src/dashboard/server/routes/flywheel.js');
+      const result = await postFlywheelResumePayload(JSON.parse(String(init.body)) as Record<string, unknown>);
+      return new Response(JSON.stringify(result.body), { status: result.status });
+    });
+  });
+
+  afterEach(async () => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+    const { closeOverdeckDatabase } = await import('../../../../src/lib/overdeck/infra.js');
+    closeOverdeckDatabase();
+    const { rmSync } = await import('node:fs');
+    rmSync(home, { recursive: true, force: true });
+    delete process.env.OVERDECK_HOME;
+  });
+
+  /** The operator pauses the dead loop after the reboot; then the dashboard restarts (`pan reload`). */
+  async function pauseThenRestartDashboard(paused: boolean): Promise<void> {
+    const { join } = await import('node:path');
+    const conversations = await import('../../../../src/lib/overdeck/conversations.js');
+    const marks = await import('../../../../src/lib/overdeck/conversation-stop-marks.js');
+    const infra = await import('../../../../src/lib/overdeck/infra.js');
+    conversations.createConversation({ name: 'conv-flywheel', tmuxSession: 'conv-flywheel', cwd: join(home, 'projects', 'fixture'), harness: 'claude-code' });
+    if (paused) marks.recordConversationStop('conv-flywheel', BOOT + 2 * MIN);
+    conversations.markConversationEnded('conv-flywheel', BOOT + 2 * MIN);
+    infra.closeOverdeckDatabase();
+    vi.resetModules();
+  }
+
+  function rebootedRun(): Partial<FlywheelWatchdogDeps> {
+    return {
+      readRun: async () => ({ run: 'paused', conv: conv({ status: 'ended', endedAt: new Date(BOOT + 2 * MIN).toISOString() }) }),
+      readTranscript: async () => ({ messages: [tickMessage(BOOT - 30 * MIN)], atTurnBoundary: true }),
+      paneState: async () => 'unknown',
+      nudge: vi.fn(async () => undefined),
+      resume: (sinceMs) => resumeFlywheelThroughRoute(sinceMs, DASHBOARD),
+      isNoResumeBoot: () => false,
+      isDraining: () => false,
+      bootTimeMs: () => BOOT,
+      log: vi.fn(),
+      now: () => Date.now(),
+    };
+  }
+
+  it('does not resume a Flywheel the operator paused before the dashboard restarted', async () => {
+    await pauseThenRestartDashboard(true);
+    const deps = rebootedRun();
+
+    expect((await watchFlywheelLoop(deps))[0]).toMatch(/did not resume.*stopped on purpose/);
+    vi.advanceTimersByTime(FLYWHEEL_RESUME_RETRY_MS * 3);
+    expect(await watchFlywheelLoop(deps)).toEqual([]);
+    expect(flywheelActions.resumeFlywheel).not.toHaveBeenCalled();
+  });
+
+  it('still resumes a Flywheel the reboot stopped (no deliberate pause)', async () => {
+    await pauseThenRestartDashboard(false);
+    expect(await watchFlywheelLoop(rebootedRun())).toEqual(['watchFlywheelLoop: resumed conv-flywheel after the host reboot']);
+    expect(flywheelActions.resumeFlywheel).toHaveBeenCalledTimes(1);
   });
 });
 

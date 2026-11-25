@@ -14,6 +14,7 @@ import {
   waitForConversationRuntimeReady,
 } from './conversation-runtime.js';
 import { listConversations, markConversationActive, setConversationHarness, type LegacyConversation as Conversation } from './conversations.js';
+import { clearConversationStop } from './conversation-stop-marks.js';
 import { deliverMandatoryKimiResumeContext } from './resume-contract-delivery.js';
 
 export async function handleConversationRestartAll(
@@ -47,6 +48,7 @@ export async function handleConversationRestartAll(
         }
         setConversationHarness(conv.name, harness);
         markConversationActive(conv.name);
+        clearConversationStop(conv.name); // PAN-5673: restarted, so no longer stopped on purpose
         results.push({ name: conv.name, model: conv.model, status: 'restarted' });
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
