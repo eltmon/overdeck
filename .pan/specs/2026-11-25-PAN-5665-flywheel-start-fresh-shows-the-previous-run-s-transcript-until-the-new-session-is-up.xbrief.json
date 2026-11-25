@@ -4,17 +4,17 @@
     "created": "2026-11-25T12:30:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5665: Flywheel 'Start fresh' shows the previous run's transcript until the new session is up",
-    "updated": "2026-11-25T12:05:04.300Z"
+    "updated": "2026-11-25T12:06:07.156Z"
   },
   "plan": {
     "id": "pan-5665",
     "title": "Flywheel 'Start fresh' shows the previous run's transcript until the new session is up",
-    "status": "proposed",
+    "status": "running",
     "uid": "156ae98b-74fe-465e-9957-306b4aac0d97",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-25T12:30:00.000Z",
-    "updated": "2026-11-25T12:05:04.300Z",
+    "updated": "2026-11-25T12:06:07.156Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5665",
@@ -361,5 +361,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
