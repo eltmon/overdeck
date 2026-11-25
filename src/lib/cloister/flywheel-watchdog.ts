@@ -37,12 +37,23 @@
  * 4. Nothing was written to the transcript since the boot. A resume writes a
  *    record at once, so a loop that was resumed and then paused by the
  *    operator is never resumed again, even across a dashboard restart.
- * 5. The newest tick is not `phase=stopping` (a graceful `pan flywheel stop`).
+ * 5. The transcript holds a tick, and the newest one is not `phase=stopping`
+ *    (a graceful `pan flywheel stop`). Requiring a tick keeps a resume whose
+ *    `/pan-flywheel` delivery failed recoverable: the loop is then `running`
+ *    with a stale tick, so the next patrol's nudge sends the skill.
  * 6. The dashboard has recorded no deliberate stop of the conversation since
  *    the boot (`conversation-stop-marks.ts`). The stop marks live in the
  *    dashboard process, so the resume goes through `POST /api/flywheel/resume`
  *    with the internal token and `unlessStoppedSince`; the route checks the
  *    marks and refuses with 409 `FlywheelStoppedOnPurpose`.
+ *
+ * **Never after a safe shutdown (D-9).** `pan shutdown` drains through
+ * `handleConversationStop`, so the row ends before the boot and rule 3 leaves
+ * it paused, with no grace window before the boot. Turning things back on
+ * after a deliberate shutdown is the operator's call; listing the Flywheel in
+ * the shutdown resume offer is PAN-5671. While the shutdown record exists the
+ * routine does nothing at all: `isDeaconGloballyPaused()` already stops the
+ * patrol then, and the routine checks `isShutdownDrainingSync()` itself too.
  *
  * A failed resume is retried every `FLYWHEEL_RESUME_RETRY_MS`, at most
  * `FLYWHEEL_RESUME_MAX_ATTEMPTS` times per deacon process. A refusal ends the
@@ -61,6 +72,7 @@ import { isAlive } from '../agents/liveness.js';
 import { deliverAgentMessage } from '../agents/delivery.js';
 import { isNoResumeValueEnabled } from '../boot-no-resume.js';
 import { getInternalToken, INTERNAL_TOKEN_HEADER } from '../internal-token.js';
+import { isShutdownDrainingSync } from '../shutdown/drain-record.js';
 import {
   FLYWHEEL_CONVERSATION_SESSION,
   FLYWHEEL_FRESHNESS_BREATHING_MS,
@@ -107,6 +119,8 @@ export interface FlywheelWatchdogDeps {
   /** Resumes the paused loop unless it was stopped on purpose at or after `sinceMs`. */
   resume: (sinceMs: number) => Promise<FlywheelResumeOutcome>;
   isNoResumeBoot: () => boolean;
+  /** A safe shutdown is draining (`<OVERDECK_HOME>/shutdown.json` exists). */
+  isDraining: () => boolean;
   /** When this host booted, in epoch ms. */
   bootTimeMs: () => number;
   /** The dashboard activity feed. */
@@ -211,6 +225,7 @@ const defaultDeps: FlywheelWatchdogDeps = {
   nudge: defaultNudge,
   resume: (sinceMs) => resumeFlywheelThroughRoute(sinceMs),
   isNoResumeBoot: () => isNoResumeValueEnabled(process.env.OVERDECK_NO_RESUME),
+  isDraining: isShutdownDrainingSync,
   bootTimeMs: defaultBootTimeMs,
   log: (message, level) => emitActivityEntry({ source: 'cloister', level, message, link: '/flywheel' }),
   now: () => Date.now(),
@@ -246,6 +261,8 @@ export function __resetFlywheelWatchdogStateForTests(): void {
 export async function watchFlywheelLoop(overrides: Partial<FlywheelWatchdogDeps> = {}): Promise<string[]> {
   const deps: FlywheelWatchdogDeps = { ...defaultDeps, ...overrides };
   try {
+    // A safe shutdown is in progress: nudge nothing and resume nothing.
+    if (deps.isDraining()) return [];
     const { conv, run } = await deps.readRun();
     if (!conv) return [];
     if (run === 'running') return await nudgeIfStalled(conv, deps);
@@ -295,7 +312,8 @@ async function resumeIfRebooted(conv: LegacyConversation, deps: FlywheelWatchdog
   if (!transcript) return [];
   const newest = transcript.messages[transcript.messages.length - 1];
   if (newest && !(Date.parse(newest.createdAt) < bootMs)) return [];
-  if (findLastTick(transcript.messages)?.phase === 'stopping') return [];
+  const lastTick = findLastTick(transcript.messages);
+  if (!lastTick || lastTick.phase === 'stopping') return [];
 
   const now = deps.now();
   if (lastResumeAttemptAt !== null && now - lastResumeAttemptAt < FLYWHEEL_RESUME_RETRY_MS) return [];

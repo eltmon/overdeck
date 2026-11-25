@@ -53,7 +53,7 @@ interface Harness {
   nudge: ReturnType<typeof vi.fn>;
   resume: ReturnType<typeof vi.fn>;
   log: ReturnType<typeof vi.fn>;
-  set: (next: { run?: 'running' | 'paused' | 'idle'; conv?: LegacyConversation | null; transcript?: FlywheelTranscriptRead | null; pane?: FlywheelPaneState; noResume?: boolean }) => void;
+  set: (next: { run?: 'running' | 'paused' | 'idle'; conv?: LegacyConversation | null; transcript?: FlywheelTranscriptRead | null; pane?: FlywheelPaneState; noResume?: boolean; draining?: boolean }) => void;
 }
 
 function harness(): Harness {
@@ -63,7 +63,8 @@ function harness(): Harness {
     transcript: FlywheelTranscriptRead | null;
     pane: FlywheelPaneState;
     noResume: boolean;
-  } = { run: 'running', conv: conv(), transcript: null, pane: 'idle', noResume: false };
+    draining: boolean;
+  } = { run: 'running', conv: conv(), transcript: null, pane: 'idle', noResume: false, draining: false };
   const nudge = vi.fn(async () => undefined);
   const resume = vi.fn(async (): Promise<FlywheelResumeOutcome> => ({ kind: 'resumed' }));
   const log = vi.fn();
@@ -79,6 +80,7 @@ function harness(): Harness {
       nudge,
       resume,
       isNoResumeBoot: () => state.noResume,
+      isDraining: () => state.draining,
       bootTimeMs: () => BOOT,
       log,
       now: () => Date.now(),
@@ -252,6 +254,58 @@ describe('watchFlywheelLoop (PAN-5667)', () => {
       h.set({ noResume: false, conv: conv({ forkStatus: 'pending' }) });
       await patrol();
       h.set({ conv: conv({ createdAt: new Date(BOOT + MIN).toISOString() }), transcript: { messages: [], atTurnBoundary: true } });
+      await patrol();
+      expect(h.resume).not.toHaveBeenCalled();
+    });
+
+    it('never auto-resumes after a safe shutdown: the drain ended the row just before the reboot (D-9)', async () => {
+      // `pan shutdown` stopped the idle loop 30 s before the host went down; the
+      // next boot consumed the shutdown record. Every other resume rule holds.
+      h.set({
+        run: 'paused',
+        conv: conv({ status: 'ended', endedAt: new Date(BOOT - 30_000).toISOString() }),
+        transcript: beforeBoot,
+        draining: false,
+      });
+      for (let i = 0; i < 30; i += 1) {
+        expect(await patrol()).toEqual([]);
+        vi.advanceTimersByTime(MIN);
+      }
+      expect(h.resume).not.toHaveBeenCalled();
+      expect(h.nudge).not.toHaveBeenCalled();
+    });
+
+    it('does nothing while the shutdown record exists (a drain in progress)', async () => {
+      // A loop that would otherwise be resumed, then one that would otherwise be nudged.
+      h.set({ run: 'paused', conv: conv({ status: 'active' }), transcript: beforeBoot, draining: true });
+      expect(await patrol()).toEqual([]);
+      h.set({ run: 'running', transcript: { messages: [tickMessage(START - 40 * MIN)], atTurnBoundary: true } });
+      expect(await patrol()).toEqual([]);
+      expect(h.resume).not.toHaveBeenCalled();
+      expect(h.nudge).not.toHaveBeenCalled();
+    });
+
+    it('a resume whose /pan-flywheel delivery failed is nudged on the next patrol', async () => {
+      // The conversation respawned, but sending the skill threw, so the route answered 500.
+      h.set({ run: 'paused', conv: conv({ status: 'active' }), transcript: beforeBoot });
+      h.resume.mockResolvedValueOnce({ kind: 'failed', reason: 'Flywheel message not delivered' });
+      await patrol();
+      expect(h.resume).toHaveBeenCalledTimes(1);
+
+      // Now running, idle, and its newest tick is from before the boot.
+      h.set({ run: 'running' });
+      vi.advanceTimersByTime(MIN);
+      expect((await patrol())[0]).toMatch(/sent \/pan-flywheel/);
+      expect(h.nudge).toHaveBeenCalledTimes(1);
+      expect(h.resume).toHaveBeenCalledTimes(1);
+    });
+
+    it('a loop that never printed a tick is not resumed after a reboot', async () => {
+      h.set({
+        run: 'paused',
+        conv: conv({ status: 'active' }),
+        transcript: { messages: [{ role: 'user', text: '/pan-flywheel', createdAt: new Date(BOOT - 30 * MIN).toISOString() }], atTurnBoundary: false },
+      });
       await patrol();
       expect(h.resume).not.toHaveBeenCalled();
     });

@@ -2580,13 +2580,17 @@ leaves a trace:
     - **Resume after a host reboot.** The run is `paused`, the row was
       created before the host booted and is not mid-fork, it did not end
       before the boot (still `active`, or `ended_at` at or after the boot),
-      nothing was written to its transcript since the boot, its newest tick
-      is not `phase=stopping`, and the boot is not `--no-resume`. The routine
+      nothing was written to its transcript since the boot, it has a tick and
+      the newest is not `phase=stopping`, and the boot is not `--no-resume`.
+      If the resume launches the conversation but `/pan-flywheel` fails to
+      deliver, the next patrol's nudge sends it, since the tick is stale. The routine
       then calls `POST /api/flywheel/resume` with the internal token and
       `unlessStoppedSince: <boot time>`; the route refuses with 409
       `FlywheelStoppedOnPurpose` when the dashboard recorded a deliberate
       stop since then. A failed resume is retried every 5 minutes, three
-      attempts at most per deacon process.
+      attempts at most per deacon process. It never resumes after a safe
+      shutdown: the drain ends the row before the boot (D-9). While the
+      shutdown record exists it does nothing.
 
     Each nudge and resume also goes to the dashboard activity feed. The
     routine never throws, so a failure cannot stop the routines after it.
