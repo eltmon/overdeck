@@ -153,7 +153,7 @@ already holds that registration:
       "command": "npx",
       "args": [
         "-y",
-        "@overdeck/core@0.91.0",
+        "@overdeck/core@0.92.0",
         "mcp",
         "connector",
         "serve",
