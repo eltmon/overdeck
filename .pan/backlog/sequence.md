@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-24T07:28:01Z · model: claude-opus-5-5 · open: 960_
+_Last sequenced: 2026-11-25T11:43:46Z · model: claude-opus-5-5 · open: 962_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -31,9 +31,10 @@ _Last sequenced: 2026-11-24T07:28:01Z · model: claude-opus-5-5 · open: 960_
 | 14 | PAN-5527 | M | high | needs-refinement |  |  | Overlaps merged PAN-5526 (consent field, unread marker); unique part is resuming a promotion interrupted by a dashboard death. |
 | 14 | PAN-5529 | M | high | ok |  |  | Auto-start hand-off still strands: orphaned consent claims, queued container starts lost on restart, read errors read as revoked. |
 | 15 | PAN-4666 | S | critical | ok |  |  | Flywheel status drops live agents whose Herdr pane says 'done'; loop may respawn them. Route via liveness.ts. Needs handoff. |
+| 15 | PAN-5667 | M | critical | ok |  |  | Flywheel stalled 27.5h when Claude Code killed its sleep timer; add deacon watchdog that re-delivers /pan-flywheel. TENET-10 handoff |
 | 16 | PAN-4547 | M | high | ok |  |  | Restore automatic close-out for verifying-on-main issues whose DoD fully passes; close_out.auto inert since PAN-3917 |
 | 17 | PAN-4511 | S | high | ok |  |  | pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch |
-| 18 | PAN-5447 | M | high | ok |  |  | Palette search stalls 15s+: sync 5 GB sqlite-vec scan on the event loop; aborted searches keep running and stall /api/version |
+| 18 | PAN-5666 | M | high | ok |  |  | Fresh Flywheel start drops prior run last tick, in-flight list and open needs-you (incl. security decisions); derive previousRun |
 | 19 | PAN-5381 | S | high | ok |  |  | Dashboard main thread: findProjectByPath runs realpathSync on every project root per call (10.8% of profile); cache roots once. |
 | 20 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
 | 21 | PAN-4551 | L | high | ok |  |  | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
@@ -88,6 +89,7 @@ _Last sequenced: 2026-11-24T07:28:01Z · model: claude-opus-5-5 · open: 960_
 | 68 | PAN-5228 | S | high | ok |  |  | Advisory CodeRabbit journal entries land last and hide stalled reviews from recoverStalledReviews and other last-entry readers. |
 | 69 | PAN-4344 | S | high | ok |  |  | Registered projects lack the agent main-push guard; ship a pre-push hook so agents cannot push to main outside overdeck |
 | 69 | PAN-5661 | S | high | ok |  |  | Issue panel says 'Nothing needs you yet' while the Flywheel holds the issue as needs-you; read needsYouIssueIds in StatusNarrative. |
+| 69 | PAN-5665 | S | high | ok |  |  | Flywheel 'Start fresh' pane keeps showing the old run's transcript; key ConversationPanel by conversation id and show a placeholder |
 | 70 | PAN-4550 | XS | medium | ok |  |  | Two unit tests read host state (DASHSCOPE_BASE_URL, git-ignored .map files), so pan release check reports false reds locally |
 | 71 | PAN-4566 | S | high | ok |  |  | A failed replayEvents leaves the coordinator un-bootstrapped; tab defers live events with no banner. PAN-4559 fallback has landed. |
 | 71 | PAN-5653 | S | high | ok |  |  | 3 CodeRabbit findings on merged PAN-5648; 2 Major: stack lock does not fence a stale holder, file-lock release can delete a new lock. |
@@ -1072,6 +1074,10 @@ Rank unchanged; PAN-5498 closed, so that dependency is removed.
 
 New substrate bug in the Flywheel's own status read model: a second liveness rule in derive-status.ts hides live agents, so the loop or operator may respawn running work; small fix with clear ACs, ranked beside PAN-4636 as critical but labeled needs-handoff (TENET-10), so it goes through a supervised pan handoff.
 
+### PAN-5667 (rank 15)
+
+New issue. The Flywheel loop is the pickup engine, and twice in a week its only cadence source (a background sleep) was reaped, leaving the pipeline idle for 27.5 hours with no recovery. The fix site (deacon patrol keyed on derive-status freshness and liveness.ts idleness) and fake-timer tests are named, so it is ok and ranks beside PAN-4666 as pipeline-blocking substrate work. Per TENET-10 it should go through a supervised handoff.
+
 ### PAN-4547 (rank 16)
 
 Operator decision 2026-10-04 after the Flywheel closed 19 deployed issues by hand. With false DoD refusals fixed by PAN-4543, auto close-out only needs a patrol on the existing verify-on-main path and live settings. High because unclosed issues distort every pipeline view.
@@ -1080,9 +1086,9 @@ Operator decision 2026-10-04 after the Flywheel closed 19 deployed issues by han
 
 pan spawn is the foreman's pane-only item worker, so parallel waves cannot run any item through it on either backend. The test suite never asserts argv, so it stayed green. Small fix with a clear expected behavior.
 
-### PAN-5447 (rank 18)
+### PAN-5666 (rank 18)
 
-New issue. Like PAN-4544 and PAN-5381, it blocks the dashboard event loop: each search runs a 1.1 s synchronous vector scan, superseded keystroke searches are never aborted, and stacked scans froze unrelated routes for 4.8 s. The root cause is measured and the fix direction is concrete, so it ranks with the other event-loop blockers.
+New issue. A fresh start after an unclean stop silently loses open needs-you items, which on 2026-11-25 included two security decisions, and the in-flight list the next run should drain. Code sites and a previousRun status block are specified with tests, so it is ok; it takes the slot vacated by closed PAN-5447.
 
 ### PAN-5381 (rank 19)
 
@@ -1284,10 +1290,6 @@ Concurrent review dispatches race fresh-spawn vs resume, second dispatch resumes
 
 Synthesis fires 42s after spawn and mislabels reviewers-with-reports-on-disk as infra-failure, bypassing review.
 
-### PAN-2706 (rank 67)
-
-Triage: verify whether a never-kicked-off test session can still absorb dispatch under the current liveness model. Rank held.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1295,10 +1297,10 @@ Triage: verify whether a never-kicked-off test session can still absorb dispatch
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-24T07:28:01Z",
+  "generatedAt": "2026-11-25T11:43:46Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 960,
+  "openCount": 962,
   "nodes": [
     {
       "issue": "PAN-5637",
@@ -1644,6 +1646,19 @@ Triage: verify whether a never-kicked-off test session can still absorb dispatch
       "planning": "auto"
     },
     {
+      "issue": "PAN-5667",
+      "rank": 15,
+      "size": "M",
+      "importance": "critical",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Flywheel stalled 27.5h when Claude Code killed its sleep timer; add deacon watchdog that re-delivers /pan-flywheel. TENET-10 handoff",
+      "rationale": "New issue. The Flywheel loop is the pickup engine, and twice in a week its only cadence source (a background sleep) was reaped, leaving the pipeline idle for 27.5 hours with no recovery. The fix site (deacon patrol keyed on derive-status freshness and liveness.ts idleness) and fake-timer tests are named, so it is ok and ranks beside PAN-4666 as pipeline-blocking substrate work. Per TENET-10 it should go through a supervised handoff.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-4547",
       "rank": 16,
       "size": "M",
@@ -1670,15 +1685,15 @@ Triage: verify whether a never-kicked-off test session can still absorb dispatch
       "planning": "auto"
     },
     {
-      "issue": "PAN-5447",
+      "issue": "PAN-5666",
       "rank": 18,
       "size": "M",
       "importance": "high",
       "score": 77,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Palette search stalls 15s+: sync 5 GB sqlite-vec scan on the event loop; aborted searches keep running and stall /api/version",
-      "rationale": "New issue. Like PAN-4544 and PAN-5381, it blocks the dashboard event loop: each search runs a 1.1 s synchronous vector scan, superseded keystroke searches are never aborted, and stacked scans froze unrelated routes for 4.8 s. The root cause is measured and the fix direction is concrete, so it ranks with the other event-loop blockers.",
+      "why": "Fresh Flywheel start drops prior run last tick, in-flight list and open needs-you (incl. security decisions); derive previousRun",
+      "rationale": "New issue. A fresh start after an unclean stop silently loses open needs-you items, which on 2026-11-25 included two security decisions, and the in-flight list the next run should drain. Code sites and a previousRun status block are specified with tests, so it is ok; it takes the slot vacated by closed PAN-5447.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2383,6 +2398,19 @@ Triage: verify whether a never-kicked-off test session can still absorb dispatch
       "dependsOn": [],
       "why": "Issue panel says 'Nothing needs you yet' while the Flywheel holds the issue as needs-you; read needsYouIssueIds in StatusNarrative.",
       "rationale": "New substrate-improvement bug with a clear root cause and fix: StatusNarrative.tsx derives needsYou from pipeline state only, so Flywheel needs-you items (already in the frontend as needsYouIssueIds) never reach the issue panel, and an unplanned idle issue reads as 'Planning what to build'. The label sets a high floor and it directly serves the operator's UI-discoverability priority, but it unblocks no other work, so it sits with the other high, small substrate bugs at rank 69.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5665",
+      "rank": 69,
+      "size": "S",
+      "importance": "high",
+      "score": 64,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Flywheel 'Start fresh' pane keeps showing the old run's transcript; key ConversationPanel by conversation id and show a placeholder",
+      "rationale": "New issue labeled substrate-improvement, so it gets the high floor, but the impact is display-only: the old transcript lingers until the new run writes. Fix and component test are specified, so it is ok and S-sized; it ranks beside the other Flywheel page item PAN-5661.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -14733,6 +14761,20 @@ Triage: verify whether a never-kicked-off test session can still absorb dispatch
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
+    },
+    {
+      "from": "PAN-5665",
+      "to": "PAN-5666",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-5667",
+      "to": "PAN-5666",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     },
     {
       "from": "PAN-750",
