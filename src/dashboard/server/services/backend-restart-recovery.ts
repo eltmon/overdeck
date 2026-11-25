@@ -22,8 +22,8 @@
  *    stream blip leaves every conversation live, so it offers nothing.
  * 3. **Offer.** Each read drops conversations that are live again, archived,
  *    paused (`pan pause`), held (a `--hold` handoff kickoff), or stopped on
- *    purpose. Stopped on purpose is either a stop door in this process
- *    (`conversation-stop-marks.ts`) since a minute before the loss, or a row
+ *    purpose. Stopped on purpose is either a stop door in any process
+ *    (`conversation-stop-marks.ts`, on the row) since a minute before the loss, or a row
  *    ended again after the offer first saw it ended (a stop from any process
  *    rewrites `ended_at`; settle records the first value). The list only
  *    shrinks: a conversation that dies days later is never offered as a

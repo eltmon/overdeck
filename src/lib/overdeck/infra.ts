@@ -178,6 +178,8 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `idle_reset_at` integer');
   // PAN-4651 D-4651-1: the linked machine (environment id) that started this row through a work door; null = started here.
   runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `started_by_environment_id` text');
+  // PAN-5673: when the operator stopped the conversation on purpose (epoch ms); null = not stopped on purpose.
+  runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `stopped_on_purpose_at` integer');
 }
 
 /** `app_settings` key recording that the pipeline-mirror drop already ran. */

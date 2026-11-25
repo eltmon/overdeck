@@ -41,11 +41,13 @@
  *    (a graceful `pan flywheel stop`). Requiring a tick keeps a resume whose
  *    `/pan-flywheel` delivery failed recoverable: the loop is then `running`
  *    with a stale tick, so the next patrol's nudge sends the skill.
- * 6. The dashboard has recorded no deliberate stop of the conversation since
- *    the boot (`conversation-stop-marks.ts`). The stop marks live in the
- *    dashboard process, so the resume goes through `POST /api/flywheel/resume`
- *    with the internal token and `unlessStoppedSince`; the route checks the
- *    marks and refuses with 409 `FlywheelStoppedOnPurpose`.
+ * 6. No deliberate stop of the conversation is recorded since the boot
+ *    (`conversations.stopped_on_purpose_at`, `conversation-stop-marks.ts`).
+ *    The mark is on the row, so a pause survives a dashboard restart
+ *    (PAN-5673). The resume runs in the dashboard, so it goes through
+ *    `POST /api/flywheel/resume` with the internal token and
+ *    `unlessStoppedSince`; the route checks the mark and refuses with 409
+ *    `FlywheelStoppedOnPurpose`.
  *
  * **Never after a safe shutdown (D-9).** `pan shutdown` drains through
  * `handleConversationStop`, so the row ends before the boot and rule 3 leaves
@@ -180,7 +182,7 @@ function internalDashboardOrigin(): string {
 
 /**
  * `POST /api/flywheel/resume` on the dashboard, the process that owns the
- * conversation lifecycle sweep and the stop marks. Never throws.
+ * conversation lifecycle sweep and runs the resume. Never throws.
  */
 export async function resumeFlywheelThroughRoute(
   sinceMs: number,
