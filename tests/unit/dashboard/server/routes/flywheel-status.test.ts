@@ -48,6 +48,7 @@ function offlineDeps(issueIds: readonly string[]): DeriveFlywheelStatusDeps {
     getConversation: () => null,
     sessionAlive: async () => false,
     readTranscript: async () => [],
+    listRetiredConversations: () => [],
     resolveProjectPath: () => PROJECT_ROOT,
     resolvePlanHome: () => PROJECT_ROOT,
     listWorkspaces: () => issueIds.map((issueId) => ({

@@ -56,6 +56,8 @@ flywheel-tick: tick=3 pick=PAN-3964 phase=watch in-flight=PAN-3964,PAN-3920 need
 
 `start` refuses to run while a flywheel is already running, and refuses a paused one too unless you pass `--fresh`, which replaces the paused conversation (its old transcript stays on disk). `stop` pauses the loop either way, even when no report arrives within `--timeout`.
 
+A new run does not inherit the old conversation's working context. It keeps only the previous run's last tick: `pan flywheel status --json` reports it under `previousRun`, the new loop drains its in-flight issues first and carries its open needs-you items forward, and the page keeps listing those items until the new run's first tick. After a crash or a reboot, **Resume** is usually the better choice, because it continues the same conversation. The **Start fresh** confirm says what the new loop keeps and recommends **Resume** when the paused run did not stop cleanly.
+
 The Flywheel page's toolbar shows different buttons depending on run state: idle shows **Start** (and **Start fresh** when a leftover session is detected); paused shows **Resume** and **Start fresh**; running shows **Pause**, **Report**, **Stop** and **Abort**. **Pop out** and a **Conversation** / **Terminal** toggle are always available.
 
 While a start is in progress the conversation area shows **Starting the Flywheel…** (or **Starting a fresh Flywheel…** for Start fresh) instead of a transcript. A fresh run's pane shows only that run's messages; the previous run's transcript stays on disk but is no longer shown there.

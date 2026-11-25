@@ -169,6 +169,53 @@ describe('FlywheelConversationPane (PAN-3964 FR-13)', () => {
     expect(confirmMock).toHaveBeenCalledOnce();
   });
 
+  // PAN-5666: the confirm names what the new loop keeps and drops, and
+  // recommends Resume when the paused run did not stop cleanly.
+  it('Start fresh names the tick and needs-you items it keeps and recommends Resume after an unclean stop', async () => {
+    stubFetch((url, init) => {
+      if (url === '/api/flywheel/status') {
+        return Response.json(flywheelStatus({
+          run: 'paused',
+          lastTick: { tick: 131, pick: null, phase: 'watch', inFlight: ['PAN-5649'], needsYou: 'rotate secrets; Semgrep tiers', at: '2026-09-23T09:59:40.000Z' },
+        }));
+      }
+      if (url === '/api/conversations/conv-flywheel') return Response.json(conversation);
+      if (url === '/api/settings') return Response.json({ roles: {} });
+      if (url.startsWith('/api/flywheel/') && init?.method === 'POST') return Response.json({ success: true });
+      return undefined;
+    });
+    renderWithQuery(<FlywheelConversationPane />);
+    await screen.findByRole('button', { name: 'Resume' });
+    fireEvent.click(screen.getByRole('button', { name: 'Start fresh' }));
+    await waitFor(() => expect(confirmMock).toHaveBeenCalledOnce());
+    const { message } = (confirmMock.mock.calls[0] as unknown as [{ message: string }])[0];
+    expect(message).toContain('keeps only tick 131');
+    expect(message).toContain('2 open needs-you items');
+    expect(message).toContain('did not stop cleanly, so Resume is recommended');
+  });
+
+  it('Start fresh does not recommend Resume after a clean stop', async () => {
+    stubFetch((url, init) => {
+      if (url === '/api/flywheel/status') {
+        return Response.json(flywheelStatus({
+          run: 'paused',
+          lastTick: { tick: 40, pick: null, phase: 'stopping', inFlight: [], needsYou: null, at: '2026-09-23T09:59:40.000Z' },
+        }));
+      }
+      if (url === '/api/conversations/conv-flywheel') return Response.json(conversation);
+      if (url === '/api/settings') return Response.json({ roles: {} });
+      if (url.startsWith('/api/flywheel/') && init?.method === 'POST') return Response.json({ success: true });
+      return undefined;
+    });
+    renderWithQuery(<FlywheelConversationPane />);
+    await screen.findByRole('button', { name: 'Resume' });
+    fireEvent.click(screen.getByRole('button', { name: 'Start fresh' }));
+    await waitFor(() => expect(confirmMock).toHaveBeenCalledOnce());
+    const { message } = (confirmMock.mock.calls[0] as unknown as [{ message: string }])[0];
+    expect(message).toContain('keeps only tick 40');
+    expect(message).not.toContain('Resume is recommended');
+  });
+
   it.each(['Stop', 'Abort'] as const)('%s asks for confirmation first and does nothing when declined', async (label) => {
     const fetchMock = setup('running');
     confirmMock.mockResolvedValue(false);

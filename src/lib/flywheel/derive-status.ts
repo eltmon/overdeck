@@ -9,6 +9,8 @@
  *
  *   - the `conv-flywheel` conversation row and whether its session is alive,
  *   - the newest tick marker in that conversation's transcript,
+ *   - the previous run's last tick, from the newest retired
+ *     `conv-flywheel~…` conversation (`previous-run.ts`, PAN-5666),
  *   - the project's `workspaces/feature-*` directories, their derived issue
  *     state, and the last entry of each pipeline journal,
  *   - the control-settings policies,
@@ -46,6 +48,7 @@ import {
   FLYWHEEL_FRESHNESS_LIVE_MS,
 } from './constants.js';
 import { findLastTick, resolveNeedsYouItems, type TickMarkerMessage } from './tick-marker.js';
+import { derivePreviousRun, type PreviousRunDeps } from './previous-run.js';
 import {
   activityFrom,
   deriveBlocker,
@@ -70,6 +73,8 @@ export interface DeriveFlywheelStatusDeps {
   getConversation?: (name: string) => LegacyConversation | null | Promise<LegacyConversation | null>;
   sessionAlive?: (tmuxSession: string) => Promise<boolean>;
   readTranscript?: (conv: LegacyConversation) => Promise<readonly TickMarkerMessage[]>;
+  /** The retired `conv-flywheel~…` rows, newest first (PAN-5666). */
+  listRetiredConversations?: PreviousRunDeps['listRetiredConversations'];
   /** Resolve a directory to its registered project root (null = unregistered). */
   resolveProjectPath?: (dir: string) => string | null | Promise<string | null>;
   resolvePlanHome?: (projectRoot: string) => string | Promise<string>;
@@ -536,9 +541,16 @@ export async function deriveFlywheelStatus(options: DeriveFlywheelStatusOptions 
       }
     : null;
 
-  const messages = conv ? await (deps.readTranscript ?? readFlywheelTranscript)(conv) : [];
+  const readTranscript = deps.readTranscript ?? readFlywheelTranscript;
+  const messages = conv ? await readTranscript(conv) : [];
   const newestTick = findLastTick(messages);
   const lastTick = newestTick ? { ...newestTick, needsYouItems: resolveNeedsYouItems(messages) } : null;
+  // The run before this one (PAN-5666). Its in-flight ids stay out of the
+  // board: only the running loop's own tick names what it drives.
+  const previousRun = await derivePreviousRun(conv, {
+    readTranscript,
+    ...(deps.listRetiredConversations ? { listRetiredConversations: deps.listRetiredConversations } : {}),
+  });
 
   const { projectRoot, planHome } = await resolveRoots(conv?.cwd ?? options.projectRoot ?? process.cwd(), deps);
   const panDir = join(planHome, '.pan');
@@ -716,6 +728,7 @@ export async function deriveFlywheelStatus(options: DeriveFlywheelStatusOptions 
     run,
     conversation,
     lastTick,
+    previousRun,
     freshness: lastTick ? freshnessFor(lastTick.at, now) : null,
     policies,
     inFlight,

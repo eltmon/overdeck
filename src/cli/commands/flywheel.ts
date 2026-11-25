@@ -193,6 +193,13 @@ export function formatFlywheelStatus(status: FlywheelDerivedStatus, nowMs = Date
   } else if (status.run === 'running') {
     lines.push(chalk.dim('  waiting for the first tick'));
   }
+  // PAN-5666: the run before this one, and its needs-you until this run ticks.
+  const previous = status.previousRun;
+  if (previous) {
+    const p = previous.lastTick;
+    lines.push(chalk.dim(`  previous   ${previous.conversation.name} · tick ${p.tick} · ${p.phase} · ${relativeAge(p.at, nowMs)} · ${previous.stoppedCleanly ? 'stopped cleanly' : 'no clean stop'} · in-flight ${p.inFlight.length ? p.inFlight.join(',') : 'none'}`));
+    if (!status.lastTick && p.needsYou) lines.push(chalk.yellow(`  needs you  ${p.needsYou} (from the previous run)`));
+  }
   const p = status.policies;
   lines.push(`  policies   auto-pickup ${p.auto_pickup_backlog ? 'on' : 'off'} · require UAT ${p.require_uat_before_merge ? 'on' : 'off'} · merge train ${p.merge_train_enabled ? 'on' : 'off'}`);
   if (status.orderBook) {

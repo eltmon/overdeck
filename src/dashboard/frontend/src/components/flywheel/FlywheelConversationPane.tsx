@@ -11,6 +11,7 @@ import { useEffect, useLayoutEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { FileText, Loader2, Maximize2, Pause, Play, RotateCcw, Square, StopCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { splitNeedsYouItems, type FlywheelLastTick } from '@overdeck/contracts';
 
 import {
   claimFlywheelTranscriptCache,
@@ -82,6 +83,24 @@ function useRunAction(action: FlywheelAction, onError?: (error: Error) => void) 
 
 /** The route's 409 for a leftover `conv-flywheel` session with no row (D9). */
 const ORPHAN_CODE = 'FlywheelOrphanSession';
+
+/**
+ * What Start fresh keeps and drops for the paused run it replaces (PAN-5666).
+ * The new loop keeps only the last tick, which status derives as
+ * `previousRun`; the conversation's working context is lost. A run whose last
+ * tick is not `phase=stopping` did not stop cleanly, so Resume is the better
+ * choice.
+ */
+function startFreshMessage(tick: FlywheelLastTick | null): string {
+  const items = tick ? splitNeedsYouItems(tick.needsYou).length : 0;
+  const kept = tick
+    ? `The new loop keeps only tick ${tick.tick}: its in-flight list and its ${items} open needs-you item${items === 1 ? '' : 's'}. It loses this conversation's working context.`
+    : 'This run wrote no tick, so the new loop starts with nothing from it.';
+  const advice = tick && tick.phase !== 'stopping'
+    ? ' This run did not stop cleanly, so Resume is recommended: it continues the same conversation with its full context.'
+    : '';
+  return `Start fresh replaces the paused flywheel conversation with a new one. ${kept}${advice} The old transcript stays on disk. Continue?`;
+}
 
 interface FlywheelConversationPaneProps {
   onOpenSettings?: () => void;
@@ -158,7 +177,7 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
       title: 'Start a fresh flywheel',
       message: orphanDetected
         ? `A leftover ${FLYWHEEL_CONVERSATION_NAME} session is still running with no conversation row. Start fresh replaces it with a new one; the old transcript stays on disk. Continue?`
-        : 'The paused flywheel conversation is replaced by a new one. The old transcript stays on disk. Continue?',
+        : startFreshMessage(statusQuery.data?.lastTick ?? null),
       confirmLabel: 'Start fresh',
       variant: 'destructive',
     });
