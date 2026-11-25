@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient } from '@tanstack/react-query';
 import type { FlywheelDerivedStatus } from '@overdeck/contracts';
@@ -10,27 +10,38 @@ vi.mock('../../../lib/wsTransport', () => ({
 }));
 vi.mock('../../DialogProvider', () => ({ useConfirm: () => confirmMock }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
-vi.mock('../../chat/ConversationPanel', () => ({
-  ConversationPanel: ({
-    conversation, embedded, targetMessageId, targetMessageNonce, onTargetMessageHandled,
-  }: {
-    conversation: { name: string };
-    embedded?: boolean;
-    targetMessageId?: string;
-    targetMessageNonce?: number;
-    onTargetMessageHandled?: () => void;
-  }) => (
-    <div
-      data-testid="conversation-panel"
-      data-embedded={String(embedded)}
-      data-target-id={targetMessageId ?? ''}
-      data-target-nonce={targetMessageNonce ?? ''}
-    >
-      {conversation.name}
-      <button type="button" data-testid="mock-target-handled" onClick={() => onTargetMessageHandled?.()}>target-handled</button>
-    </div>
-  ),
-}));
+vi.mock('../../chat/ConversationPanel', async () => {
+  const { useQuery } = await import('@tanstack/react-query');
+  return {
+    ConversationPanel: ({
+      conversation, embedded, targetMessageId, targetMessageNonce, onTargetMessageHandled,
+    }: {
+      conversation: { name: string };
+      embedded?: boolean;
+      targetMessageId?: string;
+      targetMessageNonce?: number;
+      onTargetMessageHandled?: () => void;
+    }) => {
+      const { data } = useQuery<{ messages: Array<{ id: string; text: string }> }>({
+        queryKey: ['conversation-messages', conversation.name],
+        queryFn: () => new Promise(() => {}),
+        enabled: false,
+      });
+      return (
+        <div
+          data-testid="conversation-panel"
+          data-embedded={String(embedded)}
+          data-target-id={targetMessageId ?? ''}
+          data-target-nonce={targetMessageNonce ?? ''}
+        >
+          {conversation.name}
+          {(data?.messages ?? []).map((m) => <p key={m.id} data-testid="mock-message">{m.text}</p>)}
+          <button type="button" data-testid="mock-target-handled" onClick={() => onTargetMessageHandled?.()}>target-handled</button>
+        </div>
+      );
+    },
+  };
+});
 vi.mock('../../EventRouter', () => ({ EventRouter: () => null }));
 vi.mock('../../../hooks/useCodexAutoRetry', () => ({ useCodexAutoRetry: () => undefined }));
 vi.mock('../../XTerminal', () => ({
@@ -39,7 +50,7 @@ vi.mock('../../XTerminal', () => ({
 
 import { FlywheelConversationPane } from '../FlywheelConversationPane';
 import { StandaloneFlywheelPopoutRoute } from '../../../App/StandaloneRoutes';
-import { claimFlywheelTranscriptCache, flywheelRunIdentity } from '../../../lib/flywheelApi';
+import { claimFlywheelTranscriptCache, flywheelRunIdentity, FLYWHEEL_CONVERSATION_QUERY_KEY } from '../../../lib/flywheelApi';
 import { useComposerStore } from '../../../lib/composerStore';
 import { flywheelStatus, renderWithQuery, stubFetch } from './fixtures';
 
@@ -186,6 +197,64 @@ describe('FlywheelConversationPane (PAN-3964 FR-13)', () => {
     await screen.findByRole('button', { name: 'Pause' });
     expect(labels()).not.toContain('Pop out');
     expect(screen.queryByTestId('sidebar-home')).toBeNull();
+  });
+});
+
+describe('a new run never shows the previous run (PAN-5665)', () => {
+  const conversationA = { id: 42, name: 'conv-flywheel', tmuxSession: 'conv-flywheel', status: 'active', cwd: '/repos/overdeck', sessionAlive: true, createdAt: '2026-11-25T08:00:00.000Z' };
+  const conversationB = { ...conversationA, createdAt: '2026-11-25T09:00:00.000Z' };
+
+  function setupWithConversation(getConversation: () => typeof conversationA) {
+    return stubFetch((url, init) => {
+      if (url === '/api/flywheel/status') return Response.json(flywheelStatus({ run: 'running' }));
+      if (url === '/api/conversations/conv-flywheel') return Response.json(getConversation());
+      if (url === '/api/settings') return Response.json({ roles: { flywheel: { model: 'claude-opus-5-5', harness: 'claude-code', maxAgents: 6 } } });
+      if (url.startsWith('/api/flywheel/') && init?.method === 'POST') return Response.json({ success: true });
+      return undefined;
+    });
+  }
+
+  it('same id, new createdAt: the previous run\'s cached message and subagent transcript disappear', async () => {
+    let current = conversationA;
+    setupWithConversation(() => current);
+    const { client } = renderWithQuery(<FlywheelConversationPane />);
+    await screen.findByTestId('conversation-panel');
+
+    client.setQueryData(['conversation-messages', 'conv-flywheel'], {
+      messages: [{ id: 'm1', role: 'assistant', text: 'old run tick 131', createdAt: '2026-11-25T08:05:00.000Z' }],
+    });
+    client.setQueryData(['conversation-messages', 'conv-flywheel', 'subagent', 'a1'], {
+      messages: [{ id: 's1', role: 'assistant', text: 'sub transcript', createdAt: '2026-11-25T08:05:00.000Z' }],
+    });
+    await screen.findByText('old run tick 131');
+
+    current = conversationB;
+    await act(async () => {
+      await client.refetchQueries({ queryKey: FLYWHEEL_CONVERSATION_QUERY_KEY });
+    });
+
+    await waitFor(() => expect(screen.queryByText('old run tick 131')).toBeNull());
+    expect(client.getQueryData(['conversation-messages', 'conv-flywheel'])).toBeUndefined();
+    expect(client.getQueryData(['conversation-messages', 'conv-flywheel', 'subagent', 'a1'])).toBeUndefined();
+    expect(screen.getByTestId('conversation-panel')).toHaveTextContent('conv-flywheel');
+  });
+
+  it('same row: refetching the unchanged row keeps the cached message', async () => {
+    const current = conversationA;
+    setupWithConversation(() => current);
+    const { client } = renderWithQuery(<FlywheelConversationPane />);
+    await screen.findByTestId('conversation-panel');
+
+    client.setQueryData(['conversation-messages', 'conv-flywheel'], {
+      messages: [{ id: 'm1', role: 'assistant', text: 'old run tick 131', createdAt: '2026-11-25T08:05:00.000Z' }],
+    });
+    await screen.findByText('old run tick 131');
+
+    await act(async () => {
+      await client.refetchQueries({ queryKey: FLYWHEEL_CONVERSATION_QUERY_KEY });
+    });
+
+    await screen.findByText('old run tick 131');
   });
 });
 
