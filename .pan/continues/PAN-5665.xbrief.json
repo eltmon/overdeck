@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5665",
+  "created": "2026-11-25T12:06:20.386Z",
+  "updated": "2026-11-25T12:06:20.387Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "cache-claim-helpers": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5665",
+      "claimedAt": "2026-11-25T12:06:20.386Z"
+    }
+  }
+}
