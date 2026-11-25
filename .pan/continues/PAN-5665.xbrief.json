@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5665",
   "created": "2026-11-25T12:06:20.386Z",
-  "updated": "2026-11-25T12:20:44.599Z",
+  "updated": "2026-11-25T12:20:51.164Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,11 @@
     "pane-run-gate.ac4": {
       "status": "completed",
       "doneAt": "2026-11-25T12:20:44.599Z"
+    },
+    "starting-placeholder": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5665",
+      "claimedAt": "2026-11-25T12:20:51.164Z"
     }
   }
 }
