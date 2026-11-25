@@ -22,7 +22,7 @@ import type {
 } from '@overdeck/contracts';
 import { getOverdeckDatabase } from './infra.js';
 import { parseSkillOverridesColumn } from './conversation-launch-context.js';
-import { vacateConversationName } from './conversation-replace.js';
+import { retireConversationName, vacateConversationName } from './conversation-replace.js';
 import { resolveWorkspaceForCwd } from '../workspaces/resolver.js';
 import { getEventStore } from '../../dashboard/server/event-store.js';
 import { ensureDiscoveredSessionsSchema } from './discovered-sessions.js';
@@ -883,6 +883,23 @@ export function archiveConversation(name: string): void {
   const db = overdeckDb();
   db.prepare(`UPDATE conversations SET archived_at = ? WHERE name = ?`).run(toMillis(), name);
   db.prepare(`DELETE FROM favorites WHERE type = 'conversation' AND item_id = ?`).run(name);
+}
+
+/** PAN-5666: archive the row under `<name>~<id8>` so a new row can take `name`; see retireConversationName. */
+export function retireConversation(name: string): string | null {
+  return retireConversationName(overdeckDb(), name, toMillis());
+}
+
+/** PAN-5666: the rows retired from `name` (named `<name>~…`), newest first. */
+export function listRetiredConversations(name: string, limit = 5): LegacyConversation[] {
+  const prefix = `${name}~`;
+  const rows = overdeckDb()
+    .prepare(`${LEGACY_CONVERSATION_SELECT}
+      WHERE substr(c.name, 1, ?) = ?
+      ORDER BY c.created_at DESC, c.rowid DESC
+      LIMIT ?`)
+    .all(prefix.length, prefix, limit) as LegacyConversationRow[];
+  return rows.map(rowToLegacyConversation);
 }
 
 export function unarchiveConversation(name: string): void {

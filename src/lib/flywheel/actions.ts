@@ -2,8 +2,9 @@
  * Flywheel actions (PAN-3964 FR-5, D4, D5).
  *
  * The CLI verbs and the `/api/flywheel/*` POST routes are both thin wrappers
- * over these functions. None of them writes a run record: start creates the
- * `conv-flywheel` conversation, pause/abort stop it through the ordinary
+ * over these functions. None of them writes a run record: start retires the
+ * previous `conv-flywheel` row (kept as `conv-flywheel~<id8>` so status can
+ * derive `previousRun`, PAN-5666) and creates a new one, pause/abort stop it through the ordinary
  * conversation stop path (session killed, row marked ended, transcript kept),
  * resume respawns it and re-sends `/pan-flywheel`, and report/stop ask the
  * loop itself to write `.pan/flywheel/report.md`.
@@ -80,6 +81,8 @@ export interface FlywheelActionDeps extends Pick<
     name: string; tmuxSession: string; cwd: string; claudeSessionId: string; title: string;
     titleSource: 'manual'; model: string; effort: string; harness: RuntimeName;
   }) => unknown;
+  /** Keep the previous `conv-flywheel` row under a retired name instead of deleting it (PAN-5666). */
+  retireConversation?: (name: string) => unknown;
   spawnSession?: (session: string, cwd: string, claudeSessionId: string, model: string, harness: RuntimeName, effort: EffortLevel) => Promise<void>;
   waitReady?: (session: string, harness: RuntimeName, mode: 'spawn' | 'respawn') => Promise<void>;
   /** Deliver a message (a slash command, a request) to the loop and submit it. */
@@ -126,6 +129,11 @@ export async function resolveFlywheelLaunch(
 async function defaultCreateConversation(opts: Parameters<NonNullable<FlywheelActionDeps['createConversation']>>[0]): Promise<void> {
   const { createConversation } = await import('../overdeck/conversations.js');
   createConversation(opts);
+}
+
+async function defaultRetireConversation(name: string): Promise<void> {
+  const { retireConversation } = await import('../overdeck/conversations.js');
+  retireConversation(name);
 }
 
 async function defaultSpawnSession(session: string, cwd: string, claudeSessionId: string, model: string, harness: RuntimeName, effort: EffortLevel): Promise<void> {
@@ -210,6 +218,13 @@ export async function startFlywheel(opts: FlywheelStartOptions = {}, deps: Flywh
 
   const cwd = opts.cwd ?? process.cwd();
   const { model, harness, effort } = await (deps.resolveModelAndHarness ?? resolveFlywheelLaunch)(opts);
+
+  // The previous run's row (paused, crashed, or archived) is retired, not
+  // deleted: status derives `previousRun` — its last tick, in-flight list and
+  // open needs-you items — from it, and the new loop's Orient reads that
+  // (PAN-5666). Without this, `createConversation` below drops the row and the
+  // old transcript can no longer be found.
+  await (deps.retireConversation ?? defaultRetireConversation)(FLYWHEEL_CONVERSATION_SESSION);
 
   // Register the conversation before the session exists, so the dashboard's
   // conversation list sees it the moment it comes up. An operator

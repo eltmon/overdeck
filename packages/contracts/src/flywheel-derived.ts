@@ -123,6 +123,26 @@ export const FlywheelLastTick = Schema.Struct({
 })
 export type FlywheelLastTick = typeof FlywheelLastTick.Type
 
+/**
+ * The run before this one (PAN-5666): the newest retired `conv-flywheel~…`
+ * conversation that wrote a tick marker. `pan flywheel start` retires the
+ * previous row instead of deleting it, so its last tick, in-flight list and
+ * open needs-you items survive a fresh start, a crash or a reboot.
+ */
+export const FlywheelPreviousRun = Schema.Struct({
+  conversation: Schema.Struct({
+    /** The retired name, `conv-flywheel~<id8>`. */
+    name: Schema.String,
+    id: Schema.Number,
+    createdAt: Schema.String,
+    endedAt: Schema.NullOr(Schema.String),
+  }),
+  lastTick: FlywheelLastTick,
+  /** The last tick was `phase=stopping`: the run wrote its report and ended. */
+  stoppedCleanly: Schema.Boolean,
+})
+export type FlywheelPreviousRun = typeof FlywheelPreviousRun.Type
+
 export const FlywheelPolicies = Schema.Struct({
   auto_pickup_backlog: Schema.Boolean,
   require_uat_before_merge: Schema.Boolean,
@@ -326,6 +346,8 @@ export const FlywheelDerivedStatus = Schema.Struct({
   run: FlywheelRunState,
   conversation: Schema.NullOr(FlywheelConversationSummary),
   lastTick: Schema.NullOr(FlywheelLastTick),
+  /** The previous run's last tick (PAN-5666); absent from payloads older than it. */
+  previousRun: Schema.optional(Schema.NullOr(FlywheelPreviousRun)),
   freshness: Schema.NullOr(FlywheelFreshness),
   policies: FlywheelPolicies,
   inFlight: Schema.Array(FlywheelInFlightRow),
@@ -344,6 +366,39 @@ export const FlywheelDerivedStatus = Schema.Struct({
   shipped: Schema.optional(FlywheelShipped),
 })
 export type FlywheelDerivedStatus = typeof FlywheelDerivedStatus.Type
+
+/**
+ * The tick whose needs-you items the page and `pan flywheel status` show
+ * (PAN-5666). The current run's newest tick is the authority once it exists:
+ * the loop carries every open item forward verbatim, and an item it drops is
+ * resolved. Before that first tick, the previous run's items stay open. Their
+ * message ids are dropped because they point into the previous transcript.
+ */
+export function needsYouTick(
+  status: Pick<FlywheelDerivedStatus, "lastTick" | "previousRun">,
+): FlywheelLastTick | null {
+  if (status.lastTick) return status.lastTick
+  const previous = status.previousRun?.lastTick
+  if (!previous) return null
+  return {
+    tick: previous.tick,
+    pick: previous.pick,
+    phase: previous.phase,
+    inFlight: previous.inFlight,
+    needsYou: previous.needsYou,
+    at: previous.at,
+    ...(previous.needsYouItems
+      ? {
+          needsYouItems: previous.needsYouItems.map((item) => ({
+            text: item.text,
+            firstRaisedTick: item.firstRaisedTick,
+            firstRaisedAt: item.firstRaisedAt,
+            ...(item.context ? { context: item.context } : {}),
+          })),
+        }
+      : {}),
+  }
+}
 
 /** Cards on the Deploy and Done-today lanes. */
 export function shippedCardCount(status: Pick<FlywheelDerivedStatus, "shipped">): number {
