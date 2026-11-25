@@ -200,12 +200,12 @@ instead (`src/dashboard/server/services/backend-restart-recovery.ts`, primary da
 3. **Offer.** `GET /api/backend-restart-recovery` (`read:conversations`) serves the list as one
    Needs-you row (`BackendRestartCard`). Each read drops conversations that are live again, archived,
    released to another machine, paused (`pan pause`), holding a `--hold` kickoff, or stopped on
-   purpose. Stopped on purpose is either a stop door in the dashboard process since a minute
-   before the loss (`handleConversationStop`, lane stop and lane reap write `conversation-stop-marks.ts`)
-   or a row ended again after the offer first saw it ended: a stop from any process, such as
-   `pan flywheel pause` in a CLI process, rewrites `ended_at`. A failed resume's own later `ended_at`
-   change is not a stop. Two gaps remain: a CLI-process stop in the minute before the loss, and one
-   in the seconds between the lifecycle poll ending the row and the offer's first read of it.
+   purpose. Stopped on purpose is either a deliberate stop recorded since a minute before the loss
+   (`handleConversationStop`, lane stop and lane reap write `conversations.stopped_on_purpose_at`
+   through `conversation-stop-marks.ts`, from any process, including `pan flywheel pause` in a CLI
+   process; a dashboard restart keeps it) or a row ended again after the offer first saw it ended.
+   A failed resume's own later `ended_at` change is not a stop. A successful resume or restart
+   clears the stop mark.
 4. **Resume all.** `POST /api/backend-restart-recovery/resume-all` (`operate`) resumes them one at a
    time through `handleConversationResume` with resume cause `system`, so the resume contract says the
    process ended unexpectedly, and each harness takes a turn to re-arm its timers and loops.

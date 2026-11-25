@@ -204,8 +204,9 @@ export async function postFlywheelStartPayload(body: Record<string, unknown>): P
 /**
  * `unlessStoppedSince` (epoch ms, PAN-5667) is the deacon's reboot resume: it
  * asks this route to refuse when the conversation was stopped on purpose at or
- * after that time. The stop marks live only in this process
- * (`conversation-stop-marks.ts`), which is why the deacon child asks here.
+ * after that time. The stop mark is on the conversation row
+ * (`conversation-stop-marks.ts`, PAN-5673); the deacon child asks here because
+ * the resume itself runs in the dashboard.
  */
 export async function postFlywheelResumePayload(
   body: Record<string, unknown>,

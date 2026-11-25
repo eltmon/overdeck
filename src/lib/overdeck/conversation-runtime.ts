@@ -91,7 +91,7 @@ import { piSessionsRoot } from '../runtimes/storage/pi.js';
 import { conversationContextEnvExports, conversationLaunchContext, type ConversationLaunchContext } from './conversation-launch-context.js';
 import { ConversationCreateInputError, parseConversationLaunchContext, resolveConversationCreateTarget } from './conversation-create-input.js';
 import { FLYWHEEL_CONVERSATION_SESSION } from '../flywheel/constants.js';
-import { recordConversationStop } from './conversation-stop-marks.js';
+import { clearConversationStop, recordConversationStop } from './conversation-stop-marks.js';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 const PROCESS_CLEANUP_GRACE_MS = 750;
@@ -1143,6 +1143,7 @@ export async function handleConversationResume(
     if (claudeAlive) {
       updateLastAttached(name);
       markConversationActive(name);
+      clearConversationStop(name); // PAN-5673: resumed, so no longer stopped on purpose
       return jsonResponse({ ...conv, status: 'active', reattached: true, ...(requestedName !== name ? { redirectedFrom: requestedName } : {}) });
     }
     const oldSessionId = conv.claudeSessionId, resumeCause = deps.resumeCause ?? (conv.status === 'ended' ? 'operator' : 'system'), sendResumeContract = body['sendResumeContract'] !== false && !conv.bareContext;
@@ -1180,6 +1181,7 @@ export async function handleConversationResume(
       }, deps.deliverKickoff);
       if (caps.resumeContractMustLand) assertKimiResumeContractResult(resumeContractResult);
       markConversationActive(name);
+      clearConversationStop(name); // PAN-5673
       return jsonResponse({ ...conv, status: 'active', model: model ?? conv.model, effort: getConversationByName(name)?.effort ?? conv.effort, harness, reattached: false, sessionAlive: true, ...(requestedName !== name ? { redirectedFrom: requestedName } : {}) });
     } catch (error) {
       // PAN-1837: a failed capture must not leave a running session with no owned native identity.

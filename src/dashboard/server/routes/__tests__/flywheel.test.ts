@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => ({
   abortFlywheel: vi.fn(),
   requestFlywheelReport: vi.fn(),
 }));
+const stopMarks = vi.hoisted(() => new Map<string, number>());
 
 vi.mock('../../../../lib/flywheel/derive-status.js', () => ({
   deriveFlywheelStatus: mocks.deriveFlywheelStatus,
@@ -45,6 +46,12 @@ vi.mock('../../../../lib/flywheel/actions.js', () => ({
   stopFlywheel: mocks.stopFlywheel,
   abortFlywheel: mocks.abortFlywheel,
   requestFlywheelReport: mocks.requestFlywheelReport,
+}));
+
+// The stop marks live on the conversation row (PAN-5673); keep them off the real database here.
+vi.mock('../../../../lib/overdeck/conversation-stop-marks.js', () => ({
+  recordConversationStop: (name: string, atMs: number) => { stopMarks.set(name, atMs); },
+  conversationStoppedSince: (name: string, sinceMs: number) => (stopMarks.get(name) ?? -Infinity) >= sinceMs,
 }));
 
 const { flywheelRouteLayer } = await import('../flywheel.js');
@@ -152,11 +159,10 @@ describe('/api/flywheel routes (PAN-3964 FR-7)', () => {
   });
 
   it('POST /resume with unlessStoppedSince refuses a flywheel stopped on purpose since then (PAN-5667)', async () => {
-    const { recordConversationStop, _resetConversationStopMarksForTests } = await import('../../../../lib/overdeck/conversation-stop-marks.js');
-    _resetConversationStopMarksForTests();
+    stopMarks.clear();
     mocks.resumeFlywheel.mockResolvedValue({ session: 'conv-flywheel' });
 
-    recordConversationStop('conv-flywheel', 1_000);
+    stopMarks.set('conv-flywheel', 1_000);
     expect((await request('/api/flywheel/resume', trustedPost({ unlessStoppedSince: 500 })))).toEqual({
       status: 409,
       body: { error: 'The flywheel was stopped on purpose after that time', code: 'FlywheelStoppedOnPurpose' },
@@ -168,7 +174,7 @@ describe('/api/flywheel routes (PAN-3964 FR-7)', () => {
     expect(mocks.resumeFlywheel).toHaveBeenCalledTimes(1);
 
     expect((await request('/api/flywheel/resume', trustedPost({ unlessStoppedSince: 'soon' }))).status).toBe(400);
-    _resetConversationStopMarksForTests();
+    stopMarks.clear();
   });
 
   it('POST /stop answers 202 and runs the graceful stop in the background', async () => {

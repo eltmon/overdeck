@@ -266,3 +266,41 @@ describe('PAN-4640 resume cause override', () => {
     expect(contract).toContain('The operator resumed this session');
   });
 });
+
+describe('PAN-5673 a resume clears the deliberate stop', () => {
+  beforeEach(() => {
+    ensurePtySupervisorBuildArtifact();
+    overdeckHome = join(tmpdir(), `pan-conv-resume-stop-mark-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    process.env.OVERDECK_HOME = overdeckHome;
+    mkdirSync(overdeckHome, { recursive: true });
+    fakeHome = overdeckHome;
+    resolvedHarnessBinary = '/usr/bin/claude';
+    createSessionCalls = [];
+  });
+
+  afterEach(async () => {
+    await resetConversationDb();
+    rmSync(overdeckHome, { recursive: true, force: true });
+    delete process.env.OVERDECK_HOME;
+  });
+
+  it('respawning a conversation stopped on purpose clears its stop mark', async () => {
+    const { createConversation, markConversationEnded } = await import('../conversations.js');
+    const { handleConversationResume } = await import('../conversation-runtime.js');
+    const { conversationStoppedSince, recordConversationStop } = await import('../conversation-stop-marks.js');
+    const name = 'resume-stop-mark';
+    const cwd = join(overdeckHome, 'projects', name);
+    mkdirSync(cwd, { recursive: true });
+    const sessionFile = join(overdeckHome, `${name}.jsonl`);
+    writeFileSync(sessionFile, '');
+    createConversation({ name, tmuxSession: `conv-${name}`, cwd, harness: 'claude-code', claudeSessionId: `${name}-session` });
+    recordConversationStop(name, 1_000);
+    markConversationEnded(name);
+
+    const response = await handleConversationResume(name, {}, { resolveSessionFile: async () => sessionFile });
+
+    expect(decodeJsonResponse(response as unknown as { body: unknown })['status']).toBe('active');
+    expect(createSessionCalls).toHaveLength(1);
+    expect(conversationStoppedSince(name, 0)).toBe(false);
+  });
+});

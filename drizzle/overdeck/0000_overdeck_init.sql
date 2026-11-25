@@ -179,6 +179,7 @@ CREATE TABLE `conversations` (
 	`auto_settle_override` text,
 	`idle_reset_at` integer,
 	`started_by_environment_id` text,
+	`stopped_on_purpose_at` integer,
 	FOREIGN KEY (`handoff_target_conv_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`cleared_to_conv_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`parent_conversation_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE no action,
