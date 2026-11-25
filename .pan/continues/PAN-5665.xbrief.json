@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5665",
   "created": "2026-11-25T12:06:20.386Z",
-  "updated": "2026-11-25T12:12:19.817Z",
+  "updated": "2026-11-25T12:12:28.370Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,6 +34,11 @@
     "cache-claim-helpers.ac5": {
       "status": "completed",
       "doneAt": "2026-11-25T12:12:19.817Z"
+    },
+    "pane-run-gate": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5665",
+      "claimedAt": "2026-11-25T12:12:28.370Z"
     }
   }
 }
