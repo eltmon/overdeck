@@ -199,6 +199,29 @@ describe('drain service (PAN-5342 WI-5)', () => {
     expect(h.deps.stopAgent).not.toHaveBeenCalledWith('agent-b');
   });
 
+  it('7b. cancel offers the Flywheel the drain stopped between ticks (PAN-5671)', async () => {
+    // `agent-b` keeps working, so the drain is still running when it is cancelled.
+    const h = harness({ 'conv-flywheel': { boundary: true }, 'conv-idle': { boundary: true }, 'agent-b': { boundary: false } });
+    // The real Flywheel row is named after its session: `conv-flywheel`.
+    const describeSession = h.deps.describeSession;
+    h.deps.describeSession = async (id) => (id === 'conv-flywheel'
+      ? { kind: 'conversation', label: 'Flywheel', conversationName: 'conv-flywheel' }
+      : describeSession(id));
+    vi.mocked(h.deps.stopConversation).mockImplementation(async (name: string) => {
+      const session = h.sessions.get(name.startsWith('conv-') ? name : `conv-${name}`);
+      if (session) session.live = false;
+    });
+    _setDrainDepsForTests(h.deps);
+    await startShutdown(opts());
+    await flush();
+    expect(h.deps.stopConversation).toHaveBeenCalledWith('conv-flywheel');
+    expect(await cancelShutdown()).toBe('cancelled');
+    const offered = vi.mocked(h.deps.seedResumeOffer).mock.calls[0]![0];
+    expect(offered).toEqual([
+      expect.objectContaining({ kind: 'conversation', id: 'conv-flywheel', name: 'conv-flywheel', wasWorking: false }),
+    ]);
+  });
+
   it('8. refuses with restart-in-progress while a reload or restart holds the lock', async () => {
     const h = harness({ 'agent-a': {} });
     h.state.holder = { pid: 4242 };

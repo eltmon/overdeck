@@ -4,12 +4,14 @@
  * Cancel (in the dashboard that runs the drain) and dashboard boot (after a
  * reboot, a `pan up`, or a crash mid-drain) both call `endShutdown(record)`: it
  * deletes the record, which reopens every admission door, then seeds the
- * PAN-5091 resume offer with every agent the drain stopped plus the
- * conversations that were mid-turn when the drain started (D-9). Idle
- * conversations are not offered; they resume when the operator opens them.
+ * PAN-5091 resume offer with every agent the drain stopped, the
+ * conversations that were mid-turn when the drain started, and the Flywheel
+ * conversation idle or not (D-9, PAN-5671; `isOfferedAfterShutdown`). Other
+ * idle conversations are not offered; they resume when the operator opens them.
  */
 import {
   deleteShutdownRecord,
+  isOfferedAfterShutdown,
   type ShutdownRecord,
   type ShutdownStoppedSession,
 } from '../../../../lib/shutdown/drain-record.js';
@@ -32,7 +34,7 @@ const defaultEndDeps: EndShutdownDeps = {
 
 /** The sessions the resume offer lists for this record (D-9). */
 export function resumeOfferSessions(record: ShutdownRecord): ShutdownStoppedSession[] {
-  return (record.stopped ?? []).filter((s) => s.kind === 'agent' || s.wasWorking);
+  return (record.stopped ?? []).filter(isOfferedAfterShutdown);
 }
 
 export async function endShutdown(record: ShutdownRecord, overrides: Partial<EndShutdownDeps> = {}): Promise<number> {

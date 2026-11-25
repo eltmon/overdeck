@@ -52,8 +52,9 @@
  * **Never after a safe shutdown (D-9).** `pan shutdown` drains through
  * `handleConversationStop`, so the row ends before the boot and rule 3 leaves
  * it paused, with no grace window before the boot. Turning things back on
- * after a deliberate shutdown is the operator's call; listing the Flywheel in
- * the shutdown resume offer is PAN-5671. While the shutdown record exists the
+ * after a deliberate shutdown is the operator's call, so the shutdown resume
+ * offer lists the Flywheel instead, idle or not (PAN-5671,
+ * `isOfferedAfterShutdown`). While the shutdown record exists the
  * routine does nothing at all: `isDeaconGloballyPaused()` already stops the
  * patrol then, and the routine checks `isShutdownDrainingSync()` itself too.
  *

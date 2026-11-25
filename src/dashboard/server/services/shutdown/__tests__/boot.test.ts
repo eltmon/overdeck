@@ -15,7 +15,7 @@ import {
   type ShutdownRecord,
 } from '../../../../../lib/shutdown/drain-record.js';
 import { startShutdownServices } from '../boot.js';
-import { endShutdown } from '../end.js';
+import { endShutdown, resumeOfferSessions } from '../end.js';
 
 let home: string;
 const savedHome = process.env.OVERDECK_HOME;
@@ -100,5 +100,23 @@ describe('startShutdownServices (PAN-5342 WI-7)', () => {
       startRebootGuard: f.startRebootGuard,
     })).resolves.toBeUndefined();
     expect(f.startRebootGuard).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('resumeOfferSessions (PAN-5342 D-9, PAN-5671)', () => {
+  const flywheel = { kind: 'conversation' as const, id: 'conv-flywheel', name: 'conv-flywheel', label: 'Flywheel', wasWorking: false };
+
+  it('lists every agent and the mid-turn conversations, not other idle conversations', () => {
+    expect(resumeOfferSessions(record).map((s) => s.id)).toEqual(['agent-pan-1', 'conv-busy']);
+  });
+
+  it('lists the Flywheel conversation the drain stopped between ticks', () => {
+    const offered = resumeOfferSessions({ ...record, stopped: [...record.stopped, flywheel] });
+    expect(offered.map((s) => s.id)).toEqual(['agent-pan-1', 'conv-busy', 'conv-flywheel']);
+  });
+
+  it('lists the Flywheel conversation the drain stopped mid-turn once', () => {
+    const offered = resumeOfferSessions({ ...record, stopped: [{ ...flywheel, wasWorking: true }] });
+    expect(offered.map((s) => s.id)).toEqual(['conv-flywheel']);
   });
 });

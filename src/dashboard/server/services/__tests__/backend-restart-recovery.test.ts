@@ -514,6 +514,27 @@ describe('the offer a safe shutdown seeds (PAN-5342)', () => {
     expect(snapshot.lostAt).toBe(new Date(NOW).toISOString());
   });
 
+  it('lists the Flywheel the drain stopped between ticks, and leaves other idle conversations out (PAN-5671)', async () => {
+    const endedAt = new Date(NOW - 1_000).toISOString();
+    const w = world([
+      row('conv-flywheel', { tmuxSession: 'conv-flywheel', title: 'Flywheel', status: 'ended', endedAt }),
+      row('idle', { status: 'ended', endedAt }),
+    ]);
+    w.stopped.set('conv-flywheel', NOW - 1_000);
+    startBackendRestartRecovery(w.deps);
+    seedShutdownOffer([
+      stopped('conversation', 'idle', { wasWorking: false }),
+      { kind: 'conversation', id: 'conv-flywheel', name: 'conv-flywheel', label: 'Flywheel', wasWorking: false },
+    ]);
+
+    const snapshot = await getBackendRestartRecoverySnapshot();
+    expect(snapshot.cause).toBe('shutdown');
+    expect(snapshot.conversations).toEqual([{ name: 'conv-flywheel', title: 'Flywheel' }]);
+    // Offered, never resumed on its own.
+    await vi.advanceTimersByTimeAsync(10 * PRESSURE_WAIT_MS);
+    expect(w.resumed).toEqual([]);
+  });
+
   it('seeds nothing when the drain stopped only idle conversations', async () => {
     const w = world([row('idle', { status: 'ended', endedAt: new Date(NOW).toISOString() })]);
     startBackendRestartRecovery(w.deps);
