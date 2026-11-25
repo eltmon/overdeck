@@ -1,39 +1,32 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-24T07:28:01Z · model: claude-opus-5-5 · open: 960_
+_Last sequenced: 2026-11-25T12:13:56Z · model: claude-opus-5-5 · open: 948_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
-| 1 | PAN-5637 | S | critical | ok |  |  | In pipeline. Merge train never admits polyrepo issues touching CI-less member repos; add ci: none per repo so MYN infra/docs MRs merge |
-| 1 | PAN-5638 | M | critical | ok |  |  | In pipeline. Polyrepo review verdicts refuse GitHub member PRs and the ready set ignores verdict markers; MIN-1142 can't merge |
-| 1 | PAN-5654 | S | high | ok |  |  | In pipeline. mobile-android CI goes red on non-mobile PRs when Robolectric android-all download fails; cache the jar. |
-| 1 | PAN-5657 | S | high | ok |  |  | In pipeline. 7 CodeRabbit findings on merged PAN-5652; 2 Major: failed pane listing reads as pane-dead, legacy tmux agents read as gone. |
-| 1 | PAN-5662 | M | medium | ok |  |  | In pipeline. Composer @ files and $ skills pickers plus an 'Ask anything' placeholder listing triggers; one shared trigger menu. |
-| 2 | PAN-5652 | M | critical | ok |  |  | Herdr agents fail tmux has-session checks, so polyrepo merge aborts on live agents (MIN-1144). Merge routes: TENET-10 handoff. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 4 | PAN-5430 | S | medium | ok |  |  | Markdown Preview prints raw HTML (README logo <div>/<picture>) as text; render it via rehype-raw + rehype-sanitize in doc previews. |
 | 5 | PAN-5567 | S | high | ok |  |  | Codex app-server threads hardcode on-request/workspace-write, so Read-only and Full access settings never apply. |
-| 6 | PAN-5489 | S | high | ok |  |  | pan plan from an agent shell fails workspace creation without HUME_API_KEY, leaves a half-built workspace and hides the cause. |
 | 7 | PAN-5566 | M | high | ok |  |  | UI/help text says Auto blocks destructive calls but the hook approves all; repo .pan.yaml can set bypass mode. |
 | 8 | PAN-5385 | S | critical | ok |  |  | Anywhere remote access is down for trickle clients: machine drops ICE candidates sent before session registers; small server fix |
-| 9 | PAN-5633 | M | high | ok |  |  | Codex app-server auth burn never flags: banner silent, conv shows isWorking while 578 turns fail over 14h. Detect turn errors. |
 | 10 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 10 | PAN-5523 | S | high | ok |  |  | pan conversations move/heal send raw fetch with no token, so routes refuse with Missing origin; same fix pattern as in-pipeline PAN-5516. |
 | 10 | PAN-5625 | M | critical | ok |  |  | Approved green PR for new standalone project BT-1 sits 'held'; train never batches and per-PR scheduler defers forever. |
-| 10 | PAN-5641 | M | critical | ok |  | PAN-5637, PAN-5638 | Polyrepo UAT batch promote and train board read one PR from the non-git root, so no MYN batch can land; walk member repos. |
+| 10 | PAN-5641 | M | critical | ok |  |  | Polyrepo UAT batch promote and train board read one PR from the non-git root, so no MYN batch can land; walk member repos. |
 | 10 | PAN-5663 | S | critical | ok |  |  | Close-out row 6 requires Overdeck's own CI job names from any project lacking main_verify_required_checks, so it never passes. |
 | 11 | PAN-4553 | S | critical | ok |  |  | Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges. |
-| 11 | PAN-5640 | S | high | needs-refinement |  | PAN-5637 | Overlaps PAN-5641 (derived state reads MRs at non-git polyrepo root); unique part: glab MR list omits head_pipeline, never green. |
+| 11 | PAN-5640 | S | high | needs-refinement |  |  | Overlaps PAN-5641 (derived state reads MRs at non-git polyrepo root); unique part: glab MR list omits head_pipeline, never green. |
 | 12 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
 | 13 | PAN-4710 | S | high | ok |  |  | Deferred plan hand-off retries omit the guardrail ack, so they're refused at 'agent count high' and give up silently; needs handoff |
 | 14 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; re-test now that likely root cause PAN-5526 merged. |
 | 14 | PAN-5527 | M | high | needs-refinement |  |  | Overlaps merged PAN-5526 (consent field, unread marker); unique part is resuming a promotion interrupted by a dashboard death. |
 | 14 | PAN-5529 | M | high | ok |  |  | Auto-start hand-off still strands: orphaned consent claims, queued container starts lost on restart, read errors read as revoked. |
 | 15 | PAN-4666 | S | critical | ok |  |  | Flywheel status drops live agents whose Herdr pane says 'done'; loop may respawn them. Route via liveness.ts. Needs handoff. |
+| 15 | PAN-5667 | M | critical | ok |  |  | Flywheel stalled 27.5h when Claude Code killed its sleep timer; add deacon watchdog that re-delivers /pan-flywheel. TENET-10 handoff |
 | 16 | PAN-4547 | M | high | ok |  |  | Restore automatic close-out for verifying-on-main issues whose DoD fully passes; close_out.auto inert since PAN-3917 |
 | 17 | PAN-4511 | S | high | ok |  |  | pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch |
-| 18 | PAN-5447 | M | high | ok |  |  | Palette search stalls 15s+: sync 5 GB sqlite-vec scan on the event loop; aborted searches keep running and stall /api/version |
+| 18 | PAN-5666 | M | high | ok |  |  | Fresh Flywheel start drops prior run last tick, in-flight list and open needs-you (incl. security decisions); derive previousRun |
 | 19 | PAN-5381 | S | high | ok |  |  | Dashboard main thread: findProjectByPath runs realpathSync on every project root per call (10.8% of profile); cache roots once. |
 | 20 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
 | 21 | PAN-4551 | L | high | ok |  |  | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
@@ -88,6 +81,7 @@ _Last sequenced: 2026-11-24T07:28:01Z · model: claude-opus-5-5 · open: 960_
 | 68 | PAN-5228 | S | high | ok |  |  | Advisory CodeRabbit journal entries land last and hide stalled reviews from recoverStalledReviews and other last-entry readers. |
 | 69 | PAN-4344 | S | high | ok |  |  | Registered projects lack the agent main-push guard; ship a pre-push hook so agents cannot push to main outside overdeck |
 | 69 | PAN-5661 | S | high | ok |  |  | Issue panel says 'Nothing needs you yet' while the Flywheel holds the issue as needs-you; read needsYouIssueIds in StatusNarrative. |
+| 69 | PAN-5665 | S | high | ok |  |  | Flywheel 'Start fresh' pane keeps showing the old run's transcript; key ConversationPanel by conversation id and show a placeholder |
 | 70 | PAN-4550 | XS | medium | ok |  |  | Two unit tests read host state (DASHSCOPE_BASE_URL, git-ignored .map files), so pan release check reports false reds locally |
 | 71 | PAN-4566 | S | high | ok |  |  | A failed replayEvents leaves the coordinator un-bootstrapped; tab defers live events with no banner. PAN-4559 fallback has landed. |
 | 71 | PAN-5653 | S | high | ok |  |  | 3 CodeRabbit findings on merged PAN-5648; 2 Major: stack lock does not fence a stale holder, file-lock release can delete a new lock. |
@@ -102,11 +96,12 @@ _Last sequenced: 2026-11-24T07:28:01Z · model: claude-opus-5-5 · open: 960_
 | 80 | PAN-3522 | S | critical | ok |  |  | Supervisor watchdog restart-churns under CPU storm because the probe timeout budget ignores the boot warm phase. |
 | 81 | PAN-3314 | M | critical | ok |  |  | One cgroup holds every agent pane, so a single hungry agent inflates the unit and oomd kills the whole fleet — twice now. |
 | 82 | PAN-3278 | S | critical | needs-refinement |  |  | A finished work agent with an open PR sat two hours because review was never dispatched and auto-requeue fired none of 25 attempts. |
-| 83 | PAN-5636 | S | medium | ok |  | PAN-5633 | UI follow-up to PAN-5633: row state word and composer notice (with Hand off) for failed Codex turns; needs 5633's providerError.kind. |
+| 83 | PAN-5636 | S | medium | ok |  |  | UI follow-up to PAN-5633: row state word and composer notice (with Hand off) for failed Codex turns; needs 5633's providerError.kind. |
 | 84 | PAN-3234 | S | critical | needs-refinement |  |  | Agents freeze indefinitely on blocking choice menus and no health surface notices; the detector is wired only to delivery refusal. |
 | 84 | PAN-5467 | XL | high | ok | ✓ |  | Epic: docs overhaul, 16 page issues, 6 accuracy audits (PAN-5499..5504) and an intro rewrite (PAN-5505); order book drives pickup. |
 | 84 | PAN-5642 | M | medium | ok |  |  | Plan-action endpoints accept approval without matching toolUseId; a stale dialog can approve a plan the operator never reviewed. |
 | 85 | PAN-3205 | S | critical | ok |  |  | The deployment gate promises the queued deploy will fire at the next verification boundary; that trigger does not exist. |
+| 85 | PAN-5668 | S | medium | needs-refinement |  |  | Suspected: same-name recreated Codex/ACP/Kimi convs serve old transcript by tmux name; verify, then filter by createdAt |
 | 86 | PAN-3118 | S | critical | needs-refinement |  |  | Model-specific quota exhaustion is invisible everywhere but the pane: four planning agents read 'running' at $0.00 with no fallback. |
 | 87 | PAN-3106 | S | critical | ok |  |  | auto_merge_default: hold is consulted on one merge path only, so held issues merge individually and defeat the UAT train. |
 | 88 | PAN-3100 | S | critical | ok |  |  | The test role evaluates the dirty working tree, so a live work agent's uncommitted edits are recorded as the issue's test failure. |
@@ -203,9 +198,7 @@ _Last sequenced: 2026-11-24T07:28:01Z · model: claude-opus-5-5 · open: 960_
 | 177 | PAN-3854 | S | high | ok |  |  | Feature-workspace devcontainer stack 403s on POST /api/dashboard/session, blocking all in-browser mutation UAT |
 | 178 | PAN-4577 | M | high | ok |  |  | Operator's facts didn't follow them to a new Mac: no importer for Claude auto-memory. PAN-3957 merged, so W9-W11 are unblocked. |
 | 179 | PAN-3307 | XS | high | ok |  |  | commitlint scope-enum lists 11 scopes, 14 real ones are missing, and it still names the removed beads scope — trains everyone to ignore it. |
-| 180 | PAN-5250 | M | high | ok |  |  | Idle workspace frontend and dev containers never stop while an agent lives; ~9 GB held by unviewed Vite containers. |
 | 181 | PAN-2642 | XL | high | ok | ✓ |  | Cost strategy: waste detection over budget policing |
-| 181 | PAN-5649 | M | medium | ok |  | PAN-5250 | Browser half of PAN-5250 restart-on-demand (wake page, start-app action); PAN-5250 merged, so it can start now. |
 | 182 | PAN-1868 | XS | high | ok |  |  | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
 | 183 | PAN-4847 | S | high | ok |  |  | Remote reap silently skips review request when a background writer dirties a tracked file; pipeline stalls at PR-open. |
 | 184 | PAN-1042 | S | high | ok |  |  | cost_events retention: 14 months of granular rows accumulating with ad-hoc partial deletions |
@@ -297,7 +290,6 @@ _Last sequenced: 2026-11-24T07:28:01Z · model: claude-opus-5-5 · open: 960_
 | 264 | PAN-3533 | L | high | ok |  |  | No per-project resource partitioning, so one project's docker stacks and installs starve another project's pipeline and the dashboard. |
 | 265 | PAN-3107 | S | high | ok |  |  | OOM spikes are unattributable after the fact; productize the machine-local memory-attribution census stopgap. |
 | 266 | PAN-4512 | M | medium | needs-refinement |  |  | Tier escalation config is shown but nothing fires it since the Cut; choose a trigger, persist tierOverrides, re-dispatch |
-| 266 | PAN-5597 | M | medium | ok |  |  | Order books page rework: show the live book, simpler build/run. Body is a placeholder; PRD and mockup pending. |
 | 267 | PAN-1666 | XL | medium | ok | ✓ |  | Pipeline Throughput Hardening |
 | 268 | PAN-1556 | S | high | ok |  |  | Session/activity feed: coalesce review-spawn spam, supersede re-reviews per issue, keep active conversations most-recent |
 | 269 | PAN-4510 | S | medium | ok |  |  | Show effort on issue-view agent rows, conversation rows and Agents-page conversation entries; split from closed PAN-4259 |
@@ -364,23 +356,22 @@ _Last sequenced: 2026-11-24T07:28:01Z · model: claude-opus-5-5 · open: 960_
 | 330 | PAN-1553 | M | high | ok |  |  | Investigate Claude Code Fast mode support (and fast-tier pricing) |
 | 331 | PAN-1504 | M | high | ok |  |  | pan hygiene |
 | 332 | PAN-1480 | L | high | ok |  |  | TLDR: 93% bypass rate |
-| 333 | PAN-5058 | XL | high | ok |  |  | Parked, in planning: TLS passthrough relay at <name>.mcp.overdeck.ai so hosted bots reach /mcp without Tailscale Funnel. |
 | 334 | PAN-1479 | M | high | ok |  |  | RTK: Add telemetry to measure token savings from bash output compression |
-| 334 | PAN-5490 | M | medium | ok |  | PAN-5058 | MCP relay S-A: hostname registry, relay tickets in account service, wire contract. First slice; waits on PAN-5058 PRD. |
+| 334 | PAN-5490 | M | medium | ok |  |  | MCP relay S-A: hostname registry, relay tickets in account service, wire contract. First slice; waits on PAN-5058 PRD. |
 | 335 | PAN-2950 | L | high | ok |  |  | Refactor god files back under file-size ceilings after the UX overhaul |
-| 335 | PAN-5491 | L | medium | ok |  | PAN-5058, PAN-5490 | MCP relay S-B: SNI passthrough relay service on Fly (services/mcp-relay); never decrypts. Needs S-A (PAN-5490). |
+| 335 | PAN-5491 | L | medium | ok |  | PAN-5490 | MCP relay S-B: SNI passthrough relay service on Fly (services/mcp-relay); never decrypts. Needs S-A (PAN-5490). |
 | 336 | PAN-2720 | M | high | ok |  |  | File-size ratchet counts lines, so it rewards line-packing on the god files it means to improve |
-| 336 | PAN-5492 | L | medium | ok |  | PAN-5058, PAN-5490 | MCP relay S-C: machine tunnel client and TLS listener for public /mcp; one public-ingress predicate. Needs S-A (PAN-5490). |
+| 336 | PAN-5492 | L | medium | ok |  | PAN-5490 | MCP relay S-C: machine tunnel client and TLS listener for public /mcp; one public-ingress predicate. Needs S-A (PAN-5490). |
 | 337 | PAN-2650 | S | high | ok |  |  | Shed-stack half is moot (slot merges verify on host); remaining: pan swarm recover path for a stuck ready-to-merge slot. |
-| 337 | PAN-5493 | M | medium | ok |  | PAN-5058, PAN-5492 | MCP relay S-D: ACME TLS-ALPN-01 certificates on the machine; key never leaves it. Needs S-C (PAN-5492). |
+| 337 | PAN-5493 | M | medium | ok |  | PAN-5492 | MCP relay S-D: ACME TLS-ALPN-01 certificates on the machine; key never leaves it. Needs S-C (PAN-5492). |
 | 338 | PAN-2358 | M | high | ok |  |  | PAN-2145 follow-up: restore PAN-1535 hardening in transformMessageForHarness (rewritten during conversations.ts decomposition) |
-| 338 | PAN-5494 | M | medium | ok |  | PAN-5058, PAN-5491, PAN-5492, PAN-5493 | MCP relay S-E: Settings switch, enable flow, loopback end-to-end test and user docs. Needs S-B, S-C and S-D. |
+| 338 | PAN-5494 | M | medium | ok |  | PAN-5491, PAN-5492, PAN-5493 | MCP relay S-E: Settings switch, enable flow, loopback end-to-end test and user docs. Needs S-B, S-C and S-D. |
 | 339 | PAN-2334 | XS | high | ok |  |  | write a Definition of Ready (DoR) |
-| 339 | PAN-5495 | S | medium | ok |  | PAN-5058, PAN-5493 | MCP relay S-F: Google Trust Services fallback CA via EAB when Let's Encrypt rate-limits. Needs S-D (PAN-5493). |
+| 339 | PAN-5495 | S | medium | ok |  | PAN-5493 | MCP relay S-F: Google Trust Services fallback CA via EAB when Let's Encrypt rate-limits. Needs S-D (PAN-5493). |
 | 340 | PAN-2193 | S | high | ok |  |  | Held issues (objection/parked/vetoed/needs-handoff) are invisible in the Command Deck tree |
-| 340 | PAN-5496 | S | medium | ok |  | PAN-5058, PAN-5493 | MCP relay S-G: daily Certificate Transparency watch for the relay hostname; ships with S-E. Needs S-D (PAN-5493). |
+| 340 | PAN-5496 | S | medium | ok |  | PAN-5493 | MCP relay S-G: daily Certificate Transparency watch for the relay hostname; ships with S-E. Needs S-D (PAN-5493). |
 | 341 | PAN-1984 | XS | high | ok |  |  | Migrate or delete the 18 dead panopticon.db modules referenced by ~30 test files (#1983 follow-up) |
-| 341 | PAN-5602 | M | medium | ok |  | PAN-5058, PAN-5494 | Live Grok Bot and Muse checkpoints over the MCP relay, moved from PAN-5058. Blocked by relay S-E (PAN-5494); needs operator sign-ins. |
+| 341 | PAN-5602 | M | medium | ok |  | PAN-5494 | Live Grok Bot and Muse checkpoints over the MCP relay, moved from PAN-5058. Blocked by relay S-E (PAN-5494); needs operator sign-ins. |
 | 342 | PAN-1913 | XS | high | ok |  |  | Project description: show on click, edit in dashboard, mirror into the project layer (and document what's in .pan and ~/.panopticon) |
 | 343 | PAN-1906 | M | high | ok |  |  | Enforce harness restrictions with subscription: gray out non-claude-code, validate everywhere |
 | 344 | PAN-1544 | M | high | ok |  |  | Type cleanup: strip 'ship' from the Role union and its ~10 downstream references |
@@ -523,7 +514,6 @@ _Last sequenced: 2026-11-24T07:28:01Z · model: claude-opus-5-5 · open: 960_
 | 473 | PAN-3873 | M | medium | ok |  |  | GitHub event delivery: support gh webhook forward alongside smee with guided setup, settings exposure, and docs |
 | 474 | PAN-5346 | S | medium | ok |  |  | Auth docs misstate #overdeck_token delivery, the Origin rule and 401 troubleshooting; PAN-5344 fix has landed. |
 | 475 | PAN-1150 | S | medium | ok |  |  | Settings: "Anthropic is not configured" warning persists in Model Routing after claude /login (Provider tab disagrees) |
-| 475 | PAN-5486 | M | medium | ok |  |  | Bot integration core pins are hand-typed and stale (0.74/0.77); stamp them at release and fix Grok Bot docs. |
 | 476 | PAN-1149 | S | medium | ok |  |  | v0.9.3 upgraders: stale workhorses.mid: claude-sonnet-4-7 in config.yaml keeps breaking Model Routing saves |
 | 477 | PAN-1130 | S | medium | ok |  |  | Headless review sub-reviewer normal exit misclassified as 'crashed', triggers spurious restart |
 | 478 | PAN-1129 | S | medium | ok |  |  | Review-request route pushes wrong branch name: 'feature/977' instead of 'feature/pan-977' |
@@ -531,11 +521,9 @@ _Last sequenced: 2026-11-24T07:28:01Z · model: claude-opus-5-5 · open: 960_
 | 480 | PAN-1113 | S | medium | ok |  |  | Conversations sidebar lets you message review-specialist sessions, which derails them silently |
 | 481 | PAN-1068 | S | medium | ok |  |  | PAN-1048 deferred findings: security, correctness, and model validation gaps |
 | 482 | PAN-3938 | M | medium | needs-refinement |  |  | Run Muse Spark under Claude Code via cliproxy — only the paid Zen model is routable; free tier is OpenCode-client gated; needs credit… |
-| 482 | PAN-5464 | L | medium | ok |  |  | Video skill set: Remotion, HyperFrames, OpenMontage, video-use packs + 'video' group; fixes LFS extraction. PRD on main. |
 | 483 | PAN-933 | S | medium | ok |  |  | Review poster cannot post to GitLab MRs (only supports GitHub PRs) |
-| 484 | PAN-5465 | L | medium | ok |  |  | Add skill packs to a live conversation: /reload-plugins hot apply, resume fallback, CLI, MCP tool, dashboard modal. PRD on main. |
 | 484 | PAN-932 | S | medium | ok |  |  | pan done: polyrepo uncommitted changes check + existing MR handling |
-| 485 | PAN-5497 | S | medium | ok |  | PAN-5464, PAN-5465 | Follow-up: accept pack groups in pan skills add, add_skills and the Add skills dialog; PAN-5464 and PAN-5465 merged. |
+| 485 | PAN-5497 | S | medium | ok |  |  | Follow-up: accept pack groups in pan skills add, add_skills and the Add skills dialog; PAN-5464 and PAN-5465 merged. |
 | 485 | PAN-927 | M | medium | ok |  |  | Rewrite containerize route: dead code, orphan processes, no pending-op tracking |
 | 486 | PAN-900 | S | medium | ok |  |  | Trust devroot for conversations + atomic .claude.json writes |
 | 487 | PAN-886 | S | medium | ok |  |  | pan review request shows 'fetch failed' instead of actual sync-target-branch error |
@@ -968,30 +956,6 @@ _Last sequenced: 2026-11-24T07:28:01Z · model: claude-opus-5-5 · open: 960_
 
 ## Rationale detail
 
-### PAN-5637 (rank 1)
-
-New since the prior run and already in the pipeline, so it is pinned at rank 1. The ready set requires green checks on every member MR, and MYN's infra and docs repos have no CI, so MIN-1144 and MIN-1146 can never queue; the fix site and a safe opt-in field are named, so it is ok and S-sized.
-
-### PAN-5638 (rank 1)
-
-New since the prior run and already in the pipeline, so it is pinned at rank 1. It replaces the PAN-5614 stopgap that refuses GitHub-member verdicts and teaches githubRows to read verdict markers, which unblocks polyrepo issues like MIN-1142 from reaching the merge train.
-
-### PAN-5654 (rank 1)
-
-Already in the pipeline, so pinned at rank 1. A flaky Robolectric runtime download turns the test aggregate red on PRs that touch no mobile code, as it did on PR #5651 for PAN-5250.
-
-### PAN-5657 (rank 1)
-
-New CodeRabbit follow-up on the merged PAN-5652 Herdr liveness fix, already in the pipeline, so pinned at rank 1. Two Major findings are liveness misreports in merge-ops and the cloister service, which is substrate hardening at the same tier as PAN-5653.
-
-### PAN-5662 (rank 1)
-
-New issue already in the pipeline, so it is pinned at rank 1 and not re-ranked. It is a discoverability feature: one shared trigger menu for /, @ and $ in the conversation composer, with harness-declared skill invocation forms.
-
-### PAN-5652 (rank 2)
-
-New substrate bug: merge-ops.ts and several cloister modules test agent liveness with tmux has-session, which is always false on Herdr, the default backend. It failed the MIN-1144 polyrepo merge within 50 seconds while the agent was finishing the rebases, so it blocks polyrepo merges and sits beside the polyrepo merge cluster (PAN-5637, PAN-5638, PAN-5641) in a free rank slot. The fix routes these checks through liveness.ts and adds a ratchet; it touches merge routes, so it needs a supervised handoff.
-
 ### PAN-5013 (rank 3)
 
 Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.
@@ -1004,10 +968,6 @@ New issue, sibling of the just-merged front-matter fix PAN-5427, and already que
 
 New bug: on the default Codex transport the permission setting is silently ignored, so a Read-only choice still lets agents write. A safety setting that does nothing ranks with the top substrate fixes; the fix is small and well specified.
 
-### PAN-5489 (rank 6)
-
-Unchanged rank: a 2026-11-22 comment adds an unconfirmed related start_issue 500 for MIN-1142; the CLI env-dependence bug still strands Flywheel planning.
-
 ### PAN-5566 (rank 7)
 
 New bug: operators choose Auto believing it gates destructive calls, and a project .pan.yaml can switch agents to bypass/full-access. Item 6 needs a decision (strip the keys or document); the text fixes are mechanical.
@@ -1015,10 +975,6 @@ New bug: operators choose Auto believing it gates destructive calls, and a proje
 ### PAN-5385 (rank 8)
 
 New issue. Phones (iOS, Android) and the connector cannot reach the machine at all, directly or through the relay, because RtcTransport.accept awaits ICE servers before registering the signalling session and drops trickle candidates that arrive in that window. The root cause and the fix (buffer candidates from offer acceptance) are stated in the body and touch only the dashboard server, so this is a small, well-defined fix for a full outage of a shipped feature. It takes the open rank-8 slot ahead of the remaining pipeline-substrate bugs.
-
-### PAN-5633 (rank 9)
-
-New bug with a traced root cause: classifyNativeCodexAuth treats any refresh token as valid and nothing writes the codex-auth-burned flag, so a Codex app-server conversation failed silently for 14 hours. It ranks beside PAN-5567 (the other Codex app-server substrate gap) because silent agent failure undermines every Codex-routed conversation and worker.
 
 ### PAN-4636 (rank 10)
 
@@ -1034,7 +990,7 @@ New bug with live evidence: the merge train and the per-PR auto-merge scheduler 
 
 ### PAN-5641 (rank 10)
 
-New since the prior run. It is the last step before a polyrepo batch can merge: in-pipeline PAN-5637 and PAN-5638 fix admission and verdicts, but promote eligibility and the board still read one PR from the non-git MYN root. The fix site and the reuse of memberReposForProject are named, so it is ok and ranks just behind its in-pipeline siblings.
+New since the prior run. It is the last step before a polyrepo batch can merge: in-pipeline PAN-5637 and PAN-5638 fix admission and verdicts, but promote eligibility and the board still read one PR from the non-git MYN root. The fix site and the reuse of memberReposForProject are named, so it is ok and ranks just behind its in-pipeline siblings. Dependencies PAN-5637, PAN-5638 closed, so they are dropped from dependsOn; the rank stays because it already reflects the unblocked work.
 
 ### PAN-5663 (rank 10)
 
@@ -1046,7 +1002,7 @@ Rank unchanged; its duplicate PAN-4929 entered the pipeline with an open PR, so 
 
 ### PAN-5640 (rank 11)
 
-New since the prior run and filed minutes before PAN-5641 with the same first cause, so it carries a duplicate risk. Its unique second cause (GitLab's MR listing omits head_pipeline, so checks never read green) must ride with PAN-5641 or be scoped to that alone.
+New since the prior run and filed minutes before PAN-5641 with the same first cause, so it carries a duplicate risk. Its unique second cause (GitLab's MR listing omits head_pipeline, so checks never read green) must ride with PAN-5641 or be scoped to that alone. Dependencies PAN-5637 closed, so they are dropped from dependsOn; the rank stays because it already reflects the unblocked work.
 
 ### PAN-4733 (rank 12)
 
@@ -1072,6 +1028,10 @@ Rank unchanged; PAN-5498 closed, so that dependency is removed.
 
 New substrate bug in the Flywheel's own status read model: a second liveness rule in derive-status.ts hides live agents, so the loop or operator may respawn running work; small fix with clear ACs, ranked beside PAN-4636 as critical but labeled needs-handoff (TENET-10), so it goes through a supervised pan handoff.
 
+### PAN-5667 (rank 15)
+
+New issue. The Flywheel loop is the pickup engine, and twice in a week its only cadence source (a background sleep) was reaped, leaving the pipeline idle for 27.5 hours with no recovery. The fix site (deacon patrol keyed on derive-status freshness and liveness.ts idleness) and fake-timer tests are named, so it is ok and ranks beside PAN-4666 as pipeline-blocking substrate work. Per TENET-10 it should go through a supervised handoff.
+
 ### PAN-4547 (rank 16)
 
 Operator decision 2026-10-04 after the Flywheel closed 19 deployed issues by hand. With false DoD refusals fixed by PAN-4543, auto close-out only needs a patrol on the existing verify-on-main path and live settings. High because unclosed issues distort every pipeline view.
@@ -1080,9 +1040,9 @@ Operator decision 2026-10-04 after the Flywheel closed 19 deployed issues by han
 
 pan spawn is the foreman's pane-only item worker, so parallel waves cannot run any item through it on either backend. The test suite never asserts argv, so it stayed green. Small fix with a clear expected behavior.
 
-### PAN-5447 (rank 18)
+### PAN-5666 (rank 18)
 
-New issue. Like PAN-4544 and PAN-5381, it blocks the dashboard event loop: each search runs a 1.1 s synchronous vector scan, superseded keystroke searches are never aborted, and stacked scans froze unrelated routes for 4.8 s. The root cause is measured and the fix direction is concrete, so it ranks with the other event-loop blockers.
+New issue. A fresh start after an unclean stop silently loses open needs-you items, which on 2026-11-25 included two security decisions, and the in-flight list the next run should drain. Code sites and a previousRun status block are specified with tests, so it is ok; it takes the slot vacated by closed PAN-5447.
 
 ### PAN-5381 (rank 19)
 
@@ -1288,6 +1248,34 @@ Synthesis fires 42s after spawn and mislabels reviewers-with-reports-on-disk as 
 
 Triage: verify whether a never-kicked-off test session can still absorb dispatch under the current liveness model. Rank held.
 
+### PAN-5228 (rank 68)
+
+New pipeline bug placed in a freed critical-tier slot. Reviews whose reviewers die after a CodeRabbit post are never re-dispatched, and PAN-5218 widened the masking.
+
+### PAN-4344 (rank 69)
+
+New issue from the Deft adoption PRD. Its dependency PAN-3308 has closed. The main-push guard exists only in the overdeck repo, so agents in other registered projects can still push to main, which is the PAN-2204 hazard class.
+
+### PAN-5661 (rank 69)
+
+New substrate-improvement bug with a clear root cause and fix: StatusNarrative.tsx derives needsYou from pipeline state only, so Flywheel needs-you items (already in the frontend as needsYouIssueIds) never reach the issue panel, and an unplanned idle issue reads as 'Planning what to build'. The label sets a high floor and it directly serves the operator's UI-discoverability priority, but it unblocks no other work, so it sits with the other high, small substrate bugs at rank 69.
+
+### PAN-5665 (rank 69)
+
+New issue labeled substrate-improvement, so it gets the high floor, but the impact is display-only: the old transcript lingers until the new run writes. Fix and component test are specified, so it is ok and S-sized; it ranks beside the other Flywheel page item PAN-5661.
+
+### PAN-4550 (rank 70)
+
+Found cutting v0.65.0: CI was green but the local release check failed on two host-dependent tests. XS fix that removes false reds from the release verb, so it sits above routine medium work.
+
+### PAN-4566 (rank 71)
+
+Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback this fix routes failures to is on main and work can start.
+
+### PAN-5653 (rank 71)
+
+New CodeRabbit follow-up on the just-merged PAN-5648 stack-lock fixes. Two Major findings are lock races in the shared file-lock and stack lock that guard container stop/restore, so it ranks beside its parent as high-importance substrate hardening.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1295,89 +1283,11 @@ Triage: verify whether a never-kicked-off test session can still absorb dispatch
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-24T07:28:01Z",
+  "generatedAt": "2026-11-25T12:13:56Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 960,
+  "openCount": 948,
   "nodes": [
-    {
-      "issue": "PAN-5637",
-      "rank": 1,
-      "size": "S",
-      "importance": "critical",
-      "score": 86,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline. Merge train never admits polyrepo issues touching CI-less member repos; add ci: none per repo so MYN infra/docs MRs merge",
-      "rationale": "New since the prior run and already in the pipeline, so it is pinned at rank 1. The ready set requires green checks on every member MR, and MYN's infra and docs repos have no CI, so MIN-1144 and MIN-1146 can never queue; the fix site and a safe opt-in field are named, so it is ok and S-sized.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5638",
-      "rank": 1,
-      "size": "M",
-      "importance": "critical",
-      "score": 85,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline. Polyrepo review verdicts refuse GitHub member PRs and the ready set ignores verdict markers; MIN-1142 can't merge",
-      "rationale": "New since the prior run and already in the pipeline, so it is pinned at rank 1. It replaces the PAN-5614 stopgap that refuses GitHub-member verdicts and teaches githubRows to read verdict markers, which unblocks polyrepo issues like MIN-1142 from reaching the merge train.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5654",
-      "rank": 1,
-      "size": "S",
-      "importance": "high",
-      "score": 75,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline. mobile-android CI goes red on non-mobile PRs when Robolectric android-all download fails; cache the jar.",
-      "rationale": "Already in the pipeline, so pinned at rank 1. A flaky Robolectric runtime download turns the test aggregate red on PRs that touch no mobile code, as it did on PR #5651 for PAN-5250.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5657",
-      "rank": 1,
-      "size": "S",
-      "importance": "high",
-      "score": 62,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline. 7 CodeRabbit findings on merged PAN-5652; 2 Major: failed pane listing reads as pane-dead, legacy tmux agents read as gone.",
-      "rationale": "New CodeRabbit follow-up on the merged PAN-5652 Herdr liveness fix, already in the pipeline, so pinned at rank 1. Two Major findings are liveness misreports in merge-ops and the cloister service, which is substrate hardening at the same tier as PAN-5653.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5662",
-      "rank": 1,
-      "size": "M",
-      "importance": "medium",
-      "score": 62,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline. Composer @ files and $ skills pickers plus an 'Ask anything' placeholder listing triggers; one shared trigger menu.",
-      "rationale": "New issue already in the pipeline, so it is pinned at rank 1 and not re-ranked. It is a discoverability feature: one shared trigger menu for /, @ and $ in the conversation composer, with harness-declared skill invocation forms.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5652",
-      "rank": 2,
-      "size": "M",
-      "importance": "critical",
-      "score": 86,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Herdr agents fail tmux has-session checks, so polyrepo merge aborts on live agents (MIN-1144). Merge routes: TENET-10 handoff.",
-      "rationale": "New substrate bug: merge-ops.ts and several cloister modules test agent liveness with tmux has-session, which is always false on Herdr, the default backend. It failed the MIN-1144 polyrepo merge within 50 seconds while the agent was finishing the rebases, so it blocks polyrepo merges and sits beside the polyrepo merge cluster (PAN-5637, PAN-5638, PAN-5641) in a free rank slot. The fix routes these checks through liveness.ts and adds a ratchet; it touches merge routes, so it needs a supervised handoff.",
-      "gate": "auto",
-      "planning": "auto"
-    },
     {
       "issue": "PAN-5013",
       "rank": 3,
@@ -1418,19 +1328,6 @@ Triage: verify whether a never-kicked-off test session can still absorb dispatch
       "planning": "auto"
     },
     {
-      "issue": "PAN-5489",
-      "rank": 6,
-      "size": "S",
-      "importance": "high",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan plan from an agent shell fails workspace creation without HUME_API_KEY, leaves a half-built workspace and hides the cause.",
-      "rationale": "Unchanged rank: a 2026-11-22 comment adds an unconfirmed related start_issue 500 for MIN-1142; the CLI env-dependence bug still strands Flywheel planning.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-5566",
       "rank": 7,
       "size": "M",
@@ -1453,19 +1350,6 @@ Triage: verify whether a never-kicked-off test session can still absorb dispatch
       "dependsOn": [],
       "why": "Anywhere remote access is down for trickle clients: machine drops ICE candidates sent before session registers; small server fix",
       "rationale": "New issue. Phones (iOS, Android) and the connector cannot reach the machine at all, directly or through the relay, because RtcTransport.accept awaits ICE servers before registering the signalling session and drops trickle candidates that arrive in that window. The root cause and the fix (buffer candidates from offer acceptance) are stated in the body and touch only the dashboard server, so this is a small, well-defined fix for a full outage of a shipped feature. It takes the open rank-8 slot ahead of the remaining pipeline-substrate bugs.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5633",
-      "rank": 9,
-      "size": "M",
-      "importance": "high",
-      "score": 76,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Codex app-server auth burn never flags: banner silent, conv shows isWorking while 578 turns fail over 14h. Detect turn errors.",
-      "rationale": "New bug with a traced root cause: classifyNativeCodexAuth treats any refresh token as valid and nothing writes the codex-auth-burned flag, so a Codex app-server conversation failed silently for 14 hours. It ranks beside PAN-5567 (the other Codex app-server substrate gap) because silent agent failure undermines every Codex-routed conversation and worker.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1515,12 +1399,9 @@ Triage: verify whether a never-kicked-off test session can still absorb dispatch
       "importance": "critical",
       "score": 80,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-5637",
-        "PAN-5638"
-      ],
+      "dependsOn": [],
       "why": "Polyrepo UAT batch promote and train board read one PR from the non-git root, so no MYN batch can land; walk member repos.",
-      "rationale": "New since the prior run. It is the last step before a polyrepo batch can merge: in-pipeline PAN-5637 and PAN-5638 fix admission and verdicts, but promote eligibility and the board still read one PR from the non-git MYN root. The fix site and the reuse of memberReposForProject are named, so it is ok and ranks just behind its in-pipeline siblings.",
+      "rationale": "New since the prior run. It is the last step before a polyrepo batch can merge: in-pipeline PAN-5637 and PAN-5638 fix admission and verdicts, but promote eligibility and the board still read one PR from the non-git MYN root. The fix site and the reuse of memberReposForProject are named, so it is ok and ranks just behind its in-pipeline siblings. Dependencies PAN-5637, PAN-5638 closed, so they are dropped from dependsOn; the rank stays because it already reflects the unblocked work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1557,11 +1438,9 @@ Triage: verify whether a never-kicked-off test session can still absorb dispatch
       "importance": "high",
       "score": 72,
       "condition": "needs-refinement",
-      "dependsOn": [
-        "PAN-5637"
-      ],
+      "dependsOn": [],
       "why": "Overlaps PAN-5641 (derived state reads MRs at non-git polyrepo root); unique part: glab MR list omits head_pipeline, never green.",
-      "rationale": "New since the prior run and filed minutes before PAN-5641 with the same first cause, so it carries a duplicate risk. Its unique second cause (GitLab's MR listing omits head_pipeline, so checks never read green) must ride with PAN-5641 or be scoped to that alone.",
+      "rationale": "New since the prior run and filed minutes before PAN-5641 with the same first cause, so it carries a duplicate risk. Its unique second cause (GitLab's MR listing omits head_pipeline, so checks never read green) must ride with PAN-5641 or be scoped to that alone. Dependencies PAN-5637 closed, so they are dropped from dependsOn; the rank stays because it already reflects the unblocked work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1644,6 +1523,19 @@ Triage: verify whether a never-kicked-off test session can still absorb dispatch
       "planning": "auto"
     },
     {
+      "issue": "PAN-5667",
+      "rank": 15,
+      "size": "M",
+      "importance": "critical",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Flywheel stalled 27.5h when Claude Code killed its sleep timer; add deacon watchdog that re-delivers /pan-flywheel. TENET-10 handoff",
+      "rationale": "New issue. The Flywheel loop is the pickup engine, and twice in a week its only cadence source (a background sleep) was reaped, leaving the pipeline idle for 27.5 hours with no recovery. The fix site (deacon patrol keyed on derive-status freshness and liveness.ts idleness) and fake-timer tests are named, so it is ok and ranks beside PAN-4666 as pipeline-blocking substrate work. Per TENET-10 it should go through a supervised handoff.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-4547",
       "rank": 16,
       "size": "M",
@@ -1670,15 +1562,15 @@ Triage: verify whether a never-kicked-off test session can still absorb dispatch
       "planning": "auto"
     },
     {
-      "issue": "PAN-5447",
+      "issue": "PAN-5666",
       "rank": 18,
       "size": "M",
       "importance": "high",
       "score": 77,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Palette search stalls 15s+: sync 5 GB sqlite-vec scan on the event loop; aborted searches keep running and stall /api/version",
-      "rationale": "New issue. Like PAN-4544 and PAN-5381, it blocks the dashboard event loop: each search runs a 1.1 s synchronous vector scan, superseded keystroke searches are never aborted, and stacked scans froze unrelated routes for 4.8 s. The root cause is measured and the fix direction is concrete, so it ranks with the other event-loop blockers.",
+      "why": "Fresh Flywheel start drops prior run last tick, in-flight list and open needs-you (incl. security decisions); derive previousRun",
+      "rationale": "New issue. A fresh start after an unclean stop silently loses open needs-you items, which on 2026-11-25 included two security decisions, and the in-flight list the next run should drain. Code sites and a previousRun status block are specified with tests, so it is ok; it takes the slot vacated by closed PAN-5447.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2387,6 +2279,19 @@ Triage: verify whether a never-kicked-off test session can still absorb dispatch
       "planning": "auto"
     },
     {
+      "issue": "PAN-5665",
+      "rank": 69,
+      "size": "S",
+      "importance": "high",
+      "score": 64,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Flywheel 'Start fresh' pane keeps showing the old run's transcript; key ConversationPanel by conversation id and show a placeholder",
+      "rationale": "New issue labeled substrate-improvement, so it gets the high floor, but the impact is display-only: the old transcript lingers until the new run writes. Fix and component test are specified, so it is ok and S-sized; it ranks beside the other Flywheel page item PAN-5661.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-4550",
       "rank": 70,
       "size": "XS",
@@ -2575,11 +2480,9 @@ Triage: verify whether a never-kicked-off test session can still absorb dispatch
       "importance": "medium",
       "score": 62,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-5633"
-      ],
+      "dependsOn": [],
       "why": "UI follow-up to PAN-5633: row state word and composer notice (with Hand off) for failed Codex turns; needs 5633's providerError.kind.",
-      "rationale": "New issue split from PAN-5633's PRD (D13); it only reads server fields PAN-5633 adds, so it ranks behind that in-pipeline fix as a small medium-value UI follow-up.",
+      "rationale": "New issue split from PAN-5633's PRD (D13); it only reads server fields PAN-5633 adds, so it ranks behind that in-pipeline fix as a small medium-value UI follow-up. Dependencies PAN-5633 closed, so they are dropped from dependsOn; the rank stays because it already reflects the unblocked work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2633,6 +2536,19 @@ Triage: verify whether a never-kicked-off test session can still absorb dispatch
       "dependsOn": [],
       "why": "The deployment gate promises the queued deploy will fire at the next verification boundary; that trigger does not exist.",
       "rationale": "New this pass. The deployment gate's queue message is unusually good — it names the holders, the queue age, and warns against forcing — and it promises a 'next verification boundary' trigger that does not exist. Every holder cleared and the deploy never fired; the live build stayed stale for 35 minutes until a manual reload. A correct-sounding instruction that cannot happen is worse than no message.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5668",
+      "rank": 85,
+      "size": "S",
+      "importance": "medium",
+      "score": 58,
+      "condition": "needs-refinement",
+      "dependsOn": [],
+      "why": "Suspected: same-name recreated Codex/ACP/Kimi convs serve old transcript by tmux name; verify, then filter by createdAt",
+      "rationale": "New issue found while planning PAN-5665. Non-Claude transcript lookups resolve by tmux session name with a fallback, so a recreated conversation may show the previous run's file until the new one writes; the code sites are named but the bug is unconfirmed, so it is needs-refinement and ranks beside the other medium follow-ups.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3867,19 +3783,6 @@ Triage: verify whether a never-kicked-off test session can still absorb dispatch
       "planning": "skip"
     },
     {
-      "issue": "PAN-5250",
-      "rank": 180,
-      "size": "M",
-      "importance": "high",
-      "score": 72,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Idle workspace frontend and dev containers never stop while an agent lives; ~9 GB held by unviewed Vite containers.",
-      "rationale": "New substrate item placed in a freed high-tier slot; it frees memory the governor and the live stream need.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2642",
       "rank": 181,
       "size": "XL",
@@ -3892,21 +3795,6 @@ Triage: verify whether a never-kicked-off test session can still absorb dispatch
       "gate": "blocked",
       "planning": "skip",
       "isEpic": true
-    },
-    {
-      "issue": "PAN-5649",
-      "rank": 181,
-      "size": "M",
-      "importance": "medium",
-      "score": 58,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-5250"
-      ],
-      "why": "Browser half of PAN-5250 restart-on-demand (wake page, start-app action); PAN-5250 merged, so it can start now.",
-      "rationale": "PAN-5250 merged on 2026-11-24, which clears this issue's only dependency; rank held directly behind it as medium-importance UI follow-up.",
-      "gate": "auto",
-      "planning": "auto"
     },
     {
       "issue": "PAN-1868",
@@ -5044,19 +4932,6 @@ Triage: verify whether a never-kicked-off test session can still absorb dispatch
       "planning": "auto"
     },
     {
-      "issue": "PAN-5597",
-      "rank": 266,
-      "size": "M",
-      "importance": "medium",
-      "score": 55,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Order books page rework: show the live book, simpler build/run. Body is a placeholder; PRD and mockup pending.",
-      "rationale": "New issue. The body is still a placeholder awaiting its PRD, so it is needs-refinement; it ranks with other medium UI-discoverability work.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1666",
       "rank": 267,
       "size": "XL",
@@ -5881,19 +5756,6 @@ Triage: verify whether a never-kicked-off test session can still absorb dispatch
       "planning": "interactive"
     },
     {
-      "issue": "PAN-5058",
-      "rank": 333,
-      "size": "XL",
-      "importance": "high",
-      "score": 66,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Parked, in planning: TLS passthrough relay at <name>.mcp.overdeck.ai so hosted bots reach /mcp without Tailscale Funnel.",
-      "rationale": "Architecture-labeled and in the planning pipeline, so at least high; parked by the operator pending the relay add-on. Takes the slot freed by its parent PRD's issue PAN-4927.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1479",
       "rank": 334,
       "size": "M",
@@ -5912,11 +5774,9 @@ Triage: verify whether a never-kicked-off test session can still absorb dispatch
       "importance": "medium",
       "score": 56,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-5058"
-      ],
+      "dependsOn": [],
       "why": "MCP relay S-A: hostname registry, relay tickets in account service, wire contract. First slice; waits on PAN-5058 PRD.",
-      "rationale": "New sibling slice of PAN-5058 (relay add-on). Its body says it cannot be planned until the PAN-5058 PRD is on main, so it ranks directly behind PAN-5058 in the slice build order (S-A, then S-B/S-C, S-D, S-E/S-F/S-G).",
+      "rationale": "New sibling slice of PAN-5058 (relay add-on). Its body says it cannot be planned until the PAN-5058 PRD is on main, so it ranks directly behind PAN-5058 in the slice build order (S-A, then S-B/S-C, S-D, S-E/S-F/S-G). Dependencies PAN-5058 closed, so they are dropped from dependsOn; the rank stays because it already reflects the unblocked work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -5940,11 +5800,10 @@ Triage: verify whether a never-kicked-off test session can still absorb dispatch
       "score": 54,
       "condition": "ok",
       "dependsOn": [
-        "PAN-5058",
         "PAN-5490"
       ],
       "why": "MCP relay S-B: SNI passthrough relay service on Fly (services/mcp-relay); never decrypts. Needs S-A (PAN-5490).",
-      "rationale": "New sibling slice of PAN-5058 (relay add-on). Its body says it cannot be planned until the PAN-5058 PRD is on main, so it ranks directly behind PAN-5058 in the slice build order (S-A, then S-B/S-C, S-D, S-E/S-F/S-G).",
+      "rationale": "New sibling slice of PAN-5058 (relay add-on). Its body says it cannot be planned until the PAN-5058 PRD is on main, so it ranks directly behind PAN-5058 in the slice build order (S-A, then S-B/S-C, S-D, S-E/S-F/S-G). Dependencies PAN-5058 closed, so they are dropped from dependsOn; the rank stays because it already reflects the unblocked work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -5968,11 +5827,10 @@ Triage: verify whether a never-kicked-off test session can still absorb dispatch
       "score": 54,
       "condition": "ok",
       "dependsOn": [
-        "PAN-5058",
         "PAN-5490"
       ],
       "why": "MCP relay S-C: machine tunnel client and TLS listener for public /mcp; one public-ingress predicate. Needs S-A (PAN-5490).",
-      "rationale": "New sibling slice of PAN-5058 (relay add-on). Its body says it cannot be planned until the PAN-5058 PRD is on main, so it ranks directly behind PAN-5058 in the slice build order (S-A, then S-B/S-C, S-D, S-E/S-F/S-G).",
+      "rationale": "New sibling slice of PAN-5058 (relay add-on). Its body says it cannot be planned until the PAN-5058 PRD is on main, so it ranks directly behind PAN-5058 in the slice build order (S-A, then S-B/S-C, S-D, S-E/S-F/S-G). Dependencies PAN-5058 closed, so they are dropped from dependsOn; the rank stays because it already reflects the unblocked work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -5997,11 +5855,10 @@ Triage: verify whether a never-kicked-off test session can still absorb dispatch
       "score": 52,
       "condition": "ok",
       "dependsOn": [
-        "PAN-5058",
         "PAN-5492"
       ],
       "why": "MCP relay S-D: ACME TLS-ALPN-01 certificates on the machine; key never leaves it. Needs S-C (PAN-5492).",
-      "rationale": "New sibling slice of PAN-5058 (relay add-on). Its body says it cannot be planned until the PAN-5058 PRD is on main, so it ranks directly behind PAN-5058 in the slice build order (S-A, then S-B/S-C, S-D, S-E/S-F/S-G).",
+      "rationale": "New sibling slice of PAN-5058 (relay add-on). Its body says it cannot be planned until the PAN-5058 PRD is on main, so it ranks directly behind PAN-5058 in the slice build order (S-A, then S-B/S-C, S-D, S-E/S-F/S-G). Dependencies PAN-5058 closed, so they are dropped from dependsOn; the rank stays because it already reflects the unblocked work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6025,13 +5882,12 @@ Triage: verify whether a never-kicked-off test session can still absorb dispatch
       "score": 52,
       "condition": "ok",
       "dependsOn": [
-        "PAN-5058",
         "PAN-5491",
         "PAN-5492",
         "PAN-5493"
       ],
       "why": "MCP relay S-E: Settings switch, enable flow, loopback end-to-end test and user docs. Needs S-B, S-C and S-D.",
-      "rationale": "New sibling slice of PAN-5058 (relay add-on). Its body says it cannot be planned until the PAN-5058 PRD is on main, so it ranks directly behind PAN-5058 in the slice build order (S-A, then S-B/S-C, S-D, S-E/S-F/S-G).",
+      "rationale": "New sibling slice of PAN-5058 (relay add-on). Its body says it cannot be planned until the PAN-5058 PRD is on main, so it ranks directly behind PAN-5058 in the slice build order (S-A, then S-B/S-C, S-D, S-E/S-F/S-G). Dependencies PAN-5058 closed, so they are dropped from dependsOn; the rank stays because it already reflects the unblocked work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6055,11 +5911,10 @@ Triage: verify whether a never-kicked-off test session can still absorb dispatch
       "score": 44,
       "condition": "ok",
       "dependsOn": [
-        "PAN-5058",
         "PAN-5493"
       ],
       "why": "MCP relay S-F: Google Trust Services fallback CA via EAB when Let's Encrypt rate-limits. Needs S-D (PAN-5493).",
-      "rationale": "New sibling slice of PAN-5058 (relay add-on). Its body says it cannot be planned until the PAN-5058 PRD is on main, so it ranks directly behind PAN-5058 in the slice build order (S-A, then S-B/S-C, S-D, S-E/S-F/S-G).",
+      "rationale": "New sibling slice of PAN-5058 (relay add-on). Its body says it cannot be planned until the PAN-5058 PRD is on main, so it ranks directly behind PAN-5058 in the slice build order (S-A, then S-B/S-C, S-D, S-E/S-F/S-G). Dependencies PAN-5058 closed, so they are dropped from dependsOn; the rank stays because it already reflects the unblocked work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6083,11 +5938,10 @@ Triage: verify whether a never-kicked-off test session can still absorb dispatch
       "score": 48,
       "condition": "ok",
       "dependsOn": [
-        "PAN-5058",
         "PAN-5493"
       ],
       "why": "MCP relay S-G: daily Certificate Transparency watch for the relay hostname; ships with S-E. Needs S-D (PAN-5493).",
-      "rationale": "New sibling slice of PAN-5058 (relay add-on). Its body says it cannot be planned until the PAN-5058 PRD is on main, so it ranks directly behind PAN-5058 in the slice build order (S-A, then S-B/S-C, S-D, S-E/S-F/S-G).",
+      "rationale": "New sibling slice of PAN-5058 (relay add-on). Its body says it cannot be planned until the PAN-5058 PRD is on main, so it ranks directly behind PAN-5058 in the slice build order (S-A, then S-B/S-C, S-D, S-E/S-F/S-G). Dependencies PAN-5058 closed, so they are dropped from dependsOn; the rank stays because it already reflects the unblocked work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6112,11 +5966,10 @@ Triage: verify whether a never-kicked-off test session can still absorb dispatch
       "score": 46,
       "condition": "ok",
       "dependsOn": [
-        "PAN-5058",
         "PAN-5494"
       ],
       "why": "Live Grok Bot and Muse checkpoints over the MCP relay, moved from PAN-5058. Blocked by relay S-E (PAN-5494); needs operator sign-ins.",
-      "rationale": "New issue carved out of PAN-5058; it is the last step of the relay chain, so it ranks right after the relay slices it depends on.",
+      "rationale": "New issue carved out of PAN-5058; it is the last step of the relay chain, so it ranks right after the relay slices it depends on. Dependencies PAN-5058 closed, so they are dropped from dependsOn; the rank stays because it already reflects the unblocked work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7869,19 +7722,6 @@ Triage: verify whether a never-kicked-off test session can still absorb dispatch
       "planning": "auto"
     },
     {
-      "issue": "PAN-5486",
-      "rank": 475,
-      "size": "M",
-      "importance": "medium",
-      "score": 52,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Bot integration core pins are hand-typed and stale (0.74/0.77); stamp them at release and fix Grok Bot docs.",
-      "rationale": "New; stale pins ship connectors that predate one-paste connect, so it bands with medium integration fixes.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1149",
       "rank": 476,
       "size": "S",
@@ -7967,19 +7807,6 @@ Triage: verify whether a never-kicked-off test session can still absorb dispatch
       "planning": "auto"
     },
     {
-      "issue": "PAN-5464",
-      "rank": 482,
-      "size": "L",
-      "importance": "medium",
-      "score": 48,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Video skill set: Remotion, HyperFrames, OpenMontage, video-use packs + 'video' group; fixes LFS extraction. PRD on main.",
-      "rationale": "New issue. Ships four known skill packs and a pack-group alias, and fixes two real skill-pack gaps on the way: the Git LFS smudge that breaks HyperFrames extraction, and repos whose only skill is a root SKILL.md. A full PRD with verified research, seven work items and acceptance criteria landed on main, so it is workable and ranks with mid-tier medium features.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-933",
       "rank": 483,
       "size": "S",
@@ -7988,19 +7815,6 @@ Triage: verify whether a never-kicked-off test session can still absorb dispatch
       "condition": "ok",
       "dependsOn": [],
       "why": "Review poster cannot post to GitLab MRs (only supports GitHub PRs)",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5465",
-      "rank": 484,
-      "size": "L",
-      "importance": "medium",
-      "score": 47,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Add skill packs to a live conversation: /reload-plugins hot apply, resume fallback, CLI, MCP tool, dashboard modal. PRD on main.",
-      "rationale": "New issue. Lets an operator or agent add skill packs to a running conversation without losing context, proven by a 2026-11-17 spike that /reload-plugins rebuilds the skill list in place. The PRD on main covers the route, launcher change, CLI, MCP tool and dashboard modal (FR-1 to FR-9), so it is workable; it ranks just after PAN-5464 because its --group support waits on that issue.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -8023,12 +7837,9 @@ Triage: verify whether a never-kicked-off test session can still absorb dispatch
       "importance": "medium",
       "score": 40,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-5464",
-        "PAN-5465"
-      ],
+      "dependsOn": [],
       "why": "Follow-up: accept pack groups in pan skills add, add_skills and the Add skills dialog; PAN-5464 and PAN-5465 merged.",
-      "rationale": "Unblocked: PAN-5464 (#5507) and PAN-5465 (#5509) both merged on 2026-11-17, so it can start; rank and score hold, since the merge changes readiness, not impact.",
+      "rationale": "Unblocked: PAN-5464 (#5507) and PAN-5465 (#5509) both merged on 2026-11-17, so it can start; rank and score hold, since the merge changes readiness, not impact. Dependencies PAN-5464, PAN-5465 closed, so they are dropped from dependsOn; the rank stays because it already reflects the unblocked work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13517,13 +13328,6 @@ Triage: verify whether a never-kicked-off test session can still absorb dispatch
       "confidence": 1
     },
     {
-      "from": "PAN-2424",
-      "to": "PAN-5597",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
       "from": "PAN-2566",
       "to": "PAN-2565",
       "type": "contains",
@@ -13944,20 +13748,6 @@ Triage: verify whether a never-kicked-off test session can still absorb dispatch
       "confidence": 0.4
     },
     {
-      "from": "PAN-3657",
-      "to": "PAN-5637",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
-      "from": "PAN-3657",
-      "to": "PAN-5638",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
-    },
-    {
       "from": "PAN-3771",
       "to": "PAN-2981",
       "type": "informs",
@@ -14336,74 +14126,11 @@ Triage: verify whether a never-kicked-off test session can still absorb dispatch
       "confidence": 0.6
     },
     {
-      "from": "PAN-5029",
-      "to": "PAN-5058",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
       "from": "PAN-5048",
       "to": "PAN-5028",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
-    },
-    {
-      "from": "PAN-5058",
-      "to": "PAN-5490",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5058",
-      "to": "PAN-5491",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5058",
-      "to": "PAN-5492",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5058",
-      "to": "PAN-5493",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5058",
-      "to": "PAN-5494",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5058",
-      "to": "PAN-5495",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5058",
-      "to": "PAN-5496",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5058",
-      "to": "PAN-5602",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
     },
     {
       "from": "PAN-5201",
@@ -14437,20 +14164,6 @@ Triage: verify whether a never-kicked-off test session can still absorb dispatch
       "from": "PAN-5241",
       "to": "PAN-1676",
       "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5250",
-      "to": "PAN-5312",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.3
-    },
-    {
-      "from": "PAN-5250",
-      "to": "PAN-5649",
-      "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
     },
@@ -14499,34 +14212,6 @@ Triage: verify whether a never-kicked-off test session can still absorb dispatch
     {
       "from": "PAN-5446",
       "to": "PAN-5449",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-5464",
-      "to": "PAN-5465",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-5464",
-      "to": "PAN-5497",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5465",
-      "to": "PAN-5497",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5486",
-      "to": "PAN-5602",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
@@ -14644,48 +14329,6 @@ Triage: verify whether a never-kicked-off test session can still absorb dispatch
       "confidence": 0.5
     },
     {
-      "from": "PAN-5633",
-      "to": "PAN-5567",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
-    },
-    {
-      "from": "PAN-5633",
-      "to": "PAN-5636",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5637",
-      "to": "PAN-5638",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-5637",
-      "to": "PAN-5640",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5637",
-      "to": "PAN-5641",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-5638",
-      "to": "PAN-5641",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-5640",
       "to": "PAN-5641",
       "type": "informs",
@@ -14693,46 +14336,32 @@ Triage: verify whether a never-kicked-off test session can still absorb dispatch
       "confidence": 0.8
     },
     {
-      "from": "PAN-5652",
-      "to": "PAN-3355",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-5652",
-      "to": "PAN-5013",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
-      "from": "PAN-5652",
-      "to": "PAN-5641",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
-    },
-    {
-      "from": "PAN-5652",
-      "to": "PAN-5657",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-5662",
-      "to": "PAN-660",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
       "from": "PAN-5663",
       "to": "PAN-5625",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
+    },
+    {
+      "from": "PAN-5665",
+      "to": "PAN-5666",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-5665",
+      "to": "PAN-5668",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5667",
+      "to": "PAN-5666",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     },
     {
       "from": "PAN-750",
