@@ -119,9 +119,14 @@ export interface FlywheelWatchdogDeps {
 // ============================================================================
 
 async function defaultReadTranscript(conv: LegacyConversation): Promise<FlywheelTranscriptRead | null> {
-  const { resolveSessionFile, getCachedMessages } = await import('../overdeck/conversation-reads.js');
+  const { resolveSessionFile } = await import('../overdeck/conversation-reads.js');
   const file = await resolveSessionFile(conv).catch(() => null);
-  if (!file) return null;
+  return file ? readWatchdogTranscriptFile(file) : null;
+}
+
+/** Parses one transcript file through the conversation reader. Null when it cannot be read. */
+export async function readWatchdogTranscriptFile(file: string): Promise<FlywheelTranscriptRead | null> {
+  const { getCachedMessages } = await import('../overdeck/conversation-reads.js');
   try {
     const parsed = await getCachedMessages(file, false);
     let last: (typeof parsed.messages)[number] | undefined;

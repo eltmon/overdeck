@@ -282,3 +282,65 @@ describe('watchFlywheelLoop failure isolation (PAN-5667)', () => {
     error.mockRestore();
   });
 });
+
+describe('readWatchdogTranscriptFile against real Claude JSONL (PAN-5667)', () => {
+  let dir: string;
+  beforeEach(async () => {
+    const { mkdtemp } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    dir = await mkdtemp(join(tmpdir(), 'flywheel-watchdog-'));
+  });
+  afterEach(async () => {
+    const { rm } = await import('node:fs/promises');
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  const user = (uuid: string, ts: string, text: string) =>
+    JSON.stringify({ type: 'user', uuid, timestamp: ts, message: { role: 'user', content: text } });
+  const assistant = (uuid: string, ts: string, content: unknown[], stopReason: string) =>
+    JSON.stringify({ type: 'assistant', uuid, timestamp: ts, message: { id: `msg-${uuid}`, role: 'assistant', model: 'claude', type: 'message', stop_reason: stopReason, content } });
+  const tick = 'flywheel-tick: tick=7 pick=none phase=idle in-flight=none needs-you=none';
+
+  async function read(name: string, lines: string[]) {
+    const { writeFile } = await import('node:fs/promises');
+    const { join } = await import('node:path');
+    const file = join(dir, `${name}.jsonl`);
+    await writeFile(file, `${lines.join('\n')}\n`);
+    const { readWatchdogTranscriptFile } = await import('../../../../src/lib/cloister/flywheel-watchdog.js');
+    return readWatchdogTranscriptFile(file);
+  }
+
+  it('an ended turn is a turn boundary, and its tick is found', async () => {
+    const result = await read('ended', [
+      user('u1', '2026-11-25T12:00:00.000Z', '/pan-flywheel'),
+      assistant('a1', '2026-11-25T12:01:00.000Z', [{ type: 'text', text: `Done.\n${tick}` }], 'end_turn'),
+    ]);
+    expect(result?.atTurnBoundary).toBe(true);
+    expect(result?.messages.at(-1)?.text).toContain('flywheel-tick:');
+  });
+
+  it('a tool call waiting on its result is not a turn boundary', async () => {
+    const result = await read('pending-tool', [
+      user('u1', '2026-11-25T12:00:00.000Z', '/pan-flywheel'),
+      assistant('a1', '2026-11-25T12:01:00.000Z', [
+        { type: 'text', text: 'Checking.' },
+        { type: 'tool_use', id: 'toolu_1', name: 'AskUserQuestion', input: { questions: [] } },
+      ], 'tool_use'),
+    ]);
+    expect(result?.atTurnBoundary).toBe(false);
+  });
+
+  it('a user message after an ended turn is not a turn boundary', async () => {
+    const result = await read('trailing-user', [
+      assistant('a1', '2026-11-25T12:01:00.000Z', [{ type: 'text', text: `Done.\n${tick}` }], 'end_turn'),
+      user('u2', '2026-11-25T12:30:00.000Z', 'what is in flight?'),
+    ]);
+    expect(result?.atTurnBoundary).toBe(false);
+  });
+
+  it('a missing file reads as null', async () => {
+    const { readWatchdogTranscriptFile } = await import('../../../../src/lib/cloister/flywheel-watchdog.js');
+    await expect(readWatchdogTranscriptFile('/nonexistent/flywheel.jsonl')).resolves.toBeNull();
+  });
+});
