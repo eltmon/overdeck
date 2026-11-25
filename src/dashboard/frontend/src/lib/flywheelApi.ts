@@ -5,15 +5,46 @@
  * that wrap the CLI's own action functions.
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { QueryClient } from '@tanstack/react-query';
 import type { FlywheelDerivedStatus } from '@overdeck/contracts';
 
 import { dashboardMutationJsonHeaders } from './wsTransport';
+import { conversationMessagesQueryKey } from '../components/chat/useConversationMessagesStream';
+import { useComposerStore } from './composerStore';
 
 export { useMergeTrainConfig, useMergeTrainConfigMutation } from '../components/merge-train/config';
 
 export const FLYWHEEL_CONVERSATION_NAME = 'conv-flywheel';
 export const FLYWHEEL_STATUS_QUERY_KEY = ['flywheel', 'status'] as const;
 export const FLYWHEEL_CONVERSATION_QUERY_KEY = ['conversation', FLYWHEEL_CONVERSATION_NAME] as const;
+
+/**
+ * One run of `conv-flywheel` (PAN-5665). Every run reuses the name, and the
+ * rowid can be reused after `vacateConversationName` deletes the old row, so
+ * the row's `createdAt` is what tells two runs apart.
+ */
+export function flywheelRunIdentity(conversation: { id: number; createdAt?: string | null }): string {
+  return `${conversation.id}:${conversation.createdAt ?? ''}`;
+}
+
+/** Which run's transcript the name-keyed caches of each QueryClient hold. */
+const transcriptCacheOwner = new WeakMap<QueryClient, string>();
+
+/**
+ * Make `identity` the owner of the `conv-flywheel` caches. When another run
+ * (or nobody known) owned them, drop the messages, subagent transcripts and
+ * about summary first; reset the run-bound composer state only when a known
+ * other run owned it. Returns true when it cleared.
+ */
+export function claimFlywheelTranscriptCache(queryClient: QueryClient, identity: string): boolean {
+  const previous = transcriptCacheOwner.get(queryClient);
+  if (previous === identity) return false;
+  queryClient.removeQueries({ queryKey: conversationMessagesQueryKey(FLYWHEEL_CONVERSATION_NAME) });
+  queryClient.removeQueries({ queryKey: ['conversation-about', FLYWHEEL_CONVERSATION_NAME] });
+  if (previous !== undefined) useComposerStore.getState().resetForNewRun(FLYWHEEL_CONVERSATION_NAME);
+  transcriptCacheOwner.set(queryClient, identity);
+  return true;
+}
 
 export type FlywheelAction = 'start' | 'pause' | 'resume' | 'stop' | 'abort' | 'report';
 

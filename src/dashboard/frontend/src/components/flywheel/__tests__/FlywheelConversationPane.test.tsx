@@ -1,5 +1,6 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { QueryClient } from '@tanstack/react-query';
 import type { FlywheelDerivedStatus } from '@overdeck/contracts';
 
 const confirmMock = vi.hoisted(() => vi.fn(async () => true));
@@ -38,6 +39,8 @@ vi.mock('../../XTerminal', () => ({
 
 import { FlywheelConversationPane } from '../FlywheelConversationPane';
 import { StandaloneFlywheelPopoutRoute } from '../../../App/StandaloneRoutes';
+import { claimFlywheelTranscriptCache, flywheelRunIdentity } from '../../../lib/flywheelApi';
+import { useComposerStore } from '../../../lib/composerStore';
 import { flywheelStatus, renderWithQuery, stubFetch } from './fixtures';
 
 const conversation = { id: 42, name: 'conv-flywheel', tmuxSession: 'conv-flywheel', status: 'active', cwd: '/repos/overdeck', sessionAlive: true };
@@ -183,5 +186,63 @@ describe('FlywheelConversationPane (PAN-3964 FR-13)', () => {
     await screen.findByRole('button', { name: 'Pause' });
     expect(labels()).not.toContain('Pop out');
     expect(screen.queryByTestId('sidebar-home')).toBeNull();
+  });
+});
+
+describe('claimFlywheelTranscriptCache (PAN-5665)', () => {
+  afterEach(() => {
+    useComposerStore.setState({ byConversation: {} });
+  });
+
+  it('flywheelRunIdentity combines id and createdAt, falling back to an empty createdAt', () => {
+    expect(flywheelRunIdentity({ id: 42, createdAt: 'X' })).toBe('42:X');
+    expect(flywheelRunIdentity({ id: 42 })).toBe('42:');
+  });
+
+  it('a first claim returns true and clears the messages, subagent and about caches', () => {
+    const client = new QueryClient();
+    client.setQueryData(['conversation-messages', 'conv-flywheel'], { messages: ['m1'] });
+    client.setQueryData(['conversation-messages', 'conv-flywheel', 'subagent', 'a1'], { messages: ['m2'] });
+    client.setQueryData(['conversation-about', 'conv-flywheel'], { summary: 'old run' });
+
+    expect(claimFlywheelTranscriptCache(client, '42:A')).toBe(true);
+    expect(client.getQueryData(['conversation-messages', 'conv-flywheel'])).toBeUndefined();
+    expect(client.getQueryData(['conversation-messages', 'conv-flywheel', 'subagent', 'a1'])).toBeUndefined();
+    expect(client.getQueryData(['conversation-about', 'conv-flywheel'])).toBeUndefined();
+  });
+
+  it('a repeated claim of the same identity returns false and removes nothing', () => {
+    const client = new QueryClient();
+    claimFlywheelTranscriptCache(client, '42:A');
+    client.setQueryData(['conversation-messages', 'conv-flywheel'], { messages: ['seeded'] });
+
+    expect(claimFlywheelTranscriptCache(client, '42:A')).toBe(false);
+    expect(client.getQueryData(['conversation-messages', 'conv-flywheel'])).toEqual({ messages: ['seeded'] });
+  });
+
+  it('a first claim on an unknown owner keeps composer state; a changed owner resets it', () => {
+    const client = new QueryClient();
+    useComposerStore.getState().addOptimistic('conv-flywheel', 'old echo', 0);
+    useComposerStore.getState().addCommandResult('conv-flywheel', '/pan status', {
+      kind: 'captured', status: 'completed', command: '/pan status', output: 'ok', truncated: false,
+    });
+    useComposerStore.getState().holdSend('conv-flywheel', 'held text', { clientMessageId: 'h1' });
+    useComposerStore.getState().failSend('conv-flywheel', 'rejected text');
+
+    claimFlywheelTranscriptCache(client, '42:A');
+    const afterFirstClaim = useComposerStore.getState().byConversation['conv-flywheel']!;
+    expect(afterFirstClaim.optimistic).toHaveLength(1);
+    expect(afterFirstClaim.commandResults).toHaveLength(1);
+    expect(afterFirstClaim.failed).toHaveLength(2);
+
+    claimFlywheelTranscriptCache(client, '42:B');
+    const afterSecondClaim = useComposerStore.getState().byConversation['conv-flywheel']!;
+    expect(afterSecondClaim.optimistic).toEqual([]);
+    expect(afterSecondClaim.commandResults).toEqual([]);
+    const held = afterSecondClaim.failed.find((failed) => failed.clientMessageId === 'h1')!;
+    expect(held.code).toBe('cancelled');
+    expect(held.heldOffline).toBeUndefined();
+    const rejected = afterSecondClaim.failed.find((failed) => failed.text === 'rejected text')!;
+    expect(rejected.code).not.toBe('cancelled');
   });
 });
