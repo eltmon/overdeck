@@ -3,15 +3,19 @@
  * conversation panel for `conv-flywheel` (with a Terminal toggle) and the
  * run controls. Which controls show is decided by the derived run state from
  * `GET /api/flywheel/status`; every control POSTs to the route that wraps the
- * same action the CLI verb calls.
+ * same action the CLI verb calls. The embedded panel is keyed by run identity
+ * (`id:createdAt`), and a new identity clears the previous run's name-keyed
+ * caches before the panel renders (PAN-5665).
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { FileText, Loader2, Maximize2, Pause, Play, RotateCcw, Square, StopCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { splitNeedsYouItems, type FlywheelLastTick } from '@overdeck/contracts';
 
 import {
+  claimFlywheelTranscriptCache,
+  flywheelRunIdentity,
   FLYWHEEL_CONVERSATION_NAME,
   FLYWHEEL_CONVERSATION_QUERY_KEY,
   FlywheelActionHttpError,
@@ -66,6 +70,7 @@ function useRunAction(action: FlywheelAction, onError?: (error: Error) => void) 
   const mutation = useFlywheelAction(action);
   return {
     pending: mutation.isPending,
+    pendingFresh: mutation.isPending && (mutation.variables as { fresh?: boolean } | undefined)?.fresh === true,
     run: (body?: unknown) => mutation.mutate(body, {
       onSuccess: () => toast.success(ACTION_TOAST[action]),
       onError: (error: Error) => {
@@ -136,6 +141,17 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
 
   const conversation = conversationQuery.data ?? null;
   const config = configQuery.data ?? {};
+
+  // PAN-5665: every run is named conv-flywheel, so the panel's name-keyed
+  // caches outlive a run. Render the panel only for a run that owns them.
+  const runIdentity = conversation ? flywheelRunIdentity(conversation) : null;
+  const [claimedIdentity, setClaimedIdentity] = useState<string | null>(null);
+  useLayoutEffect(() => {
+    if (runIdentity === null || claimedIdentity === runIdentity) return;
+    claimFlywheelTranscriptCache(queryClient, runIdentity);
+    setClaimedIdentity(runIdentity);
+  }, [runIdentity, claimedIdentity, queryClient]);
+  const panelReady = runIdentity !== null && claimedIdentity === runIdentity;
 
   const handleStop = async () => {
     const ok = await confirm({
@@ -245,22 +261,27 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
       </header>
 
       <div className="min-h-0 flex-1 overflow-hidden">
-        {conversationQuery.isLoading ? (
+        {start.pending ? (
+          <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground" data-testid="flywheel-starting">
+            <Loader2 className="h-4 w-4 animate-spin" />{start.pendingFresh ? 'Starting a fresh Flywheel…' : 'Starting the Flywheel…'}
+          </div>
+        ) : conversationQuery.isLoading ? (
           <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />Loading flywheel conversation…
           </div>
         ) : conversation ? (
           viewMode === 'terminal' ? (
             <XTerminal sessionName={FLYWHEEL_CONVERSATION_NAME} />
-          ) : (
+          ) : panelReady ? (
             <ConversationPanel
+              key={runIdentity}
               conversation={conversation}
               embedded
               onEmbeddedResume={run === 'paused' ? () => resume.run() : undefined}
               embeddedResumeLabel={resume.pending ? 'Resuming…' : 'Resume flywheel'}
               onSendFailed={() => void queryClient.invalidateQueries({ queryKey: FLYWHEEL_CONVERSATION_QUERY_KEY })}
             />
-          )
+          ) : null
         ) : (
           <div className="flex h-full flex-col items-center justify-center p-8 text-center">
             <p className="text-sm font-medium text-foreground">No flywheel conversation yet — Start to create it</p>

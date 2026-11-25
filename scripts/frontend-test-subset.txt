@@ -414,6 +414,7 @@ src/components/explorer/viewers/shared/__tests__/imageDimensions.test.ts
 src/components/explorer/viewers/shared/__tests__/shared.test.tsx
 src/components/explorer/watch/__tests__/explorer-watch-hub.test.ts
 src/components/explorer/watch/__tests__/useExplorerWatch.test.tsx
+src/components/flywheel/__tests__/FlywheelConversationPane.test.tsx
 src/components/flywheel/__tests__/FlywheelHealthStrip.test.tsx
 src/components/flywheel/__tests__/FlywheelLaneBoard.test.tsx
 src/components/flywheel/__tests__/FlywheelNeedsYouCards.test.tsx

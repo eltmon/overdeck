@@ -334,6 +334,9 @@ interface ComposerStore {
   markNotFoundInTranscript(conversationName: string, id: string): void;
   clearOptimistic(conversationName: string): void;
 
+  /** PAN-5665: a conversation name now names a new run. Drop the old run's echoes and /pan results, and stop its held prompts from auto-sending. */
+  resetForNewRun(conversationName: string): void;
+
   /**
    * PAN-4278: the server refused to paste because a permission prompt is up
    * (409 permission-pending). Keep the bubble as 'held' until the prompt clears.
@@ -591,6 +594,17 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
       byConversation: mutateSlice(state.byConversation, conversationName, (s) =>
         s.optimistic.length === 0 ? s : { ...s, optimistic: [], optimisticBaseCount: 0 },
       ),
+    })),
+
+  resetForNewRun: (conversationName) =>
+    set((state) => ({
+      byConversation: mutateSlice(state.byConversation, conversationName, (s) => ({
+        ...s,
+        optimistic: [],
+        optimisticBaseCount: 0,
+        commandResults: [],
+        failed: s.failed.map((failed) => failed.heldOffline ? cancelledEntry(failed) : failed),
+      })),
     })),
 
   reconcileEchoes: (conversationName, messages, subagents = []) => {

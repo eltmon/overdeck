@@ -1,0 +1,112 @@
+{
+  "version": "1",
+  "issueId": "PAN-5665",
+  "created": "2026-11-25T12:06:20.386Z",
+  "updated": "2026-11-25T12:32:51.144Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-25T12:32Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-25T12:32:51.143Z"
+    }
+  ],
+  "items": {
+    "cache-claim-helpers": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5665",
+      "claimedAt": "2026-11-25T12:06:20.386Z",
+      "doneAt": "2026-11-25T12:12:19.817Z"
+    },
+    "cache-claim-helpers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-25T12:12:19.817Z"
+    },
+    "cache-claim-helpers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-25T12:12:19.817Z"
+    },
+    "cache-claim-helpers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-25T12:12:19.817Z"
+    },
+    "cache-claim-helpers.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-25T12:12:19.817Z"
+    },
+    "cache-claim-helpers.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-25T12:12:19.817Z"
+    },
+    "pane-run-gate": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5665",
+      "claimedAt": "2026-11-25T12:12:28.370Z",
+      "doneAt": "2026-11-25T12:20:44.599Z"
+    },
+    "pane-run-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-25T12:20:44.599Z"
+    },
+    "pane-run-gate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-25T12:20:44.599Z"
+    },
+    "pane-run-gate.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-25T12:20:44.599Z"
+    },
+    "pane-run-gate.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-25T12:20:44.599Z"
+    },
+    "starting-placeholder": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5665",
+      "claimedAt": "2026-11-25T12:20:51.164Z",
+      "doneAt": "2026-11-25T12:24:31.182Z"
+    },
+    "starting-placeholder.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-25T12:24:31.182Z"
+    },
+    "starting-placeholder.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-25T12:24:31.182Z"
+    },
+    "starting-placeholder.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-25T12:24:31.182Z"
+    },
+    "docs-changelog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5665",
+      "claimedAt": "2026-11-25T12:24:36.223Z",
+      "doneAt": "2026-11-25T12:25:37.436Z"
+    },
+    "docs-changelog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-25T12:25:37.436Z"
+    },
+    "docs-changelog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-25T12:25:37.436Z"
+    },
+    "docs-changelog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-25T12:25:37.436Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-25T12:32:51Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5665\n\nPull request: https://github.com/eltmon/overdeck/pull/5672 (head `2b2e01df`)\n\nSource: check_run:test-e2e\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-e2e\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/139203768586/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/45613772941/job/139203768586  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/components/chat/__tests__/ComposerPromptEditor.skillMentions.test.tsx\u001b[2m > \u001b[22mComposerPromptEditor $ Skill menu (PAN-5662)\u001b[2m > \u001b[22mclaude-code lists skills as /<name> and inserts /pan-flywheel on Enter\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected \"vi.fn()\" to be called with arguments: [ +0, 1, '/pan-flywheel ', true ]\u001b[90m\n\nNumber of calls: \u001b[1m0\u001b[22m\n\u001b[31m\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m src/components/chat/__tests__/ComposerPromptEditor.skillMentions.test.tsx:\u001b[2m164:24\u001b[22m\u001b[39m\n    \u001b[90m162|\u001b[39m\n    \u001b[90m163|\u001b[39m     fireEvent\u001b[33m.\u001b[39m\u001b[34mkeyDown\u001b[39m(document\u001b[33m,\u001b[39m { key\u001b[33m:\u001b[39m \u001b[32m'Enter'\u001b[39m })\u001b[33m;\u001b[39m\n    \u001b[90m164|\u001b[39m     expect(spliceText).toHaveBeenCalledWith(0, 1, '/pan-flywheel ', tr…\n    \u001b[90m   |\u001b[39m                        \u001b[31m^\u001b[39m\n    \u001b[90m165|\u001b[39m   })\u001b[33m;\u001b[39m\n    \u001b[90m166|\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\u001b[22m\u001b[39m\n\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m592 passed\u001b[39m\u001b[22m\u001b[90m (593)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ]
+}

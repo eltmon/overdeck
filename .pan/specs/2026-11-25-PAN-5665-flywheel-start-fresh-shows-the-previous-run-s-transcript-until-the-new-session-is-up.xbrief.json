@@ -1,0 +1,365 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-25T12:30:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5665: Flywheel 'Start fresh' shows the previous run's transcript until the new session is up",
+    "updated": "2026-11-25T12:06:07.156Z"
+  },
+  "plan": {
+    "id": "pan-5665",
+    "title": "Flywheel 'Start fresh' shows the previous run's transcript until the new session is up",
+    "status": "running",
+    "uid": "156ae98b-74fe-465e-9957-306b4aac0d97",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-25T12:30:00.000Z",
+    "updated": "2026-11-25T12:06:07.156Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5665",
+        "label": "PAN-5665",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5668",
+        "label": "PAN-5668 (server follow-up, out of scope)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "flywheel",
+      "dashboard",
+      "frontend",
+      "conversation-cache",
+      "bug"
+    ],
+    "narratives": {
+      "Problem": "Every Flywheel run is named conv-flywheel, and ConversationPanel keys its messages, subagent and about caches by name. The Flywheel pane renders the panel with no key, so after Start fresh the new row (reached through the 5 s poll or the start mutation's invalidation) reuses the old run's cache. The stream's 'discovering' events and the no-shrink snapshot merge keep the old rows until the new harness writes its transcript. The rowid can repeat across runs because the conversations table has no AUTOINCREMENT.",
+      "Proposal": "Fix in the Flywheel pane only. A run identity id:createdAt and a per-QueryClient cache owner (WeakMap) in flywheelApi.ts; the pane claims the cache for the row's identity in a useLayoutEffect, clearing the name-keyed caches and composer echoes when the owner changes, and renders ConversationPanel keyed by identity only after the claim. While the start mutation is pending, the pane body shows 'Starting a fresh Flywheel…' or 'Starting the Flywheel…'. Docs and a changelog entry describe the behavior.",
+      "NonGoals": "- Re-keying conversationMessagesQueryKey or any shared conversation cache by id across the app; ConversationPanel.tsx stays unchanged\n- The Command Deck /conv/conv-flywheel pane and other conversations recreated under the same name\n- Server-side transcript resolution for non-Claude harnesses (PAN-5668)\n- Clearing failed-send outbox entries or slash-command results of the old run\n- Any change to startFlywheel, vacateConversationName or the conversation routes"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fix lives in FlywheelConversationPane + flywheelApi.ts, not in ConversationPanel",
+        "rationale": "The issue scopes the fix to the pane; re-keying the shared cache touches five consumer files and eight test files for no extra benefit to this bug."
+      },
+      {
+        "summary": "Run identity is id:createdAt, not id or claudeSessionId",
+        "rationale": "conversations.rowid has no AUTOINCREMENT so a deleted row's id can be reused; claudeSessionId can change mid-run on fork adoption or /clear; created_at is written once at insert."
+      },
+      {
+        "summary": "Clear in a layout effect gated before the panel renders, independent of the start mutation",
+        "rationale": "A CLI `pan flywheel start --fresh` and the popout window have no mutation in this tab; gating before the first render keeps the old cache off screen and keeps a stale resume payload out of the new subscription."
+      },
+      {
+        "summary": "On a known run change, reset run-bound composer state: echoes and /pan command results cleared, held-offline prompts turned into cancelled outbox entries; rejected sends kept",
+        "rationale": "Plan critic round 1: command results render in the new run and held prompts auto-send to the reused name; rejected sends need an explicit operator retry anyway."
+      },
+      {
+        "summary": "Placeholder covers plain Start too, with different text",
+        "rationale": "An idle pane can still show an archived row; all three start.run call sites go through one pending flag."
+      },
+      {
+        "summary": "Non-Claude server-side transcript fallback filed as PAN-5668 instead of fixed here",
+        "rationale": "The incident ran on Claude Code, whose read path resolves only the new session file; the name-keyed lookups for codex/pi/acp/kimi are a different subsystem and need their own verification."
+      }
+    ],
+    "items": [
+      {
+        "id": "cache-claim-helpers",
+        "title": "Add flywheelRunIdentity and claimFlywheelTranscriptCache to flywheelApi.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-25T12:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5665",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "pane-run-gate"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/flywheelApi.ts",
+            "src/dashboard/frontend/src/lib/composerStore.ts",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelConversationPane.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/flywheel/__tests__/FlywheelConversationPane.test.tsx",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "FlywheelConversationPane.test.tsx runs the new claimFlywheelTranscriptCache describe block with every test green",
+            "typecheck exits 0",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1 (.pan/drafts/PAN-5665.md), all three steps. (0) In src/dashboard/frontend/src/lib/composerStore.ts add the store action resetForNewRun(conversationName) exactly as PRD WI-1 step 0 (interface line next to clearOptimistic at line 335; implementation after clearOptimistic at line 589; about 12 lines total because the file has 969 of its 1000-line ceiling): clear optimistic, optimisticBaseCount and commandResults, and map failed entries with heldOffline through cancelledEntry() (line 144). Do not call cancelHeldOffline. (1) In src/dashboard/frontend/src/lib/flywheelApi.ts below FLYWHEEL_CONVERSATION_QUERY_KEY (line 16) add the exact WI-1 code: flywheelRunIdentity returns `${id}:${createdAt ?? ''}`; a module-level WeakMap<QueryClient,string> holds the cache owner; claimFlywheelTranscriptCache(queryClient, identity) returns false when the owner equals identity, else removeQueries(['conversation-messages','conv-flywheel']) (prefix: also subagent keys) and removeQueries(['conversation-about','conv-flywheel']), calls useComposerStore.getState().resetForNewRun('conv-flywheel') ONLY when a known different owner was recorded, records the owner, returns true. If npm run lint:circular reports a new cycle, inline the key literal with a comment. (2) Add the WI-1 helper tests to the existing pane test file (plain new QueryClient per test; reset the composer store with useComposerStore.setState({ byConversation: {} }) in afterEach). (3) Append `src/components/flywheel/__tests__/FlywheelConversationPane.test.tsx` to scripts/frontend-test-subset.txt near the other flywheel entries (around line 417): CI runs only listed frontend test files."
+        },
+        "items": [
+          {
+            "id": "cache-claim-helpers.ac1",
+            "title": "Given conversation {id:42, createdAt:'X'}, flywheelRunIdentity returns '42:X', and given {id:42} with no createdAt it returns '42:'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cache-claim-helpers.ac2",
+            "title": "Given a QueryClient with no owner or a different owner, claimFlywheelTranscriptCache returns true and getQueryData then returns undefined for the conv-flywheel messages, subagent 'a1' and about keys",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cache-claim-helpers.ac3",
+            "title": "Given a QueryClient already owned by the identity, claimFlywheelTranscriptCache returns false and preserves every seeded query",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cache-claim-helpers.ac4",
+            "title": "Given a conv-flywheel slice with an echo, a command result, a held-offline prompt and a rejected send, a first claim preserves all four, and a claim of '42:B' after '42:A' leaves no echo or command result, marks the held prompt code 'cancelled', and preserves the rejected send",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cache-claim-helpers.ac5",
+            "title": "scripts/frontend-test-subset.txt contains the line src/components/flywheel/__tests__/FlywheelConversationPane.test.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pane-run-gate",
+        "title": "Render the Flywheel pane's ConversationPanel only for a claimed run, keyed by run identity",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-25T12:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5665",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/flywheel/FlywheelConversationPane.tsx",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelConversationPane.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/flywheel/__tests__/FlywheelConversationPane.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "FlywheelConversationPane.test.tsx runs the new PAN-5665 run-switch describe block with every test green",
+            "typecheck exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2, steps 1-6. In FlywheelConversationPane.tsx import useLayoutEffect, claimFlywheelTranscriptCache and flywheelRunIdentity; after `const conversation = conversationQuery.data ?? null;` (line 118) add runIdentity, claimedIdentity state and the useLayoutEffect that calls claimFlywheelTranscriptCache(queryClient, runIdentity) then setClaimedIdentity(runIdentity) when they differ. In the conversation branch render <ConversationPanel key={runIdentity} …> only when panelReady (claimedIdentity === runIdentity), else null; the terminal branch is unchanged. Update the header comment. Do NOT edit ConversationPanel.tsx. Tests: replace the ConversationPanel mock so it reads ['conversation-messages', name] with useQuery(enabled:false) and renders each message's `text`; add the same-id/new-createdAt switch test, the same-row test and the subagent test from WI-2 step 6. Switch rows via the fetch stub plus client.refetchQueries; never wait on the real 5 s poll (fake-timers rule). Wrap setQueryData seeding in act(). Confirm the switch test fails when the claim only records the owner, then restore."
+        },
+        "items": [
+          {
+            "id": "pane-run-gate.ac1",
+            "title": "Given the pane shows row A {id:42, createdAt:T1} with a seeded message 'old run tick 131', when the conversation query returns row B {id:42, createdAt:T2}, then 'old run tick 131' no longer renders, the messages cache returns undefined, and the panel renders conv-flywheel",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pane-run-gate.ac2",
+            "title": "Given row A is refetched unchanged, the seeded message still renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pane-run-gate.ac3",
+            "title": "Given a seeded subagent transcript query for run A, when row B arrives, getQueryData for ['conversation-messages','conv-flywheel','subagent','a1'] returns undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pane-run-gate.ac4",
+            "title": "The same-id switch test fails when claimFlywheelTranscriptCache only records the owner, and `git diff --stat main -- src/dashboard/frontend/src/components/chat/ConversationPanel.tsx` prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "starting-placeholder",
+        "title": "Show a starting message in the Flywheel pane while a start is pending",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-25T12:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5665",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/flywheel/FlywheelConversationPane.tsx",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelConversationPane.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/flywheel/__tests__/FlywheelConversationPane.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "FlywheelConversationPane.test.tsx runs both starting-message tests green and all 12 pre-existing tests green",
+            "typecheck exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. useRunAction (lines 64-76) also returns pendingFresh = mutation.isPending && (mutation.variables as {fresh?: boolean} | undefined)?.fresh === true. In the body, a start.pending branch comes before the conversationQuery.isLoading branch (line 229) and renders <div data-testid=\"flywheel-starting\"> with a spinning Loader2 and 'Starting a fresh Flywheel…' when pendingFresh, else 'Starting the Flywheel…'; it replaces the panel, the terminal and the empty state. TanStack Query 5.103.2 keeps the mutation pending until useFlywheelAction's onSettled invalidations finish, so no extra wait is needed. Tests hold the POST /api/flywheel/start response in a promise resolved by hand."
+        },
+        "items": [
+          {
+            "id": "starting-placeholder.ac1",
+            "title": "Given a paused flywheel, when the operator confirms Start fresh and the POST is pending, the pane renders 'Starting a fresh Flywheel…' and renders no conversation-panel",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "starting-placeholder.ac2",
+            "title": "Given an idle flywheel, when Start is clicked and the POST is pending, the pane renders 'Starting the Flywheel…'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "starting-placeholder.ac3",
+            "title": "When the pending POST resolves, the flywheel-starting element disappears and the conversation panel renders again, and all 12 pre-existing tests in the file pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-changelog",
+        "title": "Document the starting message and per-run pane in the Flywheel docs and changelog",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-25T12:30:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5665",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/flywheel.mdx",
+            "docs/FLYWHEEL.md",
+            "changelog.d/pan-5665.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. features/flywheel.mdx: after the toolbar paragraph (line 59) add the paragraph from WI-4 step 1. docs/FLYWHEEL.md: append the WI-4 step 2 sentence to the last cell of the `pan flywheel start` row (line 90). Create changelog.d/pan-5665.md with the WI-4 step 3 #### Fixed entry (format in changelog.d/README.md). Do not edit changelog.mdx."
+        },
+        "items": [
+          {
+            "id": "docs-changelog.ac1",
+            "title": "features/flywheel.mdx contains 'Starting a fresh Flywheel…' and states that a fresh run's pane shows only that run's messages",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac2",
+            "title": "docs/FLYWHEEL.md's `pan flywheel start` row contains claimFlywheelTranscriptCache and the run identity id:createdAt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac3",
+            "title": "changelog.d/pan-5665.md contains one '#### Fixed' bullet linking issue #5665, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "cache-claim-helpers",
+        "to": "pane-run-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "pane-run-gate",
+        "to": "starting-placeholder",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-25-PAN-5665-flywheel-start-fresh-shows-the-previous-run-s-transcript-until-the-new-session-is-up.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}
