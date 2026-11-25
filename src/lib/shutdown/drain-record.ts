@@ -8,13 +8,15 @@
  * (D-9, D-10). It has no expiry: the next dashboard boot consumes a leftover
  * record.
  *
- * Leaf module: imports only node built-ins and `../paths.js`, so the CLI, the
- * dashboard and the deacon child can all stat it cheaply.
+ * Leaf module: imports only node built-ins, `../paths.js` and the flywheel
+ * constants, so the CLI, the dashboard and the deacon child can all stat it
+ * cheaply.
  */
 import { existsSync } from 'node:fs';
 import { readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
+import { FLYWHEEL_CONVERSATION_SESSION } from '../flywheel/constants.js';
 import { getOverdeckHome } from '../paths.js';
 
 export type ShutdownPhase = 'draining' | 'waiting-for-writers' | 'verifying' | 'complete';
@@ -26,6 +28,18 @@ export interface ShutdownStoppedSession {
   issueId?: string;
   label: string;
   wasWorking: boolean;
+}
+
+/**
+ * Whether the resume offer lists a session the drain stopped (D-9): every
+ * agent, the conversations that were mid-turn when the drain first saw them,
+ * and the Flywheel conversation even when it was idle between ticks
+ * (PAN-5671). The loop waits for its next tick almost all of the time, so a
+ * `wasWorking` rule alone would almost never offer it. It is offered, never
+ * resumed on its own.
+ */
+export function isOfferedAfterShutdown(session: ShutdownStoppedSession): boolean {
+  return session.kind === 'agent' || session.wasWorking || session.id === FLYWHEEL_CONVERSATION_SESSION;
 }
 
 export interface ShutdownRecord {

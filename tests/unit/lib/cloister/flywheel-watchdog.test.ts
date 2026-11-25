@@ -260,7 +260,8 @@ describe('watchFlywheelLoop (PAN-5667)', () => {
 
     it('never auto-resumes after a safe shutdown: the drain ended the row just before the reboot (D-9)', async () => {
       // `pan shutdown` stopped the idle loop 30 s before the host went down; the
-      // next boot consumed the shutdown record. Every other resume rule holds.
+      // next boot consumed the shutdown record and offered the loop in Needs you
+      // (PAN-5671). Every other resume rule holds, and the offer is the only way back.
       h.set({
         run: 'paused',
         conv: conv({ status: 'ended', endedAt: new Date(BOOT - 30_000).toISOString() }),

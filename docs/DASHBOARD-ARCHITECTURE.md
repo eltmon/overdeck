@@ -2290,7 +2290,8 @@ User docs: `features/safe-shutdown.mdx`. PRD: `.pan/drafts/pan-5342.md`.
   in-flight auto-merges, post-merge runs and verification workers; `verify.ts`
   reports leftover panes, `index.lock` files and half-done rebases;
   `end.ts` is the one end path (cancel and boot) that deletes the record and
-  seeds the resume offer; `boot.ts` consumes a leftover record at boot and
+  seeds the resume offer (every agent, the mid-turn conversations, and
+  `conv-flywheel` idle or not: `isOfferedAfterShutdown`, PAN-5671); `boot.ts` consumes a leftover record at boot and
   starts the reboot guard (`reboot-guard.ts`, a `systemd-inhibit` block lock
   held while a session is mid-turn).
 - **The snapshot** is derived each tick and emitted with

@@ -40,7 +40,8 @@
  *
  * 5. **Shutdown (PAN-5342).** `seedShutdownOffer` turns the sessions a safe
  *    shutdown's drain stopped into the same offer, settled at once, with cause
- *    `shutdown`: the mid-turn conversations, plus every work agent. The drain's
+ *    `shutdown`: the mid-turn conversations, the Flywheel conversation idle or
+ *    not (PAN-5671), plus every work agent. The drain's
  *    own stops recorded stop marks, so the stopped-on-purpose mark rule is off
  *    for that cause; the `ended_at` baseline still drops a conversation the
  *    operator stops after the offer. Resume all then resumes conversations with
@@ -70,7 +71,7 @@ import { getConversationByName, listConversations } from '../../../lib/overdeck/
 import { decodeDoorResponse } from '../../../lib/overdeck/scheduled-message-delivery.js';
 import { FLYWHEEL_CONVERSATION_SESSION } from '../../../lib/flywheel/constants.js';
 import type { ResumeCause } from '../../../lib/resume-contract.js';
-import type { ShutdownStoppedSession } from '../../../lib/shutdown/drain-record.js';
+import { isOfferedAfterShutdown, type ShutdownStoppedSession } from '../../../lib/shutdown/drain-record.js';
 import { listLiveAgentIds } from '../../../lib/terminal-backends/inventory.js';
 import { onBackendConnectionChange } from './backend-inventory.js';
 
@@ -229,13 +230,14 @@ export function noteBackendLost(): void {
 }
 
 /**
- * Offer what a safe shutdown stopped (PAN-5342, D-9/D-10): every agent, plus
- * the conversations that were mid-turn (`wasWorking`). The offer is settled at
- * once; names an existing offer still holds carry over.
+ * Offer what a safe shutdown stopped (PAN-5342, D-9/D-10): every agent, the
+ * conversations that were mid-turn (`wasWorking`), and the Flywheel
+ * conversation idle or not (PAN-5671). `isOfferedAfterShutdown` is the rule.
+ * The offer is settled at once; names an existing offer still holds carry over.
  */
 export function seedShutdownOffer(sessions: readonly ShutdownStoppedSession[]): void {
   const names = sessions
-    .filter((session) => session.kind === 'conversation' && session.wasWorking)
+    .filter((session) => session.kind === 'conversation' && isOfferedAfterShutdown(session))
     .map((session) => session.name ?? session.id.replace(/^conv-/, ''));
   const agents = new Map((capture?.agents ?? []).map((agent) => [agent.id, agent]));
   for (const session of sessions) {

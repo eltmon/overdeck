@@ -2589,8 +2589,9 @@ leaves a trace:
       `FlywheelStoppedOnPurpose` when the dashboard recorded a deliberate
       stop since then. A failed resume is retried every 5 minutes, three
       attempts at most per deacon process. It never resumes after a safe
-      shutdown: the drain ends the row before the boot (D-9). While the
-      shutdown record exists it does nothing.
+      shutdown: the drain ends the row before the boot (D-9); the shutdown
+      resume offer lists the Flywheel instead, idle or not (PAN-5671). While
+      the shutdown record exists it does nothing.
 
     Each nudge and resume also goes to the dashboard activity feed. The
     routine never throws, so a failure cannot stop the routines after it.

@@ -59,7 +59,7 @@ If an agent or conversation runs `pan shutdown` itself, the command starts the d
 
 ## After the restart
 
-Nothing resumes by itself. When the dashboard starts again, **Needs you** shows "Resume the N sessions shutdown stopped". It lists every agent the drain stopped and every conversation that was working when the drain began. **Resume all** starts them one at a time and waits while memory or CPU pressure is high. Idle conversations are not listed; they resume when you open them.
+Nothing resumes by itself. When the dashboard starts again, **Needs you** shows "Resume the N sessions shutdown stopped". It lists every agent the drain stopped and every conversation that was working when the drain began. It also lists the Flywheel conversation whenever the drain stopped it, even while it was idle between ticks. **Resume all** starts them one at a time and waits while memory or CPU pressure is high, and resumes the Flywheel the way `pan flywheel resume` does. Other idle conversations are not listed; they resume when you open them.
 
 A cancelled drain makes the same offer. If the dashboard restarts in the middle of a drain, the drain ends as a cancel.
 
