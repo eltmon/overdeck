@@ -37,6 +37,7 @@ vi.mock('../deacon-api-recovery.js', () => ({ checkApiErrorAgents: mocks.checkAp
 vi.mock('../../activity-logger.js', () => ({ emitActivityEntry: mocks.emitActivityEntry }));
 vi.mock('../../agents.js', () => ({ listAgentStates: mocks.listAgentStates }));
 vi.mock('../../pipeline-notifier.js', () => ({ notifyPipeline: mocks.notifyPipeline }));
+vi.mock('../flywheel-watchdog.js', () => ({ watchFlywheelLoop: async () => [] }));
 
 const { recordHandoffDeferred } = await import('../deferred-handoff.js');
 const { readPipelineJournal } = await import('../pipeline-journal.js');

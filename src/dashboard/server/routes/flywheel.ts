@@ -34,9 +34,11 @@ import {
   FlywheelOrphanSession,
   FlywheelPausedExists,
 } from '../../../lib/flywheel/errors.js';
+import { FLYWHEEL_CONVERSATION_SESSION } from '../../../lib/flywheel/constants.js';
 import { readFlywheelReportFile, readFlywheelStateFile } from '../../../lib/flywheel/files.js';
 import { deriveFlywheelHealth, type FlywheelHealthResult } from '../../../lib/flywheel/health.js';
 import { computeSubstrateStats } from '../../../lib/flywheel/substrate-stats.js';
+import { conversationStoppedSince } from '../../../lib/overdeck/conversation-stop-marks.js';
 import type { TrackerIssueFacts } from '../../../lib/overdeck/derived-issue-state.js';
 import { jsonResponse } from '../http-helpers.js';
 import { getBackendPanes } from '../services/backend-inventory.js';
@@ -200,6 +202,29 @@ export async function postFlywheelStartPayload(body: Record<string, unknown>): P
 }
 
 /**
+ * `unlessStoppedSince` (epoch ms, PAN-5667) is the deacon's reboot resume: it
+ * asks this route to refuse when the conversation was stopped on purpose at or
+ * after that time. The stop marks live only in this process
+ * (`conversation-stop-marks.ts`), which is why the deacon child asks here.
+ */
+export async function postFlywheelResumePayload(
+  body: Record<string, unknown>,
+  stoppedSince: (name: string, sinceMs: number) => boolean = conversationStoppedSince,
+): Promise<RouteResult> {
+  const since = body['unlessStoppedSince'];
+  if (since !== undefined && (typeof since !== 'number' || !Number.isFinite(since))) {
+    return { status: 400, body: { error: 'unlessStoppedSince must be a number' } };
+  }
+  if (typeof since === 'number' && stoppedSince(FLYWHEEL_CONVERSATION_SESSION, since)) {
+    return {
+      status: 409,
+      body: { error: 'The flywheel was stopped on purpose after that time', code: 'FlywheelStoppedOnPurpose' },
+    };
+  }
+  return guarded(() => resumeFlywheel());
+}
+
+/**
  * Graceful stop waits up to two minutes for the loop's report. The route
  * checks the flywheel is running, starts the stop, and answers 202; the page
  * sees the run flip to `paused` on its next status poll.
@@ -283,7 +308,7 @@ const postFlywheelPauseRoute = HttpRouter.add(
 const postFlywheelResumeRoute = HttpRouter.add(
   'POST',
   '/api/flywheel/resume',
-  mutation(() => guarded(() => resumeFlywheel())),
+  mutation((body) => postFlywheelResumePayload(body)),
 );
 
 const postFlywheelStopRoute = HttpRouter.add(

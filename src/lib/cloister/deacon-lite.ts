@@ -11,7 +11,9 @@
  * (PAN-4295, in remote-reap-routine.ts), hands finished Fly remote agents to
  * review. `resumeCrashedWorkAgents` (PAN-5354, in crashed-work-resume.ts)
  * resumes a work agent that `reconcileAgentLiveness` confirmed dead with no
- * recorded stop. Every routine's action lines go to deacon.log. See
+ * recorded stop. `watchFlywheelLoop` (PAN-5667, in flywheel-watchdog.ts)
+ * wakes a Flywheel loop whose tick timer died and resumes one a host reboot
+ * stopped. Every routine's action lines go to deacon.log. See
  * docs/PIPELINE-GATES.md and the PAN-3917 PRD ("The patrol loop",
  * FR-11, D1/D4/D5/D6/D7).
  *
@@ -44,6 +46,7 @@ import { recoverSilentReviewers } from './silent-reviewer-recovery.js';
 import { reapFinishedRemoteAgents } from './remote-reap-routine.js';
 import { recoverAdvisoryFollowups } from './advisory-followup-patrol.js';
 import { resumeCrashedWorkAgents } from './crashed-work-resume.js';
+import { watchFlywheelLoop } from './flywheel-watchdog.js';
 import { logDeaconEvent } from '../persistent-logger.js';
 
 export { checkApiErrorAgents, retryDeferredHandoffs, recoverUndispatchedReviews, recoverSilentReviewers, resumeCrashedWorkAgents };
@@ -649,6 +652,8 @@ export async function runDeaconLite(): Promise<void> {
   // a manual "run patrol now" and the interval both respect it. Host hygiene
   // is unaffected (FR-11 runs it outside deacon-lite).
   if (isDeaconGloballyPaused()) return;
+  // PAN-5667: first, so slow routines below never delay the Flywheel's wake-up.
+  logActions(await watchFlywheelLoop());
   logActions(await checkStuckWorkAgents());
   logActions(await checkApiErrorAgents());
   logActions(await reconcileAgentLiveness());

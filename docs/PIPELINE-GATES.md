@@ -1778,9 +1778,10 @@ Auto-resume is intentionally suppressible:
 - **Boot no-resume:** `OVERDECK_NO_RESUME=1`, `pan dev --no-resume`, or
   `pan up --no-resume` marks a human-driven boot. For that dashboard boot
   only, the deacon-lite routine `resumeCrashedWorkAgents` (PAN-5354, see
-  "Deacon-lite: nine routines") resumes no crashed work agent, and no
-  autonomous backlog sequencer pass runs. Nothing else auto-resumes a stopped
-  agent: the orphan recovery and stopped-agent auto-resume this flag used to
+  "Deacon-lite: ten routines") resumes no crashed work agent,
+  `watchFlywheelLoop` (PAN-5667) does not resume the Flywheel after a host
+  reboot, and no autonomous backlog sequencer pass runs. Nothing else
+  auto-resumes a stopped agent: the orphan recovery and stopped-agent auto-resume this flag used to
   disable were deleted in PAN-3917.
 - **Manual pause:** `pan pause <id> [--reason <text>]` persists `paused`
   fields in `~/.overdeck/agents/<agent-id>/state.json` and stops the agent
@@ -2480,7 +2481,7 @@ Every surface reads that one rule:
 The journal dies with the workspace, so an issue whose workspace is gone has no
 open decision.
 
-## Deacon-lite: nine routines
+## Deacon-lite: ten routines
 
 `runDeaconLite()` runs on a 60s tick and holds the routines below. None
 reconciles a stored copy of anything. Most only observe and nudge; the
@@ -2563,6 +2564,32 @@ leaves a trace:
    Needs-you item naming the agent and the reason, and the routine does not
    retry it. The attempt record is in memory, so a deacon child restart
    allows one more attempt. The stall sweeper stays report-only.
+10. `watchFlywheelLoop` (`cloister/flywheel-watchdog.ts`, PAN-5667) — runs
+    first in every tick and keeps the Flywheel loop (`conv-flywheel`)
+    ticking. The loop schedules its own next tick with a background
+    `sleep`, and Claude Code can kill that timer under memory pressure.
+    - **Nudge.** The run is `running`, the newest tick is older than 20
+      minutes (the `stalled` freshness), and the conversation is at a turn
+      boundary: the transcript's last non-system message is a completed
+      assistant message and no tool call waits on a result. A Herdr pane
+      that reads `working` or `blocked` vetoes it. The routine then delivers
+      `/pan-flywheel` through `deliverAgentMessage`. No tick, a
+      `phase=stopping` tick or an unreadable transcript means no nudge. One
+      stall gets one nudge; the same tick is nudged again only 20 minutes
+      later.
+    - **Resume after a host reboot.** The run is `paused`, the row was
+      created before the host booted and is not mid-fork, it did not end
+      before the boot (still `active`, or `ended_at` at or after the boot),
+      nothing was written to its transcript since the boot, its newest tick
+      is not `phase=stopping`, and the boot is not `--no-resume`. The routine
+      then calls `POST /api/flywheel/resume` with the internal token and
+      `unlessStoppedSince: <boot time>`; the route refuses with 409
+      `FlywheelStoppedOnPurpose` when the dashboard recorded a deliberate
+      stop since then. A failed resume is retried every 5 minutes, three
+      attempts at most per deacon process.
+
+    Each nudge and resume also goes to the dashboard activity feed. The
+    routine never throws, so a failure cannot stop the routines after it.
 
 While the Deacon is frozen (`deacon.globally_paused`), `runDeaconLite()`
 returns before any of the routines run — none of them fires at all

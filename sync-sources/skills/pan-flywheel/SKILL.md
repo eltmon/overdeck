@@ -291,12 +291,18 @@ status anywhere. Draining in-flight work reports as `phase=watch`.
 
 ## Cadence
 
-Nothing outside this conversation wakes the loop, so every tick schedules the
-next one before it ends: run `sleep 450` as a background Bash command
-(`run_in_background`); its completion starts the next tick. Use 450 seconds
-while anything is in flight and 1000 seconds when idle. Never wait longer than
-1000 seconds: a gap past 20 minutes reads as a hung loop. Skip scheduling only
-when stopping.
+Every tick schedules the next one before it ends: run `sleep 450` as a
+background Bash command (`run_in_background`); its completion starts the next
+tick. Use 450 seconds while anything is in flight and 1000 seconds when idle.
+Never wait longer than 1000 seconds: a gap past 20 minutes reads as a hung
+loop. Skip scheduling only when stopping.
+
+If Claude Code stops that timer (it does under memory pressure), the Deacon's
+Flywheel watchdog sends `/pan-flywheel` to this conversation once the last
+tick is 20 minutes old and the conversation is idle, and it resumes the loop
+after a host reboot. A `/pan-flywheel` that arrives this way is an ordinary
+tick. Do not raise a needs-you item asking the operator to resume the loop
+because the timer stopped.
 
 ## State file
 

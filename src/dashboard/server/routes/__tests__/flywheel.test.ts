@@ -151,6 +151,26 @@ describe('/api/flywheel routes (PAN-3964 FR-7)', () => {
     expect((await request('/api/flywheel/report', trustedPost())).status).toBe(404);
   });
 
+  it('POST /resume with unlessStoppedSince refuses a flywheel stopped on purpose since then (PAN-5667)', async () => {
+    const { recordConversationStop, _resetConversationStopMarksForTests } = await import('../../../../lib/overdeck/conversation-stop-marks.js');
+    _resetConversationStopMarksForTests();
+    mocks.resumeFlywheel.mockResolvedValue({ session: 'conv-flywheel' });
+
+    recordConversationStop('conv-flywheel', 1_000);
+    expect((await request('/api/flywheel/resume', trustedPost({ unlessStoppedSince: 500 })))).toEqual({
+      status: 409,
+      body: { error: 'The flywheel was stopped on purpose after that time', code: 'FlywheelStoppedOnPurpose' },
+    });
+    expect(mocks.resumeFlywheel).not.toHaveBeenCalled();
+
+    // A stop before that time does not block the resume.
+    expect((await request('/api/flywheel/resume', trustedPost({ unlessStoppedSince: 2_000 }))).status).toBe(200);
+    expect(mocks.resumeFlywheel).toHaveBeenCalledTimes(1);
+
+    expect((await request('/api/flywheel/resume', trustedPost({ unlessStoppedSince: 'soon' }))).status).toBe(400);
+    _resetConversationStopMarksForTests();
+  });
+
   it('POST /stop answers 202 and runs the graceful stop in the background', async () => {
     mocks.readFlywheelRun.mockResolvedValue({ run: 'running' });
     mocks.stopFlywheel.mockResolvedValue({ reportWritten: true, stopped: true });
