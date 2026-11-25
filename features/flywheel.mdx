@@ -58,6 +58,8 @@ flywheel-tick: tick=3 pick=PAN-3964 phase=watch in-flight=PAN-3964,PAN-3920 need
 
 The Flywheel page's toolbar shows different buttons depending on run state: idle shows **Start** (and **Start fresh** when a leftover session is detected); paused shows **Resume** and **Start fresh**; running shows **Pause**, **Report**, **Stop** and **Abort**. **Pop out** and a **Conversation** / **Terminal** toggle are always available.
 
+While a start is in progress the conversation area shows **Starting the Flywheel…** (or **Starting a fresh Flywheel…** for Start fresh) instead of a transcript. A fresh run's pane shows only that run's messages; the previous run's transcript stays on disk but is no longer shown there.
+
 A **Run config** footer shows the Harness, Model, Effort, Max agents and Scope the loop is running with, and opens `Settings → Roles → Flywheel`, where the `Flywheel effort` and `Flywheel max agents` fields live. The model defaults to `claude-opus-5-5` and the effort to `high`; see [Effort](/configuration/effort) for what effort controls and how a resumed loop keeps the effort it started with.
 
 `pan orders start <book-id>` opens the same flywheel conversation bound to that book; see [Order books](/configuration/order-books) for how that compares to `pan flywheel start --orders`.
