@@ -45,6 +45,31 @@ describe('FlywheelStatusPane (PAN-3964 FR-9)', () => {
     }
   });
 
+  // PAN-5666: after Start fresh, the previous run's open items stay listed
+  // until the new run's first tick, with no jump into the old transcript.
+  it('lists the previous run\'s needs-you items before the new run\'s first tick', () => {
+    const status = flywheelStatus({
+      lastTick: null,
+      freshness: null,
+      previousRun: {
+        conversation: { name: 'conv-flywheel~aaaaaaaa', id: 41, createdAt: '2026-09-22T08:00:00.000Z', endedAt: null },
+        lastTick: {
+          tick: 131, pick: null, phase: 'watch', inFlight: ['PAN-5649'], needsYou: 'rotate the leaked secrets; Semgrep tier decision', at: '2026-09-23T09:00:00.000Z',
+          needsYouItems: [
+            { text: 'rotate the leaked secrets', firstRaisedTick: 125, firstRaisedAt: '2026-09-23T08:00:00.000Z', firstRaisedMessageId: 'old-1' },
+            { text: 'Semgrep tier decision', firstRaisedTick: 120, firstRaisedAt: '2026-09-23T07:00:00.000Z', firstRaisedMessageId: 'old-2' },
+          ],
+        },
+        stoppedCleanly: false,
+      },
+    });
+    render(<FlywheelStatusPane status={status} unreachable={false} nowMs={NOW} />);
+    expect(screen.getByTestId('flywheel-previous-run')).toHaveTextContent('Previous run ended at tick 131 without a clean stop');
+    const rows = screen.getAllByTestId('flywheel-needs-you-item');
+    expect(rows.map((row) => row.textContent)).toEqual([expect.stringContaining('rotate the leaked secrets'), expect.stringContaining('Semgrep tier decision')]);
+    expect(screen.queryAllByTestId('flywheel-needs-you-jump')).toHaveLength(0);
+  });
+
   it('an issue button navigates to the issue and does not jump (PAN-5217)', () => {
     const onNavigateIssue = vi.fn();
     const onNeedsYouClick = vi.fn();

@@ -50,6 +50,8 @@ pan flywheel status --json
 pan flywheel stats --json
 ```
 
+`start --fresh` replaces a paused conversation. The old one is retired, not
+deleted, and its last tick reaches the new loop as `previousRun` (Phase 1).
 `stop` asks this loop to write its report, waits, then pauses the
 conversation; `abort` pauses without a report; `pause` stops the session and
 keeps the conversation; `resume` respawns it and re-sends `/pan-flywheel`
@@ -107,6 +109,15 @@ section is how they reach the loop. They bind every tick.
 1. Read the policies from `pan flywheel status --json` (the `.policies`
    object) — never assume their defaults. Read `.pan/flywheel/state.md` for
    what earlier runs learned.
+1a. On the first tick of this conversation, read `.previousRun` from the same
+   `pan flywheel status --json`. When it is not null, it is the run before this
+   one (a fresh start, a crash, a reboot), and its last tick is all that
+   survives of it. Add `.previousRun.lastTick.inFlight` to the set Phase 1b
+   drains, and drain those issues first. Carry every item of
+   `.previousRun.lastTick.needsYouItems` forward verbatim into your first tick
+   marker's `needs-you`, with the same wording, so the page keeps matching it.
+   Keep each item in later ticks until you verify it is resolved: an item you
+   leave out of a tick reads as resolved.
 2. Read `.pan/backlog/sequence.md` for the operator-set pickup order.
 3. If a book is active (`pan orders list` shows one book with phase `active`),
    read it with `pan orders show <book-id>`: its Lane A/B items and prereqs

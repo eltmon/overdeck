@@ -13,7 +13,13 @@ const TEST_HOME = join(tmpdir(), `replace-linked-${Date.now()}-${Math.random().t
 process.env.OVERDECK_HOME = TEST_HOME;
 
 const { closeOverdeckDatabase } = await import('../infra.js');
-const { createConversation, getConversationByName } = await import('../conversations.js');
+const {
+  createConversation,
+  getConversationByClaudeSessionId,
+  getConversationByName,
+  listRetiredConversations,
+  retireConversation,
+} = await import('../conversations.js');
 
 const CWD = join(TEST_HOME, 'projects', 'overdeck');
 
@@ -52,5 +58,37 @@ describe('createConversation over a linked same-name row', () => {
     conv('plain', { title: 'old' });
     const fresh = conv('plain', { title: 'new' });
     expect(getConversationByName('plain')).toMatchObject({ id: fresh.id, title: 'new' });
+  });
+});
+
+describe('retireConversation (PAN-5666)', () => {
+  it('keeps the previous row, its session id and its files under a retired name when a new row takes the name', () => {
+    const old = conv('conv-wheel', { claudeSessionId: 'aaaaaaaa-1111-4111-8111-111111111111' });
+
+    const retiredName = retireConversation('conv-wheel');
+    const fresh = conv('conv-wheel', { claudeSessionId: 'bbbbbbbb-2222-4222-8222-222222222222' });
+
+    expect(retiredName).toMatch(/^conv-wheel~/);
+    expect(getConversationByName('conv-wheel')?.id).toBe(fresh.id);
+    const retired = getConversationByName(retiredName ?? '');
+    expect(retired).toMatchObject({ id: old.id, status: 'ended', claudeSessionId: 'aaaaaaaa-1111-4111-8111-111111111111' });
+    expect(retired?.archivedAt).toBeTruthy();
+    expect(retired?.tmuxSession).not.toBe('conv-wheel');
+    // The conversation_files locator survives, so the transcript still resolves.
+    expect(getConversationByClaudeSessionId('aaaaaaaa-1111-4111-8111-111111111111')?.id).toBe(old.id);
+    expect(listRetiredConversations('conv-wheel').map((row) => row.id)).toEqual([old.id]);
+  });
+
+  it('lists retired rows newest first and returns null when no row holds the name', () => {
+    expect(retireConversation('conv-none')).toBeNull();
+    const first = conv('conv-many');
+    retireConversation('conv-many');
+    const second = conv('conv-many');
+    retireConversation('conv-many');
+    conv('conv-many');
+    expect(listRetiredConversations('conv-many').map((row) => row.id)).toEqual([second.id, first.id]);
+    // `conv-many~…` only: a different name sharing the prefix is not retired from it.
+    conv('conv-many-other');
+    expect(listRetiredConversations('conv-many')).toHaveLength(2);
   });
 });

@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-25T12:13:56Z · model: claude-opus-5-5 · open: 948_
+_Last sequenced: 2026-11-25T12:43:56Z · model: claude-opus-5-5 · open: 950_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -28,6 +28,7 @@ _Last sequenced: 2026-11-25T12:13:56Z · model: claude-opus-5-5 · open: 948_
 | 17 | PAN-4511 | S | high | ok |  |  | pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch |
 | 18 | PAN-5666 | M | high | ok |  |  | Fresh Flywheel start drops prior run last tick, in-flight list and open needs-you (incl. security decisions); derive previousRun |
 | 19 | PAN-5381 | S | high | ok |  |  | Dashboard main thread: findProjectByPath runs realpathSync on every project root per call (10.8% of profile); cache roots once. |
+| 19 | PAN-5673 | S | high | ok |  |  | Deliberate stops live in an in-memory map; after a dashboard restart auto-resume (and PAN-5667 watchdog) can undo an operator pause |
 | 20 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
 | 21 | PAN-4551 | L | high | ok |  |  | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
 | 22 | PAN-4671 | M | high | ok |  |  | CodeRabbit comments posted after the reviewer snapshot merge unseen; deliver late ones to the work agent at merge. Needs handoff. |
@@ -82,6 +83,7 @@ _Last sequenced: 2026-11-25T12:13:56Z · model: claude-opus-5-5 · open: 948_
 | 69 | PAN-4344 | S | high | ok |  |  | Registered projects lack the agent main-push guard; ship a pre-push hook so agents cannot push to main outside overdeck |
 | 69 | PAN-5661 | S | high | ok |  |  | Issue panel says 'Nothing needs you yet' while the Flywheel holds the issue as needs-you; read needsYouIssueIds in StatusNarrative. |
 | 69 | PAN-5665 | S | high | ok |  |  | Flywheel 'Start fresh' pane keeps showing the old run's transcript; key ConversationPanel by conversation id and show a placeholder |
+| 69 | PAN-5671 | S | high | ok |  |  | Safe-shutdown resume offer drops an idle Flywheel (wasWorking=false); offer conv-flywheel after a drain, never auto-resume it |
 | 70 | PAN-4550 | XS | medium | ok |  |  | Two unit tests read host state (DASHSCOPE_BASE_URL, git-ignored .map files), so pan release check reports false reds locally |
 | 71 | PAN-4566 | S | high | ok |  |  | A failed replayEvents leaves the coordinator un-bootstrapped; tab defers live events with no banner. PAN-4559 fallback has landed. |
 | 71 | PAN-5653 | S | high | ok |  |  | 3 CodeRabbit findings on merged PAN-5648; 2 Major: stack lock does not fence a stale holder, file-lock release can delete a new lock. |
@@ -1048,6 +1050,10 @@ New issue. A fresh start after an unclean stop silently loses open needs-you ite
 
 New follow-up to in-pipeline PAN-5369 from the same main-thread CPU profile: about 40 call sites, several on poll paths, each pay (projects+1) synchronous realpath calls, so it is the next-largest cause of a frozen dashboard after the orphan scan. Small, verified in code, with a mechanical acceptance test, so it ranks directly after PAN-5369.
 
+### PAN-5673 (rank 19)
+
+New substrate issue. Operator intent to stop a conversation is lost on any pan reload, and the PAN-5667 Flywheel watchdog adds a second automatic reader that could resume a Flywheel the operator paused. The fix (persisted stopped_on_purpose_at column), touched files and fake-timer tests are specified, so it is ok and ranks just behind the PAN-5667/PAN-5666 Flywheel recovery work it hardens.
+
 ### PAN-4544 (rank 20)
 
 Follow-up to PAN-4543, which fixed the summary route. The Pipeline view polls this route in the background, so every poll freezes all HTTP and WebSocket traffic for ~1.6 s and can fail DoD health probes. The async reader already exists, so the fix is small.
@@ -1264,17 +1270,13 @@ New substrate-improvement bug with a clear root cause and fix: StatusNarrative.t
 
 New issue labeled substrate-improvement, so it gets the high floor, but the impact is display-only: the old transcript lingers until the new run writes. Fix and component test are specified, so it is ok and S-sized; it ranks beside the other Flywheel page item PAN-5661.
 
+### PAN-5671 (rank 69)
+
+New substrate issue with the high floor, but the impact is a missing convenience: after a deliberate drain the operator must resume the Flywheel by hand. One shared predicate in two filters with named unit tests, so it is ok and S-sized; it ranks beside the other Flywheel-page item PAN-5665.
+
 ### PAN-4550 (rank 70)
 
 Found cutting v0.65.0: CI was green but the local release check failed on two host-dependent tests. XS fix that removes false reds from the release verb, so it sits above routine medium work.
-
-### PAN-4566 (rank 71)
-
-Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback this fix routes failures to is on main and work can start.
-
-### PAN-5653 (rank 71)
-
-New CodeRabbit follow-up on the just-merged PAN-5648 stack-lock fixes. Two Major findings are lock races in the shared file-lock and stack lock that guard container stop/restore, so it ranks beside its parent as high-importance substrate hardening.
 
 
 <!-- machine-readable; do not hand-edit below this line -->
@@ -1283,10 +1285,10 @@ New CodeRabbit follow-up on the just-merged PAN-5648 stack-lock fixes. Two Major
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-25T12:13:56Z",
+  "generatedAt": "2026-11-25T12:43:56Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 948,
+  "openCount": 950,
   "nodes": [
     {
       "issue": "PAN-5013",
@@ -1584,6 +1586,19 @@ New CodeRabbit follow-up on the just-merged PAN-5648 stack-lock fixes. Two Major
       "dependsOn": [],
       "why": "Dashboard main thread: findProjectByPath runs realpathSync on every project root per call (10.8% of profile); cache roots once.",
       "rationale": "New follow-up to in-pipeline PAN-5369 from the same main-thread CPU profile: about 40 call sites, several on poll paths, each pay (projects+1) synchronous realpath calls, so it is the next-largest cause of a frozen dashboard after the orphan scan. Small, verified in code, with a mechanical acceptance test, so it ranks directly after PAN-5369.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5673",
+      "rank": 19,
+      "size": "S",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Deliberate stops live in an in-memory map; after a dashboard restart auto-resume (and PAN-5667 watchdog) can undo an operator pause",
+      "rationale": "New substrate issue. Operator intent to stop a conversation is lost on any pan reload, and the PAN-5667 Flywheel watchdog adds a second automatic reader that could resume a Flywheel the operator paused. The fix (persisted stopped_on_purpose_at column), touched files and fake-timer tests are specified, so it is ok and ranks just behind the PAN-5667/PAN-5666 Flywheel recovery work it hardens.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2288,6 +2303,19 @@ New CodeRabbit follow-up on the just-merged PAN-5648 stack-lock fixes. Two Major
       "dependsOn": [],
       "why": "Flywheel 'Start fresh' pane keeps showing the old run's transcript; key ConversationPanel by conversation id and show a placeholder",
       "rationale": "New issue labeled substrate-improvement, so it gets the high floor, but the impact is display-only: the old transcript lingers until the new run writes. Fix and component test are specified, so it is ok and S-sized; it ranks beside the other Flywheel page item PAN-5661.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5671",
+      "rank": 69,
+      "size": "S",
+      "importance": "high",
+      "score": 64,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Safe-shutdown resume offer drops an idle Flywheel (wasWorking=false); offer conv-flywheel after a drain, never auto-resume it",
+      "rationale": "New substrate issue with the high floor, but the impact is a missing convenience: after a deliberate drain the operator must resume the Flywheel by hand. One shared predicate in two filters with named unit tests, so it is ok and S-sized; it ranks beside the other Flywheel-page item PAN-5665.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -14362,6 +14390,20 @@ New CodeRabbit follow-up on the just-merged PAN-5648 stack-lock fixes. Two Major
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-5667",
+      "to": "PAN-5671",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-5667",
+      "to": "PAN-5673",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
     },
     {
       "from": "PAN-750",

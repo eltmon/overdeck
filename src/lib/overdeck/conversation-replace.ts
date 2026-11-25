@@ -9,6 +9,10 @@
  * "FOREIGN KEY constraint failed" once the old flywheel had a successor.
  *
  * Call it inside the transaction that inserts the new row.
+ *
+ * `retireConversationName` keeps an unlinked row the same way on purpose:
+ * `pan flywheel start` retires the previous flywheel run before creating the
+ * new one, so its transcript survives the replace (PAN-5666).
  */
 import type { SqliteDatabase } from '../database/driver.js';
 
@@ -21,8 +25,34 @@ export function vacateConversationName(db: SqliteDatabase, name: string, now: nu
   if (linked) {
     db.prepare(`
       UPDATE conversations SET name = ?, tmux_session = NULL, archived_at = COALESCE(archived_at, ?) WHERE id = ?
-    `).run(`${name}~${linked.id.slice(0, 8)}`, now, linked.id);
+    `).run(retiredConversationName(name, linked.id), now, linked.id);
   }
   db.prepare(`DELETE FROM conversation_files WHERE conversation_id IN (SELECT id FROM conversations WHERE name = ?)`).run(name);
   db.prepare(`DELETE FROM conversations WHERE name = ?`).run(name);
+}
+
+/** The `~` suffix a retired row's name carries: `<name>~<first 8 of its uuid>`. */
+export function retiredConversationName(name: string, id: string): string {
+  return `${name}~${id.slice(0, 8)}`;
+}
+
+/**
+ * Keep the row `name` holds under its retired name instead of letting the next
+ * `createConversation(name)` delete it (PAN-5666). The row is archived, marked
+ * ended and detached from its session, and keeps its `claude_session_id` and
+ * `conversation_files`, so its transcript still resolves. `pan flywheel start`
+ * retires the previous flywheel run this way so status can read its last tick.
+ * Returns the retired name, or null when no row holds `name`.
+ */
+export function retireConversationName(db: SqliteDatabase, name: string, now: number): string | null {
+  const row = db.prepare(`SELECT id FROM conversations WHERE name = ?`).get(name) as { id: string } | undefined;
+  if (!row) return null;
+  const retired = retiredConversationName(name, row.id);
+  db.prepare(`
+    UPDATE conversations
+    SET name = ?, tmux_session = NULL, archived_at = COALESCE(archived_at, ?),
+        status = 'ended', ended_at = COALESCE(ended_at, ?)
+    WHERE id = ?
+  `).run(retired, now, now, row.id);
+  return retired;
 }

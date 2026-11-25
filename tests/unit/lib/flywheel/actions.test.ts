@@ -40,6 +40,7 @@ function depsFor(state: State, overrides: FlywheelActionDeps = {}) {
   const calls = {
     sendMessage: vi.fn(async () => {}),
     createConversation: vi.fn(),
+    retireConversation: vi.fn(),
     spawnSession: vi.fn(async () => {}),
     waitReady: vi.fn(async () => {}),
     killSession: vi.fn(async () => {}),
@@ -146,6 +147,27 @@ describe('startFlywheel (PAN-3964 FR-5, D5)', () => {
     await startFlywheel({ fresh: true, cwd: '/repos/overdeck' }, deps);
     expect(calls.killSession).toHaveBeenCalledWith('conv-flywheel');
     expect(calls.createConversation).toHaveBeenCalled();
+  });
+
+  // PAN-5666: the previous run's row is retired, not deleted, before the new
+  // row takes the name, so status can still derive its last tick.
+  it('retires the previous conv-flywheel row before creating the new one', async () => {
+    const { deps, calls } = depsFor('paused');
+    await startFlywheel({ fresh: true, cwd: '/repos/overdeck' }, deps);
+    expect(calls.retireConversation).toHaveBeenCalledWith('conv-flywheel');
+    expect(calls.retireConversation.mock.invocationCallOrder[0]).toBeLessThan(calls.createConversation.mock.invocationCallOrder[0]!);
+  });
+
+  it('retires on a plain start too, so an archived previous row is kept', async () => {
+    const { deps, calls } = depsFor('idle');
+    await startFlywheel({ cwd: '/repos/overdeck' }, deps);
+    expect(calls.retireConversation).toHaveBeenCalledWith('conv-flywheel');
+  });
+
+  it('retires nothing when the start is refused', async () => {
+    const { deps, calls } = depsFor('paused');
+    await expect(startFlywheel({ cwd: '/repos/overdeck' }, deps)).rejects.toBeInstanceOf(FlywheelPausedExists);
+    expect(calls.retireConversation).not.toHaveBeenCalled();
   });
 });
 

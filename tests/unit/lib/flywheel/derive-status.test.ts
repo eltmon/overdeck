@@ -78,6 +78,7 @@ function baseDeps(overrides: DeriveFlywheelStatusDeps = {}): DeriveFlywheelStatu
     getConversation: () => conversation(),
     sessionAlive: async () => true,
     readTranscript: async () => [],
+    listRetiredConversations: () => [],
     resolveProjectPath: (dir) => dir,
     resolvePlanHome: (root) => root,
     listWorkspaces: () => [],
@@ -786,6 +787,95 @@ describe('deriveFlywheelStatus (PAN-3964 FR-1)', () => {
     const spies = Object.fromEntries(Object.entries(deps).map(([k, v]) => [k, vi.fn(v as (...a: unknown[]) => unknown)]));
     await deriveFlywheelStatus({ deps: spies as DeriveFlywheelStatusDeps });
     expect(Object.keys(spies).every((key) => !/^(set|write|create|mark|append|delete)/.test(key))).toBe(true);
+  });
+});
+
+describe('previousRun (PAN-5666)', () => {
+  // The run that ended at tick 131 without a clean stop, then a fresh start.
+  const retired = conversation({
+    id: 41,
+    name: 'conv-flywheel~aaaaaaaa',
+    tmuxSession: 'conv-conv-flywheel~aaaaaaaa',
+    status: 'ended',
+    archivedAt: '2026-09-23T09:40:00.000Z',
+    endedAt: '2026-09-23T09:40:00.000Z',
+    claudeSessionId: 'old-session',
+  });
+  const previousTranscript = [
+    marker(130, '2026-09-23T09:20:00.000Z', 'pick=none phase=watch in-flight=PAN-5,PAN-6 needs-you=rotate the leaked secrets; keep the API docs public'),
+    marker(131, '2026-09-23T09:30:00.000Z', 'pick=none phase=watch in-flight=PAN-5,PAN-6 needs-you=rotate the leaked secrets; keep the API docs public; Semgrep tier decision'),
+  ];
+  const freshConv = conversation({ claudeSessionId: 'new-session', createdAt: '2026-09-23T09:50:00.000Z' });
+
+  function twoTranscripts(current: ReturnType<typeof marker>[]) {
+    return vi.fn(async (conv: LegacyConversation) => (conv.name === 'conv-flywheel' ? current : previousTranscript));
+  }
+
+  it('keeps the previous run\'s last tick and open needs-you items after a fresh start', async () => {
+    const status = await deriveFlywheelStatus({
+      deps: baseDeps({
+        getConversation: () => freshConv,
+        readTranscript: twoTranscripts([]),
+        listRetiredConversations: () => [retired],
+      }),
+    });
+
+    expect(status.lastTick).toBeNull();
+    expect(status.previousRun).toMatchObject({
+      conversation: { name: 'conv-flywheel~aaaaaaaa', id: 41, endedAt: '2026-09-23T09:40:00.000Z' },
+      lastTick: { tick: 131, phase: 'watch', inFlight: ['PAN-5', 'PAN-6'] },
+      stoppedCleanly: false,
+    });
+    expect(status.previousRun?.lastTick.needsYouItems?.map((item) => [item.text, item.firstRaisedTick])).toEqual([
+      ['rotate the leaked secrets', 130],
+      ['keep the API docs public', 130],
+      ['Semgrep tier decision', 131],
+    ]);
+    // The previous run's in-flight ids are not the new loop's board.
+    expect(status.inFlightSource).toBe('census');
+    expect(status.inFlight).toEqual([]);
+  });
+
+  it('still derives the previous run once the new run ticks', async () => {
+    const status = await deriveFlywheelStatus({
+      deps: baseDeps({
+        getConversation: () => freshConv,
+        readTranscript: twoTranscripts([marker(1, '2026-09-23T09:59:00.000Z', 'pick=none phase=watch in-flight=none needs-you=rotate the leaked secrets')]),
+        listRetiredConversations: () => [retired],
+      }),
+    });
+    expect(status.lastTick?.tick).toBe(1);
+    expect(status.previousRun?.lastTick.tick).toBe(131);
+  });
+
+  it('skips a retired row that never ticked (a failed start) and finds the run before it', async () => {
+    const failedStart = conversation({ id: 43, name: 'conv-flywheel~bbbbbbbb', status: 'ended', claudeSessionId: 'failed-session' });
+    const readTranscript = vi.fn(async (conv: LegacyConversation) => (conv.id === 41 ? previousTranscript : []));
+    const status = await deriveFlywheelStatus({
+      deps: baseDeps({ getConversation: () => null, readTranscript, listRetiredConversations: () => [failedStart, retired] }),
+    });
+    expect(status.run).toBe('idle');
+    expect(status.previousRun?.conversation.id).toBe(41);
+  });
+
+  it('marks a run that ended with phase=stopping as stopped cleanly', async () => {
+    const stopped = [marker(132, '2026-09-23T09:35:00.000Z', 'pick=none phase=stopping in-flight=none needs-you=none')];
+    const status = await deriveFlywheelStatus({
+      deps: baseDeps({
+        getConversation: () => freshConv,
+        readTranscript: vi.fn(async (conv: LegacyConversation) => (conv.id === 41 ? stopped : [])),
+        listRetiredConversations: () => [retired],
+      }),
+    });
+    expect(status.previousRun?.stoppedCleanly).toBe(true);
+  });
+
+  it('is null when no retired row exists or the listing fails', async () => {
+    expect((await deriveFlywheelStatus({ deps: baseDeps() })).previousRun).toBeNull();
+    const failing = await deriveFlywheelStatus({
+      deps: baseDeps({ listRetiredConversations: () => { throw new Error('db locked'); } }),
+    });
+    expect(failing.previousRun).toBeNull();
   });
 });
 
