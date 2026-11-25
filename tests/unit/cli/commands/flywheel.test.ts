@@ -154,6 +154,24 @@ describe('pan flywheel verbs (PAN-3964 FR-6)', () => {
     expect(out).toContain('PAN-1');
   });
 
+  it('status prints the previous run and its needs-you before this run ticks (PAN-5666)', async () => {
+    mocks.deriveFlywheelStatus.mockResolvedValue({
+      ...status,
+      lastTick: null,
+      freshness: null,
+      previousRun: {
+        conversation: { name: 'conv-flywheel~aaaaaaaa', id: 41, createdAt: '2026-09-22T08:00:00.000Z', endedAt: null },
+        lastTick: { tick: 131, pick: null, phase: 'watch', inFlight: ['PAN-5649', 'MIN-1145'], needsYou: 'rotate the leaked secrets', at: '2026-09-23T09:00:00.000Z' },
+        stoppedCleanly: false,
+      },
+    } satisfies FlywheelDerivedStatus);
+    await run('status');
+    const out = log.mock.calls.map((c) => String(c[0])).join('\n');
+    expect(out).toContain('previous   conv-flywheel~aaaaaaaa · tick 131 · watch');
+    expect(out).toContain('no clean stop · in-flight PAN-5649,MIN-1145');
+    expect(out).toContain('needs you  rotate the leaked secrets (from the previous run)');
+  });
+
   it('status names the no-agent row, its title, and the loop in-flight count (PAN-4199 ac1)', async () => {
     mocks.deriveFlywheelStatus.mockResolvedValue(status);
     await run('status');

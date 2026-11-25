@@ -5,6 +5,7 @@ import {
   TickMarker,
   decodeFlywheelDerivedStatus,
   needsYouItemKey,
+  needsYouTick,
   parseNeedsYouTarget,
   splitNeedsYouItems,
 } from "./flywheel-derived"
@@ -152,5 +153,51 @@ describe("parseNeedsYouTarget (PAN-5239)", () => {
     for (const item of items) {
       expect(parseNeedsYouTarget(item).target).toBeUndefined()
     }
+  })
+})
+
+describe("needsYouTick (PAN-5666)", () => {
+  const previousRun = {
+    conversation: { name: "conv-flywheel~aaaaaaaa", id: 41, createdAt: "2026-09-22T08:00:00.000Z", endedAt: null },
+    lastTick: {
+      tick: 131,
+      pick: null,
+      phase: "watch" as const,
+      inFlight: ["PAN-5649"],
+      needsYou: "rotate the leaked secrets",
+      at: "2026-09-23T07:00:00.000Z",
+      messageId: "old-msg",
+      needsYouItems: [{
+        text: "rotate the leaked secrets",
+        firstRaisedTick: 120,
+        firstRaisedAt: "2026-09-23T05:00:00.000Z",
+        firstRaisedMessageId: "old-raise",
+        context: "MIN-1157 leaked data.",
+      }],
+    },
+    stoppedCleanly: false,
+  }
+
+  it("decodes a status carrying previousRun", () => {
+    expect(decodeFlywheelDerivedStatus({ ...running, previousRun }).previousRun?.lastTick.tick).toBe(131)
+  })
+
+  it("shows the previous run's items, without message ids, until the current run ticks", () => {
+    const tick = needsYouTick({ lastTick: null, previousRun })
+    expect(tick?.tick).toBe(131)
+    expect(tick).not.toHaveProperty("messageId")
+    expect(tick?.needsYouItems).toEqual([
+      { text: "rotate the leaked secrets", firstRaisedTick: 120, firstRaisedAt: "2026-09-23T05:00:00.000Z", context: "MIN-1157 leaked data." },
+    ])
+  })
+
+  it("takes the current run's tick once it exists", () => {
+    const current = decodeFlywheelDerivedStatus(running).lastTick
+    expect(needsYouTick({ lastTick: current, previousRun })).toBe(current)
+  })
+
+  it("is null with no tick in either run", () => {
+    expect(needsYouTick({ lastTick: null })).toBeNull()
+    expect(needsYouTick({ lastTick: null, previousRun: null })).toBeNull()
   })
 })

@@ -5,7 +5,7 @@
  * of in-flight and shipped-today cards, and the shipped-today timeline.
  */
 import type { FlywheelDerivedStatus, FlywheelFreshness } from '@overdeck/contracts';
-import { shippedCardCount } from '@overdeck/contracts';
+import { needsYouTick, shippedCardCount } from '@overdeck/contracts';
 
 import { formatAge } from '../../lib/flywheelApi';
 import { FlywheelHealthStrip } from './FlywheelHealthStrip';
@@ -120,8 +120,16 @@ export function FlywheelStatusPane({ status, unreachable, nowMs, onNavigateIssue
         </section>
       )}
 
+      {!tick && status.previousRun && (
+        <p className="text-xs text-muted-foreground" data-testid="flywheel-previous-run">
+          Previous run ended at tick {status.previousRun.lastTick.tick}
+          {status.previousRun.stoppedCleanly ? ' after a clean stop' : ' without a clean stop'} ({formatAge(status.previousRun.lastTick.at, nowMs)}).
+          {' '}Its open needs-you items stay listed until this run&apos;s first tick.
+        </p>
+      )}
+
       <FlywheelNeedsYouCards
-        tick={tick}
+        tick={needsYouTick(status)}
         inFlight={status.inFlight}
         nowMs={nowMs}
         onNavigateIssue={onNavigateIssue}

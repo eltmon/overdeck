@@ -10,7 +10,7 @@
 //       agent requests, and any decision kind added later).
 
 import { useMemo } from 'react'
-import type { DerivedIssueState } from '@overdeck/contracts'
+import { needsYouTick, type DerivedIssueState } from '@overdeck/contracts'
 import { useDashboardStore, selectIssues, type PendingInputSubject } from '../store'
 import { usePendingInputSubjects, useDecisions, type Decision } from '../useDecisions'
 import { useAskUserQuestionUiStore } from '../askUserQuestionUiStore'
@@ -52,7 +52,7 @@ export interface NeedsYouSources {
   subjects: readonly PendingInputSubject[]
   resolution: SubjectResolution
   derived: Readonly<Record<string, DerivedIssueState>>
-  /** needsYouRows(status.lastTick) when lastTick exists, else []. */
+  /** needsYouRows(needsYouTick(status)): the current run's tick, else the previous run's (PAN-5666); else []. */
   flywheelRows: readonly NeedsYouRow[]
   decisions: readonly Decision[]
   issueTitles: ReadonlyMap<string, string>
@@ -242,8 +242,13 @@ export function useNeedsYouItems(opts?: { projectKey?: string }): NeedsYouItem[]
   const projectKey = opts?.projectKey
 
   const issueTitles = useMemo(() => issueTitleMap(issues), [issues])
-  const lastTick = flywheelStatus?.lastTick
-  const flywheelRows = useMemo(() => (lastTick ? needsYouRows(lastTick) : []), [lastTick])
+  // Before a fresh run's first tick, the previous run's open items stay listed (PAN-5666).
+  const lastTick = flywheelStatus?.lastTick ?? null
+  const previousRun = flywheelStatus?.previousRun
+  const flywheelRows = useMemo(() => {
+    const tick = needsYouTick({ lastTick, previousRun })
+    return tick ? needsYouRows(tick) : []
+  }, [lastTick, previousRun])
 
   return useMemo(
     () =>
