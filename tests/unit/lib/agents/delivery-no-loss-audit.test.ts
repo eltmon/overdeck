@@ -65,6 +65,10 @@ const KNOWN_CALL_SITES = new Set([
   'lib/cloister/crashed-work-resume.ts|result = await deps.resumeAgent(agent.id);',
   'lib/cloister/deacon-api-recovery.ts|await deliverAgentMessage(pane.agentId, CONTINUE_MSG, \'deacon-lite:checkApiErrorAgents\');',
   'lib/cloister/deacon-lite.ts|await deliverAgentMessage(',
+  // PAN-5667: the Flywheel watchdog nudges a stalled loop with /pan-flywheel. A
+  // failed delivery is logged to the activity feed and deacon.log, and the same
+  // stall is nudged again 20 minutes later.
+  'lib/cloister/flywheel-watchdog.ts|const delivery = await deliverAgentMessage(FLYWHEEL_CONVERSATION_SESSION, FLYWHEEL_SKILL_COMMAND, CALLER);',
   'lib/cloister/deacon-swarm-completion.ts|await messageAgent(',
   'lib/cloister/deacon-swarm.ts|sendStallEvent: (agentId, message) => messageAgent(agentId, message, \'deacon:swarm-stall\'),',
   'lib/cloister/feedback-target.ts|const result = await resumeAgent(agentId);',

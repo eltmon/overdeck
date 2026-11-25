@@ -24,6 +24,7 @@ const mocks = vi.hoisted(() => ({
   recoverAdvisoryFollowups: vi.fn(async () => [] as string[]),
   readRecordedAgentStopAt: vi.fn((): number | null => null),
   resumeCrashedWorkAgents: vi.fn(async () => [] as string[]),
+  watchFlywheelLoop: vi.fn(async () => [] as string[]),
   logDeaconEvent: vi.fn(),
 }));
 
@@ -109,6 +110,9 @@ vi.mock('../../../../src/lib/cloister/advisory-followup-patrol.js', () => ({
 
 vi.mock('../../../../src/lib/cloister/crashed-work-resume.js', () => ({
   resumeCrashedWorkAgents: mocks.resumeCrashedWorkAgents,
+}));
+vi.mock('../../../../src/lib/cloister/flywheel-watchdog.js', () => ({
+  watchFlywheelLoop: mocks.watchFlywheelLoop,
 }));
 
 vi.mock('../../../../src/lib/persistent-logger.js', () => ({
@@ -655,6 +659,20 @@ describe('deacon-lite', () => {
       expect(mocks.reapFinishedRemoteAgents).not.toHaveBeenCalled();
       expect(mocks.recoverAdvisoryFollowups).not.toHaveBeenCalled();
       expect(mocks.resumeCrashedWorkAgents).not.toHaveBeenCalled();
+      expect(mocks.watchFlywheelLoop).not.toHaveBeenCalled();
+    });
+
+    it('runs the Flywheel watchdog first and logs its lines (PAN-5667)', async () => {
+      mocks.listAgentStates.mockReturnValue([]);
+      mocks.liveAgentInventory.mockResolvedValue(inventory([]));
+      mocks.watchFlywheelLoop.mockResolvedValueOnce(['watchFlywheelLoop: sent /pan-flywheel to conv-flywheel']);
+
+      await runDeaconLite();
+
+      expect(mocks.watchFlywheelLoop).toHaveBeenCalledTimes(1);
+      expect(mocks.watchFlywheelLoop.mock.invocationCallOrder[0])
+        .toBeLessThan(mocks.listAgentStates.mock.invocationCallOrder[0]!);
+      expect(mocks.logDeaconEvent).toHaveBeenCalledWith('[deacon-lite] watchFlywheelLoop: sent /pan-flywheel to conv-flywheel');
     });
 
     it('runs the remote reap once, last, after retryDeferredHandoffs (PAN-4295)', async () => {
