@@ -69,6 +69,7 @@ function useRunAction(action: FlywheelAction, onError?: (error: Error) => void) 
   const mutation = useFlywheelAction(action);
   return {
     pending: mutation.isPending,
+    pendingFresh: mutation.isPending && (mutation.variables as { fresh?: boolean } | undefined)?.fresh === true,
     run: (body?: unknown) => mutation.mutate(body, {
       onSuccess: () => toast.success(ACTION_TOAST[action]),
       onError: (error: Error) => {
@@ -241,7 +242,11 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
       </header>
 
       <div className="min-h-0 flex-1 overflow-hidden">
-        {conversationQuery.isLoading ? (
+        {start.pending ? (
+          <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground" data-testid="flywheel-starting">
+            <Loader2 className="h-4 w-4 animate-spin" />{start.pendingFresh ? 'Starting a fresh Flywheel…' : 'Starting the Flywheel…'}
+          </div>
+        ) : conversationQuery.isLoading ? (
           <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />Loading flywheel conversation…
           </div>

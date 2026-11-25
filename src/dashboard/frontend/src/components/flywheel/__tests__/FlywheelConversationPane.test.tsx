@@ -200,6 +200,50 @@ describe('FlywheelConversationPane (PAN-3964 FR-13)', () => {
   });
 });
 
+describe('a starting message replaces the panel while a start is pending (PAN-5665)', () => {
+  it('Start fresh shows "Starting a fresh Flywheel…" and no panel until the POST resolves', async () => {
+    let resolvePost: ((value: Response) => void) | undefined;
+    const postPromise = new Promise<Response>((resolve) => { resolvePost = resolve; });
+    stubFetch((url, init) => {
+      if (url === '/api/flywheel/status') return Response.json(flywheelStatus({ run: 'paused' }));
+      if (url === '/api/conversations/conv-flywheel') return Response.json(conversation);
+      if (url === '/api/settings') return Response.json({ roles: { flywheel: { model: 'claude-opus-5-5', harness: 'claude-code', maxAgents: 6 } } });
+      if (url === '/api/flywheel/start' && init?.method === 'POST') return postPromise;
+      return undefined;
+    });
+    renderWithQuery(<FlywheelConversationPane />);
+    await screen.findByRole('button', { name: 'Resume' });
+    fireEvent.click(screen.getByRole('button', { name: 'Start fresh' }));
+
+    expect(await screen.findByTestId('flywheel-starting')).toHaveTextContent('Starting a fresh Flywheel…');
+    expect(screen.queryByTestId('conversation-panel')).toBeNull();
+
+    await act(async () => {
+      resolvePost?.(Response.json({ success: true }));
+      await postPromise;
+    });
+
+    await waitFor(() => expect(screen.queryByTestId('flywheel-starting')).toBeNull());
+    expect(await screen.findByTestId('conversation-panel')).toBeInTheDocument();
+  });
+
+  it('plain Start shows "Starting the Flywheel…"', async () => {
+    const postPromise = new Promise<Response>(() => {});
+    stubFetch((url, init) => {
+      if (url === '/api/flywheel/status') return Response.json(flywheelStatus({ run: 'idle' }));
+      if (url === '/api/conversations/conv-flywheel') return Response.json({ error: 'Conversation not found' }, { status: 404 });
+      if (url === '/api/settings') return Response.json({ roles: {} });
+      if (url === '/api/flywheel/start' && init?.method === 'POST') return postPromise;
+      return undefined;
+    });
+    renderWithQuery(<FlywheelConversationPane />);
+    await screen.findByRole('button', { name: 'Start' });
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+
+    expect(await screen.findByTestId('flywheel-starting')).toHaveTextContent('Starting the Flywheel…');
+  });
+});
+
 describe('a new run never shows the previous run (PAN-5665)', () => {
   const conversationA = { id: 42, name: 'conv-flywheel', tmuxSession: 'conv-flywheel', status: 'active', cwd: '/repos/overdeck', sessionAlive: true, createdAt: '2026-11-25T08:00:00.000Z' };
   const conversationB = { ...conversationA, createdAt: '2026-11-25T09:00:00.000Z' };
