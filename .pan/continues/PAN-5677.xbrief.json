@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5677",
   "created": "2026-11-27T13:58:48.629Z",
-  "updated": "2026-11-27T14:11:47.585Z",
+  "updated": "2026-11-27T14:12:02.535Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
     "w1-db-recent-order.ac3": {
       "status": "completed",
       "doneAt": "2026-11-27T14:11:47.585Z"
+    },
+    "w2-append-recent-rows": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5677",
+      "claimedAt": "2026-11-27T14:12:02.535Z"
     }
   }
 }
