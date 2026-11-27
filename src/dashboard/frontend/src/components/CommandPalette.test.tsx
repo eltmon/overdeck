@@ -380,7 +380,13 @@ describe('CommandPalette conversation results', () => {
 });
 
 describe('CommandPalette newest-first conversation toggle (PAN-3704)', () => {
-  const conversation = (id: string, rank: number, ts: string | null, matchTier: 'title' | 'text' | 'path' = 'text') => ({
+  const conversation = (
+    id: string,
+    rank: number,
+    ts: string | null,
+    matchTier: 'title' | 'text' | 'path' = 'text',
+    lastMatchAt?: string | null,
+  ) => ({
     sessionId: id,
     conversationId: id,
     projectId: 'overdeck',
@@ -391,6 +397,7 @@ describe('CommandPalette newest-first conversation toggle (PAN-3704)', () => {
     hitCount: 1,
     role: 'assistant',
     ts,
+    ...(lastMatchAt !== undefined ? { lastMatchAt } : {}),
     byteOffset: rank,
     displayContent: id,
     excerpt: id,
@@ -497,6 +504,35 @@ describe('CommandPalette newest-first conversation toggle (PAN-3704)', () => {
     expect(actionValues()).toEqual(['start-cloister']);
     fireEvent.click(screen.getByRole('button', { name: 'Newest first' }));
     expect(actionValues()).toEqual(['start-cloister']);
+  });
+
+  it('sends sort=recent by default (PAN-5677)', async () => {
+    installConversationResults([conversation('only', 1, '2026-01-01T00:00:00Z')]);
+    renderCommandPalette();
+    await search();
+    const searchCalls = fetchControl.fetchMock.mock.calls.filter((call) => String(call[0]).startsWith('/api/palette/search'));
+    expect(searchCalls.length).toBeGreaterThan(0);
+    expect(String(searchCalls.at(-1)?.[0])).toContain('sort=recent');
+  });
+
+  it('clicking Newest first sends a new request with sort=relevance (PAN-5677)', async () => {
+    installConversationResults([conversation('only', 1, '2026-01-01T00:00:00Z')]);
+    renderCommandPalette();
+    await search();
+    fireEvent.click(screen.getByRole('button', { name: 'Newest first' }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(120); });
+    const searchCalls = fetchControl.fetchMock.mock.calls.filter((call) => String(call[0]).startsWith('/api/palette/search'));
+    expect(String(searchCalls.at(-1)?.[0])).toContain('sort=relevance');
+  });
+
+  it('renders rows in lastMatchAt order when it disagrees with ts (PAN-5677)', async () => {
+    installConversationResults([
+      conversation('stale-ts-but-recent-match', 1, '2026-01-01T00:00:00Z', 'text', '2026-11-24T00:00:00Z'),
+      conversation('fresh-ts-but-old-match', 2, '2026-10-01T00:00:00Z', 'text', '2026-02-01T00:00:00Z'),
+    ]);
+    renderCommandPalette();
+    await search();
+    expect(optionLabels()).toEqual(['conv-stale-ts-but-recent-match-1', 'conv-fresh-ts-but-old-match-2']);
   });
 });
 

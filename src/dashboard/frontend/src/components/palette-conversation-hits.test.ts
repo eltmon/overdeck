@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { describeConversationHit, type PaletteConversationHit } from './palette-conversation-hits';
+import { describeConversationHit, formatHitDate, type PaletteConversationHit } from './palette-conversation-hits';
 
 function hit(overrides: Partial<PaletteConversationHit> = {}): PaletteConversationHit {
   return {
@@ -68,5 +68,13 @@ describe('describeConversationHit', () => {
       title: 'A conversation with no claude-code file',
     }));
     expect(described.sourceLabel).toBe('Conversation conv-no-claude-session');
+  });
+
+  it('date chip uses lastMatchAt when present and falls back to ts (PAN-5677)', () => {
+    const withLastMatchAt = describeConversationHit(hit({ ts: '2026-01-01T00:00:00.000Z', lastMatchAt: '2026-11-24T00:00:00.000Z' }));
+    expect(withLastMatchAt.chips).toContainEqual({ kind: 'date', text: formatHitDate('2026-11-24T00:00:00.000Z') });
+
+    const withoutLastMatchAt = describeConversationHit(hit({ ts: '2026-01-01T00:00:00.000Z' }));
+    expect(withoutLastMatchAt.chips).toContainEqual({ kind: 'date', text: formatHitDate('2026-01-01T00:00:00.000Z') });
   });
 });

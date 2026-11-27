@@ -31,6 +31,8 @@ export interface PaletteConversationHit {
   hitCount: number;
   role: string;
   ts: string | null;
+  /** Newest matching activity (PAN-5677); older linked machines may omit it, so callers fall back to `ts`. */
+  lastMatchAt?: string | null;
   /** Byte offset of the best chunk; null for title-only rows (open without a message target). */
   byteOffset: number | null;
   displayContent: string;
@@ -138,7 +140,7 @@ export function describeConversationHit(hit: PaletteConversationHit): Conversati
     : `Claude session ${rootSessionId.slice(0, 8)}`;
   const sourceLabel = subagentId ? `Subagent of ${rootLabel}` : rootLabel;
 
-  const date = formatHitDate(hit.ts);
+  const date = formatHitDate(hit.lastMatchAt ?? hit.ts);
 
   const chips: ConversationHitChip[] = [];
   if (project) chips.push({ kind: 'project', text: project });
