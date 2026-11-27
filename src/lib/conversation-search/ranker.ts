@@ -149,6 +149,27 @@ export function fuseRankedRows(input: {
     });
 }
 
+/**
+ * Newest-first palette search (PAN-5677): append recency-leg rows that the
+ * relevance hits do not already contain. Relevance hits keep their order,
+ * ranks and RRF scores; appended rows score 0 and rank after them.
+ */
+export function appendRecentRows(input: {
+  hits: ConversationSearchHit[];
+  recentRows: RankedChunkRow[];
+  query: string;
+}): ConversationSearchHit[] {
+  const seen = new Set(input.hits.map((hit) => hit.rowid));
+  const out = [...input.hits];
+  for (const row of input.recentRows) {
+    if (seen.has(row.rowid)) continue;
+    seen.add(row.rowid);
+    const excerpt = buildMarkedExcerpt(row.text, input.query);
+    out.push({ ...row, rank: out.length + 1, rrfScore: 0, excerpt, excerptSegments: parseMarkedExcerpt(excerpt) });
+  }
+  return out;
+}
+
 function addRrfScores(target: Map<number, { row: RankedChunkRow; score: number }>, rows: RankedChunkRow[], rrfK: number): void {
   rows.forEach((row, index) => {
     const score = 1 / (rrfK + index + 1);

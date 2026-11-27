@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  appendRecentRows,
   buildMarkedExcerpt,
   ConversationQueryEmbedTimeoutError,
   DEFAULT_EMBED_TIMEOUT_MS,
@@ -176,5 +177,36 @@ describe('conversation ranker', () => {
       expect(onEmbedFailure).not.toHaveBeenCalled();
       expect(onEmbedSuccess).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('appendRecentRows (PAN-5677)', () => {
+  it('drops recentRows whose rowid is already in hits', () => {
+    const hits = fuseRankedRows({ query: 'needle', bm25Rows: [row(1, 'needle one')], vectorRows: [], limit: 1 });
+
+    const out = appendRecentRows({ hits, recentRows: [row(1, 'needle one')], query: 'needle' });
+
+    expect(out.map((hit) => hit.rowid)).toEqual([1]);
+  });
+
+  it('returns relevance hits unchanged and first, appended rows with rrfScore 0 and consecutive ranks after them', () => {
+    const hits = fuseRankedRows({ query: 'needle', bm25Rows: [row(1, 'needle one')], vectorRows: [], limit: 1 });
+
+    const out = appendRecentRows({ hits, recentRows: [row(2, 'needle two'), row(3, 'needle three')], query: 'needle' });
+
+    expect(out[0]).toEqual(hits[0]);
+    expect(out.map((hit) => hit.rowid)).toEqual([1, 2, 3]);
+    expect(out.map((hit) => hit.rank)).toEqual([1, 2, 3]);
+    expect(out[1]?.rrfScore).toBe(0);
+    expect(out[2]?.rrfScore).toBe(0);
+    expect(out[1]?.excerptSegments.some((segment) => segment.match)).toBe(true);
+  });
+
+  it('appends a duplicate inside recentRows itself only once', () => {
+    const hits = fuseRankedRows({ query: 'needle', bm25Rows: [row(1, 'needle one')], vectorRows: [], limit: 1 });
+
+    const out = appendRecentRows({ hits, recentRows: [row(2, 'needle two'), row(2, 'needle two again')], query: 'needle' });
+
+    expect(out.map((hit) => hit.rowid)).toEqual([1, 2]);
   });
 });
