@@ -1337,8 +1337,8 @@ Press `⌘J` (macOS) or `Ctrl+J` (Linux and Windows) to open the command palette
 by the conversation's title, or by the matching text when it has none, with the best-matching
 excerpt highlighted. A row's chips show the project (and workspace), the issue id when the
 transcript belongs to an issue workspace, where it came from (a named conversation, a Claude
-session, or a subagent), the date, the role, the number of matching chunks when there is more than
-one, and `archived` for archived conversations.
+session, or a subagent), the date of the latest match, the role, the number of matching chunks when
+there is more than one, and `archived` for archived conversations.
 
 Results rank in three tiers, in this order:
 
@@ -1346,8 +1346,11 @@ Results rank in three tiers, in this order:
 2. **Text matches.** The query matched prose in the transcript.
 3. **Path matches.** The query matched only inside code, inline code or a file path.
 
-The **Newest first** button in the palette footer sorts results by date inside each tier; tiers
-still come first. It is on by default, and your browser remembers the choice.
+The **Newest first** button in the palette footer shows the conversations that matched most
+recently, newest first inside each tier; tiers still come first. The search itself picks the
+newest matches, so a conversation from yesterday appears even when older conversations match the
+query more strongly. Turn it off to rank by how well each conversation matches. It is on by
+default, and your browser remembers the choice.
 
 Choosing a conversation row opens it in the Command Deck and scrolls to the matching message; a
 title-only match opens the conversation without one. Opening a subagent match opens its parent

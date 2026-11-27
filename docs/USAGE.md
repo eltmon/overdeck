@@ -795,7 +795,10 @@ only inside file paths, code blocks, or tool output. Archived conversations are
 included and marked **archived**. Title matching works even when conversation
 search indexing is off. Keyword and title matches still return when semantic search
 is slow or the embedding provider fails, and the palette shows
-"Search timed out after 10 s. Try again." if no answer arrives within 10 seconds. See [DESKTOP-APP.md#cmdk-command-palette](DESKTOP-APP.md#cmdk-command-palette).
+"Search timed out after 10 s. Try again." if no answer arrives within 10 seconds.
+**Newest first** (on by default) asks the server for the most recently matching
+conversations (`sort=recent`); with it off, results rank by match strength.
+See [DESKTOP-APP.md#cmdk-command-palette](DESKTOP-APP.md#cmdk-command-palette).
 
 ### `pan up` Electron Detection
 

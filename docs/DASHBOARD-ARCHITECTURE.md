@@ -305,7 +305,9 @@ door that does not exist; a real record read door would be a separate change.
   live conversation subscribe could wait behind a 13-second search-stats refresh).
 - Seven lanes, counting the two conversation-search lanes (PAN-5447). The
   `conversation-text` lane runs the palette's BM25 scan (`searchConversationBm25`) and
-  its live-transcript filter (`filterLiveConversationSessions`). The
+  its live-transcript filter (`filterLiveConversationSessions`). The same lane also runs
+  the newest-first recency scan (`searchConversationBm25` with `order: 'recent'`), which
+  runs only for `sort=recent` (PAN-5677). The
   `conversation-vector` lane runs the sqlite-vec brute-force scan
   (`searchConversationVector`), which takes over a second on a large index. Two lanes
   keep a vector scan that cannot be stopped from delaying the next query's BM25 scan.
