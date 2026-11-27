@@ -1,0 +1,578 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-27T13:52:07Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5677: Ctrl+K conversation search buries recent conversations: newest-first only re-sorts the top 15",
+    "updated": "2026-11-27T13:57:23.961Z"
+  },
+  "plan": {
+    "id": "pan-5677",
+    "title": "Ctrl+K conversation search buries recent conversations: newest-first only re-sorts the top 15",
+    "status": "proposed",
+    "uid": "6e8bec91-5f54-498d-b70e-a0281e537fe2",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-27T13:52:07Z",
+    "updated": "2026-11-27T13:57:23.961Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5677",
+        "label": "PAN-5677",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-5677.md",
+        "label": "PRD draft (.pan/drafts/pan-5677.md)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "palette",
+      "conversation-search",
+      "dashboard",
+      "frontend",
+      "backend"
+    ],
+    "narratives": {
+      "Problem": "Ctrl+K search truncates conversation results to 15 rows on the server, ordered by tier then best-chunk relevance. The palette's Newest first toggle (on by default) only re-sorts those 15 rows, so a conversation from yesterday that ranks 16th or lower (20261124-2455 ranks 22nd for 'restic') never appears. For common terms the 300-chunk BM25 pool can also miss recent conversations entirely.",
+      "Proposal": "Make Newest first a server-side sort. GET /api/palette/search accepts sort=recent; in that mode the search service adds a recency-ordered BM25 leg (same FTS match, ORDER BY ts DESC, 300 chunks, same lane and deadline, best effort) appended after the relevance hits, and groupConversationHits orders rows by tier, then lastMatchAt (newest matching chunk or title-match activity) descending, then relevance, before truncating. Each wire row carries lastMatchAt; the palette sends sort=recent|relevance from the toggle, refetches on toggle, sorts and labels the date chip with lastMatchAt ?? ts. Relevance mode (the default for every other caller) is unchanged. Full detail, before/after snippets and measured evidence are in .pan/drafts/pan-5677.md.",
+      "NonGoals": "- No recency decay or boost in relevance mode; requests without sort=recent return today's order and today's BM25 payload.\n- No change to the vector leg, RRF constants, the 300-chunk pool size, or the title-match SQL.\n- No sort forwarding to linked machines (fleet search, 'On <machine>' groups), the MCP search_conversations tool, or any CLI command.\n- No change to which message a row opens (best hit byteOffset) or to its excerpt.\n- No new DB-worker operation or lane, and no change to CHUNK_SCAN_DEADLINE_MS.\n- No change to compareConversationActionsNewestFirst, the toggle default, or its localStorage key.\n- No raise of any file-size allowlist cap."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Chose the issue's option 2 (server-side newest-first sort) and did not add a recency decay to relevance mode.",
+        "rationale": "Newest first is on by default, so a server-side sort fixes the operator's case directly. A planning simulation over the live index puts the target at positions 9, 8, 2 and 1 (1-based) for the four queries the issue measured, all inside the 15-row page. Relevance mode stays untouched for the MCP tool and fleet search."
+      },
+      {
+        "summary": "'Newest' means lastMatchAt: the newest matching chunk ts in the row's pool hits, or the title match's last activity, whichever is later.",
+        "rationale": "The best chunk's ts (today's tiebreak) leaves a long conversation with an old best chunk and a mention yesterday buried; the newest match is what 'newest first' means to the operator."
+      },
+      {
+        "summary": "Add a best-effort recency-ordered BM25 leg in recent mode, appended (not RRF-fused) after the relevance hits.",
+        "rationale": "For common terms (backup: 15,837 chunks) the relevance top 300 misses recent conversations; the simulation found 90 extra conversations for 'backup' with the leg. Appending keeps relevance scores, best hits and excerpts unchanged. Measured cost: 0.013-0.375 s warm."
+      },
+      {
+        "summary": "The date chip shows lastMatchAt ?? ts in both modes.",
+        "rationale": "Under newest-first ordering a chip showing the best chunk's older date would make the list look out of order."
+      },
+      {
+        "summary": "The sort query parameter defaults to relevance; fleet and MCP callers are left unchanged and out of scope.",
+        "rationale": "Keeps every existing caller's behaviour and the fleet-search URL test unchanged; fleet groups never used newest-first."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Seven small items across one subsystem (conversation search: DB, ranker, grouping, service, route, palette client) plus docs; 15 files in scope.",
+      "canonicalFilename": "2026-11-27-PAN-5677-ctrl-k-conversation-search-buries-recent-conversations-newest-first-only-re-sorts-the-top-15.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "w1-db-recent-order",
+        "title": "searchBm25 accepts order 'recent' and the BM25 job forwards it",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-27T13:52:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5677",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/database/conversation-embeddings-db.ts",
+            "src/lib/overdeck/conversations-search.ts",
+            "src/lib/conversation-search/chunk-search-jobs.ts",
+            "src/lib/database/__tests__/conversation-embeddings-db.test.ts",
+            "src/lib/conversation-search/__tests__/chunk-search-jobs.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/database/__tests__/conversation-embeddings-db.test.ts src/lib/conversation-search/__tests__/chunk-search-jobs.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass, including the new order 'recent' test",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item W1. Export type ChunkSearchOrder = 'relevance' | 'recent' from src/lib/database/conversation-embeddings-db.ts and re-export it from src/lib/overdeck/conversations-search.ts. Change EmbeddingsDbHandle.searchBm25 to (query, limit, order?: ChunkSearchOrder). In the implementation keep the SELECT list (including bm25(chunks_fts) AS score) and choose ORDER BY from a two-value literal: 'c.ts DESC, c.rowid DESC' for 'recent', 'bm25(chunks_fts) ASC' otherwise (default 'relevance'). The unavailable stub keeps throwing. searchConversationBm25Job input gains order?: ChunkSearchOrder and passes it as the third argument. Add the two tests described in the PRD."
+        },
+        "items": [
+          {
+            "id": "w1-db-recent-order.ac1",
+            "title": "Given four chunks matching 'needle' with ts March, February, January (strongest BM25 match) and NULL, when searchBm25 runs with order 'recent' and limit 3, then it returns the March, February and January chunks in that order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-db-recent-order.ac2",
+            "title": "Given the same chunks, when searchBm25 runs without an order argument, then it returns the strongest BM25 match first, the same order as before this change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-db-recent-order.ac3",
+            "title": "When searchConversationBm25Job receives order 'recent', then it returns the newest matching chunk first; when the payload has no order key, it returns relevance order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w2-append-recent-rows",
+        "title": "Add appendRecentRows to merge recency-leg rows after relevance hits",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-27T13:52:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5677",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/conversation-search/ranker.ts",
+            "src/lib/conversation-search/__tests__/ranker.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/conversation-search/__tests__/ranker.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ranker.test.ts passes including the appendRecentRows (PAN-5677) describe",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item W2. Add exported appendRecentRows({ hits, recentRows, query }) to src/lib/conversation-search/ranker.ts below fuseRankedRows, exactly as the PRD snippet shows: keep hits unchanged and first, skip any recent row whose rowid is already present (including duplicates inside recentRows), append the rest with rank continuing from the current length + 1, rrfScore 0, excerpt = buildMarkedExcerpt(row.text, query) and excerptSegments = parseMarkedExcerpt(excerpt). Add tests under describe('appendRecentRows (PAN-5677)')."
+        },
+        "items": [
+          {
+            "id": "w2-append-recent-rows.ac1",
+            "title": "Given two relevance hits and three recent rows of which one shares a rowid with a hit, appendRecentRows returns four hits: the two relevance hits unchanged and first, then the two new rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-append-recent-rows.ac2",
+            "title": "Appended rows have rrfScore 0, ranks 3 and 4, and an excerpt that marks the query term as ⦇needle⦈",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-append-recent-rows.ac3",
+            "title": "Given a rowid that appears twice inside recentRows, appendRecentRows returns that row appended once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w3-group-recent-sort",
+        "title": "groupConversationHits orders by lastMatchAt in recent mode and exposes latestMatchAt",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-27T13:52:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5677",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "w4-service-recent-leg",
+            "w5-route-sort-param",
+            "w6-palette-client"
+          ],
+          "files_scope": [
+            "src/lib/conversation-search/group-hits.ts",
+            "src/lib/conversation-search/__tests__/group-hits.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/conversation-search/__tests__/group-hits.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "group-hits.test.ts passes, existing tests unchanged plus the recent sort (PAN-5677) describe",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item W3. In src/lib/conversation-search/group-hits.ts: export type ConversationSearchSort = 'relevance' | 'recent'; add latestMatchAt: string | null to GroupedConversationHit (keep lastActivityAt and its value unchanged); track latestTs per group as the newest hit.ts (compare with Date.parse; null/unparseable loses; both invalid returns a ?? b) and set latestMatchAt to the newer of latestTs and titleMatch.lastActivityAt. Split today's compareGroups into compareRelevance (score, hitCount, lastActivityAt, id, unchanged) and keep compareGroups = tier then compareRelevance (relevance mode identical to today). Add compareGroupsRecent = tier, then latestMatchAt descending with null/invalid last, then compareRelevance. groupConversationHits input gains sort?: ConversationSearchSort defaulting to 'relevance' and sorts with the matching comparator before slice(0, limit). Add the five recent-sort tests from the PRD."
+        },
+        "items": [
+          {
+            "id": "w3-group-recent-sort.ac1",
+            "title": "Given conversation A with an old best hit and a newer weak hit (2026-11-24) and conversation B with one higher-scored hit from 2026-11-20, recent mode returns A first with latestMatchAt 2026-11-24 and relevance mode returns B first",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-group-recent-sort.ac2",
+            "title": "Given 20 older higher-scored text-tier conversations and one newest lowest-scored one with limit 15, recent mode returns the newest conversation at position 1 and relevance mode excludes it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-group-recent-sort.ac3",
+            "title": "Given recent mode, when a title match from 2026-01 and a text match from 2026-11 are grouped, then the title match returns first; and a row with no valid timestamp returns after a timestamped row of the same tier",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-group-recent-sort.ac4",
+            "title": "Given a title match that also has chunk hits, groupConversationHits returns latestMatchAt equal to the later of its newest chunk ts and its lastActivityAt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-group-recent-sort.ac5",
+            "title": "Every pre-existing group-hits test passes without modification, proving the default relevance order is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w4-service-recent-leg",
+        "title": "searchConversationChunks runs a best-effort recency leg when sort is recent",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-27T13:52:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5677",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/conversation-search-service.ts",
+            "src/dashboard/server/services/__tests__/conversation-search-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/conversation-search-service.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-search-service.test.ts passes including the four new recent-leg tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item W4. searchConversationChunks input gains sort?: ConversationSearchSort (from group-hits.js). Only when sort === 'recent', start the leg before awaiting rankConversationSearch: runScanLeg('searchConversationBm25', { ...dbRef, matchQuery, limit: candidateLimit ?? limit, order: 'recent' }, signal) with a .catch attached at creation that logs one console.warn (unless signal aborted) and returns [] (hazard H2: the promise must never reject). After rankConversationSearch, pool = appendRecentRows({ hits, recentRows: await recentLeg, query: rawQuery }) and pass pool to filterLiveHits. In relevance mode pass hits straight through and send no second job; the relevance BM25 payload must have no order key. Never call recordConversationSearchFailure for the recency leg. Tests use the file's existing fake timers (repo rule: delay/deadline tests use vi.advanceTimersByTimeAsync, never real waits) and the answerJobs helper branching on payload.order."
+        },
+        "items": [
+          {
+            "id": "w4-service-recent-leg.ac1",
+            "title": "In relevance mode runDashboardDbJob receives exactly one searchConversationBm25 call and its payload has no order key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-service-recent-leg.ac2",
+            "title": "In recent mode the service sends a second searchConversationBm25 call carrying order 'recent' with the same matchQuery and limit, and returns a session found only by that call in its hits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-service-recent-leg.ac3",
+            "title": "Given a recency leg that never answers, when fake timers advance past CHUNK_SCAN_DEADLINE_MS, then the search returns the relevance hits and recordConversationSearchFailure is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-service-recent-leg.ac4",
+            "title": "Given a recency leg that rejects with an error, the search returns the relevance hits, logs one console.warn, and records no failure",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w5-route-sort-param",
+        "title": "Palette route parses sort and returns lastMatchAt on every conversation row",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-27T13:52:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-5677",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/palette.ts",
+            "src/dashboard/server/routes/__tests__/palette.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/palette.test.ts src/dashboard/server/routes/__tests__/palette-abort.test.ts src/dashboard/server/__tests__/fleet-search.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "palette.test.ts passes including the newest-first sort (PAN-5677) describe; palette-abort and fleet-search tests stay green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item W5. In src/dashboard/server/routes/palette.ts: PaletteConversationHit gains lastMatchAt: string | null (doc comment per PRD); toPaletteConversationHit sets lastMatchAt: row.latestMatchAt on both branches; searchConversations gains a sort argument passed to searchConversationChunks({ ..., sort }) and groupConversationHits({ ..., sort }); runPaletteSearch(rawQuery, limit, signal?, sort: ConversationSearchSort = 'relevance'); the route reads sort = url.searchParams.get('sort') === 'recent' ? 'recent' : 'relevance'. Update both header comments to '?q=&limit=&sort=relevance|recent'. Do not touch fleet-awareness.ts or tools-read.ts (NonGoals)."
+        },
+        "items": [
+          {
+            "id": "w5-route-sort-param.ac1",
+            "title": "Given mocked hits where the newest conversation has the lowest score, runPaletteSearch(q, 1, undefined, 'recent') returns that newest conversation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-route-sort-param.ac2",
+            "title": "Given the same hits, runPaletteSearch(q, 1) without a sort argument returns the best-scoring conversation, the same as before this change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-route-sort-param.ac3",
+            "title": "Every conversation row the route returns carries a lastMatchAt field equal to the grouped row's latestMatchAt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w6-palette-client",
+        "title": "Palette sends sort from the Newest first toggle and orders rows by lastMatchAt",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-27T13:52:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5677",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandPalette.tsx",
+            "src/dashboard/frontend/src/components/palette-conversation-hits.ts",
+            "src/dashboard/frontend/src/components/CommandPalette.test.tsx",
+            "src/dashboard/frontend/src/components/palette-conversation-hits.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/CommandPalette.test.tsx src/dashboard/frontend/src/components/palette-conversation-hits.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "both frontend test files pass including the new sort-param and lastMatchAt tests",
+            "typecheck completes without errors",
+            "file-size guard passes with CommandPalette.tsx at or below 1124 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item W6. palette-conversation-hits.ts: PaletteConversationHit gains optional lastMatchAt?: string | null; describeConversationHit uses formatHitDate(hit.lastMatchAt ?? hit.ts). CommandPalette.tsx: fetchPaletteSearch(query, signal, newestFirst) appends &sort=recent when newestFirst is true and &sort=relevance otherwise (limit stays 15); the search effect passes conversationsNewestFirst and adds it to its dependency array; memoryActions sets sortTs: hit.lastMatchAt ?? hit.ts; update the header comment line for Conversations. Do not change compareConversationActionsNewestFirst, the toggle default, the localStorage key, or palette-fleet-hits.tsx. Add the tests described in the PRD; keep the existing PAN-3704 order tests green."
+        },
+        "items": [
+          {
+            "id": "w6-palette-client.ac1",
+            "title": "With Newest first on by default, the palette's /api/palette/search request URL contains sort=recent and limit=15",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-palette-client.ac2",
+            "title": "Clicking the Newest first button sends a new /api/palette/search request whose URL contains sort=relevance",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-palette-client.ac3",
+            "title": "Given conversation rows whose ts order disagrees with their lastMatchAt order, the palette renders them in lastMatchAt order, newest first",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-palette-client.ac4",
+            "title": "describeConversationHit renders the date chip from lastMatchAt when present and falls back to ts when lastMatchAt is absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w7-docs",
+        "title": "Document server-side Newest first and add the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-27T13:52:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5677",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/conversations.mdx",
+            "features/keyboard-shortcuts.mdx",
+            "docs/USAGE.md",
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "changelog.d/pan-5677.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item W7. Apply the exact wording from the PRD: features/conversations.mdx 'Find a conversation' paragraph about Newest first (and 'the date' chip becomes 'the date of the latest match'); features/keyboard-shortcuts.mdx 'reorders conversation results by date' becomes 'shows the most recently matching conversations first'; docs/USAGE.md 'Command palette conversation search' gains the sort=recent sentence; docs/DASHBOARD-ARCHITECTURE.md conversation-text lane bullet gains the recency scan (searchConversationBm25 with order 'recent', only for sort=recent, PAN-5677); create changelog.d/pan-5677.md with the #### Fixed bullet from the PRD."
+        },
+        "items": [
+          {
+            "id": "w7-docs.ac1",
+            "title": "features/conversations.mdx states that Newest first shows the conversations that matched most recently and that the search itself picks the newest matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w7-docs.ac2",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains the recency scan (searchConversationBm25 with order 'recent') on the conversation-text lane, and docs/USAGE.md contains sort=recent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w7-docs.ac3",
+            "title": "changelog.d/pan-5677.md exists with a #### Fixed bullet linking https://github.com/eltmon/overdeck/issues/5677, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "w1-db-recent-order",
+        "to": "w4-service-recent-leg",
+        "type": "blocks"
+      },
+      {
+        "from": "w2-append-recent-rows",
+        "to": "w4-service-recent-leg",
+        "type": "blocks"
+      },
+      {
+        "from": "w3-group-recent-sort",
+        "to": "w4-service-recent-leg",
+        "type": "blocks"
+      },
+      {
+        "from": "w3-group-recent-sort",
+        "to": "w5-route-sort-param",
+        "type": "blocks"
+      },
+      {
+        "from": "w4-service-recent-leg",
+        "to": "w5-route-sort-param",
+        "type": "blocks"
+      },
+      {
+        "from": "w3-group-recent-sort",
+        "to": "w6-palette-client",
+        "type": "informs"
+      }
+    ]
+  },
+  "status": "proposed"
+}
