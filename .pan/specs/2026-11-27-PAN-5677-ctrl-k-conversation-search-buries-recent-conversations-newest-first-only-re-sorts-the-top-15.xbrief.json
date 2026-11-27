@@ -4,17 +4,17 @@
     "created": "2026-11-27T13:52:07Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5677: Ctrl+K conversation search buries recent conversations: newest-first only re-sorts the top 15",
-    "updated": "2026-11-27T13:57:23.961Z"
+    "updated": "2026-11-27T13:58:30.590Z"
   },
   "plan": {
     "id": "pan-5677",
     "title": "Ctrl+K conversation search buries recent conversations: newest-first only re-sorts the top 15",
-    "status": "proposed",
+    "status": "running",
     "uid": "6e8bec91-5f54-498d-b70e-a0281e537fe2",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-27T13:52:07Z",
-    "updated": "2026-11-27T13:57:23.961Z",
+    "updated": "2026-11-27T13:58:30.590Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5677",
@@ -574,5 +574,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }

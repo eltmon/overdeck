@@ -41,10 +41,10 @@ function fakeProvider(): ConversationEmbeddingProvider {
   };
 }
 
-function jsonlMessage(text: string): string {
+function jsonlMessage(text: string, timestamp = '2026-06-02T01:00:00.000Z'): string {
   return `${JSON.stringify({
     type: 'assistant',
-    timestamp: '2026-06-02T01:00:00.000Z',
+    timestamp,
     message: { role: 'assistant', content: [{ type: 'text', text }] },
   })}\n`;
 }
@@ -91,6 +91,33 @@ describe('chunk-search jobs', () => {
     expect(bm25.available && bm25.value.map((row) => row.sessionId)).toEqual(['session-a']);
     expect(vector.available && vector.value.map((row) => row.sessionId)).toEqual(['session-a']);
     expect(openEmbeddingsDb).toHaveBeenCalledTimes(1);
+  });
+
+  it('forwards order: recent to searchBm25; omitting order keeps relevance order (PAN-5677)', async () => {
+    const dbPath = join(tmpDir, 'embeddings.db');
+    const db = openEmbeddingsDb(dbPath, DIMENSIONS);
+    expect(db.available).toBe(true);
+    const projectDir = join(tmpDir, 'projects', 'overdeck');
+    mkdirSync(projectDir, { recursive: true });
+    const config: NormalizedConversationSearchConfig = { enabled: true, provider: 'openai', model: MODEL, apiKeyRef: undefined, dbPath };
+    const provider = fakeProvider();
+    const sessions: Array<[sessionId: string, ts: string, text: string]> = [
+      ['session-old', '2026-01-01T00:00:00.000Z', 'needle needle needle strongest match'],
+      ['session-new', '2026-06-01T00:00:00.000Z', 'a single needle mention'],
+    ];
+    for (const [sessionId, ts, text] of sessions) {
+      const filePath = join(projectDir, `${sessionId}.jsonl`);
+      writeFileSync(filePath, jsonlMessage(text, ts));
+      await indexConversationFile({ filePath, config, db, provider, now: () => '2026-06-02T01:01:00.000Z' });
+    }
+    db.close();
+    vi.mocked(openEmbeddingsDb).mockClear();
+
+    const relevance = searchConversationBm25Job({ dbPath, model: MODEL, matchQuery: 'needle', limit: 5 });
+    expect(relevance.available && relevance.value[0]?.sessionId).toBe('session-old');
+
+    const recent = searchConversationBm25Job({ dbPath, model: MODEL, matchQuery: 'needle', limit: 5, order: 'recent' });
+    expect(recent.available && recent.value[0]?.sessionId).toBe('session-new');
   });
 
   it('returns available:false with the reason when the DB cannot open', () => {

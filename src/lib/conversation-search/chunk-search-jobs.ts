@@ -16,6 +16,7 @@ import { stat } from 'node:fs/promises';
 import {
   dimensionsForModel,
   openEmbeddingsDb,
+  type ChunkSearchOrder,
   type ChunkSearchRow,
   type EmbeddingsDbHandle,
 } from '../overdeck/conversations-search.js';
@@ -53,11 +54,11 @@ function unavailable(opened: EmbeddingsDbHandle | { reason: string }): opened is
 }
 
 export function searchConversationBm25Job(
-  input: ChunkSearchDbRef & { matchQuery: string; limit: number },
+  input: ChunkSearchDbRef & { matchQuery: string; limit: number; order?: ChunkSearchOrder },
 ): ChunkSearchJobResult<ChunkSearchRow[]> {
   const db = openCached(input);
   if (unavailable(db)) return { available: false, reason: db.reason };
-  return { available: true, value: db.searchBm25(input.matchQuery, input.limit) };
+  return { available: true, value: db.searchBm25(input.matchQuery, input.limit, input.order) };
 }
 
 export function searchConversationVectorJob(
