@@ -16,6 +16,11 @@
  * channels survive the peer's network change. An offer with a new session id still replaces the
  * peer's connection.
  *
+ * Trickle candidates for a new offer are held until that offer's peer connection exists. The
+ * responder asks the directory for ICE servers before it can register the session, and a phone or
+ * connector flushes its candidates in the burst right behind the offer. Dropping that burst left
+ * the answerer with no remote candidates (`received 0`) on both the direct and relay routes.
+ *
  * Diagnostics (PAN-5018 FR-6): one always-on line per offer received and one for its outcome
  * (`answered`, `dropped: <reason>`, `failed at <step>: <message>`), `ice restart from <peer>` for a
  * same-session offer, plus each peer connection's `connected`, `failed` and `closed`. Dropped
@@ -129,6 +134,14 @@ export function firstTurnUrl(servers: readonly RTCIceServerLike[]): string | nul
   return null;
 }
 
+type RemoteCandidate = NonNullable<SignalData['candidate']>;
+
+/** Trickle candidates for an offer that has arrived but whose peer connection does not exist yet. */
+interface EarlyRemote {
+  readonly from: string;
+  readonly candidates: RemoteCandidate[];
+}
+
 interface PeerEntry {
   readonly key: string;
   readonly peer: string;
@@ -156,6 +169,12 @@ function entryKey(peer: string, relay: boolean, purpose: RtcPurpose): string {
 export class RtcTransport {
   private readonly byKey = new Map<string, PeerEntry>();
   private readonly bySession = new Map<string, PeerEntry>();
+  /**
+   * Candidates that arrive while `accept` is still waiting on ICE servers. The session is not in
+   * `bySession` until the peer connection is constructed, so without this map those frames match
+   * no session and are dropped.
+   */
+  private readonly earlyRemote = new Map<string, EarlyRemote>();
   /** Peer connections being created, so concurrent dials to one peer share one connection. */
   private readonly creating = new Map<string, Promise<{ entry: PeerEntry; channel: RTCDataChannel }>>();
   private readonly unsubscribe: () => void;
@@ -345,6 +364,20 @@ export class RtcTransport {
     }
   }
 
+  /**
+   * Move candidates held during the ICE-server wait onto the entry. Called synchronously after
+   * `register`, before the next await, so a candidate frame cannot land in the gap.
+   */
+  private claimEarly(session: string, entry: PeerEntry): void {
+    const early = this.earlyRemote.get(session);
+    if (!early || early.from !== entry.peer) return;
+    this.earlyRemote.delete(session);
+    for (const candidate of early.candidates) {
+      entry.received.add(candidate.candidate);
+      entry.pendingRemote.push(candidate);
+    }
+  }
+
   private async setRemote(entry: PeerEntry, type: 'offer' | 'answer', sdp: string): Promise<void> {
     entry.received.addSdp(sdp);
     await entry.pc.setRemoteDescription({ type, sdp });
@@ -400,13 +433,33 @@ export class RtcTransport {
         if (data.candidate) await this.addRemoteCandidate(known, data.candidate);
         return;
       }
+      const early = this.earlyRemote.get(session);
+      if (early) {
+        // The offer is in `accept`, still waiting on ICE servers, so the session is not registered yet.
+        if (early.from !== from) {
+          this.dropped(data, `session ${shortId(session)} belongs to ${shortId(early.from)}, not ${shortId(from)}`);
+          return;
+        }
+        if (data.candidate) early.candidates.push(data.candidate);
+        if (data.sdp) this.dropped(data, `session ${shortId(session)} from ${shortId(from)} is already being accepted`);
+        return;
+      }
       if (data.sdp?.type !== 'offer') {
         this.dropped(data, `unknown session ${shortId(session)} from ${shortId(from)}`);
         return;
       }
+      // Reserve the session before the ICE-server await. The client's trickle burst follows the
+      // offer on the same socket and would otherwise be dropped as an unknown session.
+      const bucket: EarlyRemote = { from, candidates: [] };
+      if (data.candidate) bucket.candidates.push(data.candidate);
+      this.earlyRemote.set(session, bucket);
       this.log(`rtc offer from ${shortId(from)} session ${shortId(session)} (${purpose}, ${relay ? 'relay' : 'direct'})`);
-      await this.accept(from, session, purpose, relay, data.sdp.sdp, data.candidate, progress);
-      this.log(`rtc session ${shortId(session)} answered`);
+      try {
+        await this.accept(from, session, purpose, relay, data.sdp.sdp, progress);
+        this.log(`rtc session ${shortId(session)} answered`);
+      } finally {
+        if (this.earlyRemote.get(session) === bucket) this.earlyRemote.delete(session);
+      }
     } catch (error) {
       // First line only, so an error that quotes SDP cannot carry it into the log (NFR-1).
       const message = (error instanceof Error ? error.message : String(error)).split('\n')[0]!.slice(0, 200);
@@ -423,7 +476,6 @@ export class RtcTransport {
     purpose: RtcPurpose,
     relay: boolean,
     sdp: string,
-    candidate: SignalData['candidate'],
     progress: { step: SignalStep },
   ): Promise<void> {
     const key = entryKey(from, relay, purpose);
@@ -437,9 +489,10 @@ export class RtcTransport {
     progress.step = 'peer-connection';
     const pc = new RTCPeerConnection({ iceServers });
     const entry = this.register(pc, key, from, session, purpose, relay);
+    // Synchronous: candidates queued during the await above must be on the entry before setRemote yields.
+    this.claimEarly(session, entry);
     progress.step = 'remote-description';
     await this.setRemote(entry, 'offer', sdp);
-    if (candidate) await this.addRemoteCandidate(entry, candidate);
     progress.step = 'answer';
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
