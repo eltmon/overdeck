@@ -14,6 +14,7 @@ export {
   type ChunkInsert,
   type ChunkRow,
   type ChunkSearchRow,
+  type ChunkSearchOrder,
   type EmbeddingsDbStats,
   type OpenEmbeddingsDbOptions,
 } from '../database/conversation-embeddings-db.js';

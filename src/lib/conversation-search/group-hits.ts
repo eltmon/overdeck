@@ -3,6 +3,9 @@ import { classifyChunkMatch } from './match-context.js';
 
 export type ConversationMatchTier = 'title' | 'text' | 'path';
 
+/** Grouped-row order (PAN-5677): best match, or the most recently matching conversations. */
+export type ConversationSearchSort = 'relevance' | 'recent';
+
 export interface ConversationIdentity {
   conversationId: string;
   projectKey: string | null;
@@ -26,6 +29,8 @@ export interface GroupedConversationHit {
   titleMatch: TitleMatchedConversation | null;
   score: number;
   lastActivityAt: string | null;
+  /** Newest chunk `ts` among this row's pool hits, or the title match's last activity, whichever is later (PAN-5677). */
+  latestMatchAt: string | null;
 }
 
 interface GroupState {
@@ -34,13 +39,23 @@ interface GroupState {
   firstAny: ConversationSearchHit | null;
   firstText: ConversationSearchHit | null;
   titleMatch: TitleMatchedConversation | null;
+  latestTs: string | null;
 }
 
 const TIER_ORDER: Record<ConversationMatchTier, number> = { title: 0, text: 1, path: 2 };
 
-function compareGroups(a: GroupedConversationHit, b: GroupedConversationHit): number {
-  const tierDiff = TIER_ORDER[a.tier] - TIER_ORDER[b.tier];
-  if (tierDiff !== 0) return tierDiff;
+/** The newer of two timestamps; a null/unparseable value loses to a valid one, and `a ?? b` when both are invalid. */
+function newerTimestamp(a: string | null, b: string | null): string | null {
+  const aTime = a ? Date.parse(a) : NaN;
+  const bTime = b ? Date.parse(b) : NaN;
+  const aValid = !Number.isNaN(aTime);
+  const bValid = !Number.isNaN(bTime);
+  if (aValid && bValid) return bTime > aTime ? b : a;
+  if (aValid !== bValid) return aValid ? a : b;
+  return a ?? b;
+}
+
+function compareRelevance(a: GroupedConversationHit, b: GroupedConversationHit): number {
   if (b.score !== a.score) return b.score - a.score;
   if (b.hitCount !== a.hitCount) return b.hitCount - a.hitCount;
   const aTime = a.lastActivityAt ?? '';
@@ -51,14 +66,33 @@ function compareGroups(a: GroupedConversationHit, b: GroupedConversationHit): nu
   return aId < bId ? -1 : aId > bId ? 1 : 0;
 }
 
+function compareGroups(a: GroupedConversationHit, b: GroupedConversationHit): number {
+  const tierDiff = TIER_ORDER[a.tier] - TIER_ORDER[b.tier];
+  if (tierDiff !== 0) return tierDiff;
+  return compareRelevance(a, b);
+}
+
+function compareGroupsRecent(a: GroupedConversationHit, b: GroupedConversationHit): number {
+  const tierDiff = TIER_ORDER[a.tier] - TIER_ORDER[b.tier];
+  if (tierDiff !== 0) return tierDiff;
+  const aTs = a.latestMatchAt ? Date.parse(a.latestMatchAt) : NaN;
+  const bTs = b.latestMatchAt ? Date.parse(b.latestMatchAt) : NaN;
+  const aValid = !Number.isNaN(aTs);
+  const bValid = !Number.isNaN(bTs);
+  if (aValid && bValid && aTs !== bTs) return bTs - aTs;
+  if (aValid !== bValid) return aValid ? -1 : 1;
+  return compareRelevance(a, b);
+}
+
 export function groupConversationHits(input: {
   hits: ConversationSearchHit[];
   titleMatches: TitleMatchedConversation[];
   query: string;
   resolve: (rootSessionId: string) => ConversationIdentity;
   limit: number;
+  sort?: ConversationSearchSort;
 }): GroupedConversationHit[] {
-  const { hits, titleMatches, query, resolve, limit } = input;
+  const { hits, titleMatches, query, resolve, limit, sort = 'relevance' } = input;
   const groups = new Map<string, GroupState>();
 
   for (const hit of hits) {
@@ -67,7 +101,7 @@ export function groupConversationHits(input: {
     const key = identity.conversationId;
     let group = groups.get(key);
     if (!group) {
-      group = { identity, hitCount: 0, firstAny: null, firstText: null, titleMatch: null };
+      group = { identity, hitCount: 0, firstAny: null, firstText: null, titleMatch: null, latestTs: null };
       groups.set(key, group);
     }
     group.hitCount += 1;
@@ -75,6 +109,7 @@ export function groupConversationHits(input: {
     if (!group.firstText && classifyChunkMatch(hit.text, query) === 'text') {
       group.firstText = hit;
     }
+    group.latestTs = newerTimestamp(group.latestTs, hit.ts);
   }
 
   for (const titleMatch of titleMatches) {
@@ -92,6 +127,7 @@ export function groupConversationHits(input: {
         firstAny: null,
         firstText: null,
         titleMatch: null,
+        latestTs: null,
       };
       groups.set(key, group);
     } else {
@@ -112,9 +148,10 @@ export function groupConversationHits(input: {
       titleMatch: group.titleMatch,
       score: bestHit?.rrfScore ?? 0,
       lastActivityAt: bestHit?.ts ?? group.titleMatch?.lastActivityAt ?? null,
+      latestMatchAt: newerTimestamp(group.latestTs, group.titleMatch?.lastActivityAt ?? null),
     });
   }
 
-  rows.sort(compareGroups);
+  rows.sort(sort === 'recent' ? compareGroupsRecent : compareGroups);
   return rows.slice(0, limit);
 }

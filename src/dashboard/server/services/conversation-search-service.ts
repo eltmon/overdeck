@@ -12,8 +12,9 @@
 import { getConversationSearchConfig, type NormalizedConversationSearchConfig } from '../../../lib/config-yaml.js';
 import { closeChunkSearchHandles, type ChunkSearchJobResult } from '../../../lib/conversation-search/chunk-search-jobs.js';
 import { createConversationEmbeddingProvider, type ConversationEmbeddingProvider } from '../../../lib/conversation-search/embedding-provider.js';
+import type { ConversationSearchSort } from '../../../lib/conversation-search/group-hits.js';
 import { recordConversationSearchFailure, recordConversationSearchSuccess } from '../../../lib/conversation-search/health.js';
-import { rankConversationSearch, type ConversationSearchHit, type RankedChunkRow } from '../../../lib/conversation-search/ranker.js';
+import { appendRecentRows, rankConversationSearch, type ConversationSearchHit, type RankedChunkRow } from '../../../lib/conversation-search/ranker.js';
 import { runDashboardDbJob, type DashboardDbOperation } from './dashboard-db-task.js';
 
 /** Budget for each BM25 / vector leg, counted from submission so queue wait counts. */
@@ -141,6 +142,7 @@ export async function searchConversationChunks(input: {
   candidateLimit?: number;
   config?: NormalizedConversationSearchConfig;
   signal?: AbortSignal;
+  sort?: ConversationSearchSort;
 }): Promise<ConversationSearchHit[]> {
   const { signal } = input;
   signal?.throwIfAborted();
@@ -150,7 +152,16 @@ export async function searchConversationChunks(input: {
   const dbRef = { dbPath: config.dbPath, model: config.model };
 
   try {
-    const hits = await rankConversationSearch({
+    // The relevance scan's own `store.searchBm25` call is itself deferred by
+    // one microtask inside rankConversationSearch (`Promise.resolve().then(...)`).
+    // Calling rankConversationSearch first, then deferring the recent leg's
+    // runScanLeg call by one more microtask, puts the relevance BM25 job on
+    // the shared `conversation-text` lane ahead of the best-effort recent
+    // job — the recent scan must never consume the relevance scan's deadline
+    // budget by queueing in front of it (PAN-5677; CodeRabbit PR #5678,
+    // thread 4720777472). The recent leg is still caught at creation (H2): a
+    // relevance-path failure must not leave it unobserved.
+    const searchPromise = rankConversationSearch({
       query: input.rawQuery,
       limit: input.limit,
       candidateLimit: input.candidateLimit,
@@ -173,7 +184,23 @@ export async function searchConversationChunks(input: {
       onEmbedFailure: recordConversationSearchFailure,
       onEmbedSuccess: recordConversationSearchSuccess,
     });
-    return await filterLiveHits(config, hits, signal);
+
+    const recentLeg: Promise<RankedChunkRow[]> = input.sort === 'recent'
+      ? Promise.resolve().then(() => runScanLeg(
+          'searchConversationBm25',
+          { ...dbRef, matchQuery: input.matchQuery, limit: input.candidateLimit ?? input.limit, order: 'recent' },
+          signal,
+        )).catch((error: unknown) => {
+          if (!signal?.aborted) console.warn('[conversation-search] recent leg failed; using relevance results only:', error);
+          return [];
+        })
+      : Promise.resolve([]);
+
+    const hits = await searchPromise;
+    const pool = input.sort === 'recent'
+      ? appendRecentRows({ hits, recentRows: await recentLeg, query: input.rawQuery })
+      : hits;
+    return await filterLiveHits(config, pool, signal);
   } catch (error) {
     if (signal?.aborted) throw signal.reason;
     if (error instanceof EmbeddingsDbUnavailable) return [];

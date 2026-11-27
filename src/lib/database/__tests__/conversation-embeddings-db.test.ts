@@ -312,6 +312,31 @@ describe('conversation-embeddings-db', () => {
     });
   });
 
+  describe('searchBm25 order (PAN-5677)', () => {
+    function indexNeedleChunks(dir: string): EmbeddingsDbHandle {
+      const db = openEmbeddingsDb(join(dir, 'embeddings.db'), 8);
+      db.upsertChunk(makeChunk({ sessionId: 'session-jan', byteOffset: 0, ts: '2026-01-01T00:00:00.000Z', text: 'needle needle needle strongest match' }));
+      db.upsertChunk(makeChunk({ sessionId: 'session-mar', byteOffset: 0, ts: '2026-03-01T00:00:00.000Z', text: 'a single needle mention' }));
+      db.upsertChunk(makeChunk({ sessionId: 'session-null', byteOffset: 0, ts: null, text: 'needle with no timestamp' }));
+      db.upsertChunk(makeChunk({ sessionId: 'session-feb', byteOffset: 0, ts: '2026-02-01T00:00:00.000Z', text: 'needle mentioned once here' }));
+      return db;
+    }
+
+    it("order 'recent' returns the newest matching chunks first, NULL ts last", () => {
+      const dir = makeTmpDir();
+      handle = indexNeedleChunks(dir);
+      const rows = handle.searchBm25('needle', 3, 'recent');
+      expect(rows.map((row) => row.sessionId)).toEqual(['session-mar', 'session-feb', 'session-jan']);
+    });
+
+    it('default order returns the strongest BM25 match first, unchanged from before this change', () => {
+      const dir = makeTmpDir();
+      handle = indexNeedleChunks(dir);
+      const rows = handle.searchBm25('needle', 1);
+      expect(rows[0]?.sessionId).toBe('session-jan');
+    });
+  });
+
   describe('upsertEmbedding', () => {
     it('stores a Float32Array embedding for a chunk rowid', () => {
       const dir = makeTmpDir();

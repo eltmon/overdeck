@@ -74,10 +74,10 @@ function fakeProvider(dimensions: number): ConversationEmbeddingProvider {
   };
 }
 
-function jsonlMessage(role: string, text: string): string {
+function jsonlMessage(role: string, text: string, timestamp = '2026-06-02T01:00:00.000Z'): string {
   return `${JSON.stringify({
     type: role,
-    timestamp: '2026-06-02T01:00:00.000Z',
+    timestamp,
     message: { role, content: [{ type: 'text', text }] },
   })}\n`;
 }
@@ -502,6 +502,51 @@ describe('palette conversation search', () => {
     const result = await runPaletteSearch('needle', 5);
     expect(result.conversations.map((c) => c.conversationId)).toEqual(['session-text', 'session-path']);
     expect(result.conversations[1]).toMatchObject({ matchTier: 'path' });
+  });
+
+  describe('newest-first sort (PAN-5677)', () => {
+    it('sort=recent returns the newest, lowest-scored conversation; no sort returns the best-scoring one; every row carries lastMatchAt', async () => {
+      const root = tmpDir!;
+      const projectDir = join(root, 'projects', 'overdeck');
+      mkdirSync(projectDir, { recursive: true });
+      const strongFile = join(projectDir, 'session-strong.jsonl');
+      writeFileSync(strongFile, jsonlMessage('assistant', 'needle needle needle strongest match', '2026-01-01T00:00:00.000Z'));
+      const newestFile = join(projectDir, 'session-newest.jsonl');
+      writeFileSync(newestFile, jsonlMessage('assistant', 'a single needle mention', '2026-11-26T00:00:00.000Z'));
+
+      const config: NormalizedConversationSearchConfig = {
+        enabled: true,
+        provider: 'openai',
+        model: 'text-embedding-3-small',
+        apiKeyRef: undefined,
+        dbPath: join(root, 'embeddings.db'),
+      };
+      const dimensions = dimensionsForModel(config.model);
+      const indexProvider = fakeProvider(dimensions);
+      vi.mocked(getConversationSearchConfig).mockReturnValue(config);
+
+      const db = openEmbeddingsDb(config.dbPath, dimensions);
+      for (const filePath of [strongFile, newestFile]) {
+        await indexConversationFile({ filePath, config, db, provider: indexProvider, now: () => '2026-06-02T01:01:00.000Z' });
+      }
+      db.close();
+
+      // A rejecting embed disables the vector leg (PAN-3771 failure path) so
+      // this test's relevance order is driven by BM25 alone, not an
+      // identical-embedding tie between the two fixture chunks.
+      vi.mocked(createConversationEmbeddingProvider).mockReturnValue({
+        ...fakeProvider(dimensions),
+        embed: vi.fn(async () => { throw new Error('embedding disabled for this test'); }),
+      });
+
+      const recent = await runPaletteSearch('needle', 1, undefined, 'recent');
+      expect(recent.conversations).toHaveLength(1);
+      expect(recent.conversations[0]).toMatchObject({ conversationId: 'session-newest', lastMatchAt: '2026-11-26T00:00:00.000Z' });
+
+      const relevance = await runPaletteSearch('needle', 1);
+      expect(relevance.conversations).toHaveLength(1);
+      expect(relevance.conversations[0]).toMatchObject({ conversationId: 'session-strong', lastMatchAt: '2026-01-01T00:00:00.000Z' });
+    });
   });
 
   describe('request signal and concurrency (PAN-5447)', () => {

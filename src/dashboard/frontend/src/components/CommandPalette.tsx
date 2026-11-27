@@ -8,7 +8,7 @@
  *   - Actions / Orchestration / Navigation  — built-in dashboard actions
  *   - Commands                              — curated `pan <verb>` catalog (click to copy)
  *   - Active Workspaces / Issues / Running Agents
- *   - Conversations                         — semantic search with a newest-first toggle persisted at `overdeck.ui.paletteConversationsNewestFirst`
+ *   - Conversations                         — semantic search with a server-side newest-first sort (`sort=recent`), toggle persisted at `overdeck.ui.paletteConversationsNewestFirst` (PAN-5677)
  *   - Memory / Observations                 — FTS over ~/.overdeck/memory
  */
 
@@ -254,7 +254,7 @@ async function fetchWorkspaceRegistry(): Promise<WorkspaceRegistryRow[]> {
 const PALETTE_SEARCH_TIMEOUT_MS = 10_000;
 const SEARCH_TIMED_OUT = 'timed out';
 
-async function fetchPaletteSearch(query: string, signal: AbortSignal): Promise<PaletteSearchResponse> {
+async function fetchPaletteSearch(query: string, signal: AbortSignal, newestFirst: boolean): Promise<PaletteSearchResponse> {
   // Own controller: a supersede abort (signal) and our timeout must stay distinguishable (PAN-5447).
   const request = new AbortController();
   const onSupersede = () => request.abort();
@@ -262,7 +262,8 @@ async function fetchPaletteSearch(query: string, signal: AbortSignal): Promise<P
   let timedOut = false;
   const timer = setTimeout(() => { timedOut = true; request.abort(); }, PALETTE_SEARCH_TIMEOUT_MS);
   try {
-    const res = await fetch(`/api/palette/search?q=${encodeURIComponent(query)}&limit=15`, { signal: request.signal });
+    const sort = newestFirst ? 'recent' : 'relevance';
+    const res = await fetch(`/api/palette/search?q=${encodeURIComponent(query)}&limit=15&sort=${sort}`, { signal: request.signal });
     // PAN-3975: non-OK statuses (401 expired session, 500, …) must surface as
     // an error, not collapse into "zero results".
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -413,7 +414,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
     // A superseded request settles after the next effect has started its own
     // request; letting it write state cleared the loading flag and showed
     // "No results" while the live request was still in flight.
-    void fetchPaletteSearch(trimmed, controller.signal)
+    void fetchPaletteSearch(trimmed, controller.signal, conversationsNewestFirst)
       .then((data) => {
         if (controller.signal.aborted) return;
         setSearchResults(data);
@@ -430,7 +431,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
         if (!controller.signal.aborted) setIsSearchLoading(false);
       });
     return () => controller.abort();
-  }, [isOpen, debouncedQuery]);
+  }, [isOpen, debouncedQuery, conversationsNewestFirst]);
 
   // Keyboard: Escape to close
   useEffect(() => {
@@ -775,7 +776,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
         icon: described.subagentId ? MessagesSquare : MessageCircle,
         group: 'Conversations',
         rank: hit.rank,
-        sortTs: hit.ts,
+        sortTs: hit.lastMatchAt ?? hit.ts,
         tier: described.tier,
         excerptSegments: hit.excerptSegments.map((seg) => ({
           kind: seg.match ? 'match' : 'text',

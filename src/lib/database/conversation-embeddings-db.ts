@@ -57,6 +57,9 @@ export interface ChunkSearchRow extends ChunkRow {
   score: number;
 }
 
+/** BM25 keyword search order (PAN-5677): best-scoring chunks, or the newest matching chunks. */
+export type ChunkSearchOrder = 'relevance' | 'recent';
+
 export interface EmbeddingsDbStats {
   chunkCount: number;
   indexedFileCount: number;
@@ -89,8 +92,11 @@ export interface EmbeddingsDbHandle {
   /** Persists the byte-offset cursor for a file path. */
   setCursor(filePath: string, byteOffset: number): void;
 
-  /** BM25 keyword search over indexed chunk text. */
-  searchBm25(query: string, limit: number): ChunkSearchRow[];
+  /**
+   * BM25 keyword search over indexed chunk text; `order: 'recent'` returns the
+   * newest matching chunks (by `ts`, NULL last) instead of the best-scoring ones.
+   */
+  searchBm25(query: string, limit: number, order?: ChunkSearchOrder): ChunkSearchRow[];
 
   /** Cosine/ANN vector search over indexed embeddings. */
   searchVector(embedding: Float32Array, limit: number): ChunkSearchRow[];
@@ -421,14 +427,15 @@ export function openEmbeddingsDb(
       stmts.setCursor.run(filePath, byteOffset, new Date().toISOString());
     },
 
-    searchBm25(query: string, limit: number): ChunkSearchRow[] {
+    searchBm25(query: string, limit: number, order: ChunkSearchOrder = 'relevance'): ChunkSearchRow[] {
+      const orderBy = order === 'recent' ? 'c.ts DESC, c.rowid DESC' : 'bm25(chunks_fts) ASC';
       const rows = db.prepare(`
         SELECT c.rowid, c.session_id, c.project_id, c.parent_session_id, c.role, c.ts, c.byte_offset, c.char_length, c.text, c.token_count, c.indexed_at,
                bm25(chunks_fts) AS score
         FROM chunks_fts
         JOIN chunks c ON c.rowid = chunks_fts.rowid
         WHERE chunks_fts MATCH ?
-        ORDER BY bm25(chunks_fts) ASC
+        ORDER BY ${orderBy}
         LIMIT ?
       `).all(query, limit) as DbChunkSearchRow[];
       return rows.map(mapSearchRow);
