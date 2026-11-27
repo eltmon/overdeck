@@ -2,7 +2,7 @@
  * Palette route module — Ctrl+K unified search.
  *
  *   GET /api/palette/commands       → curated `pan` command catalog (static)
- *   GET /api/palette/search?q=&limit= → memory FTS fanout plus conversation search
+ *   GET /api/palette/search?q=&limit=&sort=relevance|recent → memory FTS fanout plus conversation search
  *
  * Conversation search fuses BM25 + vector chunk hits with overdeck.db title
  * matches into one row per conversation (PAN-4358), banded into `title` >
@@ -19,7 +19,7 @@ import { runMemoryFtsStatement } from '../../../lib/memory/fts-db.js';
 import { buildMatchQuery } from '../../../lib/memory/search.js';
 import { resolveConversationsByClaudeSessionIds } from '../../../lib/overdeck/conversation-batch-lookup.js';
 import { searchConversationTitles } from '../../../lib/overdeck/conversation-title-search.js';
-import { groupConversationHits, type ConversationIdentity, type GroupedConversationHit } from '../../../lib/conversation-search/group-hits.js';
+import { groupConversationHits, type ConversationIdentity, type ConversationSearchSort, type GroupedConversationHit } from '../../../lib/conversation-search/group-hits.js';
 import { searchConversationChunks } from '../services/conversation-search-service.js';
 import { rejectUnauthorizedDashboardRequest } from './dashboard-auth.js';
 import { validateOrigin } from './origin-validation.js';
@@ -210,6 +210,8 @@ export interface PaletteConversationHit {
   role: string;
   /** Best chunk's timestamp; title-only rows: last activity (last_attached_at ?? created_at) as ISO. */
   ts: string | null;
+  /** Newest matching activity: the newest pool chunk `ts`, or a title match's last activity (PAN-5677). Newest-first ordering and the date chip use it. */
+  lastMatchAt: string | null;
   /** Byte offset of the best chunk; null for title-only rows (open without a message target). */
   byteOffset: number | null;
   /** Best chunk text (first 240 chars); title-only rows: the title. */
@@ -314,6 +316,7 @@ function toPaletteConversationHit(
       hitCount,
       role: bestHit.role,
       ts: bestHit.ts,
+      lastMatchAt: row.latestMatchAt,
       byteOffset: bestHit.byteOffset,
       displayContent: bestHit.text.slice(0, 240),
       excerpt: bestHit.excerpt,
@@ -339,6 +342,7 @@ function toPaletteConversationHit(
     hitCount,
     role: '',
     ts: row.lastActivityAt,
+    lastMatchAt: row.latestMatchAt,
     byteOffset: null,
     displayContent: identity.title ?? '',
     excerpt: '',
@@ -354,9 +358,10 @@ async function searchConversations(
   matchQuery: string,
   limit: number,
   signal?: AbortSignal,
+  sort: ConversationSearchSort = 'relevance',
 ): Promise<PaletteConversationHit[]> {
   const [hits, titleMatches] = await Promise.all([
-    searchConversationChunks({ rawQuery, matchQuery, limit: CONVERSATION_CHUNK_POOL, candidateLimit: CONVERSATION_CHUNK_POOL, signal }),
+    searchConversationChunks({ rawQuery, matchQuery, limit: CONVERSATION_CHUNK_POOL, candidateLimit: CONVERSATION_CHUNK_POOL, signal, sort }),
     Promise.resolve().then(() => searchConversationTitles(rawQuery)).catch((error: unknown) => {
       console.error('[palette] conversation title search failed:', error);
       return [];
@@ -384,6 +389,7 @@ async function searchConversations(
     query: rawQuery,
     resolve: (root) => toIdentity(routeableConversation(root, routeableConversations)),
     limit,
+    sort,
   });
   return grouped.map((row, index) => toPaletteConversationHit(row, index + 1, projectDirs));
 }
@@ -446,13 +452,18 @@ const getPaletteCommandsRoute = HttpRouter.add(
   Effect.sync(() => jsonResponse({ commands: PAN_COMMANDS })),
 );
 
-// ─── Route: GET /api/palette/search?q=&limit= ─────────────────────────────────
+// ─── Route: GET /api/palette/search?q=&limit=&sort=relevance|recent ───────────
 
 /**
  * `signal` is the HTTP request's abort signal (PAN-5447): a client that left
  * (a superseded palette keystroke) stops the search before its vector scan.
  */
-export async function runPaletteSearch(rawQuery: string, limit: number, signal?: AbortSignal) {
+export async function runPaletteSearch(
+  rawQuery: string,
+  limit: number,
+  signal?: AbortSignal,
+  sort: ConversationSearchSort = 'relevance',
+) {
   if (rawQuery.length === 0) return { memory: [], observations: [], summaries: [], conversations: [] };
 
   const matchQuery = buildMatchQuery(rawQuery);
@@ -470,7 +481,7 @@ export async function runPaletteSearch(rawQuery: string, limit: number, signal?:
   const perProject = Math.max(5, Math.ceil((limit * 2) / Math.max(1, projects.length)));
   const [nested, conversations] = await Promise.all([
     Promise.all(projects.map((projectId) => searchProjectMemory(projectId, matchQuery, perProject))),
-    searchConversations(rawQuery, matchQuery, limit, signal),
+    searchConversations(rawQuery, matchQuery, limit, signal, sort),
   ]);
   signal?.throwIfAborted();
 
@@ -505,12 +516,13 @@ const getPaletteSearchRoute = HttpRouter.add(
     const rawQuery = (url.searchParams.get('q') ?? '').trim();
     const limitParam = url.searchParams.get('limit');
     const limit = Math.max(1, Math.min(50, limitParam ? parseInt(limitParam, 10) || 20 : 20));
+    const sort: ConversationSearchSort = url.searchParams.get('sort') === 'recent' ? 'recent' : 'relevance';
 
     // The signal aborts when NodeHttpServer interrupts this request fiber on
     // client disconnect (PAN-5447), so superseded searches stop early.
     return yield* Effect.promise(async (signal) => {
       try {
-        const data = await runPaletteSearch(rawQuery, limit, signal);
+        const data = await runPaletteSearch(rawQuery, limit, signal, sort);
         return jsonResponse(data);
       } catch (err) {
         if (signal.aborted) return jsonResponse({ error: 'palette search aborted' }, { status: 499 });
