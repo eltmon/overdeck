@@ -29,6 +29,16 @@ describe('createGoogleCloudTranscription', () => {
     emitter.close();
   });
 
+  it('declares the 16 kHz rate every /ws/voice client captures', async () => {
+    googleMocks.streamingRecognize.mockReturnValueOnce(new PassThrough());
+    const emitter = createGoogleCloudTranscription('api-key', 'latest_long');
+    await vi.waitFor(() => expect(googleMocks.streamingRecognize).toHaveBeenCalled());
+    expect(googleMocks.streamingRecognize.mock.calls.at(-1)?.[0]).toMatchObject({
+      config: { encoding: 'LINEAR16', sampleRateHertz: 16000 },
+    });
+    emitter.close();
+  });
+
   it('reports backpressure when the pre-ready audio buffer is full', () => {
     const emitter = createGoogleCloudTranscription('api-key', 'latest_long');
     expect(emitter.sendAudio(Buffer.alloc(1_000_000))).toBe(true);

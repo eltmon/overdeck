@@ -164,11 +164,13 @@ export function useAutoPresoWebSocket() {
       await ensureDashboardSession();
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const AudioContextCtor = window.AudioContext;
-      audioContext = new AudioContextCtor({ sampleRate: 24000 });
+      // /ws/voice engines expect 16 kHz PCM16 mono, the same rate dictation sends.
+      audioContext = new AudioContextCtor({ sampleRate: 16000 });
       source = audioContext.createMediaStreamSource(stream);
       analyser = audioContext.createAnalyser();
       processor = audioContext.createScriptProcessor(4096, 1, 1);
-      socket = new WebSocket(websocketUrl('/ws/voice'));
+      // sink=autopreso: only this socket's turns feed the AutoPreso whiteboard.
+      socket = new WebSocket(websocketUrl('/ws/voice?sink=autopreso'));
       socket.binaryType = 'arraybuffer';
 
       socket.onmessage = (event) => {

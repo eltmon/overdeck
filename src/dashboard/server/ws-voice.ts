@@ -22,6 +22,15 @@ function rawDataToBuffer(data: WebSocket.RawData): Buffer {
 }
 
 const MAX_AUDIO_FRAME_BYTES = 64_000;
+
+/**
+ * Audio contract for every /ws/voice client: binary frames of 16 kHz PCM16LE
+ * mono. Engines (Moonshine, Google Cloud) declare that rate to the provider.
+ */
+export function isAutoPresoSink(request: http.IncomingMessage): boolean {
+  const url = new URL(request.url || '', `http://${request.headers.host ?? 'localhost'}`);
+  return url.searchParams.get('sink') === 'autopreso';
+}
 const VOICE_STOP_FINALIZE_TIMEOUT_MS = 5_000;
 
 export function setupVoiceWebSocket(server: http.Server): void {
@@ -55,7 +64,11 @@ export function setupVoiceWebSocket(server: http.Server): void {
     });
   });
 
-  wss.on('connection', (ws: WebSocket) => {
+  wss.on('connection', (ws: WebSocket, request: http.IncomingMessage) => {
+    // Only the AutoPreso page asks for `sink=autopreso`. Dictation sockets
+    // must not feed the AutoPreso session: it is usually not live, and its
+    // "not live" error would surface in the dictation widget.
+    const feedsAutoPreso = isAutoPresoSink(request);
     if (activeVoiceSocket?.readyState === WebSocket.OPEN || activeVoiceSocket?.readyState === WebSocket.CONNECTING) {
       sendJson(ws, { type: 'error', error: 'Another voice transcription session is already active' });
       ws.close(1013, 'Voice transcription session already active');
@@ -104,6 +117,7 @@ export function setupVoiceWebSocket(server: http.Server): void {
       transcription.onPartial((text) => sendJson(ws, { type: 'transcript:partial', text }));
       turnQueue = createTurnQueue(transcription, (text) => {
         sendJson(ws, { type: 'transcript:committed', text });
+        if (!feedsAutoPreso) return;
         const result = autoPresoSession.processTranscript(text, settings);
         if (!result.accepted) {
           sendJson(ws, { type: 'error', error: 'AutoPreso transcript processing is not live' });
