@@ -253,6 +253,24 @@ describe('searchConversationChunks (PAN-5447)', () => {
       expect(recordConversationSearchFailure).not.toHaveBeenCalled();
     });
 
+    it('submits the relevance BM25 scan before the recency scan, so a slow recency scan cannot steal the lane turn the relevance scan needs (CodeRabbit PR #5678, thread 4720777472)', async () => {
+      const callOrder: string[] = [];
+      answerJobs({
+        searchConversationBm25: async (payload) => {
+          callOrder.push(payload['order'] === 'recent' ? 'recent' : 'relevance');
+          return payload['order'] === 'recent'
+            ? { available: true, value: [row(2, 'session-recent')] }
+            : { available: true, value: [row(1, 'session-a')] };
+        },
+        searchConversationVector: async () => ({ available: true, value: [] }),
+        filterLiveConversationSessions: liveAll,
+      });
+
+      await searchConversationChunks({ rawQuery: 'needle', matchQuery: 'needle', limit: 5, sort: 'recent' });
+
+      expect(callOrder).toEqual(['relevance', 'recent']);
+    });
+
     it('a recency leg that rejects returns the relevance hits, logs one console.warn, and records no failure', async () => {
       const failure = new Error('boom');
       answerJobs({

@@ -152,20 +152,16 @@ export async function searchConversationChunks(input: {
   const dbRef = { dbPath: config.dbPath, model: config.model };
 
   try {
-    // Started before rankConversationSearch is awaited and caught at creation
-    // (PAN-5677 H2): a relevance-path failure must not leave this unobserved.
-    const recentLeg: Promise<RankedChunkRow[]> = input.sort === 'recent'
-      ? runScanLeg(
-          'searchConversationBm25',
-          { ...dbRef, matchQuery: input.matchQuery, limit: input.candidateLimit ?? input.limit, order: 'recent' },
-          signal,
-        ).catch((error: unknown) => {
-          if (!signal?.aborted) console.warn('[conversation-search] recent leg failed; using relevance results only:', error);
-          return [];
-        })
-      : Promise.resolve([]);
-
-    const hits = await rankConversationSearch({
+    // The relevance scan's own `store.searchBm25` call is itself deferred by
+    // one microtask inside rankConversationSearch (`Promise.resolve().then(...)`).
+    // Calling rankConversationSearch first, then deferring the recent leg's
+    // runScanLeg call by one more microtask, puts the relevance BM25 job on
+    // the shared `conversation-text` lane ahead of the best-effort recent
+    // job — the recent scan must never consume the relevance scan's deadline
+    // budget by queueing in front of it (PAN-5677; CodeRabbit PR #5678,
+    // thread 4720777472). The recent leg is still caught at creation (H2): a
+    // relevance-path failure must not leave it unobserved.
+    const searchPromise = rankConversationSearch({
       query: input.rawQuery,
       limit: input.limit,
       candidateLimit: input.candidateLimit,
@@ -188,6 +184,19 @@ export async function searchConversationChunks(input: {
       onEmbedFailure: recordConversationSearchFailure,
       onEmbedSuccess: recordConversationSearchSuccess,
     });
+
+    const recentLeg: Promise<RankedChunkRow[]> = input.sort === 'recent'
+      ? Promise.resolve().then(() => runScanLeg(
+          'searchConversationBm25',
+          { ...dbRef, matchQuery: input.matchQuery, limit: input.candidateLimit ?? input.limit, order: 'recent' },
+          signal,
+        )).catch((error: unknown) => {
+          if (!signal?.aborted) console.warn('[conversation-search] recent leg failed; using relevance results only:', error);
+          return [];
+        })
+      : Promise.resolve([]);
+
+    const hits = await searchPromise;
     const pool = input.sort === 'recent'
       ? appendRecentRows({ hits, recentRows: await recentLeg, query: input.rawQuery })
       : hits;
