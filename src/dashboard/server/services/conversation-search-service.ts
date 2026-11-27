@@ -12,8 +12,9 @@
 import { getConversationSearchConfig, type NormalizedConversationSearchConfig } from '../../../lib/config-yaml.js';
 import { closeChunkSearchHandles, type ChunkSearchJobResult } from '../../../lib/conversation-search/chunk-search-jobs.js';
 import { createConversationEmbeddingProvider, type ConversationEmbeddingProvider } from '../../../lib/conversation-search/embedding-provider.js';
+import type { ConversationSearchSort } from '../../../lib/conversation-search/group-hits.js';
 import { recordConversationSearchFailure, recordConversationSearchSuccess } from '../../../lib/conversation-search/health.js';
-import { rankConversationSearch, type ConversationSearchHit, type RankedChunkRow } from '../../../lib/conversation-search/ranker.js';
+import { appendRecentRows, rankConversationSearch, type ConversationSearchHit, type RankedChunkRow } from '../../../lib/conversation-search/ranker.js';
 import { runDashboardDbJob, type DashboardDbOperation } from './dashboard-db-task.js';
 
 /** Budget for each BM25 / vector leg, counted from submission so queue wait counts. */
@@ -141,6 +142,7 @@ export async function searchConversationChunks(input: {
   candidateLimit?: number;
   config?: NormalizedConversationSearchConfig;
   signal?: AbortSignal;
+  sort?: ConversationSearchSort;
 }): Promise<ConversationSearchHit[]> {
   const { signal } = input;
   signal?.throwIfAborted();
@@ -150,6 +152,19 @@ export async function searchConversationChunks(input: {
   const dbRef = { dbPath: config.dbPath, model: config.model };
 
   try {
+    // Started before rankConversationSearch is awaited and caught at creation
+    // (PAN-5677 H2): a relevance-path failure must not leave this unobserved.
+    const recentLeg: Promise<RankedChunkRow[]> = input.sort === 'recent'
+      ? runScanLeg(
+          'searchConversationBm25',
+          { ...dbRef, matchQuery: input.matchQuery, limit: input.candidateLimit ?? input.limit, order: 'recent' },
+          signal,
+        ).catch((error: unknown) => {
+          if (!signal?.aborted) console.warn('[conversation-search] recent leg failed; using relevance results only:', error);
+          return [];
+        })
+      : Promise.resolve([]);
+
     const hits = await rankConversationSearch({
       query: input.rawQuery,
       limit: input.limit,
@@ -173,7 +188,10 @@ export async function searchConversationChunks(input: {
       onEmbedFailure: recordConversationSearchFailure,
       onEmbedSuccess: recordConversationSearchSuccess,
     });
-    return await filterLiveHits(config, hits, signal);
+    const pool = input.sort === 'recent'
+      ? appendRecentRows({ hits, recentRows: await recentLeg, query: input.rawQuery })
+      : hits;
+    return await filterLiveHits(config, pool, signal);
   } catch (error) {
     if (signal?.aborted) throw signal.reason;
     if (error instanceof EmbeddingsDbUnavailable) return [];

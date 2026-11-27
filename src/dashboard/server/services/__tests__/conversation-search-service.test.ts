@@ -190,4 +190,86 @@ describe('searchConversationChunks (PAN-5447)', () => {
     expect(hits.map((hit) => hit.sessionId)).toEqual(['session-a', 'session-b']);
     expect(signals['filterLiveConversationSessions']?.aborted).toBe(true);
   });
+
+  describe('sort: recent (PAN-5677)', () => {
+    it('relevance mode (no sort) sends exactly one searchConversationBm25 call with no order key', async () => {
+      answerJobs({
+        searchConversationBm25: async () => ({ available: true, value: [row(1, 'session-a')] }),
+        searchConversationVector: async () => ({ available: true, value: [] }),
+        filterLiveConversationSessions: liveAll,
+      });
+
+      const hits = await searchConversationChunks({ rawQuery: 'needle', matchQuery: 'needle', limit: 5 });
+
+      expect(hits.map((hit) => hit.sessionId)).toEqual(['session-a']);
+      const bm25Calls = vi.mocked(runDashboardDbJob).mock.calls.filter((call) => call[0] === 'searchConversationBm25');
+      expect(bm25Calls).toHaveLength(1);
+      expect(bm25Calls[0]?.[1]).not.toHaveProperty('order');
+    });
+
+    it('recent mode sends a second searchConversationBm25 call carrying order "recent" and returns the union', async () => {
+      answerJobs({
+        searchConversationBm25: async (payload) => payload['order'] === 'recent'
+          ? { available: true, value: [row(2, 'session-recent')] }
+          : { available: true, value: [row(1, 'session-a')] },
+        searchConversationVector: async () => ({ available: true, value: [] }),
+        filterLiveConversationSessions: liveAll,
+      });
+
+      const hits = await searchConversationChunks({
+        rawQuery: 'needle',
+        matchQuery: 'needle',
+        limit: 5,
+        candidateLimit: 50,
+        sort: 'recent',
+      });
+
+      expect(hits.map((hit) => hit.sessionId).sort()).toEqual(['session-a', 'session-recent']);
+      const bm25Calls = vi.mocked(runDashboardDbJob).mock.calls.filter((call) => call[0] === 'searchConversationBm25');
+      expect(bm25Calls).toHaveLength(2);
+      const recentCall = bm25Calls.find((call) => (call[1] as Record<string, unknown>)['order'] === 'recent');
+      expect(recentCall?.[1]).toMatchObject({ matchQuery: 'needle', limit: 50, order: 'recent' });
+    });
+
+    it('a recency leg that never answers degrades to relevance hits past CHUNK_SCAN_DEADLINE_MS, recording no failure', async () => {
+      answerJobs({
+        searchConversationBm25: async (payload, signal) => {
+          if (payload['order'] === 'recent') {
+            return new Promise((_resolve, reject) => {
+              signal?.addEventListener('abort', () => reject(signal.reason), { once: true });
+            });
+          }
+          return { available: true, value: [row(1, 'session-a')] };
+        },
+        searchConversationVector: async () => ({ available: true, value: [] }),
+        filterLiveConversationSessions: liveAll,
+      });
+
+      const search = searchConversationChunks({ rawQuery: 'needle', matchQuery: 'needle', limit: 5, sort: 'recent' });
+      await vi.advanceTimersByTimeAsync(CHUNK_SCAN_DEADLINE_MS);
+      const hits = await search;
+
+      expect(hits.map((hit) => hit.sessionId)).toEqual(['session-a']);
+      expect(recordConversationSearchFailure).not.toHaveBeenCalled();
+    });
+
+    it('a recency leg that rejects returns the relevance hits, logs one console.warn, and records no failure', async () => {
+      const failure = new Error('boom');
+      answerJobs({
+        searchConversationBm25: async (payload) => {
+          if (payload['order'] === 'recent') throw failure;
+          return { available: true, value: [row(1, 'session-a')] };
+        },
+        searchConversationVector: async () => ({ available: true, value: [] }),
+        filterLiveConversationSessions: liveAll,
+      });
+
+      const hits = await searchConversationChunks({ rawQuery: 'needle', matchQuery: 'needle', limit: 5, sort: 'recent' });
+
+      expect(hits.map((hit) => hit.sessionId)).toEqual(['session-a']);
+      expect(recordConversationSearchFailure).not.toHaveBeenCalled();
+      expect(console.warn).toHaveBeenCalledTimes(1);
+      expect(console.warn).toHaveBeenCalledWith('[conversation-search] recent leg failed; using relevance results only:', failure);
+    });
+  });
 });
